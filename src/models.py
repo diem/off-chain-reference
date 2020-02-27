@@ -115,7 +115,8 @@ class VASPPairChannel:
 
     def pending_responses(self):
         """ Counts the number of responses this VASP is waiting for """
-        return len([ 1 for req in self.my_requests if req.response == None])
+        return len([ 1 for req in self.my_requests if not req.has_response()])
+
 
     def process_pending_requests(self):
         """ The server re-schedules and executes pending requests """
@@ -192,6 +193,7 @@ class VASPPairChannel:
             #       not true.
             if request.command_seq is not None:
                 assert request.command_seq == self.next_final_sequence
+
             request.response.command_seq = self.next_final_sequence
             self.final_sequence += [ request ]
             self.next_final_sequence += 1
@@ -218,7 +220,7 @@ class VASPPairChannel:
             or (response.status == 'failure' and not response.error.protocol_error):
 
             # Idenpotent: We have already processed the response
-            if self.my_requests[request_seq].response is not None:
+            if self.my_requests[request_seq].has_response():
                 return
 
             # Cache the replies and eventually sequence them
@@ -242,14 +244,13 @@ class VASPPairChannel:
             elif response.command_seq < self.next_final_sequence:
                 ## Request already in the sequence: happens to the leader.
                 #  No chance to register an error, since we do not reply.
-                if self.my_requests[request_seq].response is None:
+
+                if not self.my_requests[request_seq].has_response():
                     self.my_requests[request_seq].response = response
                     self.process_pending_requests()
             else:
                 # Previous conditions are exhaustive
                 assert False
-
-
         else:
             # Handle protocol failures.
             if response.error.code == 'missing':
@@ -264,7 +265,7 @@ class VASPPairChannel:
         """ Re-sends the earlierst request that has not yet got a response, if any """
         for request in self.my_requests:
             assert isinstance(request, CommandRequestObject)
-            if request.response is None:
+            if not request.has_response():
                 self.send_request(request)
                 break
 
@@ -282,7 +283,7 @@ class VASPPairChannel:
             requests for which the response has not yet been received. """
         for request in self.my_requests:
             assert isinstance(request, CommandRequestObject)
-            if request.response is None:
+            if not request.has_response():
                 return True
         return False
 
@@ -311,6 +312,8 @@ class CommandRequestObject:
             Used to detect conflicts in case of buggy corresponding VASP."""
         return self.command == other.command
 
+    def has_response(self):
+        return self.response is not None
 
 class CommandResponseObject:
     """Represents a response to a command in the Off chain protocol"""
