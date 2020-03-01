@@ -4,6 +4,8 @@ from business import SharedObject
 from utils import StructureException, StructureChecker, \
                   REQUIRED, OPTIONAL, WRITE_ONCE, UPDATABLE
 
+from status_logic import Status
+
 class KYCData:
     # TODO
     def __init__(self, kyc_json_blob):
@@ -45,6 +47,9 @@ class PaymentActor(StructureChecker):
             raise StructureException('Missing: field kyc_signature')
         if 'kyc_data' in diff and not 'kyc_certificate' in diff:
             raise StructureException('Missing: field kyc_certificate')
+
+        if 'status' in diff and not diff['status'] in Status:
+            raise StructureException('Wrong status: %s' % diff['status'])
 
         # Metadata can only be strings
         if 'metadata' in diff:
@@ -129,8 +134,19 @@ class PaymentObject(SharedObject, StructureChecker):
             'action' : action
         })
 
+    @classmethod
+    def create_from_record(cls, diff):
+        print("ALT")
+        self = PaymentObject.from_full_record(diff)
+        SharedObject.__init__(self)
+        return self
+
+
     def add_recipient_signature(self, signature):
         ''' Update the recipient signature '''
         self.update({
             'recipient_signature' : signature
         })
+
+    def status(self):
+        return (self.data['sender']['status'], self.data['receiver']['status'])

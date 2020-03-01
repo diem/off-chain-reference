@@ -66,8 +66,8 @@ def test_payment_actor_update_stable_id():
 
 def test_payment_actor_update_status():
     actor = PaymentActor('ABCD', 'XYZ', 'none', [])
-    actor.change_status('need_kyc')
-    actor.change_status('ready_to_settle')
+    actor.change_status('needs_kyc_data')
+    actor.change_status('ready_for_settlement')
 
     with pytest.raises(StructureException):
         actor.change_status(0)
@@ -113,3 +113,17 @@ def test_payment_object_update():
 
     with pytest.raises(StructureException):
         payment.add_recipient_signature('SIG2')
+
+def test_payment_to_diff():
+    sender = PaymentActor('AAAA', 'aaaa', 'none', [])
+    receiver = PaymentActor('BBBB', 'bbbb', 'none', [])
+    action = PaymentAction(Decimal('10.00'), 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
+
+    payment = PaymentObject(sender, receiver, 'ref', 'orig_ref', 'desc', action)
+    record = payment.get_full_record()
+    print(record)
+    new_payment = PaymentObject.create_from_record(record)
+    assert payment == new_payment
+
+    payment2 = PaymentObject(sender, receiver, 'ref2', 'orig_ref', 'desc', action)
+    assert payment2 != new_payment

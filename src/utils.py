@@ -11,11 +11,61 @@ class StructureChecker:
     def __init__(self):
         assert self.fields
         self.data = {}
+        self.update_record = []
+
+    def record(self, diff):
+        ''' Record all diffs applied to the object '''
+        self.update_record += [ diff ]
+
+    def flatten(self):
+        ''' Resets all diffs applied to this object '''
+        self.update_record = []
+        for field in self.data:
+            if isinstance(self.data[field], StructureChecker):
+                self.data[field].flatten()
+
+    def get_full_record(self):
+        ''' Returns a hierarchy of diffs applied to this object and children'''
+        diff = {}
+        for new_diff in self.update_record:
+            for field in new_diff:
+                if isinstance(new_diff[field], StructureChecker):
+                    diff[field] = new_diff[field].get_full_record()
+                else:
+                    diff[field] = new_diff[field]
+        return diff
+
+    def __eq__(self, other):
+        ''' Define equality as equality between data fields only '''
+        if type(other) != type(self):
+            return False
+        for field, value in self.data.items():
+            if not field in other.data or not value == other.data[field]:
+                return False
+        return True
+
+    @classmethod
+    def from_full_record(cls, diff):
+        ''' Constructs an instance from a diff '''
+        parse_further = dict( (field, field_type) for field, field_type, _, _ in cls.fields if issubclass(field_type, StructureChecker))
+        self = cls.__new__(cls)
+        StructureChecker.__init__(self)
+        new_diff = {}
+        for field in diff:
+            if field in parse_further:
+                nested_class = parse_further[field]
+                new_diff[field] = nested_class.from_full_record(diff[field])
+            else:
+                new_diff[field] = diff[field]
+        self.update(new_diff)
+        self.flatten()
+        return self
 
     def custom_update_checks(self, diff):
         pass
 
     def update(self, diff):
+        ''' Applies changes to the object and checks for validity rules '''
         ## Check all types and write mode before update
         all_fields = set()
         for field, field_type, required, write_mode in self.fields:
@@ -45,8 +95,10 @@ class StructureChecker:
             self.data[key] = diff[key]
 
         self.check_structure()
+        self.record(diff)
 
     def check_structure(self):
+        ''' Checks all structural requirements are met '''
         for field, field_type, required, _ in self.fields:
             if field in self.data:
                 if not isinstance(self.data[field], field_type):
