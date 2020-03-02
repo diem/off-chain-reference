@@ -13,9 +13,52 @@ def basic_payment():
     payment = PaymentObject(sender, receiver, 'ref', 'orig_ref', 'desc', action)
     return payment
 
+def test_payment_create_from_sender(basic_payment):
+    bcm = MagicMock(spec=BusinessContext)
+    bcm.is_recipient.side_effect=[ True ]
+
+    diff = basic_payment.get_full_record()
+    new_payment = check_new_payment(bcm, diff)
+    assert new_payment == basic_payment
+
+def test_payment_create_from_sender_sig_fail(basic_payment):
+    bcm = MagicMock(spec=BusinessContext)
+    bcm.is_recipient.side_effect=[ True ]
+    bcm.validate_recipient_signature.side_effect = [ BusinessValidationFailure('Sig fails') ]
+
+    diff = basic_payment.get_full_record()
+    with pytest.raises(BusinessValidationFailure):
+        new_payment = check_new_payment(bcm, diff)
+        assert new_payment == basic_payment
+
+def test_payment_create_from_sender(basic_payment):
+    bcm = MagicMock(spec=BusinessContext)
+    bcm.is_recipient.side_effect=[ False ]
+
+    diff = basic_payment.get_full_record()
+    new_payment = check_new_payment(bcm, diff)
+    assert new_payment == basic_payment
+
+def test_payment_create_from_sender_fail(basic_payment):
+    bcm = MagicMock(spec=BusinessContext)
+    bcm.is_recipient.side_effect=[ True ]
+
+    basic_payment.data['receiver'].update({ 'status': Status.ready_for_settlement})
+    diff = basic_payment.get_full_record()
+    with pytest.raises(PaymentLogicError):
+        _ = check_new_payment(bcm, diff)
+
+def test_payment_create_from_receiver_fail(basic_payment):
+    bcm = MagicMock(spec=BusinessContext)
+    bcm.is_recipient.side_effect=[ False ]
+
+    basic_payment.data['sender'].update({ 'status': Status.ready_for_settlement})
+    basic_payment.data['receiver'].update({ 'status': Status.ready_for_settlement})
+    diff = basic_payment.get_full_record()
+    with pytest.raises(PaymentLogicError):
+        _ = check_new_payment(bcm, diff)
 
 def xxtest_payment_creation(basic_payment):
-
     bcm = MagicMock(spec=BusinessContext)
     bcm.sure_is_retail_payment.side_effect=[ False, False ]
     bcm.check_actor_existence.side_effect=[True]

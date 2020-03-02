@@ -47,6 +47,18 @@ receiver_payment_valid_lattice = \
       (Status.signed, Status.settled) # Terminal
     ]
 
+status_heights = {
+    Status.none : 100,
+    Status.maybe_needs_kyc : 200,
+    Status.needs_stable_id : 200,
+    Status.needs_kyc_data  : 200,
+    Status.ready_for_settlement : 400,
+    Status.needs_recipient_signature : 400,
+    Status.signed : 400,
+    Status.settled : 800,
+    Status.abort : 1000
+}
+
 # Express cross party status dependencies & the starting states for process
 dependencies = [(Status.settled, {Status.settled, Status.signed}) ]
 starting_states = [ (Status.none, Status.none) ]
@@ -146,3 +158,54 @@ def make_payment_status_lattice():
 
 ''' A global variable describing the payment protocol status process '''
 payment_status_process = make_payment_status_lattice()
+
+def filter_by_heights(jointprocess, heights):
+    process = set(jointprocess)
+    for item in list(jointprocess):
+        ((s0, s1),(e0, e1)) = item
+        if (s0, s1) == (e0, e1):
+            continue
+        elif s0 == e0 and not heights[e1] >= heights[e0]:
+            process.remove(item)
+        elif s1 == e1 and not heights[e0] >= heights[e1]:
+            process.remove(item)
+    return process
+
+def sort_function(status_heights):
+    def status_pair_key(spair):
+        return [status_heights[i] for i in spair]
+    return status_pair_key
+
+
+def print_status_transmition_updates():
+
+    sender_progress = filter_one_sided_progress(payment_status_process,1)
+    all_starts = set([st for (st, en) in sender_progress])
+    receiver_progress = filter_one_sided_progress(payment_status_process,0)
+    all_starts |= set([st for (st, en) in receiver_progress])
+
+    sort = sort_function(status_heights)
+    for st in sorted(all_starts, key=sort):
+        terminals_sender = filter_for_starting_states(sender_progress, [st] )
+        ends_sender = [(st, ed) for ed in extract_end_states(terminals_sender)]
+        ends_sender = filter_by_heights(ends_sender, status_heights)
+        ends_sender = extract_end_states(ends_sender)
+
+        terminals_receiver = filter_for_starting_states(receiver_progress, [st] )
+        ends_receiver = [(st, ed) for ed in extract_end_states(terminals_receiver) ]
+        ends_receiver = filter_by_heights(ends_receiver, status_heights)
+        ends_receiver = extract_end_states(ends_receiver)
+
+        if len(ends_sender) > 1 or len(ends_receiver) > 1:
+            print()
+            print('* STATUS:', st)
+
+        if len(ends_sender) > 1:
+            print('  Sender')
+            for ed in sorted(ends_sender, key=sort):
+                    print(' '*8, '->', ed)
+
+        if len(ends_receiver) > 1:
+            print('  Receiver')
+            for ed in sorted(ends_receiver, key=sort):
+                    print(' '*8, '->', ed)

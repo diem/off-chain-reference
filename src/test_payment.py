@@ -121,7 +121,6 @@ def test_payment_to_diff():
 
     payment = PaymentObject(sender, receiver, 'ref', 'orig_ref', 'desc', action)
     record = payment.get_full_record()
-    print(record)
     new_payment = PaymentObject.create_from_record(record)
     assert payment == new_payment
 

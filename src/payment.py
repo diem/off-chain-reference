@@ -136,7 +136,6 @@ class PaymentObject(SharedObject, StructureChecker):
 
     @classmethod
     def create_from_record(cls, diff):
-        print("ALT")
         self = PaymentObject.from_full_record(diff)
         SharedObject.__init__(self)
         return self

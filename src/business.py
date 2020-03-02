@@ -230,7 +230,7 @@ class ProtocolCommand:
         ''' Upon command failure, undo any modification and free resources '''
         pass
 
-    def seriliaze(self):
+    def serialize(self):
         # TODO: representation of the command to send over.
         pass
 
@@ -283,7 +283,9 @@ class BusinessContext:
 # ----- VASP Signature -----
 
     def validate_recipient_signature(self, payment):
-        ''' Validates the recipient signature is correct.
+        ''' Validates the recipient signature is correct. If there is no
+            signature or the signature is correct do nothing.
+
             Throw a BuninessValidationFailure is not. '''
         pass
 
@@ -328,8 +330,10 @@ class BusinessContext:
         pass
 
     def validate_kyc_signature(self, payment):
-        ''' Validates the kyc signature is correct.
-            Throw a BuninessValidationFailure is not. '''
+        ''' Validates the kyc signature is correct. If the signature is correct,
+            or there is no signature, then do nothing.
+
+            Throw a BuninessValidationFailure if signature verification fails. '''
         pass
 
     def get_extended_kyc(self, payment):

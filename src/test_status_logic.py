@@ -26,3 +26,6 @@ def test_process_is_live():
     terminals = filter_for_starting_states(process, [(Status.none, Status.none)] )
     assert (Status.settled, Status.settled) in extract_end_states(terminals)
     assert (Status.abort, Status.abort) in extract_end_states(terminals)
+
+if __name__ == '__main__':
+    print_status_transmition_updates()

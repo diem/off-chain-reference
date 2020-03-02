@@ -31,6 +31,10 @@ def check_new_payment(business, initial_diff):
     if new_payment.data[role].data['status'] != Status.none:
         raise PaymentLogicError('Sender set receiver status.')
 
+    ## TODO: validate any signatures.
+    business.validate_kyc_signature(new_payment)
+    business.validate_recipient_signature(new_payment)
+
     return new_payment
 
 def check_new_update(business, payment, diff):
