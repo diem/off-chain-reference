@@ -31,11 +31,10 @@ def check_new_payment(business, initial_diff):
     role = ['sender', 'receiver'][business.is_recipient(new_payment)]
 
     if new_payment.data[role].data['status'] != Status.none:
-        raise PaymentLogicError('Sender set receiver status.')
+        raise PaymentLogicError('Sender set receiver status or vice-versa.')
 
-    # TODO: Check that other's status is valid
+    # TODO[issue #2]: Check that other's status is valid
 
-    # TODO: validate any signatures.
     business.validate_kyc_signature(new_payment)
     business.validate_recipient_signature(new_payment)
 
@@ -57,9 +56,8 @@ def check_new_update(business, payment, diff):
     if payment.data[role] != new_payment.data[role]:
         raise PaymentLogicError('Cannot change %s information.' % role)
 
-    # TODO: Check that other's status is valid
+    # TODO[issue #2]: Check that other's status is valid
 
-    # TODO: validate any signatures.
     business.validate_kyc_signature(new_payment)
     business.validate_recipient_signature(new_payment)
 
