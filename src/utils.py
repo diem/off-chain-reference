@@ -93,9 +93,6 @@ class StructureChecker:
                     raise StructureException(
                         'Wrong update: field %s cannot be changed')
 
-        # Do custom checks on object
-        self.custom_update_checks(diff)
-
         # Check we are not updating unknown fields
         for key in diff:
             if key not in all_fields:
@@ -106,6 +103,10 @@ class StructureChecker:
             self.data[key] = diff[key]
 
         self.check_structure()
+
+        # Do custom checks on object
+        self.custom_update_checks(diff)
+
         self.record(diff)
 
     def check_structure(self):

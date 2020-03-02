@@ -31,11 +31,10 @@ def check_new_payment(business, initial_diff):
     role = ['sender', 'receiver'][business.is_recipient(new_payment)]
 
     if new_payment.data[role].data['status'] != Status.none:
-        raise PaymentLogicError('Sender set receiver status.')
+        raise PaymentLogicError('Sender set receiver status or vice-versa.')
 
-    # TODO: Check that other's status is valid
+    # TODO[issue #2]: Check that other's status is valid
 
-    # TODO: validate any signatures.
     business.validate_kyc_signature(new_payment)
     business.validate_recipient_signature(new_payment)
 
@@ -58,9 +57,8 @@ def check_new_update(business, payment, diff):
     if payment.data[role] != new_payment.data[role]:
         raise PaymentLogicError('Cannot change %s information.' % role)
 
-    # TODO: Check that other's status is valid
+    # TODO[issue #2]: Check that other's status is valid
 
-    # TODO: validate any signatures.
     business.validate_kyc_signature(new_payment)
     business.validate_recipient_signature(new_payment)
 
@@ -70,7 +68,7 @@ def check_new_update(business, payment, diff):
 # The logic to process a payment from either side.
 
 def payment_process(business, payment):
-    ''' Processes a payment that was just updates, and returns a
+    ''' Processes a payment that was just updated, and returns a
         new payment with potential updates. This function may be
         called multiple times for the same payment to support
         async business operations and recovery.
@@ -144,7 +142,7 @@ def payment_process(business, payment):
     except BusinessAsyncInterupt:
         # The business layer needs to do a long duration check.
         # Cannot make quick progress, and must response with current status.
-        # TODO: Register call-back here for when the operation is done.
+        # TODO[issue #3]: Register call-back here for when the operation is done.
         pass
 
     except BusinessForceAbort:
@@ -153,8 +151,8 @@ def payment_process(business, payment):
         current_status = Status.abort
 
     finally:
-        # TODO: test is the resulting status is valid
-        # TODO: test if there are any changes to the object, to
+        # TODO[issue #4]: test is the resulting status is valid
+        # TODO[issue #5]: test if there are any changes to the object, to
         #       send to the other side as a command.
         new_payment.data[role].change_status(current_status)
 
