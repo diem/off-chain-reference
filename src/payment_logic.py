@@ -48,7 +48,8 @@ def check_new_update(business, payment, diff):
         a timely response (cannot support async operations).
     '''
 
-    new_payment = payment.clone()
+    new_payment = payment.new_version()
+    new_payment.flatten()
     new_payment.update(diff)
 
     # Ensure nothing on our side was changed by this update

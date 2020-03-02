@@ -1,3 +1,36 @@
+""" The Payment object status is defined by the status of both actors, senders and
+    receivers, namely the tuple (sender_status, recipient_status). An actor status may
+    have the following values:
+
+
+V0 States
+---------
+
+        * None                      -- denotes the status of
+                                       an object that does not exist
+        * needs_stable_id           -- requests the other VASP for
+                                       a stable identifier for
+                                       the payment recipient.
+        * needs_kyc_data            -- requires the other VASP
+                                       to provide KYC data.
+        * ready_for_settlement      -- signals that the party is ready to settle
+                                       the transaction.
+        * needs_recipient_signature -- requests the recipient VASP to sign the
+                                       identifier for this transaction to put
+                                       it on chain.
+        * signed                    -- The recipient signed the transaction to
+                                       settle
+        * settled                   -- a Libra transaction settles this
+                                       transaction
+        * abort                     -- signals that the transactions is to be
+                                       aborted.
+
+V1 States (TODO)
+---------
+
+        * in_batch                  -- payment is included in a batch
+"""
+
 from collections import defaultdict
 
 class TypeEnumeration:

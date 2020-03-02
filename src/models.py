@@ -67,6 +67,7 @@ class VASPPairChannel:
     def add_commands_from_future_cache(self):
         # Try to sequence messages
         while self.next_final_sequence in self.future_command_cache:
+            assert all(R.has_response() for R in self.final_sequence)
             command = self.future_command_cache[self.next_final_sequence]
             del self.future_command_cache[self.next_final_sequence]
             self.final_sequence += [command]
@@ -188,6 +189,7 @@ class VASPPairChannel:
             # TODO: Call the high-level state machine to get a command response
             #       or error
             request.response = make_success_response(request)
+            assert all(R.has_response() for R in self.final_sequence[:request.response.seq])
 
             # TODO: prove this assertion or we should throw an error if it is
             #       not true.
@@ -238,6 +240,7 @@ class VASPPairChannel:
                 request.response = response
                 self.final_sequence += [request]
                 self.next_final_sequence += 1
+                assert all(R.has_response() for R in self.final_sequence)
                 self.process_pending_requests()
                 self.persist()
 
