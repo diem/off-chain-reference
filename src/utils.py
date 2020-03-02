@@ -4,8 +4,10 @@ OPTIONAL = False
 WRITE_ONCE = True
 UPDATABLE = False
 
+
 class StructureException(Exception):
     pass
+
 
 class StructureChecker:
     def __init__(self):
@@ -15,7 +17,7 @@ class StructureChecker:
 
     def record(self, diff):
         ''' Record all diffs applied to the object '''
-        self.update_record += [ diff ]
+        self.update_record += [diff]
 
     def flatten(self):
         ''' Resets all diffs applied to this object '''
@@ -37,17 +39,23 @@ class StructureChecker:
 
     def __eq__(self, other):
         ''' Define equality as equality between data fields only '''
-        if type(other) != type(self):
+        if not isinstance(other, type(self)):
             return False
         for field, value in self.data.items():
-            if not field in other.data or not value == other.data[field]:
+            if field not in other.data or not value == other.data[field]:
                 return False
         return True
 
     @classmethod
     def from_full_record(cls, diff):
         ''' Constructs an instance from a diff '''
-        parse_further = dict( (field, field_type) for field, field_type, _, _ in cls.fields if issubclass(field_type, StructureChecker))
+        parse_further = {
+            field: field_type for field,
+            field_type,
+            _,
+            _ in cls.fields if issubclass(
+                field_type,
+                StructureChecker)}
         self = cls.__new__(cls)
         StructureChecker.__init__(self)
         new_diff = {}
@@ -66,7 +74,7 @@ class StructureChecker:
 
     def update(self, diff):
         ''' Applies changes to the object and checks for validity rules '''
-        ## Check all types and write mode before update
+        # Check all types and write mode before update
         all_fields = set()
         for field, field_type, required, write_mode in self.fields:
             all_fields.add(field)
@@ -76,21 +84,24 @@ class StructureChecker:
                 value = diff[field]
                 if not isinstance(value, field_type):
                     actual_type = type(value)
-                    raise StructureException('Wrong type: field %s, expected %s but got %s' % (field, field_type, type(actual_type)))
+                    raise StructureException(
+                        'Wrong type: field %s, expected %s but got %s' %
+                        (field, field_type, type(actual_type)))
 
                 # Check you can write again
                 if field in self.data and write_mode == WRITE_ONCE:
-                    raise StructureException('Wrong update: field %s cannot be changed')
+                    raise StructureException(
+                        'Wrong update: field %s cannot be changed')
 
-        ## Do custom checks on object
+        # Do custom checks on object
         self.custom_update_checks(diff)
 
-        ## Check we are not updating unknown fields
+        # Check we are not updating unknown fields
         for key in diff:
             if key not in all_fields:
                 raise StructureException('Unknown: field %s' % key)
 
-        ## Finally update
+        # Finally update
         for key in diff:
             self.data[key] = diff[key]
 
@@ -103,7 +114,9 @@ class StructureChecker:
             if field in self.data:
                 if not isinstance(self.data[field], field_type):
                     actual_type = type(self.data[field])
-                    raise StructureException('Wrong type: field %s, expected %s but got %s' % (field, field_type, type(actual_type)))
+                    raise StructureException(
+                        'Wrong type: field %s, expected %s but got %s' %
+                        (field, field_type, type(actual_type)))
             else:
                 if required == REQUIRED:
                     raise StructureException('Missing field: %s' % field)

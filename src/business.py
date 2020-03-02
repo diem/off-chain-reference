@@ -157,14 +157,18 @@ VASP sub-commands to implement all transitions:
 ''' These interfaces are heavily WIP, as we decide how to best implement the
     above state machines '''
 
+
+
+
 from os import urandom
 from base64 import standard_b64encode
 from copy import deepcopy
-
 def get_unique_string():
     return standard_b64encode(urandom(16))
 
 # Generic interface to a shared object
+
+
 class SharedObject:
     def __init__(self):
         ''' All objects have a version number and their commit status '''
@@ -188,7 +192,7 @@ class SharedObject:
 
     def is_success(self):
         ''' Denotes whether the object has been committed to the sequence'''
-        return self.is_decided() and self.decided == True
+        return self.is_decided() and self.decided
 
     def commit_success(self):
         ''' Tag this object as a success if all requests leading to it were
@@ -199,7 +203,6 @@ class SharedObject:
         ''' Tag this object as a failure if any command leading to it is a
             failure'''
         self.decided = False
-
 
 
 # Interface we need to do commands:
@@ -240,19 +243,23 @@ class ProtocolCommand:
 
 # A model for VASP business environment
 
+
 class BusinessAsyncInterupt(Exception):
     ''' Indicates that the result cannot be produced immediately,
         and the call must be done again once the result is ready. '''
     pass
+
 
 class BusinessNotAuthorized(Exception):
     ''' Indicates that the VASP requesting some information is
         not authorized to receive it. '''
     pass
 
+
 class BusinessValidationFailure(Exception):
     ''' Indicates a business check that has failed. '''
     pass
+
 
 class BusinessForceAbort(Exception):
     ''' Indicates protocol must abort the transaction. '''
@@ -261,7 +268,7 @@ class BusinessForceAbort(Exception):
 
 class BusinessContext:
 
-# ----- Actors -----
+    # ----- Actors -----
 
     def is_sender(self, payment):
         ''' Returns true is the VASP is the sender '''
@@ -281,6 +288,7 @@ class BusinessContext:
 
 
 # ----- VASP Signature -----
+
 
     def validate_recipient_signature(self, payment):
         ''' Validates the recipient signature is correct. If there is no
@@ -312,7 +320,6 @@ class BusinessContext:
                 BusinessForceAbort
         '''
         pass
-
 
     def next_kyc_level_to_request(self, payment):
         ''' Returns the next level of KYC to request from the other VASP. Must
@@ -357,7 +364,6 @@ class BusinessContext:
 
 # ----- Settlement -----
 
-
     def ready_for_settlement(self, payment):
         ''' Indicates whether a payment is ready for settlement as far as this
             VASP is concerned. Once it returns True it must never return False.
@@ -390,7 +396,6 @@ class BusinessContext:
                 BusinessForceAbort
             '''
         pass
-
 
     def want_single_payment_settlement(self, payment):
         ''' Ask the business logic whether to move this payment
