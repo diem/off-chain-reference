@@ -50,7 +50,7 @@ class VASPPairChannel:
 
         self.pending_requests = []
 
-        # TODO: persist and recover the command sequences
+        # TODO[issue #7]: persist and recover the command sequences
         self.my_requests = []
         self.my_next_seq = 0
         self.other_requests = []
@@ -154,7 +154,7 @@ class VASPPairChannel:
                 return
             else:
                 # There is a conflict, and it will have to be resolved
-                #  TODO: How are conflicts meant to be resolved? With only
+                #  TODO[issue 8]: How are conflicts meant to be resolved? With only
                 #        two participants we cannot tolerate errors.
                 response = make_protocol_error(request, code='conflict')
                 response.previous_command = previous_request.command
