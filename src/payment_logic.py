@@ -1,13 +1,15 @@
 from business import BusinessContext, BusinessAsyncInterupt, \
-                     BusinessNotAuthorized, BusinessValidationFailure, \
-                     BusinessForceAbort
+    BusinessNotAuthorized, BusinessValidationFailure, \
+    BusinessForceAbort
 
 from payment import Status, PaymentObject
 
 # Checks on diffs to ensure consistency with logic.
 
+
 class PaymentLogicError(Exception):
     pass
+
 
 def check_new_payment(business, initial_diff):
     ''' Checks a diff for a new payment from the other VASP, and returns
@@ -31,11 +33,13 @@ def check_new_payment(business, initial_diff):
     if new_payment.data[role].data['status'] != Status.none:
         raise PaymentLogicError('Sender set receiver status.')
 
-    ## TODO: validate any signatures.
+
+    # TODO: validate any signatures.
     business.validate_kyc_signature(new_payment)
     business.validate_recipient_signature(new_payment)
 
     return new_payment
+
 
 def check_new_update(business, payment, diff):
     ''' Checks a diff updating an existing payment. On success
@@ -52,14 +56,14 @@ def check_new_update(business, payment, diff):
     if payment.data[role] != new_payment.data[role]:
         raise PaymentLogicError('Cannot change %s information.' % role)
 
-    ## TODO: validate any signatures.
+    # TODO: validate any signatures.
     business.validate_kyc_signature(new_payment)
     business.validate_recipient_signature(new_payment)
 
     return new_payment
 
 
-## The logic to process a payment from either side.
+# The logic to process a payment from either side.
 
 def payment_process(payment, business):
     ''' Processes a payment that was just updates, and returns a
@@ -68,8 +72,8 @@ def payment_process(payment, business):
         async business operations and recovery.
     '''
 
-    role = [ 'sender', 'receiver' ][ business.is_recipient()]
-    other_role = [ 'sender', 'receiver' ][not business.is_recipient()]
+    role = ['sender', 'receiver'][business.is_recipient()]
+    other_role = ['sender', 'receiver'][not business.is_recipient()]
 
     status = payment.data[role].data['status']
     current_status = status
@@ -83,13 +87,13 @@ def payment_process(payment, business):
             # We set our status as abort
             current_status = Status.abort
 
-        if current_status in { Status.none }:
+        if current_status in {Status.none}:
             business.check_account_existence(payment)
 
-        if current_status in { Status.none,
-                               Status.maybe_needs_kyc,
-                               Status.needs_stable_id,
-                               Status.needs_kyc_data}:
+        if current_status in {Status.none,
+                              Status.maybe_needs_kyc,
+                              Status.needs_stable_id,
+                              Status.needs_kyc_data}:
 
             # Request KYC
             current_status = business.next_kyc_level_to_request(payment)
@@ -123,9 +127,9 @@ def payment_process(payment, business):
                 new_payment.add_recipient_signature(signature)
                 current_status = Status.signed
 
-        if current_status in { Status.ready_for_settlement,
-                               Status.needs_recipient_signature,
-                               Status.signed}:
+        if current_status in {Status.ready_for_settlement,
+                              Status.needs_recipient_signature,
+                              Status.signed}:
             if business.has_settled(payment):
                 current_status = Status.settled
 

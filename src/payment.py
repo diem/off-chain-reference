@@ -2,9 +2,10 @@ from decimal import Decimal
 
 from business import SharedObject
 from utils import StructureException, StructureChecker, \
-                  REQUIRED, OPTIONAL, WRITE_ONCE, UPDATABLE
+    REQUIRED, OPTIONAL, WRITE_ONCE, UPDATABLE
 
 from status_logic import Status
+
 
 class KYCData:
     # TODO
@@ -12,13 +13,16 @@ class KYCData:
         # Keep as blob since we need to sign / verify byte string
         self.blob = kyc_json_blob
 
+
 class NationalID:
     # TODO
     pass
 
+
 class PhysicalAddress:
     # TODO
     pass
+
 
 class PaymentActor(StructureChecker):
     fields = [
@@ -35,17 +39,17 @@ class PaymentActor(StructureChecker):
     def __init__(self, address, subaddress, status, metadata):
         StructureChecker.__init__(self)
         self.update({
-            'address'    : address,
-            'subaddress' : subaddress,
-            'status'     : status,
-            'metadata'   : metadata
+            'address': address,
+            'subaddress': subaddress,
+            'status': status,
+            'metadata': metadata
         })
 
     def custom_update_checks(self, diff):
         # If kyc data is provided we expect signature information
-        if 'kyc_data' in diff and not 'kyc_signature' in diff:
+        if 'kyc_data' in diff and 'kyc_signature' not in diff:
             raise StructureException('Missing: field kyc_signature')
-        if 'kyc_data' in diff and not 'kyc_certificate' in diff:
+        if 'kyc_data' in diff and 'kyc_certificate' not in diff:
             raise StructureException('Missing: field kyc_certificate')
 
         if 'status' in diff and not diff['status'] in Status:
@@ -55,33 +59,34 @@ class PaymentActor(StructureChecker):
         if 'metadata' in diff:
             for item in diff['metadata']:
                 if not isinstance(item, str):
-                    raise StructureException('Wrong type: metadata item type expected str, got %s' % type(item))
+                    raise StructureException(
+                        'Wrong type: metadata item type expected str, got %s' %
+                        type(item))
 
     def add_kyc_data(self, kyc_data, kyc_signature, kyc_certificate):
         ''' Add extended KYC information and kyc signature '''
         self.update({
             'kyc_data': kyc_data,
-            'kyc_signature' : kyc_signature,
-            'kyc_certificate' : kyc_certificate
+            'kyc_signature': kyc_signature,
+            'kyc_certificate': kyc_certificate
         })
 
     def add_metadata(self, item):
         ''' Add an item to the metadata '''
         self.update({
-            'metadata': self.data['metadata'] + [ item ]
+            'metadata': self.data['metadata'] + [item]
         })
-
 
     def change_status(self, status):
         ''' Change the payment status for this actor '''
         self.update({
-            'status' : status
+            'status': status
         })
 
     def add_stable_id(self, stable_id):
         ''' Add a stable id for this actor '''
         self.update({
-            'stable_id' : stable_id
+            'stable_id': stable_id
         })
 
 
@@ -96,9 +101,9 @@ class PaymentAction(StructureChecker):
     def __init__(self, amount, currency, action, timestamp):
         StructureChecker.__init__(self)
         self.update({
-            'amount'   : amount,
-            'currency' : currency,
-            'action'   : action,
+            'amount': amount,
+            'currency': currency,
+            'action': action,
             'timestamp': timestamp
         })
 
@@ -126,12 +131,12 @@ class PaymentObject(SharedObject, StructureChecker):
         SharedObject.__init__(self)
         StructureChecker.__init__(self)
         self.update({
-            'sender' : sender,
-            'receiver' : receiver,
-            'reference_id' : reference_id,
-            'original_payment_reference_id' : original_payment_reference_id,
+            'sender': sender,
+            'receiver': receiver,
+            'reference_id': reference_id,
+            'original_payment_reference_id': original_payment_reference_id,
             'description': description,
-            'action' : action
+            'action': action
         })
 
     @classmethod
@@ -140,11 +145,10 @@ class PaymentObject(SharedObject, StructureChecker):
         SharedObject.__init__(self)
         return self
 
-
     def add_recipient_signature(self, signature):
         ''' Update the recipient signature '''
         self.update({
-            'recipient_signature' : signature
+            'recipient_signature': signature
         })
 
     def status(self):
