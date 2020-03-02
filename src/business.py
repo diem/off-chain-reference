@@ -19,6 +19,10 @@ class SharedObject:
         self.version = get_unique_string()
         self.extends = [] # Strores the version of the previous object
 
+        # Flags indicate the state of the object in the store
+        self.potentially_live = False   # Pending commands could make it live
+        self.actually_live = False   # Successful command made it live
+
     def new_version(self):
         ''' Make a deep copy of an object with a new version number '''
         clone = deepcopy(self)
@@ -30,6 +34,18 @@ class SharedObject:
         ''' Return a unique version number to this object and version '''
         return self.version
 
+    def get_potentially_live(self):
+        return self.potentially_live
+
+    def set_potentially_live(self, flag):
+        self.potentially_live = flag
+
+    def get_actually_live(self):
+        return self.actually_live
+
+    def set_actually_live(self, flag):
+        self.actually_live = flag
+
 
 # Interface we need to do commands:
 class ProtocolCommand:
@@ -38,39 +54,101 @@ class ProtocolCommand:
         self.creates   = []
         self.command   = command
 
+    def get_dependencies(self):
+        return set(self.depend_on)
+
+    def new_object_versions(self):
+        return set(self.creates)
+
+    def validity_checks(self, dependencies):
+        return True
+
+    def get_object(self, version_number, dependencies):
+        assert version_number in self.new_object_versions()
+        raise NotImplementedError('You need to subclass and override this method')
+
+    def on_success(self):
+        pass
+
+    def on_fail(self):
+        pass
+
 class ProtocolExecutor:
     def __init__(self):
-        self.potentially_live = set()
-        self.actually_live    = set()
         self.seq = []
 
+        # This is the primary store of shared objects.
+        # It maps version numbers -> objects
+        self.object_store = { } # TODO: persist this structure
+
+    def count_potentially_live(self):
+        return sum(1 for obj in self.object_store.values() if obj.get_potentially_live())
+
+    def count_actually_live(self):
+        return sum(1 for obj in self.object_store.values() if obj.get_actually_live())
+
+    def all_true(self, versions, predicate):
+        for version in versions:
+            if version not in self.object_store:
+                return False
+            obj = self.object_store[version]
+            res = predicate(obj)
+            if not res:
+                return False
+        return True
+
     def sequence_next_command(self, command):
-        if set(command.depend_on).issubset(self.potentially_live):
-            pos = len(self.seq)
-            self.seq += [ command ]
-            self.potentially_live |= set(command.creates)
-            return pos
-        else:
-            # We cannot sequence this, no way.
-            raise Exception()
+        dependencies = command.get_dependencies()
+        potential_live = lambda obj: obj.get_potentially_live()
+        all_good = self.all_true(dependencies, potential_live)
+
+        pos = len(self.seq)
+        self.seq += [ command ]
+
+        # TODO: Here we need to pass the business logic.
+        all_good &= command.validity_checks(self.object_store)
+
+        if all_good:
+            new_versions = command.new_object_versions()
+            for version in new_versions:
+                obj = command.get_object(version, self.object_store)
+                obj.set_potentially_live(True)
+                self.object_store[version] = obj
+
+        return pos
 
     def own_success(self, seq_no):
         command = self.seq[seq_no]
         # Consumes old objects
-        self.actually_live -= set(command.depend_on)
-        self.potentially_live -= set(command.depend_on)
+        dependencies = command.get_dependencies()
+        for version in dependencies:
+            del self.object_store[version]
+
         # Creates new objects
-        self.actually_live |= set(command.creates)
-        pass
+        new_versions = command.new_object_versions()
+        for version in new_versions:
+            obj = self.object_store[version]
+            obj.set_actually_live(True)
+
+        command.on_success()
 
     def own_fail(self, seq_no):
         command = self.seq[seq_no]
-        self.potentially_live -= set(command.creates)
-        pass
+        new_versions = command.new_object_versions()
+        for version in new_versions:
+            if version in self.object_store:
+                del self.object_store[version]
+
+        command.on_fail()
 
     def other_get_success(self, seq_no):
         command = self.seq[seq_no]
-        if set(command.depend_on).issubset(self.actually_live):
+        dependencies = command.get_dependencies()
+
+        actually_live = lambda obj: obj.get_actually_live()
+        all_good = self.all_true(dependencies, actually_live)
+
+        if all_good:
             self.own_success(seq_no)
             return True
         else:

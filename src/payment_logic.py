@@ -1,11 +1,22 @@
 from business import BusinessContext, BusinessAsyncInterupt, \
     BusinessNotAuthorized, BusinessValidationFailure, \
-    BusinessForceAbort
+    BusinessForceAbort, ProtocolCommand
 
 from payment import Status, PaymentObject
 
 # Checks on diffs to ensure consistency with logic.
 
+class PaymentCommand(ProtocolCommand):
+    def __init__(self, payment):
+        self.depend_on = list(payment.extends)
+        self.creates   = [ payment.get_version() ]
+        self.command   = payment.get_full_record()
+        self.payment   = payment
+
+    def get_object(self, version_number, dependencies):
+        if version_number == self.creates[0]:
+            return self.payment
+        assert False
 
 class PaymentLogicError(Exception):
     pass
