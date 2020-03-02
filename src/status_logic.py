@@ -47,7 +47,7 @@ receiver_payment_valid_lattice = \
       (Status.signed, Status.settled) # Terminal
     ]
 
-status_heights = {
+status_heights_MUST = {
     Status.none : 100,
     Status.maybe_needs_kyc : 200,
     Status.needs_stable_id : 200,
@@ -58,6 +58,19 @@ status_heights = {
     Status.settled : 800,
     Status.abort : 1000
 }
+
+status_heights_SHOULD = {
+    Status.none : 100,
+    Status.maybe_needs_kyc : 200,
+    Status.needs_stable_id : 300,
+    Status.needs_kyc_data  : 400,
+    Status.ready_for_settlement : 500,
+    Status.needs_recipient_signature : 600,
+    Status.signed : 700,
+    Status.settled : 800,
+    Status.abort : 1000
+}
+
 
 # Express cross party status dependencies & the starting states for process
 dependencies = [(Status.settled, {Status.settled, Status.signed}) ]
@@ -177,7 +190,7 @@ def sort_function(status_heights):
     return status_pair_key
 
 
-def print_status_transmition_updates():
+def print_status_transmition_updates(status_heights):
 
     sender_progress = filter_one_sided_progress(payment_status_process,1)
     all_starts = set([st for (st, en) in sender_progress])

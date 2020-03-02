@@ -58,15 +58,38 @@ def test_payment_create_from_receiver_fail(basic_payment):
     with pytest.raises(PaymentLogicError):
         _ = check_new_payment(bcm, diff)
 
-def xxtest_payment_creation(basic_payment):
+def test_payment_process_receiver_new_payment(basic_payment):
     bcm = MagicMock(spec=BusinessContext)
-    bcm.sure_is_retail_payment.side_effect=[ False, False ]
-    bcm.check_actor_existence.side_effect=[True]
-    bcm.last_chance_to_abort.side_effect=[True]
-    bcm.want_single_payment_settlement.side_effect=[True]
+    bcm.is_recipient.side_effect=[ True, True ]
+    bcm.check_account_existence.side_effect=[ None ]
+    bcm.next_kyc_level_to_request.side_effect=[ Status.needs_kyc_data ]
+    bcm.next_kyc_to_provide.side_effect = [ { Status.none } ]
+    bcm.ready_for_settlement.side_effect = [ False ]
 
-    new_payment = sender_progress_payment(bcm, basic_payment)
-    assert new_payment.data['sender'].data['status'] == Status.needs_stable_id
+    assert basic_payment.data['receiver'].data['status'] == Status.none
+    new_payment = payment_process(bcm, basic_payment)
 
-    # We do not add stable_ID unless the other side asks for it.
-    assert len(new_payment.update_record) == 0
+    assert new_payment.data['receiver'].data['status'] == Status.needs_kyc_data
+
+    new_payment.data['receiver'].data['status'] == Status.ready_for_settlement
+    bcm.is_recipient.side_effect=[ True, True ]
+    bcm.check_account_existence.side_effect=[ None ]
+    bcm.next_kyc_level_to_request.side_effect=[ Status.none ]
+    bcm.next_kyc_to_provide.side_effect = [ { Status.none } ]
+    bcm.ready_for_settlement.side_effect = [ True ]
+    bcm.want_single_payment_settlement.side_effect = [ True ]
+    bcm.has_settled.side_effect = [ False ]
+
+    new_payment2 = payment_process(bcm, new_payment)
+    assert new_payment2.data['receiver'].data['status'] == Status.ready_for_settlement
+
+    bcm.is_recipient.side_effect=[ True, True ]
+    bcm.check_account_existence.side_effect=[ None ]
+    bcm.next_kyc_level_to_request.side_effect=[ Status.none ]
+    bcm.next_kyc_to_provide.side_effect = [ { Status.none } ]
+    bcm.ready_for_settlement.side_effect = [ True ]
+    bcm.want_single_payment_settlement.side_effect = [ True ]
+    bcm.has_settled.side_effect = [ True ]
+
+    new_payment3 = payment_process(bcm, new_payment2)
+    assert new_payment3.data['receiver'].data['status'] == Status.settled

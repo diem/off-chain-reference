@@ -33,6 +33,7 @@ def check_new_payment(business, initial_diff):
     if new_payment.data[role].data['status'] != Status.none:
         raise PaymentLogicError('Sender set receiver status.')
 
+    # TODO: Check that other's status is valid
 
     # TODO: validate any signatures.
     business.validate_kyc_signature(new_payment)
@@ -56,6 +57,8 @@ def check_new_update(business, payment, diff):
     if payment.data[role] != new_payment.data[role]:
         raise PaymentLogicError('Cannot change %s information.' % role)
 
+    # TODO: Check that other's status is valid
+
     # TODO: validate any signatures.
     business.validate_kyc_signature(new_payment)
     business.validate_recipient_signature(new_payment)
@@ -65,15 +68,16 @@ def check_new_update(business, payment, diff):
 
 # The logic to process a payment from either side.
 
-def payment_process(payment, business):
+def payment_process(business, payment):
     ''' Processes a payment that was just updates, and returns a
         new payment with potential updates. This function may be
         called multiple times for the same payment to support
         async business operations and recovery.
     '''
 
-    role = ['sender', 'receiver'][business.is_recipient()]
-    other_role = ['sender', 'receiver'][not business.is_recipient()]
+    is_receiver = business.is_recipient()
+    role = ['sender', 'receiver'][is_receiver]
+    other_role = ['sender', 'receiver'][not is_receiver]
 
     status = payment.data[role].data['status']
     current_status = status
@@ -85,6 +89,7 @@ def payment_process(payment, business):
     try:
         if other_status == Status.abort:
             # We set our status as abort
+            # TODO: ensure valid abort from the other side elsewhere
             current_status = Status.abort
 
         if current_status in {Status.none}:
@@ -105,12 +110,13 @@ def payment_process(payment, business):
                 stable_id = business.provide_stable_id(payment)
                 new_payment.data[role].add_stable_id(stable_id)
 
-            if Status.needs_stable_id in kyc_to_provide:
+            if Status.needs_kyc_data in kyc_to_provide:
                 extended_kyc = business.get_extended_kyc(payment)
                 new_payment.data[role].add_kyc_data(*extended_kyc)
 
             # Check if we have all the KYC we need
-            if business.ready_for_settlement(payment):
+            ready = business.ready_for_settlement(payment)
+            if ready:
                 current_status = Status.ready_for_settlement
 
         if current_status == Status.ready_for_settlement:
@@ -126,6 +132,7 @@ def payment_process(payment, business):
                 signature = business.get_recipient_signature(payment)
                 new_payment.add_recipient_signature(signature)
                 current_status = Status.signed
+
 
         if current_status in {Status.ready_for_settlement,
                               Status.needs_recipient_signature,
@@ -146,4 +153,8 @@ def payment_process(payment, business):
 
     finally:
         # TODO: test is the resulting status is valid
+        # TODO: test if there are any changes to the object, to
+        #       send to the other side as a command.
         new_payment.data[role].change_status(current_status)
+
+    return new_payment

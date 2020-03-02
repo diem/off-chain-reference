@@ -47,6 +47,7 @@ class PaymentActor(StructureChecker):
 
     def custom_update_checks(self, diff):
         # If kyc data is provided we expect signature information
+        # TODO: If ANY is in, ALL are in
         if 'kyc_data' in diff and 'kyc_signature' not in diff:
             raise StructureException('Missing: field kyc_signature')
         if 'kyc_data' in diff and 'kyc_certificate' not in diff:
@@ -151,5 +152,6 @@ class PaymentObject(SharedObject, StructureChecker):
             'recipient_signature': signature
         })
 
+    # TODO: delete
     def status(self):
         return (self.data['sender']['status'], self.data['receiver']['status'])

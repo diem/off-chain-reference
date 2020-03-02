@@ -189,6 +189,7 @@ class SharedObject:
     def is_decided(self):
         ''' Denotes the commands leading to this object have been sequenced.
             They could be successes or failures.'''
+        return self.decided is not None
 
     def is_success(self):
         ''' Denotes whether the object has been committed to the sequence'''
@@ -332,6 +333,7 @@ class BusinessContext:
             or the current status if no new information is required.
 
             Can raise:
+                BusinessAsyncInterupt
                 BusinessForceAbort
         '''
         pass
@@ -418,6 +420,8 @@ class BusinessContext:
             be settled also package it and settle it on chain. This function may
             be called multiple times for the same payment, but any on-chain
             operation should be performed only once per payment.
+
+            Returns a bool: True or False
 
             Can Raise:
                 BusinessAsyncInterupt
