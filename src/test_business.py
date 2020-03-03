@@ -62,23 +62,20 @@ def test_exec(basic_payment):
 
     assert pe.count_potentially_live() == 7
 
-    pe.own_success(0)
-    pe.own_success(1)
-    pe.own_success(2)
+    pe.set_success(0)
+    pe.set_success(1)
+    pe.set_success(2)
     assert pe.count_potentially_live() == 5
     assert pe.count_actually_live() == 1
 
-    pe.own_success(3)
-    pe.own_success(4)
+    pe.set_success(3)
+    pe.set_success(4)
 
     assert pe.count_potentially_live() == 3
     assert pe.count_actually_live() == 1
 
-    res0 = pe.other_get_success(5)
-    res1 = pe.other_get_success(6)
-
-    assert res0 is False
-    assert res1 is False
+    pe.set_fail(5)
+    pe.set_fail(6)
 
     assert pe.count_potentially_live() == 1
     assert pe.count_actually_live() == 1
