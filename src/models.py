@@ -1,5 +1,5 @@
 from copy import deepcopy
-
+from business import ProtocolExecutor
 
 class OffChainVASP:
     """Manages the off-chain protocol on behalf of one VASP"""
@@ -38,7 +38,7 @@ class VASPInfo:
 class VASPPairChannel:
     """Represents the state of an off-chain bi-directional channel bewteen two VASPs"""
 
-    def __init__(self, myself, other):
+    def __init__(self, myself, other, CommandExecutor = None):
         """ Initialize the channel between two VASPs.
 
         * Myself is the VASP initializing the local object (VASPInfo)
@@ -57,31 +57,14 @@ class VASPPairChannel:
         self.other_next_seq = 0
 
         # The final sequence
-        self.final_sequence = []
-        self.next_final_sequence = 0
+        self.executor = ProtocolExecutor()
 
-        # Cache responses to avoid retransmittions, when they are out
-        # of order.
-        self.future_command_cache = {}
 
-    def add_commands_from_future_cache(self):
-        # Try to sequence messages
-        while self.next_final_sequence in self.future_command_cache:
-            assert all(R.has_response() for R in self.final_sequence)
-            command = self.future_command_cache[self.next_final_sequence]
-            del self.future_command_cache[self.next_final_sequence]
-            self.final_sequence += [command]
-            self.next_final_sequence += 1
-            #print("[%s] Commit %s (waiting %s)" % (['Client', 'Server'][self.is_server()], self.next_final_sequence, len(self.future_command_cache)))
+    def next_final_sequence(self):
+        return self.executor.next_seq()
 
-        # Garbage Collect all already sequenced messages
-        for seq in list(self.future_command_cache):
-            if seq < self.next_final_sequence:
-                del self.future_command_cache[seq]
-
-    def debug_check_invariants(self):
-        assert len(self.final_sequence) == self.next_final_sequence
-        assert len(self.my_requests) == self.my_next_seq
+    def get_final_sequence(self):
+        return self.executor.seq
 
     def persist(self):
         """ A hook to block until state of channel is persisted """
@@ -111,6 +94,9 @@ class VASPPairChannel:
             return not myself_address.greater_than_or_equal(other_address)
         assert False  # Never reach this code
 
+    def role(self):
+        return ['Client','Server'][self.is_server()]
+
     def is_server(self):
         """ Is the local VASP a server for this pair?"""
         return not self.is_client()
@@ -127,6 +113,15 @@ class VASPPairChannel:
             for req in requests:
                 self.handle_request(req)
 
+
+    def apply_response_to_executor(self, request):
+        assert request.response is not None
+        response = request.response
+        if request.is_success():
+            self.executor.set_success(response.command_seq)
+        else:
+            self.executor.set_fail(response.command_seq)
+
     def sequence_command_local(self, off_chain_command):
         """ The local VASP attempts to sequence a new off-chain command."""
 
@@ -134,14 +129,17 @@ class VASPPairChannel:
         request.seq = self.my_next_seq
 
         if self.is_server():
-            request.command_seq = self.next_final_sequence
-            self.final_sequence += [request]
-            self.next_final_sequence += 1
+            # TODO: Handle protocol failures if raised
+            #       bail if it fails here.
+            request.command_seq = self.next_final_sequence()
+            self.executor.sequence_next_command(off_chain_command,
+                do_not_sequence_errors = True, own=True)
 
         self.my_next_seq += 1
         self.my_requests += [request]
         self.send_request(request)
         self.persist()
+
 
     def handle_request(self, request):
         """ Handles a request received by this VASP """
@@ -162,20 +160,22 @@ class VASPPairChannel:
                 self.send_response(response)
                 return
 
+        # Clients are not to suggest sequence numbers.
+        if self.is_server() and request.command_seq is not None:
+            response = make_protocol_error(request, code='malformed')
+            self.send_response(response)
+            return
+
         # As a server we first wait for the status of all server
         # requests to sequence any new client requests.
         if self.is_server() and self.pending_responses() > 0:
             self.pending_requests += [request]
-
-            # Other correct option: send a wait.
-            # response = make_protocol_error(request, code='wait')
-            # self.send_response(response)
             return
 
         # Sequence newer requests
         if request.seq == self.other_next_seq:
 
-            if self.is_client() and request.command_seq > self.next_final_sequence:
+            if self.is_client() and request.command_seq > self.next_final_sequence():
                 # We must wait, since we cannot give an answer before sequencing
                 # previous commands.
                 response = make_protocol_error(request, code='wait')
@@ -185,20 +185,27 @@ class VASPPairChannel:
             self.other_next_seq += 1
             self.other_requests += [request]
 
-            # Attempt to sequence the Command
-            # TODO: Call the high-level state machine to get a command response
-            #       or error
-            request.response = make_success_response(request)
-            assert all(R.has_response() for R in self.final_sequence[:request.response.seq])
-
             # TODO: prove this assertion or we should throw an error if it is
             #       not true.
             if request.command_seq is not None:
-                assert request.command_seq == self.next_final_sequence
+                assert request.command_seq == self.next_final_sequence()
 
-            request.response.command_seq = self.next_final_sequence
-            self.final_sequence += [request]
-            self.next_final_sequence += 1
+            # request.response.command_seq = self.next_final_sequence()
+            # TODO: if this fails, inlcude a command failure in response.
+            # TODO: Add response of failure
+
+
+            seq = self.next_final_sequence()
+            try:
+                self.executor.sequence_next_command(request.command, \
+                    do_not_sequence_errors = False, own=False)
+                response = make_success_response(request)
+            except Exception as e:
+                response = make_command_error(request, e)
+
+            request.response = response
+            request.response.command_seq = seq
+            self.apply_response_to_executor(request)
 
             self.persist()
             self.send_response(request.response)
@@ -207,8 +214,6 @@ class VASPPairChannel:
             # We have received the other side's request without receiving the
             # previous one
             response = make_protocol_error(request, code='missing')
-            response.error.my_next_seq = self.my_next_seq
-            response.error.other_next_seq = self.other_next_seq
             self.send_response(response)
         else:
             assert False
@@ -218,39 +223,56 @@ class VASPPairChannel:
         request_seq = response.seq
         assert isinstance(request_seq, int)
         assert isinstance(response, CommandResponseObject)
+
+        # Check this is the next expected response
+        if not request_seq < len(self.my_requests):
+            # Caught a bug on the other side
+            # TODO: Log warning the other side might be buggy
+            return
+
+        if request_seq > 0:
+            if not self.my_requests[request_seq - 1].has_response():
+                # TODO: the other side is buggy, log a warning
+                return
+
         if response.status == 'success' or (
                 response.status == 'failure' and not response.error.protocol_error):
 
             # Idenpotent: We have already processed the response
             if self.my_requests[request_seq].has_response():
+                # TODO: Check the reponse is the same and log warning otherwise.
                 return
 
-            # Cache the replies and eventually sequence them
-            if response.command_seq > self.next_final_sequence:
-                # This command is too far ahead. So we do not register
-                # its existance and instead require retransmission.
-
-                # Cache the responses to avoid re-transmits
-                self.cache_response(response)
-                return
-
-            elif response.command_seq == self.next_final_sequence:
+            request = self.my_requests[request_seq]
+            if response.command_seq == self.next_final_sequence():
                 # Next command to commit -- do commit it.
-                request = self.my_requests[request_seq]
                 request.response = response
-                self.final_sequence += [request]
-                self.next_final_sequence += 1
-                assert all(R.has_response() for R in self.final_sequence)
+
+                try:
+                    self.executor.sequence_next_command(request.command, \
+                        do_not_sequence_errors = False, own=True)
+                except:
+                    # We ignore the outcome since the response is what matters.
+                    # TODO: something buggy has happened, if we return an error
+                    #       at this point. Log a warning to interop testing.
+                    pass
+
+                self.apply_response_to_executor(request)
                 self.process_pending_requests()
                 self.persist()
 
-            elif response.command_seq < self.next_final_sequence:
+            elif response.command_seq < self.next_final_sequence():
                 # Request already in the sequence: happens to the leader.
                 #  No chance to register an error, since we do not reply.
+                request.response = response
+                self.apply_response_to_executor(request)
+                self.process_pending_requests()
 
-                if not self.my_requests[request_seq].has_response():
-                    self.my_requests[request_seq].response = response
-                    self.process_pending_requests()
+            elif response.command_seq > self.next_final_sequence():
+                # This is too high -- wait for more data?
+                # Never happens if both sides are correct.
+                # TODO: if this happens the other side may be buggy. Log a warning.
+                pass
             else:
                 # Previous conditions are exhaustive
                 assert False
@@ -260,6 +282,8 @@ class VASPPairChannel:
                 pass  # Will Retransmit
             elif response.error.code == 'wait':
                 pass  # Will Retransmit
+            elif response.error.code == 'malformed':
+                pass # Implementation bug was caught.
             else:
                 # Manage other errors
                 assert False
@@ -271,15 +295,6 @@ class VASPPairChannel:
             if not request.has_response():
                 self.send_request(request)
                 break
-
-    def cache_response(self, response):
-        request_seq = response.seq
-        self.my_requests[request_seq].response = response
-        command_seq = response.command_seq
-        self.future_command_cache[command_seq] = self.my_requests[request_seq]
-        self.add_commands_from_future_cache()
-        self.process_pending_requests()
-        self.persist()
 
     def would_retransmit(self):
         """ Returns true if there are any pending re-transmits, namely
@@ -295,8 +310,6 @@ class OffChainError:
     def __init__(self, protocol_error=True, code=None):
         self.protocol_error = protocol_error
         self.code = code
-        self.my_next_seq = None
-        self.other_next_seq = None
 
 
 class CommandRequestObject:
@@ -317,6 +330,10 @@ class CommandRequestObject:
 
     def has_response(self):
         return self.response is not None
+
+    def is_success(self):
+        assert self.has_response()
+        return self.response.status == 'success'
 
 
 class CommandResponseObject:
@@ -342,6 +359,13 @@ def make_protocol_error(request, code=None):
     response.seq = request.seq
     response.status = 'failure'
     response.error = OffChainError(protocol_error=True, code=code)
+    return response
+
+def make_command_error(request, code=None):
+    response = CommandResponseObject()
+    response.seq = request.seq
+    response.status = 'failure'
+    response.error = OffChainError(protocol_error=False, code=code)
     return response
 
 
