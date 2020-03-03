@@ -183,6 +183,18 @@ class BusinessForceAbort(Exception):
 
 class BusinessContext:
 
+    callbacks = {}
+
+    def register_callback(payment, callback):
+        if payment not in callbacks:
+            callbacks[payment] = callback
+
+    def resume_payment(payment):
+        if payment in callbacks:
+            callback = callbacks[payment]
+            callback()
+            del callbacks[payment]
+
     # ----- Actors -----
 
     def is_sender(self, payment):

@@ -6,17 +6,20 @@ from payment import Status, PaymentObject
 
 # Checks on diffs to ensure consistency with logic.
 
+
 class PaymentCommand(ProtocolCommand):
+
     def __init__(self, payment):
         self.depend_on = list(payment.extends)
-        self.creates   = [ payment.get_version() ]
-        self.command   = payment.get_full_record()
-        self.payment   = payment
+        self.creates = [payment.get_version()]
+        self.command = payment.get_full_record()
+        self.payment = payment
 
     def get_object(self, version_number, dependencies):
         if version_number == self.creates[0]:
             return self.payment
         assert False
+
 
 class PaymentLogicError(Exception):
     pass
@@ -110,10 +113,10 @@ def payment_process(business, payment):
                               Status.needs_stable_id,
                               Status.needs_kyc_data}:
 
-            # Request KYC
+            # Request KYC -- this may be async in case of need for user input
             current_status = business.next_kyc_level_to_request(payment)
 
-            # Provide KYC --  this may be async in case of need for user input
+            # Provide KYC -- this may be async in case of need for user input
             kyc_to_provide = business.next_kyc_to_provide(payment)
 
             if Status.needs_stable_id in kyc_to_provide:
@@ -143,7 +146,6 @@ def payment_process(business, payment):
                 new_payment.add_recipient_signature(signature)
                 current_status = Status.signed
 
-
         if current_status in {Status.ready_for_settlement,
                               Status.needs_recipient_signature,
                               Status.signed}:
@@ -153,8 +155,8 @@ def payment_process(business, payment):
     except BusinessAsyncInterupt:
         # The business layer needs to do a long duration check.
         # Cannot make quick progress, and must response with current status.
-        # TODO[issue #3]: Register call-back here for when the operation is done.
-        pass
+        new_payment.data[role].change_status(current_status)
+        business.register_callback(new_payment, payment_process)
 
     except BusinessForceAbort:
 
