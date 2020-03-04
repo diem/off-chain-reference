@@ -1,7 +1,7 @@
 from business import BusinessContext, BusinessAsyncInterupt, \
     BusinessNotAuthorized, BusinessValidationFailure, \
-    BusinessForceAbort, ProtocolCommand
-
+    BusinessForceAbort
+from executor import ProtocolCommand
 from payment import Status, PaymentObject
 
 # Checks on diffs to ensure consistency with logic.

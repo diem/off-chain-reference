@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from business import SharedObject
+from executor import SharedObject
 from utils import StructureException, StructureChecker, \
     REQUIRED, OPTIONAL, WRITE_ONCE, UPDATABLE
 
