@@ -109,9 +109,9 @@ def payment_process(business, payment):
             business.check_account_existence(payment)
 
         if current_status in {Status.none,
-                              Status.maybe_needs_kyc,
                               Status.needs_stable_id,
-                              Status.needs_kyc_data}:
+                              Status.needs_kyc_data,
+                              Status.needs_recipient_signature}:
 
             # Request KYC -- this may be async in case of need for user input
             current_status = business.next_kyc_level_to_request(payment)
@@ -127,30 +127,17 @@ def payment_process(business, payment):
                 extended_kyc = business.get_extended_kyc(payment)
                 new_payment.data[role].add_kyc_data(*extended_kyc)
 
-            # Check if we have all the KYC we need
-            ready = business.ready_for_settlement(payment)
-            if ready:
-                current_status = Status.ready_for_settlement
-
-        if current_status == Status.ready_for_settlement:
-
-            if business.want_single_payment_settlement(payment):
-                if role == 'sender':
-                    current_status = Status.needs_recipient_signature
-            else:
-                # In V1 we will allow inclusion in a batch, here
-                assert False
-
             if role == 'receiver' and other_status == Status.needs_recipient_signature:
                 signature = business.get_recipient_signature(payment)
                 new_payment.add_recipient_signature(signature)
-                current_status = Status.signed
 
-        if current_status in {Status.ready_for_settlement,
-                              Status.needs_recipient_signature,
-                              Status.signed}:
-            if business.has_settled(payment):
-                current_status = Status.settled
+        # Check if we have all the KYC we need
+        ready = business.ready_for_settlement(payment)
+        if ready:
+            current_status = Status.ready_for_settlement
+
+        if current_status == Status.ready_for_settlement and business.has_settled(payment):
+            current_status = Status.settled
 
     except BusinessAsyncInterupt:
         # The business layer needs to do a long duration check.
