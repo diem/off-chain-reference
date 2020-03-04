@@ -271,9 +271,9 @@ class BusinessContext:
             not request a level that is either already requested or provided.
 
             Returns a status code from:
-                - maybe_needs_kyc
                 - needs_stable_id
                 - needs_kyc_data
+                - needs_recipient_signature
             or the current status if no new information is required.
 
             Can raise:
