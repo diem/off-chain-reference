@@ -34,7 +34,10 @@ class StructureChecker:
                 if isinstance(new_diff[field], StructureChecker):
                     diff[field] = new_diff[field].get_full_record()
                 else:
-                    diff[field] = new_diff[field]
+                    if type(new_diff[field]) in {str, int, list}:
+                        diff[field] = new_diff[field]
+                    else:
+                        diff[field] = str(new_diff[field])
         return diff
 
     def __eq__(self, other):
@@ -56,6 +59,13 @@ class StructureChecker:
             _ in cls.fields if issubclass(
                 field_type,
                 StructureChecker)}
+        constructors = {
+            field: field_type for field,
+            field_type,
+            _,
+            _ in cls.fields if not issubclass(
+                field_type,
+                StructureChecker)}
         self = cls.__new__(cls)
         StructureChecker.__init__(self)
         new_diff = {}
@@ -64,7 +74,9 @@ class StructureChecker:
                 nested_class = parse_further[field]
                 new_diff[field] = nested_class.from_full_record(diff[field])
             else:
-                new_diff[field] = diff[field]
+                # Use default constructor of the type
+                cons = constructors[field]
+                new_diff[field] = cons(diff[field])
         self.update(new_diff)
         self.flatten()
         return self
