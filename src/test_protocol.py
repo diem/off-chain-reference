@@ -2,7 +2,7 @@ import pytest
 import types
 from copy import deepcopy
 
-from models import *
+from protocol import *
 from executor import *
 import random
 
