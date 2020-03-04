@@ -104,6 +104,95 @@ def monkey_tap_to_list(pair, requests_sent, replies_sent):
     pair.send_response = types.MethodType(to_tap_reply, pair)
     return pair
 
+class RandomRun(object):
+    def __init__(self, server, client, commands, seed='fixed seed'):
+
+        # MESSAGE QUEUES
+        self.to_server_requests = []
+        self.to_client_response = []
+        self.to_client_requests  = []
+        self.to_server_response = []
+
+        self.server = monkey_tap_to_list(server, self.to_client_requests, self.to_client_response)
+        self.client = monkey_tap_to_list(client, self.to_server_requests, self.to_server_response)
+
+        self.commands = commands
+        self.number = len(commands)
+        random.seed(seed)
+
+        self.DROP = True
+        self.VERBOSE = False
+
+    def run(self):
+        to_server_requests = self.to_server_requests
+        to_client_response = self.to_client_response
+        to_client_requests = self.to_client_requests
+        to_server_response = self.to_server_response
+        server = self.server
+        client = self.client
+        commands = self.commands
+
+        while True:
+
+            # Inject a command every round
+            if random.random() > 0.99:
+                if len(commands) > 0:
+                    c = commands.pop(0)
+                    if random.random() > 0.5:
+                        client.sequence_command_local(c)
+                    else:
+                        server.sequence_command_local(c)
+
+            # Random drop
+            while self.DROP and random.random() > 0.3:
+                kill_list = random.choice([to_server_requests,
+                                          to_client_requests,
+                                          to_client_response,
+                                          to_server_response])
+                del kill_list[-1:]
+
+            Case = [False, False, False, False, False]
+            Case[random.randint(0, len(Case) - 1)] = True
+            Case[random.randint(0, len(Case) - 1)] = True
+
+            # Make progress by delivering a random queue
+            if Case[0] and len(to_server_requests) > 0:
+                client_request = to_server_requests.pop(0)
+                server.handle_request(client_request)
+
+            if Case[1] and len(to_client_requests) > 0:
+                server_request = to_client_requests.pop(0)
+                client.handle_request(server_request)
+
+            if Case[2] and len(to_client_response) > 0:
+                rep = to_client_response.pop(0)
+                # assert req.client_sequence_number is not None
+                client.handle_response(rep)
+
+            if Case[3] and len(to_server_response) > 0:
+                rep = to_server_response.pop(0)
+                server.handle_response(rep)
+
+            # Retransmit
+            if Case[4] and random.random() > 0.10:
+                client.retransmit()
+                server.retransmit()
+
+            if self.VERBOSE:
+                print([to_server_requests,
+                                          to_client_requests,
+                                          to_client_response,
+                                          to_server_response])
+
+                print([server.would_retransmit(),
+                        client.would_retransmit(),
+                        server.executor.last_confirmed,
+                        client.executor.last_confirmed])
+
+            if not server.would_retransmit() and not client.would_retransmit() \
+                and server.executor.last_confirmed == self.number \
+                and client.executor.last_confirmed == self.number:
+                break
 
 def test_client_server_role_definition():
 
@@ -369,57 +458,16 @@ def test_random_interleave_no_drop():
     server = VASPPairChannel(a0, a1)
     client = VASPPairChannel(a1, a0)
 
-
-
-    random.seed('Random_interleave')
     NUMBER = 100
     commands = list(range(NUMBER))
-    to_server_requests = []
-    to_client_response = []
+    commands = [SampleCommand(c) for c in commands]
 
-    to_client_requests  = []
-    to_server_response = []
+    R = RandomRun(server, client, commands, seed='drop')
+    R.DROP = False
+    R.run()
 
-    server = monkey_tap_to_list(server, to_client_requests, to_client_response)
-    client = monkey_tap_to_list(client, to_server_requests, to_server_response)
-
-    while True:
-        # Inject a command every round
-        if random.random() > 0.99:
-            if len(commands) > 0:
-                c = commands.pop(0)
-                if random.random() > 0.5:
-                    client.sequence_command_local(SampleCommand(c))
-                else:
-                    server.sequence_command_local(SampleCommand(c))
-
-        # Make progress by delivering a random queue
-        if len(to_server_requests) > 0 and random.random() > 0.5:
-            client_request = to_server_requests.pop(0)
-            server.handle_request(client_request)
-
-        if len(to_client_requests) > 0 and random.random() > 0.5:
-            server_request = to_client_requests.pop(0)
-            client.handle_request(server_request)
-
-        if len(to_client_response) > 0 and random.random() > 0.5:
-            resp = to_client_response.pop(0)
-            # assert req.client_sequence_number is not None
-            client.handle_response(resp)
-
-        if len(to_server_response) > 0 and random.random() > 0.5:
-            resp = to_server_response.pop(0)
-            server.handle_response(resp)
-
-        # Retransmit
-        if random.random() > 0.99:
-            client.retransmit()
-            server.retransmit()
-
-        if not server.would_retransmit() and not client.would_retransmit() \
-            and server.executor.last_confirmed == NUMBER \
-            and client.executor.last_confirmed == NUMBER:
-            break
+    client = R.client
+    server = R.server
 
     client_seq = [c.item() for c in client.get_final_sequence()]
     server_seq = [c.item() for c in server.get_final_sequence()]
@@ -428,6 +476,7 @@ def test_random_interleave_no_drop():
     assert len(client_seq) == NUMBER
 
     # Print stats:
+    print()
     print("Client: Requests #%d  Responses #%d" % (client.xx_requests_stats, client.xx_replies_stats))
     print("Server: Requests #%d  Responses #%d" % (server.xx_requests_stats, server.xx_replies_stats))
 
@@ -440,61 +489,16 @@ def test_random_interleave_and_drop():
     server = VASPPairChannel(a0, a1)
     client = VASPPairChannel(a1, a0)
 
-    random.seed('Random_drop')
+
     NUMBER = 100
     commands = list(range(NUMBER))
-    to_server_requests = []
-    to_client_response = []
+    commands = [SampleCommand(c) for c in commands]
 
-    to_client_requests  = []
-    to_server_response = []
+    R = RandomRun(server, client, commands, seed='drop')
+    R.run()
 
-    server = monkey_tap_to_list(server, to_client_requests, to_client_response)
-    client = monkey_tap_to_list(client, to_server_requests, to_server_response)
-
-    while True:
-        # Inject a command every round
-        if random.random() > 0.99:
-            if len(commands) > 0:
-                c = commands.pop(0)
-                if random.random() > 0.5:
-                    client.sequence_command_local(SampleCommand(c))
-                    if random.random() > 0.5:
-                        del to_server_requests[-1:]
-                else:
-                    server.sequence_command_local(SampleCommand(c))
-                    if random.random() > 0.5:
-                        del to_client_requests[-1:]
-
-        # Make progress by delivering a random queue
-        if len(to_server_requests) > 0 and random.random() > 0.5:
-            client_request = to_server_requests.pop(0)
-            server.handle_request(client_request)
-
-        if len(to_client_requests) > 0 and random.random() > 0.5:
-            server_request = to_client_requests.pop(0)
-            client.handle_request(server_request)
-
-        if len(to_client_response) > 0 and random.random() > 0.5:
-            rep = to_client_response.pop(0)
-            # assert req.client_sequence_number is not None
-            client.handle_response(rep)
-
-        if len(to_server_response) > 0 and random.random() > 0.5:
-            rep = to_server_response.pop(0)
-            server.handle_response(rep)
-
-        # Retransmit
-        if random.random() > 0.99:
-            client.retransmit()
-            server.retransmit()
-
-        # print(list(map(len, [commands, to_server_requests, to_client_response, to_client_requests, to_server_response])))
-
-        if not server.would_retransmit() and not client.would_retransmit() \
-            and server.executor.last_confirmed == NUMBER \
-            and client.executor.last_confirmed == NUMBER:
-            break
+    client = R.client
+    server = R.server
 
     client_seq = [c.item() for c in client.get_final_sequence()]
     server_seq = [c.item() for c in server.get_final_sequence()]
@@ -504,6 +508,7 @@ def test_random_interleave_and_drop():
     assert set(range(NUMBER)) ==  set(client_seq)
 
     # Print stats:
+    print()
     print("Client: Requests #%d  Responses #%d" % (client.xx_requests_stats, client.xx_replies_stats))
     print("Server: Requests #%d  Responses #%d" % (server.xx_requests_stats, server.xx_replies_stats))
 
@@ -522,63 +527,17 @@ def test_random_interleave_and_drop_and_invalid():
     server = VASPPairChannel(a0, a1)
     client = VASPPairChannel(a1, a0)
 
-    random.seed('Random_fail')
     NUMBER = 100
     commands = list(range(NUMBER))
-    to_server_requests = []
-    to_client_response = []
+    commands = [SampleCommand(c) for c in commands]
+    for c in commands:
+        c.always_happy = False
 
-    to_client_requests  = []
-    to_server_response = []
+    R = RandomRun(server, client, commands, seed='drop')
+    R.run()
 
-    server = monkey_tap_to_list(server, to_client_requests, to_client_response)
-    client = monkey_tap_to_list(client, to_server_requests, to_server_response)
-
-    while True:
-        # Inject a command every round
-        if random.random() > 0.99:
-            if len(commands) > 0:
-                c = commands.pop(0)
-                cmd = SampleCommand(c)
-                cmd.always_happy = False
-                if random.random() > 0.5:
-                    client.sequence_command_local(cmd)
-                    if random.random() > 0.5:
-                        del to_server_requests[-1:]
-                else:
-                    server.sequence_command_local(cmd)
-                    if random.random() > 0.5:
-                        del to_client_requests[-1:]
-
-        # Make progress by delivering a random queue
-        if len(to_server_requests) > 0 and random.random() > 0.5:
-            client_request = to_server_requests.pop(0)
-            server.handle_request(client_request)
-
-        if len(to_client_requests) > 0 and random.random() > 0.5:
-            server_request = to_client_requests.pop(0)
-            client.handle_request(server_request)
-
-        if len(to_client_response) > 0 and random.random() > 0.5:
-            rep = to_client_response.pop(0)
-            # assert req.client_sequence_number is not None
-            client.handle_response(rep)
-
-        if len(to_server_response) > 0 and random.random() > 0.5:
-            rep = to_server_response.pop(0)
-            server.handle_response(rep)
-
-        # Retransmit
-        if random.random() > 0.99:
-            client.retransmit()
-            server.retransmit()
-
-        # print(list(map(len, [commands, to_server_requests, to_client_response, to_client_requests, to_server_response])))
-
-        if not server.would_retransmit() and not client.would_retransmit() \
-            and server.executor.last_confirmed == NUMBER \
-            and client.executor.last_confirmed == NUMBER:
-            break
+    client = R.client
+    server = R.server
 
     client_seq = [c.item() for c in client.get_final_sequence()]
     server_seq = [c.item() for c in server.get_final_sequence()]
@@ -588,6 +547,7 @@ def test_random_interleave_and_drop_and_invalid():
     assert set(range(NUMBER)) ==  set(client_seq)
 
     # Print stats:
+    print()
     print("Client: Requests #%d  Responses #%d" % (client.xx_requests_stats, client.xx_replies_stats))
     print("Server: Requests #%d  Responses #%d" % (server.xx_requests_stats, server.xx_replies_stats))
 
