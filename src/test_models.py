@@ -14,9 +14,12 @@ class SampleObject(SharedObject):
         self.item = item
 
 class SampleCommand(ProtocolCommand):
-    def __init__(self, command):
+    def __init__(self, command, deps=None):
         command = SampleObject(command)
-        self.depend_on = []
+        if deps is None:
+            self.depend_on = []
+        else:
+            self.depend_on = deps
         self.creates   = [ command.item ]
         self.command   = command
         self.always_happy = True
@@ -138,10 +141,13 @@ class RandomRun(object):
             if random.random() > 0.99:
                 if len(commands) > 0:
                     c = commands.pop(0)
-                    if random.random() > 0.5:
-                        client.sequence_command_local(c)
-                    else:
-                        server.sequence_command_local(c)
+                    try:
+                        if random.random() > 0.5:
+                            client.sequence_command_local(c)
+                        else:
+                            server.sequence_command_local(c)
+                    except ExecutorCannotSequence:
+                        commands.insert(0, c)
 
             # Random drop
             while self.DROP and random.random() > 0.3:
@@ -458,7 +464,7 @@ def test_random_interleave_no_drop():
     server = VASPPairChannel(a0, a1)
     client = VASPPairChannel(a1, a0)
 
-    NUMBER = 100
+    NUMBER = 20
     commands = list(range(NUMBER))
     commands = [SampleCommand(c) for c in commands]
 
@@ -490,7 +496,7 @@ def test_random_interleave_and_drop():
     client = VASPPairChannel(a1, a0)
 
 
-    NUMBER = 100
+    NUMBER = 20
     commands = list(range(NUMBER))
     commands = [SampleCommand(c) for c in commands]
 
@@ -527,7 +533,7 @@ def test_random_interleave_and_drop_and_invalid():
     server = VASPPairChannel(a0, a1)
     client = VASPPairChannel(a1, a0)
 
-    NUMBER = 100
+    NUMBER = 20
     commands = list(range(NUMBER))
     commands = [SampleCommand(c) for c in commands]
     for c in commands:
@@ -559,3 +565,51 @@ def test_random_interleave_and_drop_and_invalid():
     assert set(server_seq) == set(server_exec_seq)
 
     assert set(server.executor.object_store.keys()) == set(client.executor.object_store.keys())
+
+def test_dependencies():
+    a0 = FakeVASPInfo(FakeAddress(0, 10))
+    a1 = FakeVASPInfo(FakeAddress(0, 20))
+
+    server = VASPPairChannel(a0, a1)
+    client = VASPPairChannel(a1, a0)
+
+    # Commands with dependencies
+    cmd = [ (0, []),
+            (1, [0]),
+            (2, []),
+            (3, []),
+            (4, [0]),
+            (5, []),
+            (6, [2]),
+            (7, []),
+            (8, [1]),
+            (9, [4]),
+           ]
+
+    NUMBER = len(cmd)
+    commands = [SampleCommand(c, deps) for c, deps in cmd]
+
+    R = RandomRun(server, client, commands, seed='deps')
+    R.run()
+
+    client = R.client
+    server = R.server
+
+    client_seq = [c.item() for c in client.get_final_sequence()]
+    server_seq = [c.item() for c in server.get_final_sequence()]
+
+    assert len(client_seq) == NUMBER
+    assert client_seq == server_seq
+    assert set(range(NUMBER)) ==  set(client_seq)
+
+    client_seq_success = [c.commit_status for c in client.get_final_sequence()]
+    server_seq_success = [c.commit_status for c in server.get_final_sequence()]
+
+    assert client_seq_success == server_seq_success
+
+    mapcmd = { c.item():c.commit_status for c in  client.get_final_sequence()}
+    # Only one of the items with common dependency commits
+    assert sum([mapcmd[1], mapcmd[4]]) == 1
+    assert sum([mapcmd[8], mapcmd[9]]) == 1
+    # All items commit (except those with common deps)
+    assert sum(mapcmd.values()) == 8

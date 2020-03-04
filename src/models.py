@@ -59,11 +59,16 @@ class VASPPairChannel:
         # The final sequence
         self.executor = ProtocolExecutor()
 
+        # Response cache
+        self.response_cache = {}
+
 
     def next_final_sequence(self):
+        """ Returns the next sequence number in the common sequence."""
         return self.executor.next_seq()
 
     def get_final_sequence(self):
+        """ Returns a list of commands in the common sequence. """
         return self.executor.seq
 
     def persist(self):
@@ -71,10 +76,11 @@ class VASPPairChannel:
         pass
 
     def send_request(self, request):
-        """ A hook to send a message to other VASP"""
+        """ A hook to send a request to other VASP"""
         pass
 
     def send_response(self, response):
+        """ A hook to send a response to other VASP"""
         pass
 
     def get_protocol_version(self):
@@ -95,6 +101,7 @@ class VASPPairChannel:
         assert False  # Never reach this code
 
     def role(self):
+        """ The role of the VASP as a string. For debug output."""
         return ['Client','Server'][self.is_server()]
 
     def is_server(self):
@@ -105,16 +112,22 @@ class VASPPairChannel:
         """ Counts the number of responses this VASP is waiting for """
         return len([1 for req in self.my_requests if not req.has_response()])
 
-    def process_pending_requests(self):
-        """ The server re-schedules and executes pending requests """
+    def process_pending_requests_response(self):
+        """ The server re-schedules and executes pending requests, and cached
+            responses. """
         if self.pending_responses() == 0:
             requests = self.pending_requests
             self.pending_requests = []
             for req in requests:
                 self.handle_request(req)
 
+        ## No need to make loop -- it will call again upon success
+        if self.next_final_sequence() in self.response_cache:
+            response = self.response_cache[self.next_final_sequence()]
+            self.handle_response(response)
 
     def apply_response_to_executor(self, request):
+        """Signals to the executor the success of failure of a command."""
         assert request.response is not None
         response = request.response
         if request.is_success():
@@ -185,16 +198,6 @@ class VASPPairChannel:
             self.other_next_seq += 1
             self.other_requests += [request]
 
-            # TODO: prove this assertion or we should throw an error if it is
-            #       not true.
-            if request.command_seq is not None:
-                assert request.command_seq == self.next_final_sequence()
-
-            # request.response.command_seq = self.next_final_sequence()
-            # TODO: if this fails, inlcude a command failure in response.
-            # TODO: Add response of failure
-
-
             seq = self.next_final_sequence()
             try:
                 self.executor.sequence_next_command(request.command, \
@@ -215,6 +218,9 @@ class VASPPairChannel:
             # previous one
             response = make_protocol_error(request, code='missing')
             self.send_response(response)
+
+            # NOTE: the protocol is still correct without persisiting the cache
+            self.persist()
         else:
             assert False
 
@@ -230,13 +236,7 @@ class VASPPairChannel:
             # TODO: Log warning the other side might be buggy
             return
 
-        if request_seq > 0:
-            if not self.my_requests[request_seq - 1].has_response():
-                # TODO: the other side is buggy, log a warning
-                return
-
-        if response.status == 'success' or (
-                response.status == 'failure' and not response.error.protocol_error):
+        if response.not_protocol_failure():
 
             # Idenpotent: We have already processed the response
             if self.my_requests[request_seq].has_response():
@@ -258,7 +258,7 @@ class VASPPairChannel:
                     pass
 
                 self.apply_response_to_executor(request)
-                self.process_pending_requests()
+                self.process_pending_requests_response()
                 self.persist()
 
             elif response.command_seq < self.next_final_sequence():
@@ -266,13 +266,12 @@ class VASPPairChannel:
                 #  No chance to register an error, since we do not reply.
                 request.response = response
                 self.apply_response_to_executor(request)
-                self.process_pending_requests()
+                self.process_pending_requests_response()
 
             elif response.command_seq > self.next_final_sequence():
                 # This is too high -- wait for more data?
-                # Never happens if both sides are correct.
-                # TODO: if this happens the other side may be buggy. Log a warning.
-                pass
+                # Store the response for later use.
+                self.response_cache[response.command_seq] = response
             else:
                 # Previous conditions are exhaustive
                 assert False
@@ -283,9 +282,11 @@ class VASPPairChannel:
             elif response.error.code == 'wait':
                 pass  # Will Retransmit
             elif response.error.code == 'malformed':
+                # TODO: log a warning
                 pass # Implementation bug was caught.
             else:
                 # Manage other errors
+                # Implementation bug was caught.
                 assert False
 
     def retransmit(self):
@@ -329,12 +330,13 @@ class CommandRequestObject:
         return self.command == other.command
 
     def has_response(self):
+        """ Returns true if request had a response, false otherwise """
         return self.response is not None
 
     def is_success(self):
+        """ Returns true if the response was a success """
         assert self.has_response()
         return self.response.status == 'success'
-
 
 class CommandResponseObject:
     """Represents a response to a command in the Off chain protocol"""
@@ -347,7 +349,18 @@ class CommandResponseObject:
         self.error = None
 
 
+    def not_protocol_failure(self):
+        """ Returns True if the request has a response that is not a protocol
+            failure (and we can recover from it)
+        """
+        return self.status == 'success' or (
+                self.status == 'failure' and not self.error.protocol_error)
+
+
+
+
 def make_success_response(request):
+    """ Constructs a CommandResponse signaling success"""
     response = CommandResponseObject()
     response.seq = request.seq
     response.status = 'success'
@@ -355,6 +368,10 @@ def make_success_response(request):
 
 
 def make_protocol_error(request, code=None):
+    """ Constructs a CommandResponse signaling a protocol failure.
+        We do not sequence or store such responses since we can recover
+        from them.
+    """
     response = CommandResponseObject()
     response.seq = request.seq
     response.status = 'failure'
@@ -362,6 +379,9 @@ def make_protocol_error(request, code=None):
     return response
 
 def make_command_error(request, code=None):
+    """ Constructs a CommandResponse signaling a command failure.
+        Those failures lead to a command being sequenced as a failure.
+    """
     response = CommandResponseObject()
     response.seq = request.seq
     response.status = 'failure'

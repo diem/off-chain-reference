@@ -119,14 +119,14 @@ class ProtocolExecutor:
 
         if not all_good and do_not_sequence_errors:
             # TODO: Define proper exception
-            raise Exception('Cannot sequence')
+            raise ExecutorCannotSequence('Cannot sequence')
 
         pos = len(self.seq)
         self.seq += [ command ]
 
         if not all_good:
             # TODO: Define proper exception
-            raise Exception('Invalid ... ')
+            raise ExecutorCannotSequence('Invalid ... ')
 
         if all_good:
             new_versions = command.new_object_versions()
@@ -173,6 +173,8 @@ class ProtocolExecutor:
 
         command.on_fail()
 
+class ExecutorCannotSequence(Exception):
+    pass
 
 # A model for VASP business environment
 
