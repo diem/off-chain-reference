@@ -1,5 +1,5 @@
 from copy import deepcopy
-from business import ProtocolExecutor
+from executor import ProtocolExecutor
 
 class OffChainVASP:
     """Manages the off-chain protocol on behalf of one VASP"""
