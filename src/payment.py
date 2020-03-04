@@ -5,23 +5,32 @@ from utils import StructureException, StructureChecker, \
     REQUIRED, OPTIONAL, WRITE_ONCE, UPDATABLE
 
 from status_logic import Status
+import json
 
+class KYCData(StructureChecker):
+    fields = [
+        ('blob', str, REQUIRED, WRITE_ONCE)
+    ]
 
-class KYCData:
-    # TODO
     def __init__(self, kyc_json_blob):
         # Keep as blob since we need to sign / verify byte string
-        self.blob = kyc_json_blob
+        StructureChecker.__init__(self)
+        self.update({
+            'blob': kyc_json_blob
+        })
 
+    def parse(self):
+        """ Parse the KYC blob and return a data dictionary. """
+        json.loads(self.data['blob'])
 
-class NationalID:
-    # TODO
-    pass
-
-
-class PhysicalAddress:
-    # TODO
-    pass
+    def custom_update_checks(self, diff):
+        # Tests JSON parsing before accepting blob
+        if 'blob' in diff:
+            data = json.loads(diff['blob'])
+            if not 'payment_reference_id' in data:
+                raise StructureException('Missing: field payment_reference_id')
+            if not 'type' in data:
+                raise StructureException('Missing: field type')
 
 
 class PaymentActor(StructureChecker):

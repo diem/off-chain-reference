@@ -73,7 +73,12 @@ def test_payment_actor_update_status():
         actor.change_status(0)
 
 def test_payment_actor_update_kyc():
-    kyc = KYCData('KYCDATA')
+    kyc = KYCData("""{
+        "payment_reference_id" : "PAYMENT_XYZ",
+        "type" : "individual",
+        "other_field" : "other data"
+    }""")
+
     actor = PaymentActor('ABCD', 'XYZ', 'none', [])
     actor.add_kyc_data(kyc, 'sigXXXX', 'certXXX')
 
@@ -126,3 +131,30 @@ def test_payment_to_diff():
 
     payment2 = PaymentObject(sender, receiver, 'ref2', 'orig_ref', 'desc', action)
     assert payment2 != new_payment
+
+def test_to_json():
+    kyc_sender = KYCData("""{
+        "payment_reference_id" : "PAYMENT_XYZ",
+        "type" : "individual",
+        "other_field" : "other data SENDER"
+    }""")
+
+    sender = PaymentActor('AAAA', 'aaaa', 'none', [])
+    sender.add_kyc_data(kyc_sender, "sigSENDER", 'certSENDER')
+
+    kyc_receiver = KYCData("""{
+        "payment_reference_id" : "PAYMENT_XYZ",
+        "type" : "individual",
+        "other_field" : "other data RECEIVER"
+    }""")
+
+    receiver = PaymentActor('BBBB', 'bbbb', 'none', [])
+    receiver.add_kyc_data(kyc_receiver, "sigSENDER", 'certSENDER')
+
+    action = PaymentAction(Decimal('10.00'), 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
+    payment = PaymentObject(sender, receiver, 'ref', 'orig_ref', 'desc', action)
+
+    import json
+    json_payment = json.dumps(payment.get_full_record())
+    new_payment = PaymentObject.create_from_record(json.loads(json_payment))
+    assert payment == new_payment
