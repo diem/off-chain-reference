@@ -160,6 +160,12 @@ class PaymentObject(SharedObject, StructureChecker):
         SharedObject.__init__(self)
         return self
 
+    def new_version(self, new_version = None):
+        ''' Also flatten object with a new version '''
+        clone = SharedObject.new_version(self, new_version)
+        clone.flatten()
+        return clone
+
     def add_recipient_signature(self, signature):
         ''' Update the recipient signature '''
         self.update({
