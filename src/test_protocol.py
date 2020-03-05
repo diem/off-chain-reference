@@ -43,7 +43,6 @@ class SampleCommand(ProtocolCommand):
         return 'CMD(%s)' % self.item()
 
 
-
 class FakeAddress(LibraAddress):
     def __init__(self, bit, addr):
         self.bit = bit

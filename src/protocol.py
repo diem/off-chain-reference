@@ -317,7 +317,7 @@ class CommandRequestObject:
     """Represents a command of the Off chain protocol"""
 
     def __init__(self, command):
-        self.seq = None         # The sequence in the local queue
+        self.seq = None          # The sequence in the local queue
         self.command_seq = None  # Only server sets this
         self.command = command
 
@@ -338,6 +338,7 @@ class CommandRequestObject:
         assert self.has_response()
         return self.response.status == 'success'
 
+
 class CommandResponseObject:
     """Represents a response to a command in the Off chain protocol"""
 
@@ -355,8 +356,6 @@ class CommandResponseObject:
         """
         return self.status == 'success' or (
                 self.status == 'failure' and not self.error.protocol_error)
-
-
 
 
 def make_success_response(request):
@@ -377,6 +376,7 @@ def make_protocol_error(request, code=None):
     response.status = 'failure'
     response.error = OffChainError(protocol_error=True, code=code)
     return response
+
 
 def make_command_error(request, code=None):
     """ Constructs a CommandResponse signaling a command failure.

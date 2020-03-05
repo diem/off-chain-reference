@@ -133,3 +133,13 @@ class StructureChecker:
             else:
                 if required == REQUIRED:
                     raise StructureException('Missing field: %s' % field)
+
+class JSONSerializable:
+    def get_json_data_dict(self):
+        ''' Get a data disctionary compatible with JSON serilization (json.dumps) '''
+        raise NotImplemented
+
+    @classmethod
+    def from_json_data_dict(cls):
+        ''' Construct the object from a serlialized JSON data dictionary (from json.loads). '''
+        raise NotImplemented
