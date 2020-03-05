@@ -134,8 +134,12 @@ class StructureChecker:
                 if required == REQUIRED:
                     raise StructureException('Missing field: %s' % field)
 
+# define serializaqtion flags
+JSON_NET = 0
+JSON_STORE = 1
+
 class JSONSerializable:
-    def get_json_data_dict(self):
+    def get_json_data_dict(self, flag):
         ''' Get a data disctionary compatible with JSON serilization (json.dumps) '''
         raise NotImplemented
 
