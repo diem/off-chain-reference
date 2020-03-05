@@ -13,12 +13,64 @@ class PaymentCommand(ProtocolCommand):
         self.depend_on = list(payment.extends)
         self.creates = [payment.get_version()]
         self.command = payment.get_full_record()
-        self.payment = payment
+        # self.payment = payment
 
     def get_object(self, version_number, dependencies):
-        if version_number == self.creates[0]:
-            return self.payment
+        ''' Constructs the new or updated objects '''
+        # First find dependencies & created objects
+        if len(self.depend_on) > 1:
+            raise PaymentLogicError("A payment can only depend on a single previous payment")
+        if len(self.creates) != 1:
+            raise PaymentLogicError("A payment always creates a new payment")
+        new_version = self.creates[0]
+
+        if len(self.depend_on) == 0:
+            payment = PaymentObject.create_from_record(self.command)
+            # payment.version = new_version
+            return payment
+
+        elif len(self.depend_on) == 1:
+            dep = self.depend_on[0]
+            if dep not in dependencies:
+                raise PaymentLogicError('Cound not find payment dependency: %s' % dep)
+            dep_object = dependencies[dep]
+            updated_payment = dep_object.new_version(new_version)
+            PaymentObject.from_full_record(self.command, base_instance=updated_payment)
+            return updated_payment
+
         assert False
+
+    def validity_checks(self, dependencies, maybe_own=True):
+        """ Implements the Validity check interface from executor """
+        # Heavy WIP -- clean up the interface with the Executor and errors
+
+        # Ensure that the update to the object is correct
+        self.get_object(self.creates[0], dependencies)
+
+        # TODO TODO TODO: Connect with the functions to check new payments
+        #                 But those need a business. Hmmm?
+
+        return True
+
+    def on_success(self):
+        # TODO: Notify business logic of success and process PaymentCommand
+        return
+
+    def on_fail(self):
+        # TODO: Notify business logic of failure
+        return
+
+
+    def get_json_data_dict(self, flag):
+        ''' Get a data disctionary compatible with JSON serilization (json.dumps) '''
+        data_dict = ProtocolCommand.get_json_data_dict(flag)
+        data_dict['diff'] = self.command
+        return data_dict
+
+    @classmethod
+    def from_json_data_dict(cls, data, flag):
+        ''' Construct the object from a serlialized JSON data dictionary (from json.loads). '''
+        raise NotImplemented
 
 
 class PaymentLogicError(Exception):
@@ -62,7 +114,6 @@ def check_new_update(business, payment, diff):
     '''
 
     new_payment = payment.new_version()
-    new_payment.flatten()
     new_payment.update(diff)
 
     # Ensure nothing on our side was changed by this update
@@ -97,7 +148,6 @@ def payment_process(business, payment):
     other_status = payment.data[other_role].data['status']
 
     new_payment = payment.new_version()
-    new_payment.flatten()
 
     try:
         if other_status == Status.abort:

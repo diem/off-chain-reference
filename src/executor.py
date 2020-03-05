@@ -23,11 +23,17 @@ class SharedObject:
         self.potentially_live = False   # Pending commands could make it live
         self.actually_live = False   # Successful command made it live
 
-    def new_version(self):
+    def new_version(self, new_version = None):
         ''' Make a deep copy of an object with a new version number '''
         clone = deepcopy(self)
         clone.extends = [ self.get_version() ]
-        clone.version = get_unique_string()
+        clone.version = new_version
+        if clone.version is None:
+            clone.version = get_unique_string()
+
+        # New object are neither potentially or actually live
+        clone.potentially_live = False   # Pending commands could make it live
+        clone.actually_live = False   # Successful command made it live
         return clone
 
     def get_version(self):
@@ -61,17 +67,18 @@ class ProtocolCommand(JSONSerializable):
         return set(self.creates)
 
     def validity_checks(self, dependencies, maybe_own=True):
-        return True
+        raise NotImplementedError('You need to subclass and override this method')
 
     def get_object(self, version_number, dependencies):
         assert version_number in self.new_object_versions()
         raise NotImplementedError('You need to subclass and override this method')
 
     def on_success(self):
-        pass
+        raise NotImplementedError('You need to subclass and override this method')
 
     def on_fail(self):
-        pass
+        raise NotImplementedError('You need to subclass and override this method')
+
 
     def get_json_data_dict(self, flag):
         ''' Get a data disctionary compatible with JSON serilization (json.dumps) '''
@@ -154,7 +161,6 @@ class ProtocolExecutor:
         return pos
 
     def set_success(self, seq_no):
-        # print('start success', self.last_confirmed, seq_no, len(self.seq))
         assert seq_no == self.last_confirmed
         self.last_confirmed += 1
 
@@ -167,7 +173,6 @@ class ProtocolExecutor:
 
         # Creates new objects
         new_versions = command.new_object_versions()
-        # print('success', seq_no, new_versions)
         for version in new_versions:
             obj = self.object_store[version]
             obj.set_actually_live(True)
@@ -175,7 +180,6 @@ class ProtocolExecutor:
         command.on_success()
 
     def set_fail(self, seq_no):
-        # print('start fail', self.last_confirmed, seq_no, len(self.seq))
         assert seq_no == self.last_confirmed
         self.last_confirmed += 1
 
@@ -244,3 +248,11 @@ class SampleCommand(ProtocolCommand):
 
     def json_type(self):
         return "SampleCommand"
+
+    def on_success(self):
+        # TODO: Notify business logic of success and process PaymentCommand
+        return
+
+    def on_fail(self):
+        # TODO: Notify business logic of failure
+        return

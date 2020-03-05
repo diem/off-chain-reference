@@ -28,16 +28,27 @@ class StructureChecker:
 
     def get_full_record(self):
         ''' Returns a hierarchy of diffs applied to this object and children'''
+        parse_further = {
+            field: field_type for field,
+            field_type,
+            _,
+            _ in self.fields if issubclass(
+                field_type,
+                StructureChecker)}
         diff = {}
         for new_diff in self.update_record:
             for field in new_diff:
-                if isinstance(new_diff[field], StructureChecker):
-                    diff[field] = new_diff[field].get_full_record()
-                else:
+                if not isinstance(new_diff[field], StructureChecker):
                     if type(new_diff[field]) in {str, int, list}:
                         diff[field] = new_diff[field]
                     else:
                         diff[field] = str(new_diff[field])
+        for field in parse_further:
+            if field in self.data:
+                inner_diff = self.data[field].get_full_record()
+                if inner_diff != {}:
+                    diff[field] = inner_diff
+
         return diff
 
     def __eq__(self, other):
@@ -50,7 +61,7 @@ class StructureChecker:
         return True
 
     @classmethod
-    def from_full_record(cls, diff):
+    def from_full_record(cls, diff, base_instance = None):
         ''' Constructs an instance from a diff '''
         parse_further = {
             field: field_type for field,
@@ -66,19 +77,31 @@ class StructureChecker:
             _ in cls.fields if not issubclass(
                 field_type,
                 StructureChecker)}
-        self = cls.__new__(cls)
-        StructureChecker.__init__(self)
+        if base_instance is None:
+            self = cls.__new__(cls)
+            StructureChecker.__init__(self)
+        else:
+            self = base_instance
         new_diff = {}
         for field in diff:
             if field in parse_further:
                 nested_class = parse_further[field]
-                new_diff[field] = nested_class.from_full_record(diff[field])
+
+                existing_instance = None
+                if field in self.data:
+                    # When the instance exists we update it in place, and
+                    # We do not register this as an field update
+                    # (to respect WRITE ONCE).
+                    existing_instance = self.data[field]
+                    self.data[field] = nested_class.from_full_record(diff[field], existing_instance)
+                else:
+                    new_diff[field] = nested_class.from_full_record(diff[field])
             else:
                 # Use default constructor of the type
                 cons = constructors[field]
                 new_diff[field] = cons(diff[field])
+
         self.update(new_diff)
-        self.flatten()
         return self
 
     def custom_update_checks(self, diff):
@@ -103,7 +126,7 @@ class StructureChecker:
                 # Check you can write again
                 if field in self.data and write_mode == WRITE_ONCE:
                     raise StructureException(
-                        'Wrong update: field %s cannot be changed')
+                        'Wrong update: field %s cannot be changed' % field)
 
         # Check we are not updating unknown fields
         for key in diff:

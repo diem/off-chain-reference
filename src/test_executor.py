@@ -28,6 +28,10 @@ def test_exec(basic_payment):
     pay3.data['sender'].change_status(Status.needs_stable_id)
     cmd3 = PaymentCommand(pay3)
 
+    assert cmd1.depend_on == []
+    assert cmd2.depend_on == cmd1.creates
+    assert cmd3.depend_on == cmd2.creates
+
     pe.sequence_next_command(cmd1)
     pe.sequence_next_command(cmd2)
     pe.sequence_next_command(cmd3)
@@ -61,6 +65,15 @@ def test_exec(basic_payment):
     pe.sequence_next_command(cmd5b)
 
     assert pe.count_potentially_live() == 7
+
+    ## Try to sequence a really bad command
+    pay_bad = pay4b.new_version()
+    pay_bad.data['sender'].change_status(Status.abort)
+    cmd_bad = PaymentCommand(pay_bad)
+    cmd_bad.command['action'] = { 'amount' :  1000000 }
+    with pytest.raises(StructureException):
+        pe.sequence_next_command(cmd_bad, do_not_sequence_errors=True)
+
 
     pe.set_success(0)
     pe.set_success(1)
