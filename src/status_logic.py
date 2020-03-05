@@ -49,64 +49,60 @@ class TypeEnumeration:
 
 Status = TypeEnumeration([
     'none',
-    'maybe_needs_kyc',           # Sender only
     'needs_stable_id',
     'needs_kyc_data',
-    'ready_for_settlement',
     'needs_recipient_signature', # Sender only
-    'signed',                    # Receiver only
+    'signed',                    # Receiver only: this is a virtual flag
+    'ready_for_settlement',
     'settled',
     'abort'
 ])
 
 # Sequence of status for sender
 sender_payment_valid_lattice = \
-    [ (Status.none, Status.maybe_needs_kyc),
-      (Status.maybe_needs_kyc, Status.needs_stable_id),
+    [ (Status.none, Status.needs_stable_id),
       (Status.needs_stable_id, Status.needs_kyc_data),
-      (Status.needs_kyc_data, Status.ready_for_settlement),
-      (Status.needs_kyc_data, Status.abort), # Branch &Terminal
-      (Status.ready_for_settlement, Status.needs_recipient_signature),
-      (Status.needs_recipient_signature, Status.settled) # Terminal
+      (Status.needs_kyc_data, Status.needs_recipient_signature),
+      (Status.needs_recipient_signature, Status.abort), # Branch &Terminal
+      (Status.needs_recipient_signature, Status.ready_for_settlement),
+      (Status.ready_for_settlement, Status.settled) # Terminal
     ]
 
 # Sequence of status for receiver
 receiver_payment_valid_lattice = \
     [ (Status.none, Status.needs_stable_id),
       (Status.needs_stable_id, Status.needs_kyc_data),
-      (Status.needs_kyc_data, Status.ready_for_settlement),
-      (Status.needs_kyc_data, Status.abort), # Branch & terminal
-      (Status.ready_for_settlement, Status.signed),
-      (Status.signed, Status.settled) # Terminal
+      (Status.needs_kyc_data, Status.signed),
+      (Status.signed, Status.abort), # Branch & terminal
+      (Status.signed, Status.ready_for_settlement),
+      (Status.ready_for_settlement, Status.settled) # Terminal
     ]
 
 status_heights_MUST = {
     Status.none : 100,
-    Status.maybe_needs_kyc : 200,
     Status.needs_stable_id : 200,
     Status.needs_kyc_data  : 200,
-    Status.ready_for_settlement : 400,
-    Status.needs_recipient_signature : 400,
+    Status.needs_recipient_signature : 200,
     Status.signed : 400,
+    Status.ready_for_settlement : 400,
     Status.settled : 800,
     Status.abort : 1000
 }
 
 status_heights_SHOULD = {
     Status.none : 100,
-    Status.maybe_needs_kyc : 200,
     Status.needs_stable_id : 300,
     Status.needs_kyc_data  : 400,
-    Status.ready_for_settlement : 500,
-    Status.needs_recipient_signature : 600,
-    Status.signed : 700,
+    Status.needs_recipient_signature : 500,
+    Status.signed : 600,
+    Status.ready_for_settlement : 700,
     Status.settled : 800,
     Status.abort : 1000
 }
 
 
 # Express cross party status dependencies & the starting states for process
-dependencies = [(Status.settled, {Status.settled, Status.signed}) ]
+dependencies = [(Status.ready_for_settlement, {Status.ready_for_settlement, Status.signed}) ]
 starting_states = [ (Status.none, Status.none) ]
 
 # Generic functions to create and compose processes
