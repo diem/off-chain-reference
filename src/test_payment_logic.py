@@ -1,6 +1,7 @@
 from payment_logic import *
 from payment import *
 from business import BusinessAsyncInterupt
+from utils import *
 
 from unittest.mock import MagicMock
 import pytest
@@ -13,6 +14,12 @@ def basic_payment():
     action = PaymentAction(Decimal('10.00'), 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
     payment = PaymentObject(sender, receiver, 'ref', 'orig_ref', 'desc', action)
     return payment
+
+def test_payment_command_serialization(basic_payment):
+    cmd = PaymentCommand(basic_payment)
+    data = cmd.get_json_data_dict(JSON_NET)
+    cmd2 = PaymentCommand.from_json_data_dict(data, JSON_NET)
+    assert cmd == cmd2
 
 
 def test_payment_create_from_sender(basic_payment):
