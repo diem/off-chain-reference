@@ -40,7 +40,7 @@ class PaymentCommand(ProtocolCommand):
 
         assert False
 
-    def validity_checks(self, dependencies, maybe_own=True):
+    def validity_checks(self, context, dependencies, maybe_own=True):
         """ Implements the Validity check interface from executor """
         # Heavy WIP -- clean up the interface with the Executor and errors
 

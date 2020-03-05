@@ -111,7 +111,7 @@ class RandomRun(object):
                             client.sequence_command_local(c)
                         else:
                             server.sequence_command_local(c)
-                    except ExecutorCannotSequence:
+                    except ExecutorException:
                         commands.insert(0, c)
 
             # Random drop
@@ -204,6 +204,8 @@ def test_protocol_server_client_benign():
 
     # Create a server request for a command
     server.sequence_command_local(SampleCommand('Hello'))
+    assert len(server.get_final_sequence()) > 0
+
     msg_list = server.tap()
     assert len(msg_list) == 1
     request = msg_list.pop()
