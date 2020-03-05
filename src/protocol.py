@@ -1,5 +1,6 @@
 from copy import deepcopy
-from executor import ProtocolExecutor
+from executor import ProtocolExecutor, ExecutorCannotSequence
+from protocol_messages import *
 
 class OffChainVASP:
     """Manages the off-chain protocol on behalf of one VASP"""
@@ -199,12 +200,15 @@ class VASPPairChannel:
             self.other_requests += [request]
 
             seq = self.next_final_sequence()
+            old_len = len(self.executor.seq)
             try:
                 self.executor.sequence_next_command(request.command, \
                     do_not_sequence_errors = False, own=False)
                 response = make_success_response(request)
-            except Exception as e:
+            except ExecutorCannotSequence as e:
                 response = make_command_error(request, e)
+            new_len = len(self.executor.seq)
+            assert new_len == old_len + 1
 
             request.response = response
             request.response.command_seq = seq
@@ -284,6 +288,8 @@ class VASPPairChannel:
             elif response.error.code == 'malformed':
                 # TODO: log a warning
                 pass # Implementation bug was caught.
+            elif response.error.code == 'conflict':
+                pass
             else:
                 # Manage other errors
                 # Implementation bug was caught.
@@ -305,57 +311,6 @@ class VASPPairChannel:
             if not request.has_response():
                 return True
         return False
-
-
-class OffChainError:
-    def __init__(self, protocol_error=True, code=None):
-        self.protocol_error = protocol_error
-        self.code = code
-
-
-class CommandRequestObject:
-    """Represents a command of the Off chain protocol"""
-
-    def __init__(self, command):
-        self.seq = None          # The sequence in the local queue
-        self.command_seq = None  # Only server sets this
-        self.command = command
-
-        # Indicates whether the command was been confirmed by the other VASP
-        self.response = None
-
-    def is_same_command(self, other):
-        """ Returns true if the other command is the same as this one,
-            Used to detect conflicts in case of buggy corresponding VASP."""
-        return self.command == other.command
-
-    def has_response(self):
-        """ Returns true if request had a response, false otherwise """
-        return self.response is not None
-
-    def is_success(self):
-        """ Returns true if the response was a success """
-        assert self.has_response()
-        return self.response.status == 'success'
-
-
-class CommandResponseObject:
-    """Represents a response to a command in the Off chain protocol"""
-
-    def __init__(self):
-        # Start with no data
-        self.seq = None
-        self.command_seq = None
-        self.status = None
-        self.error = None
-
-
-    def not_protocol_failure(self):
-        """ Returns True if the request has a response that is not a protocol
-            failure (and we can recover from it)
-        """
-        return self.status == 'success' or (
-                self.status == 'failure' and not self.error.protocol_error)
 
 
 def make_success_response(request):

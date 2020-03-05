@@ -6,41 +6,7 @@ from protocol import *
 from executor import *
 import random
 
-# Define mock classes
 
-class SampleObject(SharedObject):
-    def __init__(self, item):
-        SharedObject.__init__(self)
-        self.item = item
-
-class SampleCommand(ProtocolCommand):
-    def __init__(self, command, deps=None):
-        command = SampleObject(command)
-        if deps is None:
-            self.depend_on = []
-        else:
-            self.depend_on = deps
-        self.creates   = [ command.item ]
-        self.command   = command
-        self.always_happy = True
-        self.commit_status = None
-
-    def get_object(self, version_number, dependencies):
-        return self.command
-
-    def item(self):
-        return self.command.item
-
-    def __eq__(self, other):
-        return self.depend_on == other.depend_on \
-            and self.creates == other.creates \
-            and self.command.item == other.command.item
-
-    def validity_checks(self, dependencies, maybe_own=True):
-        return maybe_own or self.always_happy or random.random() > 0.75
-
-    def __str__(self):
-        return 'CMD(%s)' % self.item()
 
 
 class FakeAddress(LibraAddress):
@@ -612,3 +578,32 @@ def test_dependencies():
     assert sum([mapcmd[8], mapcmd[9]]) == 1
     # All items commit (except those with common deps)
     assert sum(mapcmd.values()) == 8
+
+def test_json_serlialize():
+
+    # Test Commands (to ensure correct debug)
+    cmd = SampleCommand(1, [2, 3])
+    cmd2 = SampleCommand(10, [2, 3])
+    data = cmd.get_json_data_dict(JSON_NET)
+    cmd2 = SampleCommand.from_json_data_dict(data, JSON_NET)
+    assert cmd == cmd2
+
+    # Test Request, Response
+    req0 = CommandRequestObject(cmd)
+    req2 = CommandRequestObject(cmd2)
+    req0.seq = 10
+    req0.command_seq = 15
+    req0.status = 'success'
+
+    data = req0.get_json_data_dict(JSON_STORE)
+    assert data is not None
+    req1 = CommandRequestObject.from_json_data_dict(data, JSON_STORE)
+    assert req0 == req1
+    assert req1 != req2
+
+    req0.response = make_protocol_error(req0, 'The error code')
+    data_err = req0.get_json_data_dict(JSON_STORE)
+    assert data_err is not None
+    assert data_err['response'] is not None
+    req_err = CommandRequestObject.from_json_data_dict(data_err, JSON_STORE)
+    assert req0 == req_err

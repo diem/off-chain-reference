@@ -138,12 +138,15 @@ class StructureChecker:
 JSON_NET = 0
 JSON_STORE = 1
 
+class JSONParsingError(Exception):
+    pass
+
 class JSONSerializable:
     def get_json_data_dict(self, flag):
         ''' Get a data disctionary compatible with JSON serilization (json.dumps) '''
         raise NotImplemented
 
     @classmethod
-    def from_json_data_dict(cls):
+    def from_json_data_dict(cls, data, flag):
         ''' Construct the object from a serlialized JSON data dictionary (from json.loads). '''
         raise NotImplemented
