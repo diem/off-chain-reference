@@ -71,7 +71,7 @@ def test_exec(basic_payment):
     pay_bad.data['sender'].change_status(Status.abort)
     cmd_bad = PaymentCommand(pay_bad)
     cmd_bad.command['action'] = { 'amount' :  1000000 }
-    with pytest.raises(StructureException):
+    with pytest.raises(ExecutorException):
         pe.sequence_next_command(cmd_bad, do_not_sequence_errors=True)
 
 

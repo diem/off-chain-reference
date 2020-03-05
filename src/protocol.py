@@ -1,5 +1,5 @@
 from copy import deepcopy
-from executor import ProtocolExecutor, ExecutorCannotSequence
+from executor import ProtocolExecutor, ExecutorException
 from protocol_messages import *
 
 class OffChainVASP:
@@ -52,17 +52,21 @@ class VASPPairChannel:
         self.pending_requests = []
 
         # TODO[issue #7]: persist and recover the command sequences
+        # <STARTS to persist>
         self.my_requests = []
         self.my_next_seq = 0
         self.other_requests = []
         self.other_next_seq = 0
-
         # The final sequence
         self.executor = ProtocolExecutor()
+        # <ENDS to persist>
 
         # Response cache
         self.response_cache = {}
 
+    def set_business_context(self, context):
+        ''' Sets the business context for the executor '''
+        self.executor.set_business_context(context)
 
     def next_final_sequence(self):
         """ Returns the next sequence number in the common sequence."""
@@ -205,7 +209,7 @@ class VASPPairChannel:
                 self.executor.sequence_next_command(request.command, \
                     do_not_sequence_errors = False, own=False)
                 response = make_success_response(request)
-            except ExecutorCannotSequence as e:
+            except ExecutorException as e:
                 response = make_command_error(request, e)
             new_len = len(self.executor.seq)
             assert new_len == old_len + 1

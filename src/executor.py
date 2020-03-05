@@ -99,12 +99,18 @@ class ProtocolCommand(JSONSerializable):
 
 class ProtocolExecutor:
     def __init__(self):
+        # <STARTS to persist>
         self.seq = []
         self.last_confirmed = 0
-
         # This is the primary store of shared objects.
         # It maps version numbers -> objects
         self.object_store = { } # TODO: persist this structure
+        # <ENDS to persist>
+
+        self.context = None
+
+    def set_business_context(self, context):
+        self.context = context
 
     def next_seq(self):
         return len(self.seq)
@@ -127,36 +133,38 @@ class ProtocolExecutor:
 
     def sequence_next_command(self, command, do_not_sequence_errors = False, own=True):
         dependencies = command.get_dependencies()
+        all_good = False
+        pos = None
 
-        if own:
+        try:
             # For our own commands we do speculative execution
-            predicate = lambda obj: obj.get_potentially_live()
-        else:
             # For the other commands we do actual execution
-            predicate = lambda obj: obj.get_actually_live()
+            predicate_own = lambda obj: obj.get_potentially_live()
+            predicate_other = lambda obj: obj.get_actually_live()
+            predicate = [predicate_other, predicate_own][own]
 
-        all_good = self.all_true(dependencies, predicate)
+            all_good = self.all_true(dependencies, predicate)
+            if not all_good:
+                raise ExecutorException('Required objects do not exist')
 
-        # TODO: Here we need to pass the business logic.
-        all_good &= command.validity_checks(self.object_store, own)
+            command.validity_checks(self.context, self.object_store, own)
 
-        if not all_good and do_not_sequence_errors:
-            # TODO: Define proper exception
-            raise ExecutorCannotSequence('Cannot sequence')
+            if all_good:
+                new_versions = command.new_object_versions()
+                for version in new_versions:
+                    obj = command.get_object(version, self.object_store)
+                    obj.set_potentially_live(True)
+                    self.object_store[version] = obj
 
-        pos = len(self.seq)
-        self.seq += [ command ]
+        except Exception as e:
+            all_good = False
+            raise ExecutorException(*e.args)
 
-        if not all_good:
-            # TODO: Define proper exception
-            raise ExecutorCannotSequence('Invalid ... ')
-
-        if all_good:
-            new_versions = command.new_object_versions()
-            for version in new_versions:
-                obj = command.get_object(version, self.object_store)
-                obj.set_potentially_live(True)
-                self.object_store[version] = obj
+        finally:
+            # Sequence if all is good, or if we were asked to
+            if all_good or not do_not_sequence_errors:
+                pos = len(self.seq)
+                self.seq += [ command ]
 
         return pos
 
@@ -193,7 +201,7 @@ class ProtocolExecutor:
 
         command.on_fail()
 
-class ExecutorCannotSequence(Exception):
+class ExecutorException(Exception):
     pass
 
 # Define mock classes
@@ -215,7 +223,6 @@ class SampleCommand(ProtocolCommand):
         self.command   = command
         self.always_happy = True
 
-
     def get_object(self, version_number, dependencies):
         return self.command
 
@@ -227,8 +234,10 @@ class SampleCommand(ProtocolCommand):
             and self.creates == other.creates \
             and self.command.item == other.command.item
 
-    def validity_checks(self, dependencies, maybe_own=True):
-        return maybe_own or self.always_happy or random.random() > 0.75
+    def validity_checks(self, context, dependencies, maybe_own=True):
+        all_good = maybe_own or self.always_happy or random.random() > 0.75
+        if not all_good:
+            raise Exception('SimpleCommand checks failure')
 
     def __str__(self):
         return 'CMD(%s)' % self.item()
