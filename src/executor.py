@@ -93,9 +93,15 @@ class ProtocolCommand(JSONSerializable):
         return data_dict
 
     @classmethod
-    def from_json_data_dict(cls, data):
+    def from_json_data_dict(cls, data, flag):
         ''' Construct the object from a serlialized JSON data dictionary (from json.loads). '''
-        raise NotImplemented
+        self = cls.__new__(cls)
+        self.depend_on = list(data['depend_on'])
+        self.creates = list(data['creates'])
+        if flag == JSON_STORE:
+            self.commit_status = data["commit_status"]
+        return self
+
 
 class ProtocolExecutor:
     def __init__(self):

@@ -15,6 +15,11 @@ class PaymentCommand(ProtocolCommand):
         self.command = payment.get_full_record()
         # self.payment = payment
 
+    def __eq__(self, other):
+        return self.depend_on == other.depend_on \
+           and self.creates == other.creates \
+           and self.command == other.command
+
     def get_object(self, version_number, dependencies):
         ''' Constructs the new or updated objects '''
         # First find dependencies & created objects
@@ -63,15 +68,18 @@ class PaymentCommand(ProtocolCommand):
 
     def get_json_data_dict(self, flag):
         ''' Get a data disctionary compatible with JSON serilization (json.dumps) '''
-        data_dict = ProtocolCommand.get_json_data_dict(flag)
+        data_dict = ProtocolCommand.get_json_data_dict(self, flag)
         data_dict['diff'] = self.command
         return data_dict
 
     @classmethod
     def from_json_data_dict(cls, data, flag):
         ''' Construct the object from a serlialized JSON data dictionary (from json.loads). '''
-        raise NotImplemented
-
+        self = super().from_json_data_dict(data, flag)
+        # Thus super() is magic, but do not worry we get the right type:
+        assert isinstance(self, PaymentCommand)
+        self.command = data['diff']
+        return self
 
 class PaymentLogicError(Exception):
     pass
