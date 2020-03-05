@@ -21,7 +21,7 @@ def test_exec(basic_payment):
     cmd1 = PaymentCommand(basic_payment)
 
     pay2 = basic_payment.new_version()
-    pay2.data['sender'].change_status(Status.maybe_needs_kyc)
+    pay2.data['sender'].change_status(Status.needs_stable_id)
     cmd2 = PaymentCommand(pay2)
 
     pay3 = pay2.new_version()
