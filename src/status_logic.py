@@ -32,6 +32,7 @@ V1 States (TODO)
 """
 
 from collections import defaultdict
+from utils import StructureException
 
 class TypeEnumeration:
     ''' Express & Validate status values '''
