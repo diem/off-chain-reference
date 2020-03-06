@@ -16,8 +16,6 @@ def basic_payment():
     return payment
 
 
-
-
 def test_exec(basic_payment):
     bcm = MagicMock(spec=BusinessContext)
     pe = ProtocolExecutor()
@@ -71,14 +69,13 @@ def test_exec(basic_payment):
 
     assert pe.count_potentially_live() == 7
 
-    ## Try to sequence a really bad command
+    # Try to sequence a really bad command
     pay_bad = pay4b.new_version()
     pay_bad.data['sender'].change_status(Status.abort)
     cmd_bad = PaymentCommand(pay_bad)
-    cmd_bad.command['action'] = { 'amount' :  1000000 }
+    cmd_bad.command['action'] = {'amount':  1000000}
     with pytest.raises(ExecutorException):
         pe.sequence_next_command(cmd_bad, do_not_sequence_errors=True)
-
 
     pe.set_success(0)
     pe.set_success(1)
@@ -97,9 +94,3 @@ def test_exec(basic_payment):
 
     assert pe.count_potentially_live() == 1
     assert pe.count_actually_live() == 1
-
-    pay6 = pay5a.new_version()
-    pay6.data['sender'].change_status(Status.abort)
-    cmd6 = PaymentCommand(pay6)
-
-    pe.sequence_next_command(cmd6)
