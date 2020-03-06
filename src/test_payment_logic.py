@@ -101,7 +101,8 @@ def test_payment_process_receiver_new_payment(basic_payment):
     bcm.ready_for_settlement.side_effect = [False]
 
     assert basic_payment.data['receiver'].data['status'] == Status.none
-    new_payment = payment_process(bcm, basic_payment)
+    pp = PaymentProcessor(bcm)
+    new_payment = pp.payment_process(basic_payment)
 
     assert new_payment.data['receiver'].data['status'] == Status.needs_kyc_data
 
@@ -114,7 +115,8 @@ def test_payment_process_receiver_new_payment(basic_payment):
     bcm.want_single_payment_settlement.side_effect = [True]
     bcm.has_settled.side_effect = [False]
 
-    new_payment2 = payment_process(bcm, new_payment)
+    pp = PaymentProcessor(bcm)
+    new_payment2 = pp.payment_process(new_payment)
     assert new_payment2.data['receiver'].data['status'] == Status.ready_for_settlement
 
     bcm.is_recipient.side_effect = [True, True]
@@ -125,7 +127,8 @@ def test_payment_process_receiver_new_payment(basic_payment):
     bcm.want_single_payment_settlement.side_effect = [True]
     bcm.has_settled.side_effect = [True]
 
-    new_payment3 = payment_process(bcm, new_payment2)
+    pp = PaymentProcessor(bcm)
+    new_payment3 = pp.payment_process(new_payment2)
     assert new_payment3.data['receiver'].data['status'] == Status.settled
 
 
@@ -133,8 +136,10 @@ def test_payment_process_interrupt(basic_payment):
     bcm = MagicMock(spec=BusinessContext)
     bcm.is_recipient.side_effect = [True, True]
     bcm.check_account_existence.side_effect = [None]
-    bcm.next_kyc_level_to_request.side_effect = [BusinessAsyncInterupt]
-    new_payment = payment_process(bcm, basic_payment)
+    bcm.next_kyc_level_to_request.side_effect = [BusinessAsyncInterupt(1234)]
+    
+    pp = PaymentProcessor(bcm)
+    new_payment = pp.payment_process(basic_payment)
     assert new_payment.data['receiver'].data['status'] == Status.none
 
 
@@ -143,5 +148,7 @@ def test_payment_process_abort(basic_payment):
     bcm.is_recipient.side_effect = [True, True]
     bcm.check_account_existence.side_effect = [None]
     bcm.next_kyc_level_to_request.side_effect = [BusinessForceAbort]
-    new_payment = payment_process(bcm, basic_payment)
+
+    pp = PaymentProcessor(bcm)
+    new_payment = pp.payment_process(basic_payment)
     assert new_payment.data['receiver'].data['status'] == Status.abort

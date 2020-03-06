@@ -5,11 +5,17 @@
 
 # A model for VASP business environment
 
-
 class BusinessAsyncInterupt(Exception):
     ''' Indicates that the result cannot be produced immediately,
         and the call must be done again once the result is ready. '''
-    pass
+    
+    def __init__(self, callback_ID):
+        ''' Set a callback ID to signal which call was interupted '''
+        self.callback_ID = callback_ID
+    
+    def get_callback_ID(self):
+        ''' Return the callback ID associated with the interrupted call '''
+        return self.callback_ID
 
 
 class BusinessNotAuthorized(Exception):
@@ -29,21 +35,6 @@ class BusinessForceAbort(Exception):
 
 
 class BusinessContext:
-
-    def __init__(self):
-        self.callbacks = {}
-
-    def register_callback(self, payment, callback):
-        if payment not in self.callbacks:
-            self.callbacks[payment] = callback
-
-    def resume_payment(self, payment):
-        if payment in self.callbacks:
-            callback = self.callbacks[payment]
-            callback()
-            del self.callbacks[payment]
-
-    # Low level business function, to manage channels with other VASPs
 
     def open_channel_to(self, other_vasp_info):
         ''' Requests authorization to other a channel to another VASP.

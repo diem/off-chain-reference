@@ -8,7 +8,6 @@ from payment import Status, PaymentObject
 
 
 class PaymentCommand(ProtocolCommand):
-
     def __init__(self, payment):
         ''' Creates a new Payment command based on the diff from the given payment'''
         ProtocolCommand.__init__(self)
@@ -144,79 +143,108 @@ def check_new_update(business, payment, diff):
 
 
 # The logic to process a payment from either side.
+class PaymentProcessor():
 
-def payment_process(business, payment):
-    ''' Processes a payment that was just updated, and returns a
-        new payment with potential updates. This function may be
-        called multiple times for the same payment to support
-        async business operations and recovery.
-    '''
+    def __init__(self, business):
+        self.business = business
 
-    is_receiver = business.is_recipient()
-    role = ['sender', 'receiver'][is_receiver]
-    other_role = ['sender', 'receiver'][not is_receiver]
+        # TODO: Persit callbacks?
+        self.callbacks = {}
+        self.ready = {}
+    
+    def notify_callback(self, callback_ID):
+        ''' Notify the processor that the callback with a specific ID has returned, and is ready to provide an answer. '''
+        assert callback_ID in self.callbacks
+        obj = self.callbacks[callback_ID]
+        del self.callbacks[callback_ID]
+        # TODO: should we retrive here the latest version of the object?
+        self.ready[callback_ID] = obj
+    
+    def payment_process_ready(self, payment):
+        ''' Processes any objects for which the callbacks have returned '''
+        updated_objects = []
+        for (callback_ID, obj) in list(self.ready.items()):
+            new_obj = self.payment_process(obj)
+            del self.ready[callback_ID]
+            if new_obj is not None:
+                updated_objects += [ new_obj ] 
+        return new_obj
 
-    status = payment.data[role].data['status']
-    current_status = status
-    other_status = payment.data[other_role].data['status']
+    def payment_process(self, payment):
+        ''' Processes a payment that was just updated, and returns a
+            new payment with potential updates. This function may be
+            called multiple times for the same payment to support
+            async business operations and recovery.
+        '''
+        business = self.business
 
-    new_payment = payment.new_version()
+        is_receiver = business.is_recipient()
+        role = ['sender', 'receiver'][is_receiver]
+        other_role = ['sender', 'receiver'][not is_receiver]
 
-    try:
-        if other_status == Status.abort:
-            # We set our status as abort
-            # TODO: ensure valid abort from the other side elsewhere
+        status = payment.data[role].data['status']
+        current_status = status
+        other_status = payment.data[other_role].data['status']
+
+        new_payment = payment.new_version()
+
+        try:
+            if other_status == Status.abort:
+                # We set our status as abort
+                # TODO: ensure valid abort from the other side elsewhere
+                current_status = Status.abort
+
+            if current_status in {Status.none}:
+                business.check_account_existence(payment)
+
+            if current_status in {Status.none,
+                                Status.needs_stable_id,
+                                Status.needs_kyc_data,
+                                Status.needs_recipient_signature}:
+
+                # Request KYC -- this may be async in case of need for user input
+                current_status = business.next_kyc_level_to_request(payment)
+
+                # Provide KYC -- this may be async in case of need for user input
+                kyc_to_provide = business.next_kyc_to_provide(payment)
+
+                if Status.needs_stable_id in kyc_to_provide:
+                    stable_id = business.provide_stable_id(payment)
+                    new_payment.data[role].add_stable_id(stable_id)
+
+                if Status.needs_kyc_data in kyc_to_provide:
+                    extended_kyc = business.get_extended_kyc(payment)
+                    new_payment.data[role].add_kyc_data(*extended_kyc)
+
+                if role == 'receiver' and other_status == Status.needs_recipient_signature:
+                    signature = business.get_recipient_signature(payment)
+                    new_payment.add_recipient_signature(signature)
+
+            # Check if we have all the KYC we need
+            ready = business.ready_for_settlement(payment)
+            if ready:
+                current_status = Status.ready_for_settlement
+
+            if current_status == Status.ready_for_settlement and business.has_settled(payment):
+                current_status = Status.settled
+
+        except BusinessAsyncInterupt as e:
+            # The business layer needs to do a long duration check.
+            # Cannot make quick progress, and must response with current status.
+            new_payment.data[role].change_status(current_status)
+
+            # TODO: Should we pass the new or old object here?
+            self.callbacks[e.get_callback_ID] = new_payment
+
+        except BusinessForceAbort:
+
+            # We cannot abort once we said we are ready_for_settlement or beyond
             current_status = Status.abort
 
-        if current_status in {Status.none}:
-            business.check_account_existence(payment)
+        finally:
+            # TODO[issue #4]: test is the resulting status is valid
+            # TODO[issue #5]: test if there are any changes to the object, to
+            #       send to the other side as a command.
+            new_payment.data[role].change_status(current_status)
 
-        if current_status in {Status.none,
-                              Status.needs_stable_id,
-                              Status.needs_kyc_data,
-                              Status.needs_recipient_signature}:
-
-            # Request KYC -- this may be async in case of need for user input
-            current_status = business.next_kyc_level_to_request(payment)
-
-            # Provide KYC -- this may be async in case of need for user input
-            kyc_to_provide = business.next_kyc_to_provide(payment)
-
-            if Status.needs_stable_id in kyc_to_provide:
-                stable_id = business.provide_stable_id(payment)
-                new_payment.data[role].add_stable_id(stable_id)
-
-            if Status.needs_kyc_data in kyc_to_provide:
-                extended_kyc = business.get_extended_kyc(payment)
-                new_payment.data[role].add_kyc_data(*extended_kyc)
-
-            if role == 'receiver' and other_status == Status.needs_recipient_signature:
-                signature = business.get_recipient_signature(payment)
-                new_payment.add_recipient_signature(signature)
-
-        # Check if we have all the KYC we need
-        ready = business.ready_for_settlement(payment)
-        if ready:
-            current_status = Status.ready_for_settlement
-
-        if current_status == Status.ready_for_settlement and business.has_settled(payment):
-            current_status = Status.settled
-
-    except BusinessAsyncInterupt:
-        # The business layer needs to do a long duration check.
-        # Cannot make quick progress, and must response with current status.
-        new_payment.data[role].change_status(current_status)
-        business.register_callback(new_payment, payment_process)
-
-    except BusinessForceAbort:
-
-        # We cannot abort once we said we are ready_for_settlement or beyond
-        current_status = Status.abort
-
-    finally:
-        # TODO[issue #4]: test is the resulting status is valid
-        # TODO[issue #5]: test if there are any changes to the object, to
-        #       send to the other side as a command.
-        new_payment.data[role].change_status(current_status)
-
-    return new_payment
+        return new_payment
