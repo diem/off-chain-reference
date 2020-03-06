@@ -4,7 +4,6 @@
 from utils import JSONSerializable, JSON_NET, JSON_STORE
 
 import random
-
 from os import urandom
 from base64 import standard_b64encode
 from copy import deepcopy
@@ -166,6 +165,8 @@ class ProtocolExecutor:
                     obj = command.get_object(version, self.object_store)
                     obj.set_potentially_live(True)
                     self.object_store[version] = obj
+                
+        # TODO: have a less catch-all exception here to detect expected vs. unexpected exceptions
         except Exception as e:
             all_good = False
             type_str = str(type(e)) +": "+str(e)

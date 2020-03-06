@@ -5,7 +5,11 @@ from copy import deepcopy
 from protocol import *
 from executor import *
 from protocol_messages import *
+from business import BusinessContext
 import random
+
+from unittest.mock import MagicMock
+import pytest
 
 
 class FakeAddress(LibraAddress):
@@ -23,11 +27,16 @@ class FakeAddress(LibraAddress):
         return self.addr >= other.addr
 
 class FakeVASPInfo(VASPInfo):
-    def __init__(self, parent_addr):
+    def __init__(self, parent_addr, own_address = None):
         self.parent = parent_addr
+        self.own_address = own_address
 
     def get_parent_address(self):
         return self.parent
+    
+    def get_libra_address(self):
+        """ The settlement Libra address for this channel"""
+        return self.own_address
 
 
 def monkey_tap(pair):
@@ -611,3 +620,17 @@ def test_json_serlialize():
     assert data_err['response'] is not None
     req_err = CommandRequestObject.from_json_data_dict(data_err, JSON_STORE)
     assert req0 == req_err
+
+def test_VASProot():
+    a0 = FakeVASPInfo(FakeAddress(0, 10), FakeAddress(0, 40))
+    a1 = FakeVASPInfo(FakeAddress(0, 20), FakeAddress(0, 50))
+    a2 = FakeVASPInfo(FakeAddress(0, 30), FakeAddress(0, 60))
+    bcm = MagicMock(spec=BusinessContext)
+    vasp = OffChainVASP(a0, bcm)
+
+    # Check our own address is good
+    assert vasp.my_vasp_info() == a0
+    # Calling twice gives the same instance (use 'is')
+    assert vasp.get_channel(a1) is vasp.get_channel(a1)
+    # Different VASPs have different objects
+    assert vasp.get_channel(a1) is not vasp.get_channel(a2)
