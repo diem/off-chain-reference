@@ -10,6 +10,9 @@ class StructureException(Exception):
 
 
 class StructureChecker:
+
+    fields = {}
+
     def __init__(self):
         assert self.fields
         self.data = {}
@@ -167,9 +170,9 @@ class JSONParsingError(Exception):
 class JSONSerializable:
     def get_json_data_dict(self, flag):
         ''' Get a data disctionary compatible with JSON serilization (json.dumps) '''
-        raise NotImplemented
+        raise NotImplementedError()
 
     @classmethod
     def from_json_data_dict(cls, data, flag):
         ''' Construct the object from a serlialized JSON data dictionary (from json.loads). '''
-        raise NotImplemented
+        raise NotImplementedError()

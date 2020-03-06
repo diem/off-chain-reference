@@ -4,9 +4,8 @@ from copy import deepcopy
 
 from protocol import *
 from executor import *
+from protocol_messages import *
 import random
-
-
 
 
 class FakeAddress(LibraAddress):

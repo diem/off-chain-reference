@@ -1,6 +1,6 @@
 from copy import deepcopy
 from executor import ProtocolExecutor, ExecutorException
-from protocol_messages import *
+from protocol_messages import CommandRequestObject, CommandResponseObject, OffChainError
 
 class OffChainVASP:
     """Manages the off-chain protocol on behalf of one VASP"""
