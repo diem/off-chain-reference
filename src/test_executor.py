@@ -1,7 +1,9 @@
 from executor import *
 from payment import *
 from payment_logic import PaymentCommand
+from business import BusinessContext
 
+from unittest.mock import MagicMock
 import pytest
 
 
@@ -17,7 +19,10 @@ def basic_payment():
 
 
 def test_exec(basic_payment):
+    bcm = MagicMock(spec=BusinessContext)
     pe = ProtocolExecutor()
+    pe.set_business_context(bcm)
+
     cmd1 = PaymentCommand(basic_payment)
 
     pay2 = basic_payment.new_version()

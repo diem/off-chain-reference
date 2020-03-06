@@ -55,6 +55,11 @@ class PaymentCommand(ProtocolCommand):
         # TODO TODO TODO: Connect with the functions to check new payments
         #                 But those need a business. Hmmm?
 
+        if self.depend_on == []:
+            check_new_payment(context, self.command)
+        else:
+            check_new_update(context, dependencies[self.depend_on[0]], self.command)
+
         return True
 
     def on_success(self):
@@ -122,7 +127,7 @@ def check_new_update(business, payment, diff):
     '''
 
     new_payment = payment.new_version()
-    new_payment.update(diff)
+    PaymentObject.from_full_record(diff, base_instance=new_payment)
 
     # Ensure nothing on our side was changed by this update
     role = ['sender', 'receiver'][business.is_recipient(new_payment)]
