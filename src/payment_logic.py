@@ -107,13 +107,15 @@ def check_new_payment(business, initial_diff):
     new_payment = PaymentObject.create_from_record(initial_diff)
 
     role = ['sender', 'receiver'][business.is_recipient(new_payment)]
-
+    other_role = ['sender', 'receiver'][role == 'sender']
+    other_status = new_payment.data[other_role].data['status']
     if new_payment.data[role].data['status'] != Status.none:
         raise PaymentLogicError('Sender set receiver status or vice-versa.')
 
-    other_role = ['sender', 'receiver'][role == 'sender']
-    if other_role == 'receiver' and new_payment.data[other_role].data['status'] == Status.needs_recipient_signature:
-        raise PaymentLogicError('Receiver cannot be in %s.' % Status.needs_recipient_signature)
+    if other_role == 'receiver' and other_status == Status.needs_recipient_signature:
+        raise PaymentLogicError(
+            'Receiver cannot be in %s.' % Status.needs_recipient_signature
+        )
 
     business.validate_kyc_signature(new_payment)
     business.validate_recipient_signature(new_payment)
@@ -178,7 +180,7 @@ class PaymentProcessor():
         # TODO: Persit callbacks?
         self.callbacks = {}
         self.ready = {}
-    
+
     def notify_callback(self, callback_ID):
         ''' Notify the processor that the callback with a specific ID has returned, and is ready to provide an answer. '''
         assert callback_ID in self.callbacks
@@ -186,7 +188,7 @@ class PaymentProcessor():
         del self.callbacks[callback_ID]
         # TODO: should we retrive here the latest version of the object?
         self.ready[callback_ID] = obj
-    
+
     def payment_process_ready(self):
         ''' Processes any objects for which the callbacks have returned '''
         updated_objects = []
@@ -194,7 +196,7 @@ class PaymentProcessor():
             new_obj = self.payment_process(obj)
             del self.ready[callback_ID]
             if new_obj.has_changed():
-                updated_objects += [ new_obj ] 
+                updated_objects += [ new_obj ]
         return updated_objects
 
     def payment_process(self, payment):
@@ -225,9 +227,9 @@ class PaymentProcessor():
                 business.check_account_existence(payment)
 
             if current_status in {Status.none,
-                                Status.needs_stable_id,
-                                Status.needs_kyc_data,
-                                Status.needs_recipient_signature}:
+                                  Status.needs_stable_id,
+                                  Status.needs_kyc_data,
+                                  Status.needs_recipient_signature}:
 
                 # Request KYC -- this may be async in case of need for user input
                 current_status = business.next_kyc_level_to_request(payment)
