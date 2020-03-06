@@ -29,9 +29,8 @@ class OffChainError(JSONSerializable):
 class CommandRequestObject(JSONSerializable):
     """Represents a command of the Off chain protocol"""
 
-    type_map = {
-        "SampleCommand": SampleCommand
-    }
+    # Maps strings to class types for deserialization
+    type_map = {}
 
     def __init__(self, command):
         self.seq = None          # The sequence in the local queue
@@ -41,6 +40,11 @@ class CommandRequestObject(JSONSerializable):
 
         # Indicates whether the command was been confirmed by the other VASP
         self.response = None
+
+    @classmethod
+    def register_command_type(cls, CommandClass):
+        ''' Register a subclass of Command to allow for json serialization'''
+        cls.type_map[CommandClass.json_type()] = CommandClass
 
     def __eq__(self, other):
         ''' Define equality as field equality '''

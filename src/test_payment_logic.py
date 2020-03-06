@@ -15,12 +15,17 @@ def basic_payment():
     payment = PaymentObject(sender, receiver, 'ref', 'orig_ref', 'desc', action)
     return payment
 
-def test_payment_command_serialization(basic_payment):
+def test_payment_command_serialization_net(basic_payment):
     cmd = PaymentCommand(basic_payment)
     data = cmd.get_json_data_dict(JSON_NET)
     cmd2 = PaymentCommand.from_json_data_dict(data, JSON_NET)
     assert cmd == cmd2
 
+def test_payment_command_serialization_store(basic_payment):
+    cmd = PaymentCommand(basic_payment)
+    data = cmd.get_json_data_dict(JSON_STORE)
+    cmd2 = PaymentCommand.from_json_data_dict(data, JSON_STORE)
+    assert cmd == cmd2
 
 def test_payment_create_from_recipient(basic_payment):
     bcm = MagicMock(spec=BusinessContext)

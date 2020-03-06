@@ -147,9 +147,8 @@ class VASPPairChannel:
         request.seq = self.my_next_seq
 
         if self.is_server():
-            # TODO: Handle protocol failures if raised
-            #       bail if it fails here.
             request.command_seq = self.next_final_sequence()
+            # Raises and exits on error -- does not sequence
             self.executor.sequence_next_command(off_chain_command,
                 do_not_sequence_errors = True, own=True)
 
