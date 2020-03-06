@@ -17,17 +17,20 @@ def basic_payment():
     payment = PaymentObject(sender, receiver, 'ref', 'orig_ref', 'desc', action)
     return payment
 
+
 def test_payment_command_serialization_net(basic_payment):
     cmd = PaymentCommand(basic_payment)
     data = cmd.get_json_data_dict(JSON_NET)
     cmd2 = PaymentCommand.from_json_data_dict(data, JSON_NET)
     assert cmd == cmd2
 
+
 def test_payment_command_serialization_store(basic_payment):
     cmd = PaymentCommand(basic_payment)
     data = cmd.get_json_data_dict(JSON_STORE)
     cmd2 = PaymentCommand.from_json_data_dict(data, JSON_STORE)
     assert cmd == cmd2
+
 
 def test_payment_end_to_end_serialization(basic_payment):
     # Define a full request/reply with a Payment and test serialization
@@ -40,6 +43,8 @@ def test_payment_end_to_end_serialization(basic_payment):
     data = request.get_json_data_dict(JSON_STORE)
     request2 = CommandRequestObject.from_json_data_dict(data, JSON_STORE)
     assert request == request2
+
+# ----- check_new_payment -----
 
 
 def test_payment_create_from_recipient(basic_payment):
@@ -90,6 +95,30 @@ def test_payment_create_from_receiver_fail(basic_payment):
     diff = basic_payment.get_full_record()
     with pytest.raises(PaymentLogicError):
         _ = check_new_payment(bcm, diff)
+
+
+def test_payment_create_from_receiver_bad_state_fail(basic_payment):
+    bcm = MagicMock(spec=BusinessContext)
+    bcm.is_recipient.side_effect = [False]
+
+    basic_payment.data['receiver'].update({'status': Status.needs_recipient_signature})
+    diff = basic_payment.get_full_record()
+    with pytest.raises(PaymentLogicError):
+        _ = check_new_payment(bcm, diff)
+
+
+# ----- check_new_update -----
+
+
+def test_payment_update_from_sender_modify_receiver_fail(basic_payment):
+    bcm = MagicMock(spec=BusinessContext)
+    bcm.is_recipient.side_effect = [False]
+    diff = {}
+    new_payment = check_new_update(bcm, basic_payment, diff)
+    assert new_payment == basic_payment
+
+
+# ----- payment_process -----
 
 
 def test_payment_process_receiver_new_payment(basic_payment):
