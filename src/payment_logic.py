@@ -10,6 +10,7 @@ from payment import Status, PaymentObject
 class PaymentCommand(ProtocolCommand):
 
     def __init__(self, payment):
+        ''' Creates a new Payment command based on the diff from the given payment'''
         ProtocolCommand.__init__(self)
         self.depend_on = list(payment.extends)
         self.creates = [payment.get_version()]
@@ -31,7 +32,6 @@ class PaymentCommand(ProtocolCommand):
 
         if len(self.depend_on) == 0:
             payment = PaymentObject.create_from_record(self.command)
-            # payment.version = new_version
             return payment
 
         elif len(self.depend_on) == 1:
