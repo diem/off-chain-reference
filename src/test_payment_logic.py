@@ -110,12 +110,46 @@ def test_payment_create_from_receiver_bad_state_fail(basic_payment):
 # ----- check_new_update -----
 
 
-def test_payment_update_from_sender_modify_receiver_fail(basic_payment):
+def test_payment_update_from_sender(basic_payment):
     bcm = MagicMock(spec=BusinessContext)
     bcm.is_recipient.side_effect = [False]
     diff = {}
     new_payment = check_new_update(bcm, basic_payment, diff)
     assert new_payment == basic_payment
+
+
+def test_payment_update_from_sender_modify_receiver_fail(basic_payment):
+    bcm = MagicMock(spec=BusinessContext)
+    bcm.is_recipient.side_effect = [True]
+    diff = {'receiver': {'status': Status.settled}}
+    with pytest.raises(PaymentLogicError):
+        _ = check_new_update(bcm, basic_payment, diff)
+
+
+def test_payment_update_from_receiver_invalid_state_fail(basic_payment):
+    bcm = MagicMock(spec=BusinessContext)
+    bcm.is_recipient.side_effect = [False]
+    diff = {'receiver': {'status': Status.needs_recipient_signature}}
+    with pytest.raises(PaymentLogicError):
+        _ = check_new_update(bcm, basic_payment, diff)
+
+
+def test_payment_update_from_receiver_invalid_transition_fail(basic_payment):
+    bcm = MagicMock(spec=BusinessContext)
+    bcm.is_recipient.side_effect = [False]
+    basic_payment.data['receiver'].update({'status': Status.ready_for_settlement})
+    diff = {'receiver': {'status': Status.needs_kyc_data}}
+    with pytest.raises(PaymentLogicError):
+        _ = check_new_update(bcm, basic_payment, diff)
+
+
+def test_payment_update_from_receiver_unilateral_abort_fail(basic_payment):
+    bcm = MagicMock(spec=BusinessContext)
+    bcm.is_recipient.side_effect = [False]
+    basic_payment.data['receiver'].update({'status': Status.ready_for_settlement})
+    diff = {'receiver': {'status': Status.abort}}
+    with pytest.raises(PaymentLogicError):
+        _ = check_new_update(bcm, basic_payment, diff)
 
 
 # ----- payment_process -----
