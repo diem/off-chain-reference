@@ -30,7 +30,6 @@ class OffChainVASP:
         return self.channel_store[store_key]
 
 
-
 class VASPInfo:
     """Contains information about VASPs"""
 
