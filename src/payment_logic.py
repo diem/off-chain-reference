@@ -3,7 +3,7 @@ from business import BusinessContext, BusinessAsyncInterupt, \
     BusinessForceAbort
 from executor import ProtocolCommand
 from payment import Status, PaymentObject
-
+from status_logic import status_heights_MUST
 # Checks on diffs to ensure consistency with logic.
 
 
@@ -17,8 +17,8 @@ class PaymentCommand(ProtocolCommand):
 
     def __eq__(self, other):
         return self.depend_on == other.depend_on \
-           and self.creates == other.creates \
-           and self.command == other.command
+            and self.creates == other.creates \
+            and self.command == other.command
 
     def get_object(self, version_number, dependencies):
         ''' Constructs the new or updated objects '''
@@ -69,7 +69,6 @@ class PaymentCommand(ProtocolCommand):
         # TODO: Notify business logic of failure
         return
 
-
     def get_json_data_dict(self, flag):
         ''' Get a data disctionary compatible with JSON serilization (json.dumps) '''
         data_dict = ProtocolCommand.get_json_data_dict(self, flag)
@@ -84,6 +83,7 @@ class PaymentCommand(ProtocolCommand):
         assert isinstance(self, PaymentCommand)
         self.command = data['diff']
         return self
+
 
 class PaymentLogicError(Exception):
     pass
@@ -111,7 +111,9 @@ def check_new_payment(business, initial_diff):
     if new_payment.data[role].data['status'] != Status.none:
         raise PaymentLogicError('Sender set receiver status or vice-versa.')
 
-    # TODO[issue #2]: Check that other's status is valid
+    other_role = ['sender', 'receiver'][role == 'sender']
+    if other_role == 'receiver' and new_payment.data[other_role].data['status'] == Status.needs_recipient_signature:
+        raise PaymentLogicError('Receiver cannot be in %s.' % Status.needs_recipient_signature)
 
     business.validate_kyc_signature(new_payment)
     business.validate_recipient_signature(new_payment)
@@ -128,13 +130,38 @@ def check_new_update(business, payment, diff):
     new_payment = payment.new_version()
     PaymentObject.from_full_record(diff, base_instance=new_payment)
 
-    # Ensure nothing on our side was changed by this update
     role = ['sender', 'receiver'][business.is_recipient(new_payment)]
+    other_role = ['sender', 'receiver'][role == 'sender']
+    other_status = new_payment.data[other_role].data['status']
+    old_other_status = payment.data[other_role].data['status']
 
+    # Ensure nothing on our side was changed by this update
     if payment.data[role] != new_payment.data[role]:
         raise PaymentLogicError('Cannot change %s information.' % role)
 
-    # TODO[issue #2]: Check that other's status is valid
+    # Ensure valid transitions
+    if other_role == 'receiver' and other_status == Status.needs_recipient_signature:
+        raise PaymentLogicError(
+            'Receiver cannot be in %s.' % Status.needs_recipient_signature
+        )
+
+    if status_heights_MUST[other_status] < status_heights_MUST[old_other_status]:
+        raise PaymentLogicError(
+            'Invalid transition: %s: %s -> %s' %
+            (other_role, old_other_status, other_status)
+        )
+
+    # Prevent unilateral aborts after the finality barrier
+    finality_barrier = status_heights_MUST[Status.ready_for_settlement]
+    cond = status_heights_MUST[old_other_status] >= finality_barrier
+    cond &= other_status == Status.abort
+    cond &= payment.data[role].data['status'] != Status.abort
+    cond &= old_other_status != Status.abort
+    if cond:
+        raise PaymentLogicError(
+            '%s cannot unilaterally abort after reaching %s.' %
+            (other_role, Status.ready_for_settlement)
+        )
 
     business.validate_kyc_signature(new_payment)
     business.validate_recipient_signature(new_payment)

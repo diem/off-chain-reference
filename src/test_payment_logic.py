@@ -8,7 +8,6 @@ from utils import *
 from unittest.mock import MagicMock
 import pytest
 
-
 @pytest.fixture
 def basic_payment():
     sender = PaymentActor('AAAA', 'aaaa', Status.none, [])
@@ -41,6 +40,7 @@ def test_payment_end_to_end_serialization(basic_payment):
     request2 = CommandRequestObject.from_json_data_dict(data, JSON_STORE)
     assert request == request2
 
+# ----- check_new_payment -----
 
 def test_payment_create_from_recipient(basic_payment):
     bcm = MagicMock(spec=BusinessContext)
@@ -90,6 +90,20 @@ def test_payment_create_from_receiver_fail(basic_payment):
     diff = basic_payment.get_full_record()
     with pytest.raises(PaymentLogicError):
         _ = check_new_payment(bcm, diff)
+
+
+# ----- check_new_update -----
+
+
+def test_payment_update_from_sender_modify_receiver_fail(basic_payment):
+    bcm = MagicMock(spec=BusinessContext)
+    bcm.is_recipient.side_effect = [False]
+    diff = {}
+    new_payment = check_new_update(bcm, basic_payment, diff)
+    assert new_payment == basic_payment
+
+
+# ----- payment_process -----
 
 
 def test_payment_process_receiver_new_payment(basic_payment):
