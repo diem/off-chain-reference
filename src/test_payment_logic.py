@@ -22,7 +22,7 @@ def test_payment_command_serialization(basic_payment):
     assert cmd == cmd2
 
 
-def test_payment_create_from_sender(basic_payment):
+def test_payment_create_from_recipient(basic_payment):
     bcm = MagicMock(spec=BusinessContext)
     bcm.is_recipient.side_effect = [True]
 

@@ -30,17 +30,18 @@ class BusinessForceAbort(Exception):
 
 class BusinessContext:
 
-    callbacks = {}
+    def __init__(self):
+        self.callbacks = {}
 
-    def register_callback(payment, callback):
-        if payment not in callbacks:
-            callbacks[payment] = callback
+    def register_callback(self, payment, callback):
+        if payment not in self.callbacks:
+            self.callbacks[payment] = callback
 
-    def resume_payment(payment):
-        if payment in callbacks:
-            callback = callbacks[payment]
+    def resume_payment(self, payment):
+        if payment in self.callbacks:
+            callback = self.callbacks[payment]
             callback()
-            del callbacks[payment]
+            del self.callbacks[payment]
 
     # ----- Actors -----
 
@@ -50,7 +51,7 @@ class BusinessContext:
 
     def is_recipient(self, payment):
         ''' Returns true is the VASP is the recipient '''
-        return not self.is_sender()
+        return not self.is_sender(payment)
 
     def check_account_existence(self, payment):
         ''' Checks that the actor on this VASP exists. This may be either
@@ -204,3 +205,5 @@ class BusinessContext:
             since this is called past the finality barrier.
         '''
         pass
+
+print('!!!!!!!!!!!!!!!!!!')
