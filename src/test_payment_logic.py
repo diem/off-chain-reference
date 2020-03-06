@@ -8,6 +8,7 @@ from utils import *
 from unittest.mock import MagicMock
 import pytest
 
+
 @pytest.fixture
 def basic_payment():
     sender = PaymentActor('AAAA', 'aaaa', Status.none, [])
@@ -16,17 +17,20 @@ def basic_payment():
     payment = PaymentObject(sender, receiver, 'ref', 'orig_ref', 'desc', action)
     return payment
 
+
 def test_payment_command_serialization_net(basic_payment):
     cmd = PaymentCommand(basic_payment)
     data = cmd.get_json_data_dict(JSON_NET)
     cmd2 = PaymentCommand.from_json_data_dict(data, JSON_NET)
     assert cmd == cmd2
 
+
 def test_payment_command_serialization_store(basic_payment):
     cmd = PaymentCommand(basic_payment)
     data = cmd.get_json_data_dict(JSON_STORE)
     cmd2 = PaymentCommand.from_json_data_dict(data, JSON_STORE)
     assert cmd == cmd2
+
 
 def test_payment_end_to_end_serialization(basic_payment):
     # Define a full request/reply with a Payment and test serialization
@@ -41,6 +45,7 @@ def test_payment_end_to_end_serialization(basic_payment):
     assert request == request2
 
 # ----- check_new_payment -----
+
 
 def test_payment_create_from_recipient(basic_payment):
     bcm = MagicMock(spec=BusinessContext)
@@ -87,6 +92,16 @@ def test_payment_create_from_receiver_fail(basic_payment):
 
     basic_payment.data['sender'].update({'status': Status.ready_for_settlement})
     basic_payment.data['receiver'].update({'status': Status.ready_for_settlement})
+    diff = basic_payment.get_full_record()
+    with pytest.raises(PaymentLogicError):
+        _ = check_new_payment(bcm, diff)
+
+
+def test_payment_create_from_receiver_bad_state_fail(basic_payment):
+    bcm = MagicMock(spec=BusinessContext)
+    bcm.is_recipient.side_effect = [False]
+
+    basic_payment.data['receiver'].update({'status': Status.needs_recipient_signature})
     diff = basic_payment.get_full_record()
     with pytest.raises(PaymentLogicError):
         _ = check_new_payment(bcm, diff)
@@ -151,7 +166,7 @@ def test_payment_process_interrupt(basic_payment):
     bcm.is_recipient.side_effect = [True, True]
     bcm.check_account_existence.side_effect = [None]
     bcm.next_kyc_level_to_request.side_effect = [BusinessAsyncInterupt(1234)]
-    
+
     pp = PaymentProcessor(bcm)
     new_payment = pp.payment_process(basic_payment)
     assert new_payment.data['receiver'].data['status'] == Status.none
