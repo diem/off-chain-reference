@@ -137,10 +137,36 @@ def test_payment_process_interrupt(basic_payment):
     bcm.is_recipient.side_effect = [True, True]
     bcm.check_account_existence.side_effect = [None]
     bcm.next_kyc_level_to_request.side_effect = [BusinessAsyncInterupt(1234)]
-    
+
     pp = PaymentProcessor(bcm)
     new_payment = pp.payment_process(basic_payment)
+    assert not new_payment.has_changed()
     assert new_payment.data['receiver'].data['status'] == Status.none
+
+def test_payment_process_interrupt_resume(basic_payment):
+    bcm = MagicMock(spec=BusinessContext)
+    bcm.is_recipient.side_effect = [True, True, True, True]
+    bcm.check_account_existence.side_effect = [None, None]
+    bcm.next_kyc_level_to_request.side_effect = [Status.ready_for_settlement]
+    bcm.next_kyc_to_provide.side_effect = [BusinessAsyncInterupt(1234)]
+    
+    pp = PaymentProcessor(bcm)
+    assert basic_payment.data['receiver'].data['status'] == Status.none
+    new_payment = pp.payment_process(basic_payment)
+    assert new_payment.has_changed()
+    assert new_payment.data['receiver'].data['status'] == Status.ready_for_settlement
+
+    bcm.next_kyc_to_provide.side_effect = [set()]
+    bcm.ready_for_settlement.side_effect = [True]
+    bcm.has_settled.side_effect = [ True ]
+
+    pp.notify_callback(1234)
+    L = pp.payment_process_ready()
+    assert len(L) == 1
+    assert len(pp.callbacks) == 0
+    assert len(pp.ready) == 0
+    print(bcm.method_calls)
+    L[0].data['receiver'].data['status'] == Status.settled
 
 
 def test_payment_process_abort(basic_payment):

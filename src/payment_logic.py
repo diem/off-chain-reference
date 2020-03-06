@@ -160,15 +160,15 @@ class PaymentProcessor():
         # TODO: should we retrive here the latest version of the object?
         self.ready[callback_ID] = obj
     
-    def payment_process_ready(self, payment):
+    def payment_process_ready(self):
         ''' Processes any objects for which the callbacks have returned '''
         updated_objects = []
         for (callback_ID, obj) in list(self.ready.items()):
             new_obj = self.payment_process(obj)
             del self.ready[callback_ID]
-            if new_obj is not None:
+            if new_obj.has_changed():
                 updated_objects += [ new_obj ] 
-        return new_obj
+        return updated_objects
 
     def payment_process(self, payment):
         ''' Processes a payment that was just updated, and returns a
@@ -234,7 +234,10 @@ class PaymentProcessor():
             new_payment.data[role].change_status(current_status)
 
             # TODO: Should we pass the new or old object here?
-            self.callbacks[e.get_callback_ID] = new_payment
+            if new_payment.has_changed():
+                self.callbacks[e.get_callback_ID()] = new_payment
+            else:
+                self.callbacks[e.get_callback_ID()] = payment
 
         except BusinessForceAbort:
 

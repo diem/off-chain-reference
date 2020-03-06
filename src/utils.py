@@ -114,6 +114,7 @@ class StructureChecker:
         ''' Applies changes to the object and checks for validity rules '''
         # Check all types and write mode before update
         all_fields = set()
+        updates = False
         for field, field_type, required, write_mode in self.fields:
             all_fields.add(field)
             if field in diff:
@@ -138,14 +139,17 @@ class StructureChecker:
 
         # Finally update
         for key in diff:
-            self.data[key] = diff[key]
+            if key not in self.data or self.data[key] != diff[key]:
+                self.data[key] = diff[key]
+                updates = True
 
         self.check_structure()
 
         # Do custom checks on object
         self.custom_update_checks(diff)
 
-        self.record(diff)
+        if updates:
+            self.record(diff)
 
     def check_structure(self):
         ''' Checks all structural requirements are met '''
