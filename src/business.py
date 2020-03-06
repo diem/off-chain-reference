@@ -43,6 +43,22 @@ class BusinessContext:
             callback()
             del self.callbacks[payment]
 
+    # Low level business function, to manage channels with other VASPs
+
+    def open_channel_to(self, other_vasp_info):
+        ''' Requests authorization to other a channel to another VASP.
+
+            Can raise:
+                BusinessNotAuthorized
+        '''
+        pass
+
+    def get_vasp_info_by_libra_address(self, libra_address):
+        ''' Returns a VASPInfo instance for the other VASP. This requires
+            reading the latest authoritative information from the chain.    
+        '''
+        pass
+
     # ----- Actors -----
 
     def is_sender(self, payment):

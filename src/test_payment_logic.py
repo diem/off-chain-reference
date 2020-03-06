@@ -1,5 +1,7 @@
 from payment_logic import *
 from payment import *
+from protocol_messages import *
+from protocol import *
 from business import BusinessAsyncInterupt
 from utils import *
 
@@ -26,6 +28,19 @@ def test_payment_command_serialization_store(basic_payment):
     data = cmd.get_json_data_dict(JSON_STORE)
     cmd2 = PaymentCommand.from_json_data_dict(data, JSON_STORE)
     assert cmd == cmd2
+
+def test_payment_end_to_end_serialization(basic_payment):
+    # Define a full request/reply with a Payment and test serialization
+    CommandRequestObject.register_command_type(PaymentCommand)
+
+    cmd = PaymentCommand(basic_payment)
+    request = CommandRequestObject(cmd)
+    request.seq = 10
+    request.response = make_success_response(request)
+    data = request.get_json_data_dict(JSON_STORE)
+    request2 = CommandRequestObject.from_json_data_dict(data, JSON_STORE)
+    assert request == request2
+
 
 def test_payment_create_from_recipient(basic_payment):
     bcm = MagicMock(spec=BusinessContext)

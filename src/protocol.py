@@ -4,7 +4,30 @@ from protocol_messages import CommandRequestObject, CommandResponseObject, OffCh
 
 class OffChainVASP:
     """Manages the off-chain protocol on behalf of one VASP"""
-    pass
+    
+    def __init__(self, vasp_info, business_context = None):
+        self.vasp_info = vasp_info
+        self.business_context = business_context
+
+        # TODO: this should be a persistent store
+        self.channel_store = {}
+    
+    def my_vasp_info(self):
+        ''' Return our own VASP info record '''
+        return self.vasp_info
+
+    def get_channel(self, other_vasp_info):
+        ''' Returns a VASPPairChannel with the other VASP '''
+        self.business_context.open_channel_to(other_vasp_info)
+        my_address = self.my_vasp_info().get_libra_address()
+        other_address = other_vasp_info.get_libra_address()
+        store_key = (my_address, other_address)
+        if store_key not in self.channel_store:
+            channel = VASPPairChannel(self.my_vasp_info(), other_vasp_info, self.business_context)
+            self.channel_store[store_key] = channel
+        
+        return self.channel_store[store_key]
+
 
 
 class VASPInfo:
@@ -31,8 +54,8 @@ class VASPInfo:
         """ TODO: Get the on-chain TLS certificate to authenticate channels. """
         pass
 
-    def verify_signature(self, message, signature):
-        """ Verify a message and signature to ensure it was sent by this VASP."""
+    def is_unhosted(self):
+        """ Returns True if the other party is an unhosted wallet """
         pass
 
 
