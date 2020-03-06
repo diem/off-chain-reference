@@ -91,11 +91,16 @@ class ProtocolCommand(JSONSerializable):
             data_dict["commit_status"] = self.commit_status
 
         return data_dict
+    
+    @classmethod
+    def json_type(cls):
+        return str(cls)
 
     @classmethod
     def from_json_data_dict(cls, data, flag):
         ''' Construct the object from a serlialized JSON data dictionary (from json.loads). '''
         self = cls.__new__(cls)
+        ProtocolCommand.__init__(self)
         self.depend_on = list(data['depend_on'])
         self.creates = list(data['creates'])
         if flag == JSON_STORE:
@@ -261,6 +266,7 @@ class SampleCommand(ProtocolCommand):
             self.commit_status = data["commit_status"]
         return self
 
+    @classmethod
     def json_type(self):
         return "SampleCommand"
 

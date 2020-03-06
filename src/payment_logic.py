@@ -10,10 +10,10 @@ from payment import Status, PaymentObject
 class PaymentCommand(ProtocolCommand):
 
     def __init__(self, payment):
+        ProtocolCommand.__init__(self)
         self.depend_on = list(payment.extends)
         self.creates = [payment.get_version()]
         self.command = payment.get_full_record()
-        # self.payment = payment
 
     def __eq__(self, other):
         return self.depend_on == other.depend_on \
