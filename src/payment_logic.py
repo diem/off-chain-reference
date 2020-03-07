@@ -88,6 +88,31 @@ class PaymentCommand(ProtocolCommand):
 class PaymentLogicError(Exception):
     pass
 
+def check_status(role, old_status, new_status, other_status):
+    ''' Check that the new status is valid.
+        Otherwise raise PaymentLogicError
+    '''
+    if role == 'receiver' and new_status == Status.needs_recipient_signature:
+        raise PaymentLogicError(
+            'Receiver cannot be in %s.' % Status.needs_recipient_signature
+        )
+
+    if status_heights_MUST[new_status] < status_heights_MUST[old_status]:
+        raise PaymentLogicError(
+            'Invalid transition: %s: %s -> %s' % (role, old_status, new_status)
+        )
+
+    # Prevent unilateral aborts after the finality barrier
+    finality_barrier = status_heights_MUST[Status.ready_for_settlement]
+    cond = status_heights_MUST[old_status] >= finality_barrier
+    cond &= new_status == Status.abort
+    cond &= other_status != Status.abort
+    cond &= old_status != Status.abort
+    if cond:
+        raise PaymentLogicError(
+            '%s cannot unilaterally abort after reaching %s.' %
+            (role, Status.ready_for_settlement)
+        )
 
 def check_new_payment(business, initial_diff):
     ''' Checks a diff for a new payment from the other VASP, and returns
@@ -133,37 +158,17 @@ def check_new_update(business, payment, diff):
     PaymentObject.from_full_record(diff, base_instance=new_payment)
 
     role = ['sender', 'receiver'][business.is_recipient(new_payment)]
+    status = payment.data[role].data['status']
     other_role = ['sender', 'receiver'][role == 'sender']
-    other_status = new_payment.data[other_role].data['status']
     old_other_status = payment.data[other_role].data['status']
+    other_status = new_payment.data[other_role].data['status']
 
     # Ensure nothing on our side was changed by this update
     if payment.data[role] != new_payment.data[role]:
         raise PaymentLogicError('Cannot change %s information.' % role)
 
     # Ensure valid transitions
-    if other_role == 'receiver' and other_status == Status.needs_recipient_signature:
-        raise PaymentLogicError(
-            'Receiver cannot be in %s.' % Status.needs_recipient_signature
-        )
-
-    if status_heights_MUST[other_status] < status_heights_MUST[old_other_status]:
-        raise PaymentLogicError(
-            'Invalid transition: %s: %s -> %s' %
-            (other_role, old_other_status, other_status)
-        )
-
-    # Prevent unilateral aborts after the finality barrier
-    finality_barrier = status_heights_MUST[Status.ready_for_settlement]
-    cond = status_heights_MUST[old_other_status] >= finality_barrier
-    cond &= other_status == Status.abort
-    cond &= payment.data[role].data['status'] != Status.abort
-    cond &= old_other_status != Status.abort
-    if cond:
-        raise PaymentLogicError(
-            '%s cannot unilaterally abort after reaching %s.' %
-            (other_role, Status.ready_for_settlement)
-        )
+    check_status(other_role, old_other_status, other_status, status)
 
     business.validate_kyc_signature(new_payment)
     business.validate_recipient_signature(new_payment)
@@ -274,7 +279,7 @@ class PaymentProcessor():
             current_status = Status.abort
 
         finally:
-            # TODO[issue #4]: test is the resulting status is valid
+            check_status(role, status, current_status, other_status)
             # TODO[issue #5]: test if there are any changes to the object, to
             #       send to the other side as a command.
             new_payment.data[role].change_status(current_status)
