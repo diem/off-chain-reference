@@ -94,3 +94,47 @@ def test_exec(basic_payment):
 
     assert pe.count_potentially_live() == 1
     assert pe.count_actually_live() == 1
+
+def test_handlers(basic_payment):
+    bcm = MagicMock(spec=BusinessContext)
+
+    class Stats:
+        def __init__(self):
+            self.success_no = 0
+            self.failure_no = 0
+
+        def handle(self, command, success):
+            global success_no, failure_no
+            if success:
+                self.success_no += 1
+            else:
+                self.failure_no += 1
+
+    stat = Stats()
+    pe = ProtocolExecutor()
+    pe.set_business_context(bcm)
+    pe.set_outcome_handler(stat.handle)
+
+    cmd1 = PaymentCommand(basic_payment)
+
+    pay2 = basic_payment.new_version()
+    pay2.data['sender'].change_status(Status.needs_stable_id)
+    cmd2 = PaymentCommand(pay2)
+
+    pay3 = basic_payment.new_version()
+    pay3.data['sender'].change_status(Status.needs_stable_id)
+    cmd3 = PaymentCommand(pay3)
+
+    assert cmd1.depend_on == []
+    assert cmd2.depend_on == list(cmd1.creates)
+    assert cmd3.depend_on == list(cmd1.creates)
+
+    pe.sequence_next_command(cmd1)
+    pe.sequence_next_command(cmd2)
+    pe.sequence_next_command(cmd3)
+    pe.set_success(0)
+    pe.set_success(1)
+    pe.set_fail(2)
+
+    assert stat.success_no == 2
+    assert stat.failure_no == 1
