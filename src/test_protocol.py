@@ -634,3 +634,19 @@ def test_VASProot():
     assert vasp.get_channel(a1) is vasp.get_channel(a1)
     # Different VASPs have different objects
     assert vasp.get_channel(a1) is not vasp.get_channel(a2)
+
+def test_real_address():
+    from os import urandom
+    A = LibraAddress.encode_to_Libra_address(b'A'*16)
+    Ap = LibraAddress.encode_to_Libra_address(b'A'*16)
+    B = LibraAddress.encode_to_Libra_address(b'B'*16)
+    assert B.greater_than_or_equal(A)
+    assert not A.greater_than_or_equal(B)
+    assert A.greater_than_or_equal(A)
+    assert A.greater_than_or_equal(Ap)
+    assert A.equal(A)
+    assert A.equal(Ap)
+    assert not A.equal(B)
+    assert not B.equal(Ap)
+    assert A.last_bit() ^ B.last_bit() == 1
+    assert A.last_bit() ^ A.last_bit() == 0
