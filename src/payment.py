@@ -21,7 +21,7 @@ class KYCData(StructureChecker):
 
     def parse(self):
         """ Parse the KYC blob and return a data dictionary. """
-        json.loads(self.data['blob'])
+        return json.loads(self.data['blob'])
 
     def custom_update_checks(self, diff):
         # Tests JSON parsing before accepting blob
@@ -145,6 +145,7 @@ class PaymentObject(SharedObject, StructureChecker):
                  original_payment_reference_id, description, action):
         SharedObject.__init__(self)
         StructureChecker.__init__(self)
+        self.notes = {}
         self.update({
             'sender': sender,
             'receiver': receiver,

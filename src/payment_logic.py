@@ -212,7 +212,7 @@ class PaymentProcessor():
         '''
         business = self.business
 
-        is_receiver = business.is_recipient()
+        is_receiver = business.is_recipient(payment)
         role = ['sender', 'receiver'][is_receiver]
         other_role = ['sender', 'receiver'][not is_receiver]
 
@@ -229,7 +229,7 @@ class PaymentProcessor():
                 current_status = Status.abort
 
             if current_status in {Status.none}:
-                business.check_account_existence(payment)
+                business.check_account_existence(new_payment)
 
             if current_status in {Status.none,
                                   Status.needs_stable_id,
@@ -237,34 +237,35 @@ class PaymentProcessor():
                                   Status.needs_recipient_signature}:
 
                 # Request KYC -- this may be async in case of need for user input
-                current_status = business.next_kyc_level_to_request(payment)
+                current_status = business.next_kyc_level_to_request(new_payment)
 
                 # Provide KYC -- this may be async in case of need for user input
-                kyc_to_provide = business.next_kyc_to_provide(payment)
+                kyc_to_provide = business.next_kyc_to_provide(new_payment)
 
                 if Status.needs_stable_id in kyc_to_provide:
-                    stable_id = business.provide_stable_id(payment)
+                    stable_id = business.provide_stable_id(new_payment)
                     new_payment.data[role].add_stable_id(stable_id)
 
                 if Status.needs_kyc_data in kyc_to_provide:
-                    extended_kyc = business.get_extended_kyc(payment)
+                    extended_kyc = business.get_extended_kyc(new_payment)
                     new_payment.data[role].add_kyc_data(*extended_kyc)
 
                 if role == 'receiver' and other_status == Status.needs_recipient_signature:
-                    signature = business.get_recipient_signature(payment)
+                    signature = business.get_recipient_signature(new_payment)
                     new_payment.add_recipient_signature(signature)
 
             # Check if we have all the KYC we need
-            ready = business.ready_for_settlement(payment)
+            ready = business.ready_for_settlement(new_payment)
             if ready:
                 current_status = Status.ready_for_settlement
 
-            if current_status == Status.ready_for_settlement and business.has_settled(payment):
+            if current_status == Status.ready_for_settlement and business.has_settled(new_payment):
                 current_status = Status.settled
 
         except BusinessAsyncInterupt as e:
             # The business layer needs to do a long duration check.
             # Cannot make quick progress, and must response with current status.
+            check_status(role, status, current_status, other_status)
             new_payment.data[role].change_status(current_status)
 
             # TODO: Should we pass the new or old object here?
@@ -276,12 +277,11 @@ class PaymentProcessor():
         except BusinessForceAbort:
 
             # We cannot abort once we said we are ready_for_settlement or beyond
+            # However we will catch a wrong change in the check when we change status.
             current_status = Status.abort
 
         finally:
             check_status(role, status, current_status, other_status)
-            # TODO[issue #5]: test if there are any changes to the object, to
-            #       send to the other side as a command.
             new_payment.data[role].change_status(current_status)
 
         return new_payment
