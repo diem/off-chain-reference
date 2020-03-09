@@ -42,19 +42,19 @@ class BusinessContext:
             Can raise:
                 BusinessNotAuthorized
         '''
-        pass
+        raise NotImplementedError()
 
     def get_vasp_info_by_libra_address(self, libra_address):
         ''' Returns a VASPInfo instance for the other VASP. This requires
             reading the latest authoritative information from the chain.    
         '''
-        pass
+        raise NotImplementedError()
 
     # ----- Actors -----
 
     def is_sender(self, payment):
         ''' Returns true is the VASP is the sender '''
-        pass
+        raise NotImplementedError()
 
     def is_recipient(self, payment):
         ''' Returns true is the VASP is the recipient '''
@@ -66,7 +66,7 @@ class BusinessContext:
             in both directions.
 
             If not throw a BuninessValidationFailure.'''
-        pass
+        raise NotImplementedError()
 
 
 # ----- VASP Signature -----
@@ -77,11 +77,11 @@ class BusinessContext:
             signature or the signature is correct do nothing.
 
             Throw a BuninessValidationFailure is not. '''
-        pass
+        raise NotImplementedError()
 
     def get_recipient_signature(self, payment):
         ''' Gets a recipient signature on the payment ID'''
-        pass
+        raise NotImplementedError()
 
 # ----- KYC/Compliance checks -----
 
@@ -101,7 +101,7 @@ class BusinessContext:
                 BusinessAsyncInterupt
                 BusinessForceAbort
         '''
-        pass
+        raise NotImplementedError()
 
     def next_kyc_level_to_request(self, payment):
         ''' Returns the next level of KYC to request from the other VASP. Must
@@ -117,14 +117,14 @@ class BusinessContext:
                 BusinessAsyncInterupt
                 BusinessForceAbort
         '''
-        pass
+        raise NotImplementedError()
 
     def validate_kyc_signature(self, payment):
         ''' Validates the kyc signature is correct. If the signature is correct,
             or there is no signature, then do nothing.
 
             Throw a BuninessValidationFailure if signature verification fails. '''
-        pass
+        raise NotImplementedError()
 
     def get_extended_kyc(self, payment):
         ''' Gets the extended KYC information for this payment.
@@ -133,7 +133,7 @@ class BusinessContext:
                    BusinessAsyncInterupt
                    BusinessNotAuthorized.
         '''
-        pass
+        raise NotImplementedError()
 
     def get_stable_id(self, payment):
         ''' Provides a stable ID for the payment.
@@ -143,7 +143,7 @@ class BusinessContext:
             Can raise:
                 BusinessAsyncInterupt,
                 BusinessNotAuthorized. '''
-        pass
+        raise NotImplementedError()
 
 # ----- Settlement -----
 
@@ -178,7 +178,7 @@ class BusinessContext:
                 BusinessAsyncInterupt
                 BusinessForceAbort
             '''
-        pass
+        raise NotImplementedError()
 
     def want_single_payment_settlement(self, payment):
         ''' Ask the business logic whether to move this payment
@@ -194,7 +194,7 @@ class BusinessContext:
             since it is called when we are ready to settle.
 
         '''
-        pass
+        raise NotImplementedError()
 
     def has_settled(self, payment):
         ''' Returns whether the payment was settled on chain. If the payment can
@@ -211,6 +211,4 @@ class BusinessContext:
                 BusinessForceAbort
             since this is called past the finality barrier.
         '''
-        pass
-
-print('!!!!!!!!!!!!!!!!!!')
+        raise NotImplementedError()
