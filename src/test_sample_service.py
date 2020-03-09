@@ -2,6 +2,7 @@ from sample_service import *
 from test_protocol import FakeAddress, FakeVASPInfo
 from payment_logic import PaymentProcessor
 from payment import *
+from protocol import LibraAddress
 
 import pytest
 
@@ -172,5 +173,7 @@ def test_business_settled(settled_payment_as_receiver):
    
 
 def test_vasp_simple():
-    a0 = FakeVASPInfo(FakeAddress(0, 10), FakeAddress(0, 40))
+    AddrParent = LibraAddress.encode_to_Libra_address(b'A'*16)
+    AddrThis   = LibraAddress.encode_to_Libra_address(b'B'*16)
+    a0 = FakeVASPInfo(AddrParent, AddrThis)
     vc = sample_vasp(a0)

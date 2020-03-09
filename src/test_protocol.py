@@ -175,8 +175,8 @@ class RandomRun(object):
 
 def test_client_server_role_definition():
 
-    a0 = FakeVASPInfo(FakeAddress(0, 10))
-    a1 = FakeVASPInfo(FakeAddress(0, 20))
+    a0 = FakeAddress(0, 10)
+    a1 = FakeAddress(0, 20)
 
     # Lower address is server (xor bit = 0)
     channel = VASPPairChannel(a0, a1)
@@ -187,8 +187,8 @@ def test_client_server_role_definition():
     assert not channel.is_server()
     assert channel.is_client()
 
-    a0 = FakeVASPInfo(FakeAddress(0, 10))
-    a1 = FakeVASPInfo(FakeAddress(1, 30))
+    a0 = FakeAddress(0, 10)
+    a1 = FakeAddress(1, 30)
 
     # Lower address is server (xor bit = 1)
     channel = VASPPairChannel(a0, a1)
@@ -201,8 +201,8 @@ def test_client_server_role_definition():
 
 
 def test_protocol_server_client_benign():
-    a0 = FakeVASPInfo(FakeAddress(0, 10))
-    a1 = FakeVASPInfo(FakeAddress(0, 20))
+    a0 = FakeAddress(0, 10)
+    a1 = FakeAddress(0, 20)
 
     server = VASPPairChannel(a0, a1)
     client = VASPPairChannel(a1, a0)
@@ -242,8 +242,8 @@ def test_protocol_server_client_benign():
 
 
 def test_protocol_server_conflicting_sequence():
-    a0 = FakeVASPInfo(FakeAddress(0, 10))
-    a1 = FakeVASPInfo(FakeAddress(0, 20))
+    a0 = FakeAddress(0, 10)
+    a1 = FakeAddress(0, 20)
 
     server = VASPPairChannel(a0, a1)
     client = VASPPairChannel(a1, a0)
@@ -285,8 +285,8 @@ def test_protocol_server_conflicting_sequence():
     assert client.get_final_sequence()[0].item() == 'Hello'
 
 def test_protocol_client_server_benign():
-    a0 = FakeVASPInfo(FakeAddress(0, 10))
-    a1 = FakeVASPInfo(FakeAddress(0, 20))
+    a0 = FakeAddress(0, 10)
+    a1 = FakeAddress(0, 20)
 
     server = VASPPairChannel(a0, a1)
     client = VASPPairChannel(a1, a0)
@@ -330,8 +330,8 @@ def test_protocol_client_server_benign():
 
 
 def test_protocol_server_client_interleaved_benign():
-    a0 = FakeVASPInfo(FakeAddress(0, 10))
-    a1 = FakeVASPInfo(FakeAddress(0, 20))
+    a0 = FakeAddress(0, 10)
+    a1 = FakeAddress(0, 20)
 
     server = VASPPairChannel(a0, a1)
     client = VASPPairChannel(a1, a0)
@@ -365,8 +365,8 @@ def test_protocol_server_client_interleaved_benign():
     assert [c.item() for c in server.get_final_sequence()] == ['World', 'Hello']
 
 def test_protocol_server_client_interleaved_swapped_request():
-    a0 = FakeVASPInfo(FakeAddress(0, 10))
-    a1 = FakeVASPInfo(FakeAddress(0, 20))
+    a0 = FakeAddress(0, 10)
+    a1 = FakeAddress(0, 20)
 
     server = VASPPairChannel(a0, a1)
     client = VASPPairChannel(a1, a0)
@@ -398,8 +398,8 @@ def test_protocol_server_client_interleaved_swapped_request():
     assert [c.item() for c in server.get_final_sequence()] == ['World', 'Hello']
 
 def test_protocol_server_client_interleaved_swapped_reply():
-    a0 = FakeVASPInfo(FakeAddress(0, 10))
-    a1 = FakeVASPInfo(FakeAddress(0, 20))
+    a0 = FakeAddress(0, 10)
+    a1 = FakeAddress(0, 20)
 
     server = VASPPairChannel(a0, a1)
     client = VASPPairChannel(a1, a0)
@@ -433,8 +433,8 @@ def test_protocol_server_client_interleaved_swapped_reply():
 
 def test_random_interleave_no_drop():
 
-    a0 = FakeVASPInfo(FakeAddress(0, 10))
-    a1 = FakeVASPInfo(FakeAddress(0, 20))
+    a0 = FakeAddress(0, 10)
+    a1 = FakeAddress(0, 20)
 
     server = VASPPairChannel(a0, a1)
     client = VASPPairChannel(a1, a0)
@@ -464,8 +464,8 @@ def test_random_interleave_no_drop():
 
 def test_random_interleave_and_drop():
 
-    a0 = FakeVASPInfo(FakeAddress(0, 10))
-    a1 = FakeVASPInfo(FakeAddress(0, 20))
+    a0 = FakeAddress(0, 10)
+    a1 = FakeAddress(0, 20)
 
     server = VASPPairChannel(a0, a1)
     client = VASPPairChannel(a1, a0)
@@ -502,8 +502,8 @@ def test_random_interleave_and_drop():
 
 def test_random_interleave_and_drop_and_invalid():
 
-    a0 = FakeVASPInfo(FakeAddress(0, 10))
-    a1 = FakeVASPInfo(FakeAddress(0, 20))
+    a0 = FakeAddress(0, 10)
+    a1 = FakeAddress(0, 20)
 
     server = VASPPairChannel(a0, a1)
     client = VASPPairChannel(a1, a0)
@@ -542,8 +542,8 @@ def test_random_interleave_and_drop_and_invalid():
     assert set(server.executor.object_store.keys()) == set(client.executor.object_store.keys())
 
 def test_dependencies():
-    a0 = FakeVASPInfo(FakeAddress(0, 10))
-    a1 = FakeVASPInfo(FakeAddress(0, 20))
+    a0 = FakeAddress(0, 10)
+    a1 = FakeAddress(0, 20)
 
     server = VASPPairChannel(a0, a1)
     client = VASPPairChannel(a1, a0)
@@ -622,18 +622,19 @@ def test_json_serlialize():
     assert req0 == req_err
 
 def test_VASProot():
-    a0 = FakeVASPInfo(FakeAddress(0, 10), FakeAddress(0, 40))
-    a1 = FakeVASPInfo(FakeAddress(0, 20), FakeAddress(0, 50))
-    a2 = FakeVASPInfo(FakeAddress(0, 30), FakeAddress(0, 60))
+    a0 = LibraAddress.encode_to_Libra_address(b'A'*16)
+    a1 = LibraAddress.encode_to_Libra_address(b'B'*16)
+    a2 = LibraAddress.encode_to_Libra_address(b'C'*16)
     bcm = MagicMock(spec=BusinessContext)
     vasp = OffChainVASP(a0, bcm)
 
     # Check our own address is good
-    assert vasp.my_vasp_info() == a0
+    assert vasp.my_vasp_addr() == a0
     # Calling twice gives the same instance (use 'is')
     assert vasp.get_channel(a1) is vasp.get_channel(a1)
     # Different VASPs have different objects
     assert vasp.get_channel(a1) is not vasp.get_channel(a2)
+    assert vasp.get_channel(a1).is_client()
 
 def test_real_address():
     from os import urandom

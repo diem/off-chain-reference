@@ -7,26 +7,26 @@ import base64
 class OffChainVASP:
     """Manages the off-chain protocol on behalf of one VASP"""
     
-    def __init__(self, vasp_info, business_context = None):
-        self.vasp_info = vasp_info
+    def __init__(self, vasp_addr, business_context = None):
+        self.vasp_addr = vasp_addr
         self.business_context = business_context
 
         # TODO: this should be a persistent store
         self.channel_store = {}
     
-    def my_vasp_info(self):
+    def my_vasp_addr(self):
         ''' Return our own VASP info record '''
-        return self.vasp_info
+        return self.vasp_addr
 
-    def get_channel(self, other_vasp_info):
+    def get_channel(self, other_vasp_addr):
         ''' Returns a VASPPairChannel with the other VASP '''
-        self.business_context.open_channel_to(other_vasp_info)
-        my_address = self.my_vasp_info().get_libra_address()
-        other_address = other_vasp_info.get_libra_address()
+        self.business_context.open_channel_to(other_vasp_addr)
+        my_address = self.my_vasp_addr()
+        other_address = other_vasp_addr
         store_key = (my_address, other_address)
         print(store_key)
         if store_key not in self.channel_store:
-            channel = VASPPairChannel(self.my_vasp_info(), other_vasp_info, self.business_context)
+            channel = VASPPairChannel(self.my_vasp_addr(), other_vasp_addr, self.business_context)
             self.channel_store[store_key] = channel
         
         return self.channel_store[store_key]
@@ -125,8 +125,8 @@ class VASPPairChannel:
 
     def is_client(self):
         """ Is the local VASP a client for this pair?"""
-        myself_address = self.myself.get_parent_address()
-        other_address = self.other.get_parent_address()
+        myself_address = self.myself
+        other_address = self.other
 
         # Write out the logic, for clarity
         bit = myself_address.last_bit() ^ other_address.last_bit()

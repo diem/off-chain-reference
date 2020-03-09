@@ -202,7 +202,6 @@ class ProtocolExecutor:
         for version in new_versions:
             obj = self.object_store[version]
             obj.set_actually_live(True)
-
         
 
     def set_fail(self, seq_no):
