@@ -88,6 +88,7 @@ class PaymentCommand(ProtocolCommand):
 class PaymentLogicError(Exception):
     pass
 
+
 def check_status(role, old_status, new_status, other_status):
     ''' Check that the new status is valid.
         Otherwise raise PaymentLogicError
@@ -113,6 +114,7 @@ def check_status(role, old_status, new_status, other_status):
             '%s cannot unilaterally abort after reaching %s.' %
             (role, Status.ready_for_settlement)
         )
+
 
 def check_new_payment(business, initial_diff):
     ''' Checks a diff for a new payment from the other VASP, and returns
@@ -201,7 +203,7 @@ class PaymentProcessor():
             new_obj = self.payment_process(obj)
             del self.ready[callback_ID]
             if new_obj.has_changed():
-                updated_objects += [ new_obj ]
+                updated_objects += [new_obj]
         return updated_objects
 
     def payment_process(self, payment):
@@ -243,11 +245,12 @@ class PaymentProcessor():
                 kyc_to_provide = business.next_kyc_to_provide(new_payment)
 
                 if Status.needs_stable_id in kyc_to_provide:
-                    stable_id = business.provide_stable_id(new_payment)
+                    stable_id = business.get_stable_id(new_payment)
                     new_payment.data[role].add_stable_id(stable_id)
 
                 if Status.needs_kyc_data in kyc_to_provide:
                     extended_kyc = business.get_extended_kyc(new_payment)
+                    print('HERE2:', extended_kyc)
                     new_payment.data[role].add_kyc_data(*extended_kyc)
 
                 if role == 'receiver' and other_status == Status.needs_recipient_signature:
@@ -281,6 +284,7 @@ class PaymentProcessor():
             current_status = Status.abort
 
         finally:
+            print("HERE: %s %s %s %s" % (role, status, current_status, other_status))
             check_status(role, status, current_status, other_status)
             new_payment.data[role].change_status(current_status)
 

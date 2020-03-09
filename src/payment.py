@@ -172,7 +172,7 @@ class PaymentObject(SharedObject, StructureChecker):
         self.update({
             'recipient_signature': signature
         })
-    
+
     def has_changed(self):
         ret = not self.get_full_record() == {}
         return ret
