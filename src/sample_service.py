@@ -4,7 +4,7 @@ from protocol_messages import CommandRequestObject
 from payment_logic import PaymentCommand
 from status_logic import Status
 
-from test_protocol import FakeAddress, FakeVASPInfo
+from test_protocol import FakeAddress
 
 import json
 import decimal
@@ -34,6 +34,7 @@ class sample_business(BusinessContext):
         self.accounts_db = json.loads(business_config, parse_float=decimal.Decimal)
     
     # Helper functions for the business
+
     def get_account(self, subaddress):
         for acc in self.accounts_db:
             if acc['account'] ==  subaddress:
@@ -217,6 +218,9 @@ class sample_vasp:
         self.bc      = sample_business(self.my_addr)
 
         CommandRequestObject.register_command_type(PaymentCommand)
+        self.vasp         = OffChainVASP(self.my_addr, self.bc)
 
-        self.my_vasp_info = FakeVASPInfo(my_addr, my_addr)
-        self.vasp         = OffChainVASP(self.my_vasp_info, self.bc)
+    def process_request(self, other_vasp, request):
+        channel = self.vasp.get_channel(other_vasp)
+        channel.handle_request(request)
+        # WIP, TODO
