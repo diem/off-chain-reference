@@ -7,6 +7,7 @@ from utils import StructureException, StructureChecker, \
 from status_logic import Status
 import json
 
+
 class KYCData(StructureChecker):
     fields = [
         ('blob', str, REQUIRED, WRITE_ONCE)
@@ -161,7 +162,7 @@ class PaymentObject(SharedObject, StructureChecker):
         SharedObject.__init__(self)
         return self
 
-    def new_version(self, new_version = None):
+    def new_version(self, new_version=None):
         ''' Also flatten object with a new version '''
         clone = SharedObject.new_version(self, new_version)
         clone.flatten()
