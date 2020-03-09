@@ -90,7 +90,7 @@ class ProtocolCommand(JSONSerializable):
             data_dict["commit_status"] = self.commit_status
 
         return data_dict
-    
+
     @classmethod
     def json_type(cls):
         return str(cls)
@@ -165,7 +165,7 @@ class ProtocolExecutor:
                     obj = command.get_object(version, self.object_store)
                     obj.set_potentially_live(True)
                     self.object_store[version] = obj
-                
+
         # TODO: have a less catch-all exception here to detect expected vs. unexpected exceptions
         except Exception as e:
             all_good = False
