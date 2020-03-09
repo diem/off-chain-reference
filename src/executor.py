@@ -72,13 +72,6 @@ class ProtocolCommand(JSONSerializable):
         assert version_number in self.new_object_versions()
         raise NotImplementedError('You need to subclass and override this method')
 
-    def on_success(self):
-        raise NotImplementedError('You need to subclass and override this method')
-
-    def on_fail(self):
-        raise NotImplementedError('You need to subclass and override this method')
-
-
     def get_json_data_dict(self, flag):
         ''' Get a data disctionary compatible with JSON serilization (json.dumps) '''
         data_dict = {
@@ -118,6 +111,16 @@ class ProtocolExecutor:
         # <ENDS to persist>
 
         self.context = None
+        self.handlers = None
+    
+    def set_outcome_handler(self, handler):
+        ''' Set an external handler to deal with success of failure of commands '''
+        self.handlers = handler
+    
+    def set_outcome(self, command, success):
+        ''' Execute successful commands, and notify of failed commands'''
+        if self.handlers is not None:
+            self.handlers(command, success=success)
 
     def set_business_context(self, context):
         self.context = context
@@ -185,7 +188,10 @@ class ProtocolExecutor:
         self.last_confirmed += 1
 
         command = self.seq[seq_no]
-        command.commit_status = True
+        if command.commit_status is None:
+            command.commit_status = True
+            self.set_outcome(command, success=True)
+
         # Consumes old objects
         dependencies = command.get_dependencies()
         for version in dependencies:
@@ -197,21 +203,22 @@ class ProtocolExecutor:
             obj = self.object_store[version]
             obj.set_actually_live(True)
 
-        command.on_success()
+        
 
     def set_fail(self, seq_no):
         assert seq_no == self.last_confirmed
         self.last_confirmed += 1
 
         command = self.seq[seq_no]
-        command.commit_status = False
+        if command.commit_status is None:
+            command.commit_status = False
+            self.set_outcome(command, success=False)
 
         new_versions = command.new_object_versions()
         for version in new_versions:
             if version in self.object_store:
                 del self.object_store[version]
 
-        command.on_fail()
 
 class ExecutorException(Exception):
     pass
@@ -270,11 +277,3 @@ class SampleCommand(ProtocolCommand):
     @classmethod
     def json_type(self):
         return "SampleCommand"
-
-    def on_success(self):
-        # TODO: Notify business logic of success and process PaymentCommand
-        return
-
-    def on_fail(self):
-        # TODO: Notify business logic of failure
-        return

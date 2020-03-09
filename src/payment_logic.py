@@ -61,14 +61,6 @@ class PaymentCommand(ProtocolCommand):
 
         return True
 
-    def on_success(self):
-        # TODO: Notify business logic of success and process PaymentCommand
-        return
-
-    def on_fail(self):
-        # TODO: Notify business logic of failure
-        return
-
     def get_json_data_dict(self, flag):
         ''' Get a data disctionary compatible with JSON serilization (json.dumps) '''
         data_dict = ProtocolCommand.get_json_data_dict(self, flag)
