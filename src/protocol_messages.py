@@ -30,7 +30,7 @@ class CommandRequestObject(JSONSerializable):
     """Represents a command of the Off chain protocol"""
 
     # Maps strings to class types for deserialization
-    type_map = {} 
+    type_map = {}
 
     def __init__(self, command):
         self.seq = None          # The sequence in the local queue

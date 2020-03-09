@@ -44,6 +44,29 @@ def test_payment_end_to_end_serialization(basic_payment):
     request2 = CommandRequestObject.from_json_data_dict(data, JSON_STORE)
     assert request == request2
 
+
+def test_payment_command_multiple_dependencies_fail(basic_payment):
+    new_payment = basic_payment.new_version('v1')
+    new_payment.extends += ['v2']
+    cmd = PaymentCommand(new_payment)
+    with pytest.raises(PaymentLogicError):
+        cmd.get_object(None, [basic_payment])
+
+
+def test_payment_command_create_fail(basic_payment):
+    cmd = PaymentCommand(basic_payment)
+    cmd.creates += [basic_payment.get_version()]
+    with pytest.raises(PaymentLogicError):
+        cmd.get_object(None, [])
+
+
+def test_payment_command_missing_dependency_fail(basic_payment):
+    new_payment = basic_payment.new_version('v1')
+    cmd = PaymentCommand(new_payment)
+    with pytest.raises(PaymentLogicError):
+        cmd.get_object(None, [])
+
+
 # ----- check_new_payment -----
 
 
@@ -206,13 +229,14 @@ def test_payment_process_interrupt(basic_payment):
     assert not new_payment.has_changed()
     assert new_payment.data['receiver'].data['status'] == Status.none
 
+
 def test_payment_process_interrupt_resume(basic_payment):
     bcm = MagicMock(spec=BusinessContext)
     bcm.is_recipient.side_effect = [True, True, True, True]
     bcm.check_account_existence.side_effect = [None, None]
     bcm.next_kyc_level_to_request.side_effect = [Status.ready_for_settlement]
     bcm.next_kyc_to_provide.side_effect = [BusinessAsyncInterupt(1234)]
-    
+
     pp = PaymentProcessor(bcm)
     assert basic_payment.data['receiver'].data['status'] == Status.none
     new_payment = pp.payment_process(basic_payment)
@@ -221,7 +245,7 @@ def test_payment_process_interrupt_resume(basic_payment):
 
     bcm.next_kyc_to_provide.side_effect = [set()]
     bcm.ready_for_settlement.side_effect = [True]
-    bcm.has_settled.side_effect = [ True ]
+    bcm.has_settled.side_effect = [True]
 
     pp.notify_callback(1234)
     L = pp.payment_process_ready()
@@ -241,3 +265,39 @@ def test_payment_process_abort(basic_payment):
     pp = PaymentProcessor(bcm)
     new_payment = pp.payment_process(basic_payment)
     assert new_payment.data['receiver'].data['status'] == Status.abort
+
+
+def test_payment_process_abort_from_sender(basic_payment):
+    bcm = MagicMock(spec=BusinessContext)
+    bcm.is_recipient.side_effect = [True]
+    bcm.ready_for_settlement.side_effect = [False]
+    basic_payment.data['sender'].data['status'] = Status.abort
+    pp = PaymentProcessor(bcm)
+    new_payment = pp.payment_process(basic_payment)
+    assert new_payment.data['receiver'].data['status'] == Status.abort
+
+
+def test_payment_process_get_stable_id(basic_payment):
+    bcm = MagicMock(spec=BusinessContext)
+    bcm.is_recipient.side_effect = [True]
+    bcm.next_kyc_to_provide.side_effect = [Status.needs_stable_id]
+    bcm.get_stable_id.side_effect = ['stable_id']
+    pp = PaymentProcessor(bcm)
+    new_payment = pp.payment_process(basic_payment)
+    assert new_payment.data['receiver'].data['stable_id'] == 'stable_id'
+
+
+def test_payment_process_get_extended_kyc(basic_payment):
+    bcm = MagicMock(spec=BusinessContext)
+    bcm.is_recipient.side_effect = [True]
+    bcm.next_kyc_to_provide.side_effect = [Status.needs_kyc_data]
+    kyc_data = KYCData('{"payment_reference_id": "123", "type": "A"}')
+    bcm.get_extended_kyc.side_effect = [
+        (kyc_data, 'sig', 'cert')
+    ]
+    bcm.ready_for_settlement.side_effect = [Status.ready_for_settlement]
+    pp = PaymentProcessor(bcm)
+    new_payment = pp.payment_process(basic_payment)
+    assert new_payment.data['receiver'].data['kyc_data'] == kyc_data
+    assert new_payment.data['receiver'].data['kyc_signature'] == 'sig'
+    assert new_payment.data['receiver'].data['kyc_certificate'] == 'cert'
