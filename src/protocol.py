@@ -2,6 +2,8 @@ from copy import deepcopy
 from executor import ProtocolExecutor, ExecutorException
 from protocol_messages import CommandRequestObject, CommandResponseObject, OffChainError
 
+import base64
+
 class OffChainVASP:
     """Manages the off-chain protocol on behalf of one VASP"""
     
@@ -377,14 +379,28 @@ def make_command_error(request, code=None):
 
 
 # Helper classes
+class LibraAddressError(Exception):
+    pass
+
 class LibraAddress:
     """ An interface that abstracts a Libra Address and bit manipulations on it."""
 
+    def __init__(self, encoded_address):
+        try:
+            self.encoded_address = encoded_address
+            self.decoded_address = base64.b64decode(encoded_address)
+        except:
+            raise LibraAddressError()
+
+    @classmethod
+    def encode_to_Libra_address(cls, raw_bytes):
+        return LibraAddress(base64.b64encode(raw_bytes))
+
     def last_bit(self):
-        pass
+        return self.decoded_address[-1] & 1
 
     def greater_than_or_equal(self, other):
-        pass
+        return self.decoded_address >= other.decoded_address
 
     def equal(self, other):
-        pass
+        return self.decoded_address == other.decoded_address
