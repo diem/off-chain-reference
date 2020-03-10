@@ -16,6 +16,9 @@ class OffChainError(JSONSerializable):
             "protocol_error" : self.protocol_error,
             "code" : self.code
             }
+        if __debug__:
+            import json
+            assert json.dumps(data_dict)
         return data_dict
 
     @classmethod
@@ -84,6 +87,10 @@ class CommandRequestObject(JSONSerializable):
         if flag == JSON_STORE and self.response is not None:
             data_dict["response"] = self.response.get_json_data_dict(JSON_STORE)
 
+        if __debug__:
+            import json
+            assert json.dumps(data_dict)
+
         return data_dict
 
     @classmethod
@@ -138,6 +145,11 @@ class CommandResponseObject(JSONSerializable):
 
         if self.error is not None:
             data_dict["error"] = self.error.get_json_data_dict(flag)
+        
+        if __debug__:
+            import json
+            assert json.dumps(data_dict)
+
         return data_dict
 
     @classmethod
