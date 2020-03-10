@@ -70,7 +70,6 @@ class VASPPairChannel:
         def tap(self):
             return []
 
-
     def set_business_context(self, context):
         ''' Sets the business context for the executor '''
         self.executor.set_business_context(context)
