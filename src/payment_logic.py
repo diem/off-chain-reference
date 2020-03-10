@@ -198,13 +198,10 @@ class PaymentProcessor(CommandProcessor):
             else:
                 check_new_update(context, dependencies[command.depend_on[0]], command.command)
 
-
-
         command.payment = new_obj
 
-    def process_command(self, vasp, channel, executor, command, status, error=None):
-        
-        if status == 'success':
+    def process_command(self, vasp, channel, executor, command, status_success, error=None):
+        if status_success:
             dependencies = executor.object_store
             payment = command.get_object(command.creates[0], dependencies)
             new_payment = self.payment_process(payment)
@@ -213,8 +210,8 @@ class PaymentProcessor(CommandProcessor):
                 channel.sequence_command_local(new_cmd)
         else:
             # TODO: Log the error, but do nothing
-            pass
-
+            if command.origin == channel.myself:
+                pass # log failure of our own command :(
 
 
     def notify_callback(self, callback_ID):
