@@ -212,3 +212,32 @@ class BusinessContext:
             since this is called past the finality barrier.
         '''
         raise NotImplementedError()
+
+
+class VASPInfo:
+    """Contains information about VASPs"""
+
+    def get_base_url(self):
+        """ Base URL that manages off-chain communications"""
+        raise NotImplementedError()
+
+    def is_authorised_VASP(self):
+        """ Whether this has the authorised VASP bit set on chain"""
+        raise NotImplementedError()
+
+    def get_libra_address(self):
+        """ The settlement Libra address for this channel"""
+        raise NotImplementedError()
+
+    def get_parent_address(self):
+        """ The VASP Parent address for this channel. High level logic is common
+        to all Libra addresses under a parent to ensure consistency and compliance."""
+        raise NotImplementedError()
+
+    def get_TLS_certificate(self):
+        """ TODO: Get the on-chain TLS certificate to authenticate channels. """
+        raise NotImplementedError()
+
+    def is_unhosted(self):
+        """ Returns True if the other party is an unhosted wallet """
+        raise NotImplementedError()

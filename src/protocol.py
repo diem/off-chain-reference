@@ -1,8 +1,10 @@
 from copy import deepcopy
 from executor import ProtocolExecutor, ExecutorException
 from protocol_messages import CommandRequestObject, CommandResponseObject, OffChainError
+from utils import JSONParsingError, JSON_NET
 
 import base64
+import json
 
 class OffChainVASP:
     """Manages the off-chain protocol on behalf of one VASP"""
@@ -24,41 +26,12 @@ class OffChainVASP:
         my_address = self.my_vasp_addr()
         other_address = other_vasp_addr
         store_key = (my_address, other_address)
-        print(store_key)
         if store_key not in self.channel_store:
             channel = VASPPairChannel(self.my_vasp_addr(), other_vasp_addr, self.business_context)
+            channel.set_business_context(self.business_context)
             self.channel_store[store_key] = channel
-        
+    
         return self.channel_store[store_key]
-
-
-class VASPInfo:
-    """Contains information about VASPs"""
-
-    def get_base_url(self):
-        """ Base URL that manages off-chain communications"""
-        pass
-
-    def is_authorised_VASP(self):
-        """ Whether this has the authorised VASP bit set on chain"""
-        pass
-
-    def get_libra_address(self):
-        """ The settlement Libra address for this channel"""
-        pass
-
-    def get_parent_address(self):
-        """ The VASP Parent address for this channel. High level logic is common
-        to all Libra addresses under a parent to ensure consistency and compliance."""
-        pass
-
-    def get_TLS_certificate(self):
-        """ TODO: Get the on-chain TLS certificate to authenticate channels. """
-        pass
-
-    def is_unhosted(self):
-        """ Returns True if the other party is an unhosted wallet """
-        pass
 
 
 class VASPPairChannel:
@@ -89,6 +62,9 @@ class VASPPairChannel:
         # Response cache
         self.response_cache = {}
 
+        # Network handler
+        self.net_queue = []
+
     # Define a stub here to make the linter happy
     if __debug__:
         def tap(self):
@@ -113,11 +89,13 @@ class VASPPairChannel:
 
     def send_request(self, request):
         """ A hook to send a request to other VASP"""
-        pass
+        json_string = request.get_json_data_dict(JSON_NET)
+        self.net_queue += [ json_string ]
 
     def send_response(self, response):
         """ A hook to send a response to other VASP"""
-        pass
+        json_string = json.dumps(response.get_json_data_dict(JSON_NET))
+        self.net_queue += [ json_string ]
 
     def get_protocol_version(self):
         """ Returns the protocol version of this channel."""
@@ -187,6 +165,16 @@ class VASPPairChannel:
         self.my_requests += [request]
         self.send_request(request)
         self.persist()
+
+
+    def parse_handle_request(self, json_command):
+        try:
+            req_dict = json.loads(json_command)
+            request = CommandRequestObject.from_json_data_dict(req_dict, JSON_NET)
+            self.handle_request(request)
+        except JSONParsingError:
+            response = make_parsing_error()
+            self.send_response(response)
 
 
     def handle_request(self, request):
@@ -261,13 +249,27 @@ class VASPPairChannel:
             self.persist()
         else:
             assert False
+    
+    def parse_handle_response(self, json_response):
+        try:
+            resp_dict = json.loads(json_response)
+            response = CommandResponseObject.from_json_data_dict(resp_dict, JSON_NET)
+            self.handle_response(response)
+        except JSONParsingError:
+            # Log, but cannot reply: TODO
+            raise # To close the channel
 
     def handle_response(self, response):
         """ Handles a response to a request by this VASP """
-        request_seq = response.seq
-        assert isinstance(request_seq, int)
         assert isinstance(response, CommandResponseObject)
 
+        request_seq = response.seq
+        if type(request_seq) is not int:
+            # This denotes a serious error, where the response could not
+            # even be parsed. TODO: log the request/reply for debugging.
+            assert response.status == 'failure'
+            return
+        
         # Check this is the next expected response
         if not request_seq < len(self.my_requests):
             # Caught a bug on the other side
@@ -366,6 +368,17 @@ def make_protocol_error(request, code=None):
     response.error = OffChainError(protocol_error=True, code=code)
     return response
 
+def make_parsing_error():
+    """ Constructs a CommandResponse signaling a protocol failure.
+        We do not sequence or store such responses since we can recover
+        from them.
+    """
+    response = CommandResponseObject()
+    response.seq = None
+    response.status = 'failure'
+    response.error = OffChainError(protocol_error=True, code='parsing')
+    return response
+
 
 def make_command_error(request, code=None):
     """ Constructs a CommandResponse signaling a command failure.
@@ -387,9 +400,10 @@ class LibraAddress:
 
     def __init__(self, encoded_address):
         try:
-            self.encoded_address = encoded_address
-            self.decoded_address = base64.b64decode(encoded_address)
+            self.encoded_address = encoded_address.decode('ascii')
+            self.decoded_address = base64.b64decode(encoded_address.decode('ascii'))
         except:
+            raise
             raise LibraAddressError()
 
     @classmethod

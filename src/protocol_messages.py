@@ -145,8 +145,14 @@ class CommandResponseObject(JSONSerializable):
         ''' Construct the object from a serlialized JSON data dictionary (from json.loads). '''
         try:
             self = CommandResponseObject()
-            self.seq = int(data['seq'])
-            self.command_seq = data['command_seq']
+            try:
+                self.seq = int(data['seq'])
+            except:
+                self.seq = None
+            try:
+                self.command_seq = data['command_seq']
+            except:
+                self.command_seq = None
             self.status = str(data['status'])
 
             # Only None or int allowed
@@ -157,9 +163,12 @@ class CommandResponseObject(JSONSerializable):
             if self.status not in {'success', 'failure'}:
                 raise JSONParsingError('Status must be success or failure not %s' % self.status)
 
+            if self.status == 'success':
+                self.seq = int(data['seq'])
+
             if self.status == 'failure':
                 self.error = OffChainError.from_json_data_dict(data['error'], flag)
-
+                
             return self
         except Exception as e:
             raise JSONParsingError(*e.args)

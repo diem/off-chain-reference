@@ -3,6 +3,8 @@ from test_protocol import FakeAddress, FakeVASPInfo
 from payment_logic import PaymentProcessor
 from payment import *
 from protocol import LibraAddress
+from utils import *
+from protocol_messages import *
 
 import pytest
 
@@ -100,11 +102,11 @@ def settled_payment_as_receiver():
 
 
 def test_business_simple():
-    a0 = FakeVASPInfo(FakeAddress(0, 10), FakeAddress(0, 40))
+    a0 = FakeAddress(0, 40)
     bc = sample_business(a0)
 
 def test_business_is_related(basic_payment_as_receiver):
-    a0 = FakeVASPInfo(FakeAddress(0, 10), FakeAddress(0, 40))
+    a0 = FakeAddress(0, 40)
     bc = sample_business(a0)
 
     proc = PaymentProcessor(bc)
@@ -118,7 +120,7 @@ def test_business_is_related(basic_payment_as_receiver):
     assert ret_payment.data['receiver'].data['status'] == Status.needs_kyc_data
 
 def test_business_is_kyc_provided(kyc_payment_as_receiver):
-    a0 = FakeVASPInfo(FakeAddress(0, 10), FakeAddress(0, 40))
+    a0 = FakeAddress(0, 40)
     bc = sample_business(a0)
 
     proc = PaymentProcessor(bc)
@@ -135,7 +137,7 @@ def test_business_is_kyc_provided(kyc_payment_as_receiver):
     assert ret_payment.data['receiver'].data['status'] == Status.ready_for_settlement
 
 def test_business_is_kyc_provided_sender(kyc_payment_as_sender):
-    a0 = FakeVASPInfo(FakeAddress(0, 10), FakeAddress(0, 40))
+    a0 = FakeAddress(0, 40)
     bc = sample_business(a0)
 
     proc = PaymentProcessor(bc)
@@ -155,7 +157,7 @@ def test_business_is_kyc_provided_sender(kyc_payment_as_sender):
 
 
 def test_business_settled(settled_payment_as_receiver):
-    a0 = FakeVASPInfo(FakeAddress(0, 10), FakeAddress(0, 40))
+    a0 = FakeAddress(0, 40)
     bc = sample_business(a0)
 
     proc = PaymentProcessor(bc)
@@ -170,10 +172,54 @@ def test_business_settled(settled_payment_as_receiver):
 
     assert bc.get_account('1')['pending_transactions']['ref']['settled']
     assert bc.get_account('1')['balance'] == 15.0
-   
 
-def test_vasp_simple():
-    AddrParent = LibraAddress.encode_to_Libra_address(b'A'*16)
+
+@pytest.fixture
+def simple_request_json():
+    sender_addr = LibraAddress.encode_to_Libra_address(b'A'*16).encoded_address
+    receiver_addr   = LibraAddress.encode_to_Libra_address(b'B'*16).encoded_address
+    assert type(sender_addr) == str
+    assert type(receiver_addr) == str
+
+    sender = PaymentActor(sender_addr, 'C', Status.none, [])
+    receiver = PaymentActor(receiver_addr, '1', Status.none, [])
+    action = PaymentAction(Decimal('5.00'), 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
+    payment = PaymentObject(sender, receiver, 'ref_payment_1', 'orig_ref...', 'description ...', action)
+    command = PaymentCommand(payment)
+    request = CommandRequestObject(command)
+    request.seq = 0
+    request_json = json.dumps(request.get_json_data_dict(JSON_NET))
+    return request_json
+
+@pytest.fixture(params=[
+    (None, None, 'failure', True, 'parsing'),
+    (0, 0, 'success', None, None),
+    (0, 0, 'success', None, None),
+    (10, 10, 'success', None, None),
+    ])
+def simple_response_json_error(request):
+    seq, cmd_seq, status, protoerr, errcode =  request.param
+    sender_addr = LibraAddress.encode_to_Libra_address(b'A'*16).encoded_address
+    receiver_addr   = LibraAddress.encode_to_Libra_address(b'B'*16).encoded_address
+    resp = CommandResponseObject()
+    resp.status = status
+    resp.seq = seq
+    resp.command_seq = cmd_seq
+    if status == 'failure':
+        resp.error = OffChainError(protoerr, errcode)
+    json_obj = json.dumps(resp.get_json_data_dict(JSON_NET))
+    return json_obj
+
+def test_vasp_simple(simple_request_json):
     AddrThis   = LibraAddress.encode_to_Libra_address(b'B'*16)
-    a0 = FakeVASPInfo(AddrParent, AddrThis)
-    vc = sample_vasp(a0)
+    AddrOther = LibraAddress.encode_to_Libra_address(b'A'*16)
+    vc = sample_vasp(AddrThis)
+    response = vc.process_request(AddrOther, simple_request_json)
+    assert 'success' in response
+    
+
+def test_vasp_response(simple_response_json_error):
+    AddrThis   = LibraAddress.encode_to_Libra_address(b'B'*16)
+    AddrOther = LibraAddress.encode_to_Libra_address(b'A'*16)
+    vc = sample_vasp(AddrThis)
+    vc.process_response(AddrOther, simple_response_json_error)

@@ -3,6 +3,7 @@ from protocol import OffChainVASP
 from protocol_messages import CommandRequestObject
 from payment_logic import PaymentCommand
 from status_logic import Status
+from utils import JSON_NET
 
 from test_protocol import FakeAddress
 
@@ -35,6 +36,9 @@ class sample_business(BusinessContext):
     
     # Helper functions for the business
 
+    def get_address(self):
+        return self.my_addr.encoded_address
+
     def get_account(self, subaddress):
         for acc in self.accounts_db:
             if acc['account'] ==  subaddress:
@@ -45,8 +49,8 @@ class sample_business(BusinessContext):
         sender = payment.data['sender']
         receiver = payment.data['receiver']
 
-        if sender.data['address'] == str(self.my_addr.own_address.addr) or \
-            receiver.data['address'] == str(self.my_addr.own_address.addr):
+        if sender.data['address'] == self.get_address() or \
+            receiver.data['address'] == self.get_address():
             return
         raise BusinessValidationFailure()
 
@@ -55,6 +59,9 @@ class sample_business(BusinessContext):
             return 'recipient_signature' in payment.data
 
     # Implement the business logic interface
+
+    def open_channel_to(self, other_vasp_info):
+        return
 
     def check_account_existence(self, payment):
         self.assert_payment_for_vasp(payment)
@@ -69,13 +76,13 @@ class sample_business(BusinessContext):
 
     def is_sender(self, payment):
         self.assert_payment_for_vasp(payment)
-        return payment.data['sender'].data['address'] == str(self.my_addr.own_address.addr)
+        return payment.data['sender'].data['address'] == self.get_address()
     
     def validate_recipient_signature(self, payment):
         if 'recipient_signature' in payment.data:
             if payment.data['recipient_signature'] == 'VALID':
                 return
-        raise BusinessValidationFailure()
+            raise BusinessValidationFailure('Invalid signature: %s' % payment.data.get('recipient_signature', 'Not present'))
 
     def get_recipient_signature(self, payment):
         return 'VALID'
@@ -125,8 +132,9 @@ class sample_business(BusinessContext):
 
     def validate_kyc_signature(self, payment):
         other_role = ['sender', 'receiver'][self.is_sender(payment)]
-        if not payment.data[other_role].data['kyc_signature'] == 'KYC_SIG':
-            raise BusinessValidationFailure()
+        if 'kyc_signature' in payment.data[other_role].data:
+            if not payment.data[other_role].data['kyc_signature'] == 'KYC_SIG':
+                raise BusinessValidationFailure()
 
     def get_extended_kyc(self, payment):
         ''' Gets the extended KYC information for this payment.
@@ -166,7 +174,6 @@ class sample_business(BusinessContext):
                     account["balance"] -= payment.data['action'].data['amount']
 
             else:
-                print(account['balance'], payment.data['action'].data['amount'])
                 raise BusinessForceAbort('Insufficient Balance')
 
         # This VASP subaccount is a business
@@ -220,7 +227,13 @@ class sample_vasp:
         CommandRequestObject.register_command_type(PaymentCommand)
         self.vasp         = OffChainVASP(self.my_addr, self.bc)
 
-    def process_request(self, other_vasp, request):
+    def process_request(self, other_vasp, request_json):
+        # Get the channel 
         channel = self.vasp.get_channel(other_vasp)
-        channel.handle_request(request)
-        # WIP, TODO
+        channel.parse_handle_request(request_json)
+        return channel.net_queue.pop()
+        
+
+    def process_response(self, other_vasp, request_json):
+        channel = self.vasp.get_channel(other_vasp)
+        channel.parse_handle_response(request_json)

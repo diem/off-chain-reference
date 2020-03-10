@@ -7,8 +7,9 @@ import random
 from os import urandom
 from base64 import standard_b64encode
 from copy import deepcopy
+
 def get_unique_string():
-    return standard_b64encode(urandom(16))
+    return standard_b64encode(urandom(16)).decode('ascii')
 
 # Generic interface to a shared object
 
@@ -171,6 +172,10 @@ class ProtocolExecutor:
 
         # TODO: have a less catch-all exception here to detect expected vs. unexpected exceptions
         except Exception as e:
+            if __debug__:
+                import traceback
+                traceback.print_exc()
+
             all_good = False
             type_str = str(type(e)) +": "+str(e)
             raise ExecutorException(type_str)

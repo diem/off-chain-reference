@@ -123,6 +123,7 @@ def check_new_payment(business, initial_diff):
               potential aborts. However, KYC information on both sides may
               be included by the other party, and should be checked.
         '''
+    assert business is not None
     new_payment = PaymentObject.create_from_record(initial_diff)
 
     role = ['sender', 'receiver'][business.is_recipient(new_payment)]
@@ -242,7 +243,6 @@ class PaymentProcessor():
 
                 if Status.needs_kyc_data in kyc_to_provide:
                     extended_kyc = business.get_extended_kyc(new_payment)
-                    print('HERE2:', extended_kyc)
                     new_payment.data[role].add_kyc_data(*extended_kyc)
 
                 if role == 'receiver' and other_status == Status.needs_recipient_signature:
@@ -276,7 +276,6 @@ class PaymentProcessor():
             current_status = Status.abort
 
         finally:
-            print("HERE: %s %s %s %s" % (role, status, current_status, other_status))
             check_status(role, status, current_status, other_status)
             new_payment.data[role].change_status(current_status)
 
