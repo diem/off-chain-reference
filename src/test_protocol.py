@@ -5,7 +5,7 @@ from copy import deepcopy
 from protocol import *
 from executor import *
 from protocol_messages import *
-from business import BusinessContext
+from business import BusinessContext, VASPInfo
 import random
 
 from unittest.mock import MagicMock
@@ -16,6 +16,7 @@ class FakeAddress(LibraAddress):
     def __init__(self, bit, addr):
         self.bit = bit
         self.addr = addr
+        self.encoded_address = str(addr)
 
     def last_bit(self):
         return self.bit
