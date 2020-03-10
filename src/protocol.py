@@ -5,7 +5,9 @@ from utils import JSONParsingError, JSON_NET
 
 import base64
 import json
+from collections import namedtuple
 
+NetMessage = namedtuple('NetMessage', ['src', 'dst', 'type', 'content'])
 
 class OffChainVASP:
     """Manages the off-chain protocol on behalf of one VASP"""
@@ -104,12 +106,12 @@ class VASPPairChannel:
     def send_request(self, request):
         """ A hook to send a request to other VASP"""
         json_string = request.get_json_data_dict(JSON_NET)
-        self.net_queue += [ json_string ]
+        self.net_queue += [ NetMessage(self.myself, self.other, CommandRequestObject, json_string) ]
 
     def send_response(self, response):
         """ A hook to send a response to other VASP"""
         json_string = json.dumps(response.get_json_data_dict(JSON_NET))
-        self.net_queue += [ json_string ]
+        self.net_queue += [ NetMessage(self.myself, self.other, CommandResponseObject,json_string) ]
 
     def is_client(self):
         """ Is the local VASP a client for this pair?"""
