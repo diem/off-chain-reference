@@ -56,13 +56,14 @@ class VASPPairChannel:
             assert isinstance(processor, CommandProcessor)
             assert isinstance(vasp, OffChainVASP)
 
+        # State that is given by constructor
         self.myself = myself
         self.other = other
+        self.processor = processor
+        self.vasp = vasp
 
         if self.myself.plain() == self.other.plain():
             raise Exception('Must talk to another VASP:', self.myself.plain(), self.other.plain())
-
-        self.pending_requests = []
 
         # TODO[issue #7]: persist and recover the command sequences
         # <STARTS to persist>
@@ -72,16 +73,16 @@ class VASPPairChannel:
         self.other_next_seq = 0
 
         # The final sequence
-        self.processor = processor
-        self.vasp = vasp
         self.executor = ProtocolExecutor(self, self.processor)
         # <ENDS to persist>
 
+        # Ephemeral state that can be forgotten upon a crash
         # Response cache
         self.response_cache = {}
-
+        self.pending_requests = []
         # Network handler
         self.net_queue = []
+
 
     def get_vasp(self):
         return self.vasp
@@ -243,7 +244,7 @@ class VASPPairChannel:
                     do_not_sequence_errors = False, own=False)
                 response = make_success_response(request)
             except ExecutorException as e:
-                response = make_command_error(request, e)
+                response = make_command_error(request, str(e))
             new_len = len(self.executor.seq)
             assert new_len == old_len + 1
 

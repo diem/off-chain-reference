@@ -213,6 +213,16 @@ def test_vasp_simple(simple_request_json):
     assert responses[0].type is CommandRequestObject
     assert responses[1].type is CommandResponseObject
     assert 'success' in responses[1].content
+
+def test_vasp_simple_wrong_VASP(simple_request_json):
+    AddrThis   = LibraAddress.encode_to_Libra_address(b'X'*16)
+    AddrOther = LibraAddress.encode_to_Libra_address(b'A'*16)
+    vc = sample_vasp(AddrThis)
+    vc.process_request(AddrOther, simple_request_json)
+    responses = vc.collect_messages()
+    assert len(responses) == 1
+    assert responses[0].type is CommandResponseObject
+    assert 'failure' in responses[0].content
     
 
 def test_vasp_response(simple_response_json_error):
