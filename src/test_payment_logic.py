@@ -75,9 +75,8 @@ def test_payment_create_from_recipient(basic_payment):
     bcm.is_recipient.side_effect = [True]
 
     diff = basic_payment.get_full_record()
-    new_payment = check_new_payment(bcm, diff)
-    assert new_payment == basic_payment
-
+    check_new_payment(bcm, diff)
+    
 
 def test_payment_create_from_sender_sig_fail(basic_payment):
     bcm = MagicMock(spec=BusinessContext)
@@ -86,8 +85,8 @@ def test_payment_create_from_sender_sig_fail(basic_payment):
 
     diff = basic_payment.get_full_record()
     with pytest.raises(BusinessValidationFailure):
-        new_payment = check_new_payment(bcm, diff)
-        assert new_payment == basic_payment
+        check_new_payment(bcm, diff)
+
 
 
 def test_payment_create_from_sender(basic_payment):
@@ -95,8 +94,8 @@ def test_payment_create_from_sender(basic_payment):
     bcm.is_recipient.side_effect = [False]
 
     diff = basic_payment.get_full_record()
-    new_payment = check_new_payment(bcm, diff)
-    assert new_payment == basic_payment
+    check_new_payment(bcm, diff)
+
 
 
 def test_payment_create_from_sender_fail(basic_payment):
@@ -137,8 +136,7 @@ def test_payment_update_from_sender(basic_payment):
     bcm = MagicMock(spec=BusinessContext)
     bcm.is_recipient.side_effect = [False]
     diff = {}
-    new_payment = check_new_update(bcm, basic_payment, diff)
-    assert new_payment == basic_payment
+    check_new_update(bcm, basic_payment, diff)
 
 
 def test_payment_update_from_sender_modify_receiver_fail(basic_payment):
@@ -176,7 +174,38 @@ def test_payment_update_from_receiver_unilateral_abort_fail(basic_payment):
 
 
 # ----- payment_process -----
+@pytest.fixture(params=[
+    ('AAAA', 'BBBB', 'AAAA', True),
+    ('BBBB', 'AAAA', 'AAAA', True),
+    ('CCCC', 'AAAA', 'AAAA', False),
+    ('BBBB', 'CCCC', 'AAAA', False),
+    ('DDDD', 'CCCC', 'AAAA', False),
+    ('AAAA', 'BBBB', 'BBBB', True),
+    ('BBBB', 'AAAA', 'DDDD', False),
+])
+def states(request):
+    return request.param
 
+def test_payment_processor_check(states, basic_payment):
+    src_addr, dst_addr, origin_addr, res = states
+    bcm = MagicMock(spec=BusinessContext)
+    vasp = MagicMock()
+    channel = MagicMock()
+    channel.other.plain.side_effect = [ src_addr ] 
+    channel.myself.plain.side_effect = [ dst_addr ] 
+    executor = MagicMock()
+    own = False
+    command = PaymentCommand(basic_payment)
+    origin = MagicMock(spec=LibraAddress)
+    origin.plain.return_value = origin_addr
+    command.set_origin(origin)
+    pp = PaymentProcessor(bcm)
+
+    if res:
+        pp.check_command(vasp, channel, executor, command, own)
+    else:
+        with pytest.raises(PaymentLogicError):
+            pp.check_command(vasp, channel, executor, command, own)
 
 def test_payment_process_receiver_new_payment(basic_payment):
     bcm = MagicMock(spec=BusinessContext)

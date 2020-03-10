@@ -1,5 +1,5 @@
 from business import BusinessContext, BusinessAsyncInterupt, BusinessForceAbort, BusinessValidationFailure
-from protocol import OffChainVASP
+from protocol import OffChainVASP, LibraAddress
 from protocol_messages import CommandRequestObject
 from payment_logic import PaymentCommand, PaymentProcessor
 from status_logic import Status
@@ -225,8 +225,9 @@ class sample_vasp:
         self.bc      = sample_business(self.my_addr)
 
         CommandRequestObject.register_command_type(PaymentCommand)
-        self.vasp         = OffChainVASP(self.my_addr, self.bc)
         self.pp           = PaymentProcessor(self.bc)
+        self.vasp         = OffChainVASP(self.my_addr, self.pp)
+        
     
     def get_channel(self, other_vasp):
         channel = self.vasp.get_channel(other_vasp)
@@ -238,7 +239,18 @@ class sample_vasp:
             new_obj = self.pp.payment_process(payment_command.payment)
             if new_obj.has_changed():
                 new_cmd = PaymentCommand(new_obj)
-                # TODO: insert it back into channel
+                
+                potential_addr = {new_obj.data['sender'].data['address'],
+                                     new_obj.data['receiver'].data['address']}
+                
+                assert self.my_addr.encoded_address in potential_addr
+                assert len(potential_addr) == 2
+                potential_addr.remove(self.my_addr.encoded_address)
+                other_vasp = LibraAddress(potential_addr.pop())
+
+                assert other_vasp.encoded_address != self.my_addr.encoded_address
+                assert len(new_cmd.depend_on) > 0
+                self.insert_local_command(other_vasp, new_cmd)
         else:
             # TODO: log the command failure.
             pass
@@ -248,7 +260,14 @@ class sample_vasp:
         channel = self.get_channel(other_vasp)
         channel.parse_handle_request(request_json)
         return channel.net_queue.pop()
+    
+    def insert_local_command(self, other_vasp, command):
+        channel = self.get_channel(other_vasp)
         
+        if command.depend_on != []:
+            assert len(channel.executor.object_store) > 0
+        channel.sequence_command_local(command)
+        return channel.net_queue.pop()
 
     def process_response(self, other_vasp, request_json):
         channel = self.get_channel(other_vasp)

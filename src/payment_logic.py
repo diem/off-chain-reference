@@ -1,7 +1,7 @@
 from business import BusinessContext, BusinessAsyncInterupt, \
     BusinessNotAuthorized, BusinessValidationFailure, \
     BusinessForceAbort
-from executor import ProtocolCommand
+from executor import ProtocolCommand, CommandProcessor
 from payment import Status, PaymentObject
 from status_logic import status_heights_MUST
 
@@ -29,6 +29,7 @@ class PaymentCommand(ProtocolCommand):
 
         if len(self.depend_on) == 0:
             payment = PaymentObject.create_from_record(self.command)
+            payment.set_version(new_version)
             return payment
 
         elif len(self.depend_on) == 1:
@@ -38,23 +39,10 @@ class PaymentCommand(ProtocolCommand):
             dep_object = dependencies[dep]
             updated_payment = dep_object.new_version(new_version)
             PaymentObject.from_full_record(self.command, base_instance=updated_payment)
+            assert updated_payment.version == new_version
             return updated_payment
 
         assert False
-
-    def validity_checks(self, context, dependencies, maybe_own=True):
-        """ Implements the Validity check interface from executor """
-        # Heavy WIP -- clean up the interface with the Executor and errors
-
-        # Ensure that the update to the object is correct
-        self.get_object(self.creates[0], dependencies)
-        if self.depend_on == []:
-            new_obj = check_new_payment(context, self.command)
-        else:
-            new_obj = check_new_update(context, dependencies[self.depend_on[0]], self.command)
-
-        self.payment = new_obj
-        return True
 
     def get_json_data_dict(self, flag):
         ''' Get a data disctionary compatible with JSON serilization (json.dumps) '''
@@ -137,8 +125,6 @@ def check_new_payment(business, initial_diff):
     business.validate_kyc_signature(new_payment)
     business.validate_recipient_signature(new_payment)
 
-    return new_payment
-
 
 def check_new_update(business, payment, diff):
     ''' Checks a diff updating an existing payment. On success
@@ -165,11 +151,9 @@ def check_new_update(business, payment, diff):
     business.validate_kyc_signature(new_payment)
     business.validate_recipient_signature(new_payment)
 
-    return new_payment
-
 
 # The logic to process a payment from either side.
-class PaymentProcessor():
+class PaymentProcessor(CommandProcessor):
 
     def __init__(self, business):
         self.business = business
@@ -177,6 +161,61 @@ class PaymentProcessor():
         # TODO: Persit callbacks?
         self.callbacks = {}
         self.ready = {}
+    
+    def business_context(self):
+        return self.business
+
+    def check_command(self, vasp, channel, executor, command, own):
+        context = self.business_context()
+        dependencies = executor.object_store
+
+        new_obj = command.get_object(command.creates[0], dependencies)
+        assert new_obj.get_version() == command.creates[0]
+
+        ## Ensure that the two parties involved are in the VASP channel
+        new_obj_parties = set([new_obj.data['sender'].data['address'], 
+                            new_obj.data['receiver'].data['address'] ])
+
+        if len(new_obj_parties) != 2:
+            raise PaymentLogicError('Wrong number of parties to payment: ' + str(new_obj_parties))
+
+        my_addr = channel.myself.plain()
+        if my_addr not in new_obj_parties:
+            raise PaymentLogicError('Payment parties does not include own VASP (%s): %s' % (my_addr, str(new_obj_parties)))
+
+        other_addr = channel.other.plain()
+        if other_addr not in new_obj_parties:
+            raise PaymentLogicError('Payment parties does not include other party (%s): %s' % (other_addr, str(new_obj_parties)))
+
+        origin = command.get_origin().plain()
+        if origin not in new_obj_parties:
+            raise PaymentLogicError('Command originates from wrong party')
+
+        if origin == other_addr:
+            # Only check the commands we get from others.
+            if command.depend_on == []:
+                check_new_payment(context, command.command)
+            else:
+                check_new_update(context, dependencies[command.depend_on[0]], command.command)
+
+
+
+        command.payment = new_obj
+
+    def process_command(self, vasp, channel, executor, command, status, error=None):
+        
+        if status == 'success':
+            dependencies = executor.object_store
+            payment = command.get_object(command.creates[0], dependencies)
+            new_payment = self.payment_process(payment)
+            if new_payment.has_changed():
+                new_cmd = PaymentCommand(new_payment)
+                channel.sequence_command_local(new_cmd)
+        else:
+            # TODO: Log the error, but do nothing
+            pass
+
+
 
     def notify_callback(self, callback_ID):
         ''' Notify the processor that the callback with a specific ID has returned, and is ready to provide an answer. '''
