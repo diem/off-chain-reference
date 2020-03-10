@@ -25,7 +25,11 @@ class FakeAddress(LibraAddress):
         return self.addr >= other.addr
 
     def equal(self, other):
-        return self.addr >= other.addr
+        return isinstance(other, FakeAddress) \
+            and self.addr >= other.addr
+    
+    def plain(self):
+        return str(self.addr)
 
 class FakeVASPInfo(VASPInfo):
     def __init__(self, parent_addr, own_address = None):
@@ -196,34 +200,44 @@ def three_address():
     a2 = FakeAddress(1, 30)
     return (a0, a1, a2)
 
-def test_client_server_role_definition(three_address):
+@pytest.fixture
+def mockVASP():
+    vasp = MagicMock(spec=OffChainVASP)
+    return vasp
+
+@pytest.fixture
+def mockProcessor():
+    proc = MagicMock(spec=CommandProcessor)
+    return proc
+
+def test_client_server_role_definition(three_address, mockVASP, mockProcessor):
     a0, a1, a2 = three_address
 
     # Lower address is server (xor bit = 0)
-    channel = VASPPairChannel(a0, a1)
+    channel = VASPPairChannel(a0, a1, mockVASP, mockProcessor)
     assert channel.is_server()
     assert not channel.is_client()
 
-    channel = VASPPairChannel(a1, a0)
+    channel = VASPPairChannel(a1, a0, mockVASP, mockProcessor)
     assert not channel.is_server()
     assert channel.is_client()
 
     # Lower address is server (xor bit = 1)
-    channel = VASPPairChannel(a0, a2)
+    channel = VASPPairChannel(a0, a2, mockVASP, mockProcessor)
     assert not channel.is_server()
     assert channel.is_client()
 
-    channel = VASPPairChannel(a2, a0)
+    channel = VASPPairChannel(a2, a0, mockVASP, mockProcessor)
     assert channel.is_server()
     assert not channel.is_client()
 
 
 @pytest.fixture
-def server_client(three_address):
+def server_client(three_address, mockVASP, mockProcessor):
     a0, a1, a2 = three_address
 
-    server = VASPPairChannel(a0, a1)
-    client = VASPPairChannel(a1, a0)
+    server = VASPPairChannel(a0, a1, mockVASP, mockProcessor)
+    client = VASPPairChannel(a1, a0, mockVASP, mockProcessor)
 
     server = monkey_tap(server)
     client = monkey_tap(client)
@@ -555,8 +569,8 @@ def test_VASProot():
     a0 = LibraAddress.encode_to_Libra_address(b'A'*16)
     a1 = LibraAddress.encode_to_Libra_address(b'B'*16)
     a2 = LibraAddress.encode_to_Libra_address(b'C'*16)
-    bcm = MagicMock(spec=BusinessContext)
-    vasp = OffChainVASP(a0, bcm)
+    proc = MagicMock(spec=CommandProcessor)
+    vasp = OffChainVASP(a0, proc)
 
     # Check our own address is good
     assert vasp.my_vasp_addr() == a0
@@ -565,6 +579,19 @@ def test_VASProot():
     # Different VASPs have different objects
     assert vasp.get_channel(a1) is not vasp.get_channel(a2)
     assert vasp.get_channel(a1).is_client()
+
+
+def test_VASProot_diff_object():
+    a0 = LibraAddress.encode_to_Libra_address(b'A'*16)
+    b1 = LibraAddress.encode_to_Libra_address(b'B'*16)
+    b2 = LibraAddress.encode_to_Libra_address(b'B'*16)
+    proc = MagicMock(spec=CommandProcessor)
+    vasp = OffChainVASP(a0, proc)
+
+    # Check our own address is good
+    assert vasp.my_vasp_addr() == a0
+    # Calling twice gives the same instance (use 'is')
+    assert vasp.get_channel(b1) is vasp.get_channel(b2)
 
 def test_real_address():
     from os import urandom

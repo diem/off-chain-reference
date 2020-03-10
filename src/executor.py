@@ -39,6 +39,10 @@ class SharedObject:
     def get_version(self):
         ''' Return a unique version number to this object and version '''
         return self.version
+    
+    def set_version(self, version):
+        ''' Sets the version of the objects. Useful for contructors. '''
+        self.version = version
 
     def get_potentially_live(self):
         return self.potentially_live
@@ -59,6 +63,15 @@ class ProtocolCommand(JSONSerializable):
         self.depend_on = []
         self.creates   = []
         self.commit_status = None
+        self.origin = None # takes values 'local' and 'remote'
+    
+    def set_origin(self, origin):
+        #assert isinstance(origin, LibraAddress)
+        assert self.origin == None or origin == self.origin
+        self.origin = origin
+    
+    def get_origin(self):
+        return self.origin
 
     def get_dependencies(self):
         return set(self.depend_on)
@@ -105,14 +118,21 @@ class CommandProcessor:
     def business_context(self):
         pass
 
-    def check_command(self, vasp, channel, executor, command):
+    def check_command(self, vasp, channel, executor, command, own):
         pass
 
     def process_command(self, vasp, channel, executor, command, status, error=None):
         pass
 
 class ProtocolExecutor:
-    def __init__(self, business_context=None, handlers=None):
+    def __init__(self, channel, processor, handlers=None):
+        assert isinstance(processor, CommandProcessor)
+        from protocol import VASPPairChannel
+        assert isinstance(channel, VASPPairChannel)
+
+        self.processor = processor
+        self.channel   = channel
+
         # <STARTS to persist>
         self.seq = []
         self.last_confirmed = 0
@@ -121,7 +141,6 @@ class ProtocolExecutor:
         self.object_store = { } # TODO: persist this structure
         # <ENDS to persist>
 
-        self.context = business_context
         self.handlers = handlers
     
     def set_outcome_handler(self, handler):
@@ -133,8 +152,12 @@ class ProtocolExecutor:
         if self.handlers is not None:
             self.handlers(command, success=success)
 
-    def set_business_context(self, context):
-        self.context = context
+        vasp    = self.channel.get_vasp()
+        channel = self.channel
+        executor = self
+        status   = success
+
+        self.processor.process_command(vasp, channel, executor, command, status, error=None)
 
     def next_seq(self):
         return len(self.seq)
@@ -171,7 +194,11 @@ class ProtocolExecutor:
             if not all_good:
                 raise ExecutorException('Required objects do not exist')
 
-            command.validity_checks(self.context, self.object_store, own)
+
+            vasp = self.channel.get_vasp()
+            channel = self.channel
+            executor = self            
+            self.processor.check_command(vasp, channel, executor, command, own)
 
             if all_good:
                 new_versions = command.new_object_versions()
@@ -203,20 +230,34 @@ class ProtocolExecutor:
         self.last_confirmed += 1
 
         command = self.seq[seq_no]
-        if command.commit_status is None:
-            command.commit_status = True
-            self.set_outcome(command, success=True)
-
+        
         # Consumes old objects
         dependencies = command.get_dependencies()
         for version in dependencies:
-            del self.object_store[version]
+            obj = self.object_store[version]
+            obj.set_actually_live(False)
+            obj.set_potentially_live(False)
 
         # Creates new objects
         new_versions = command.new_object_versions()
         for version in new_versions:
             obj = self.object_store[version]
+            obj.set_potentially_live(True)
             obj.set_actually_live(True)
+        
+        if command.commit_status is None:
+            command.commit_status = True
+
+            # DEBUG
+            if __debug__:
+                for version in new_versions:
+                    assert version in self.object_store
+                    obj = self.object_store[version]
+                    assert obj.get_actually_live()
+                for version in dependencies:
+                    assert version in self.object_store
+                
+            self.set_outcome(command, success=True)
         
 
     def set_fail(self, seq_no):
@@ -224,14 +265,18 @@ class ProtocolExecutor:
         self.last_confirmed += 1
 
         command = self.seq[seq_no]
-        if command.commit_status is None:
-            command.commit_status = False
-            self.set_outcome(command, success=False)
 
         new_versions = command.new_object_versions()
         for version in new_versions:
             if version in self.object_store:
+                obj = self.object_store[version]
+                obj.set_actually_live(False)
+                obj.set_potentially_live(False)
                 del self.object_store[version]
+        
+        if command.commit_status is None:
+            command.commit_status = False
+            self.set_outcome(command, success=False)
 
 
 class ExecutorException(Exception):
@@ -266,11 +311,6 @@ class SampleCommand(ProtocolCommand):
         return self.depend_on == other.depend_on \
             and self.creates == other.creates \
             and self.command.item == other.command.item
-
-    def validity_checks(self, context, dependencies, maybe_own=True):
-        all_good = maybe_own or self.always_happy or random.random() > 0.75
-        if not all_good:
-            raise Exception('SimpleCommand checks failure')
 
     def __str__(self):
         return 'CMD(%s)' % self.item()

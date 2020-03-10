@@ -1,3 +1,4 @@
+from protocol import *
 from executor import *
 from payment import *
 from payment_logic import PaymentCommand
@@ -17,9 +18,11 @@ def basic_payment():
 
 
 def test_exec(basic_payment):
+    channel = MagicMock(spec=VASPPairChannel)
     bcm = MagicMock(spec=BusinessContext)
-    pe = ProtocolExecutor()
-    pe.set_business_context(bcm)
+    proc = MagicMock(spec=CommandProcessor)
+    pe = ProtocolExecutor(channel, proc)
+
 
     cmd1 = PaymentCommand(basic_payment)
 
@@ -96,7 +99,10 @@ def test_exec(basic_payment):
     assert pe.count_actually_live() == 1
 
 def test_handlers(basic_payment):
+    channel = MagicMock(spec=VASPPairChannel)
     bcm = MagicMock(spec=BusinessContext)
+    proc = MagicMock(spec=CommandProcessor)
+    pe = ProtocolExecutor(channel, proc)
 
     class Stats:
         def __init__(self):
@@ -111,8 +117,6 @@ def test_handlers(basic_payment):
                 self.failure_no += 1
 
     stat = Stats()
-    pe = ProtocolExecutor()
-    pe.set_business_context(bcm)
     pe.set_outcome_handler(stat.handle)
 
     cmd1 = PaymentCommand(basic_payment)

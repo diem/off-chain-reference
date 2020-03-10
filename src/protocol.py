@@ -1,5 +1,5 @@
 from copy import deepcopy
-from executor import ProtocolExecutor, ExecutorException
+from executor import ProtocolExecutor, ExecutorException, CommandProcessor
 from protocol_messages import CommandRequestObject, CommandResponseObject, OffChainError
 from utils import JSONParsingError, JSON_NET
 
@@ -10,9 +10,13 @@ import json
 class OffChainVASP:
     """Manages the off-chain protocol on behalf of one VASP"""
     
-    def __init__(self, vasp_addr, business_context = None):
+    def __init__(self, vasp_addr, processor):
+        assert isinstance(processor, CommandProcessor)
+        assert isinstance(vasp_addr, LibraAddress)
+
         self.vasp_addr = vasp_addr
-        self.business_context = business_context
+        self.business_context = processor.business_context()
+        self.processor = processor
 
         # TODO: this should be a persistent store
         self.channel_store = {}
@@ -28,8 +32,7 @@ class OffChainVASP:
         other_address = other_vasp_addr
         store_key = (my_address, other_address)
         if store_key not in self.channel_store:
-            channel = VASPPairChannel(self.my_vasp_addr(), other_vasp_addr)
-            channel.set_business_context(self.business_context)
+            channel = VASPPairChannel(self.my_vasp_addr(), other_vasp_addr, self, self.processor)
             self.channel_store[store_key] = channel
     
         return self.channel_store[store_key]
@@ -38,7 +41,7 @@ class OffChainVASP:
 class VASPPairChannel:
     """Represents the state of an off-chain bi-directional channel bewteen two VASPs"""
 
-    def __init__(self, myself, other):
+    def __init__(self, myself, other, vasp, processor):
         """ Initialize the channel between two VASPs.
 
         * Myself is the VASP initializing the local object (VASPInfo)
@@ -48,9 +51,14 @@ class VASPPairChannel:
         if __debug__:
             assert isinstance(myself, LibraAddress)
             assert isinstance(other, LibraAddress)
+            assert isinstance(processor, CommandProcessor)
+            assert isinstance(vasp, OffChainVASP)
 
         self.myself = myself
         self.other = other
+
+        if self.myself.plain() == self.other.plain():
+            raise Exception('Must talk to another VASP:', self.myself.plain(), self.other.plain())
 
         self.pending_requests = []
 
@@ -60,8 +68,11 @@ class VASPPairChannel:
         self.my_next_seq = 0
         self.other_requests = []
         self.other_next_seq = 0
+
         # The final sequence
-        self.executor = ProtocolExecutor()
+        self.processor = processor
+        self.vasp = vasp
+        self.executor = ProtocolExecutor(self, self.processor)
         # <ENDS to persist>
 
         # Response cache
@@ -70,14 +81,13 @@ class VASPPairChannel:
         # Network handler
         self.net_queue = []
 
+    def get_vasp(self):
+        return self.vasp
+
     # Define a stub here to make the linter happy
     if __debug__:
         def tap(self):
             return []
-
-    def set_business_context(self, context):
-        ''' Sets the business context for the executor '''
-        self.executor.set_business_context(context)
 
     def next_final_sequence(self):
         """ Returns the next sequence number in the common sequence."""
@@ -152,6 +162,7 @@ class VASPPairChannel:
     def sequence_command_local(self, off_chain_command):
         """ The local VASP attempts to sequence a new off-chain command."""
 
+        off_chain_command.set_origin(self.myself)
         request = CommandRequestObject(off_chain_command)
         request.seq = self.my_next_seq
 
@@ -179,6 +190,8 @@ class VASPPairChannel:
 
     def handle_request(self, request):
         """ Handles a request received by this VASP """
+        request.command.set_origin(self.other)
+
         # Always answer old requests
         if request.seq < self.other_next_seq:
             previous_request = self.other_requests[request.seq]
@@ -400,11 +413,17 @@ class LibraAddress:
 
     def __init__(self, encoded_address):
         try:
-            self.encoded_address = encoded_address.decode('ascii')
-            self.decoded_address = base64.b64decode(encoded_address.decode('ascii'))
+            if type(encoded_address) == str:
+                self.encoded_address = encoded_address
+            else:
+                self.encoded_address = encoded_address.decode('ascii')
+            self.decoded_address = base64.b64decode(self.encoded_address)
         except:
             raise
             raise LibraAddressError()
+    
+    def plain(self):
+        return self.encoded_address
 
     @classmethod
     def encode_to_Libra_address(cls, raw_bytes):
@@ -417,4 +436,11 @@ class LibraAddress:
         return self.decoded_address >= other.decoded_address
 
     def equal(self, other):
-        return self.decoded_address == other.decoded_address
+        return isinstance(other, LibraAddress) \
+            and self.decoded_address == other.decoded_address
+    
+    def __eq__(self, other):
+        return self.equal(other)
+    
+    def __hash__(self):
+        return self.decoded_address.__hash__()
