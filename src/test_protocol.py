@@ -83,7 +83,6 @@ def monkey_tap_to_list(pair, requests_sent, replies_sent):
 
 class RandomRun(object):
     def __init__(self, server, client, commands, seed='fixed seed'):
-
         # MESSAGE QUEUES
         self.to_server_requests = []
         self.to_client_response = []
@@ -174,10 +173,31 @@ class RandomRun(object):
                 and client.executor.last_confirmed == self.number:
                 break
 
-def test_client_server_role_definition():
+    def checks(self, NUMBER):
+        client = self.client
+        server = self.server
 
+        client_seq = [c.item() for c in client.get_final_sequence()]
+        server_seq = [c.item() for c in server.get_final_sequence()]
+
+        assert len(client_seq) == NUMBER
+        assert client_seq == server_seq
+        assert set(range(NUMBER)) ==  set(client_seq)
+
+        client_exec_seq = [c.item() for c in client.executor.seq]
+        server_exec_seq = [c.item() for c in server.executor.seq]
+        assert set(client_seq) == set(client_exec_seq)
+        assert set(server_seq) == set(server_exec_seq)
+
+@pytest.fixture
+def three_address():
     a0 = FakeAddress(0, 10)
     a1 = FakeAddress(0, 20)
+    a2 = FakeAddress(1, 30)
+    return (a0, a1, a2)
+
+def test_client_server_role_definition(three_address):
+    a0, a1, a2 = three_address
 
     # Lower address is server (xor bit = 0)
     channel = VASPPairChannel(a0, a1)
@@ -188,28 +208,30 @@ def test_client_server_role_definition():
     assert not channel.is_server()
     assert channel.is_client()
 
-    a0 = FakeAddress(0, 10)
-    a1 = FakeAddress(1, 30)
-
     # Lower address is server (xor bit = 1)
-    channel = VASPPairChannel(a0, a1)
+    channel = VASPPairChannel(a0, a2)
     assert not channel.is_server()
     assert channel.is_client()
 
-    channel = VASPPairChannel(a1, a0)
+    channel = VASPPairChannel(a2, a0)
     assert channel.is_server()
     assert not channel.is_client()
 
 
-def test_protocol_server_client_benign():
-    a0 = FakeAddress(0, 10)
-    a1 = FakeAddress(0, 20)
+@pytest.fixture
+def server_client(three_address):
+    a0, a1, a2 = three_address
 
     server = VASPPairChannel(a0, a1)
     client = VASPPairChannel(a1, a0)
 
     server = monkey_tap(server)
     client = monkey_tap(client)
+
+    return (server, client)
+
+def test_protocol_server_client_benign(server_client):
+    server, client = server_client
 
     # Create a server request for a command
     server.sequence_command_local(SampleCommand('Hello'))
@@ -242,15 +264,8 @@ def test_protocol_server_client_benign():
     assert client.get_final_sequence()[0].item() == 'Hello'
 
 
-def test_protocol_server_conflicting_sequence():
-    a0 = FakeAddress(0, 10)
-    a1 = FakeAddress(0, 20)
-
-    server = VASPPairChannel(a0, a1)
-    client = VASPPairChannel(a1, a0)
-
-    server = monkey_tap(server)
-    client = monkey_tap(client)
+def test_protocol_server_conflicting_sequence(server_client):
+    server, client = server_client
 
     # Create a server request for a command
     server.sequence_command_local(SampleCommand('Hello'))
@@ -285,15 +300,8 @@ def test_protocol_server_conflicting_sequence():
     assert client.get_final_sequence()[0].commit_status is not None
     assert client.get_final_sequence()[0].item() == 'Hello'
 
-def test_protocol_client_server_benign():
-    a0 = FakeAddress(0, 10)
-    a1 = FakeAddress(0, 20)
-
-    server = VASPPairChannel(a0, a1)
-    client = VASPPairChannel(a1, a0)
-
-    server = monkey_tap(server)
-    client = monkey_tap(client)
+def test_protocol_client_server_benign(server_client):
+    server, client = server_client
 
     # Create a server request for a command
     client.sequence_command_local(SampleCommand('Hello'))
@@ -330,15 +338,8 @@ def test_protocol_client_server_benign():
     assert server.my_next_seq == 0
 
 
-def test_protocol_server_client_interleaved_benign():
-    a0 = FakeAddress(0, 10)
-    a1 = FakeAddress(0, 20)
-
-    server = VASPPairChannel(a0, a1)
-    client = VASPPairChannel(a1, a0)
-
-    server = monkey_tap(server)
-    client = monkey_tap(client)
+def test_protocol_server_client_interleaved_benign(server_client):
+    server, client = server_client
 
     client.sequence_command_local(SampleCommand('Hello'))
     client_request = client.tap()[0]
@@ -365,15 +366,8 @@ def test_protocol_server_client_interleaved_benign():
     assert [c.item() for c in client.get_final_sequence()] == ['World', 'Hello']
     assert [c.item() for c in server.get_final_sequence()] == ['World', 'Hello']
 
-def test_protocol_server_client_interleaved_swapped_request():
-    a0 = FakeAddress(0, 10)
-    a1 = FakeAddress(0, 20)
-
-    server = VASPPairChannel(a0, a1)
-    client = VASPPairChannel(a1, a0)
-
-    server = monkey_tap(server)
-    client = monkey_tap(client)
+def test_protocol_server_client_interleaved_swapped_request(server_client):
+    server, client = server_client
 
     client.sequence_command_local(SampleCommand('Hello'))
     client_request = client.tap()[0]
@@ -398,15 +392,8 @@ def test_protocol_server_client_interleaved_swapped_request():
     assert [c.item() for c in client.get_final_sequence()] == ['World', 'Hello']
     assert [c.item() for c in server.get_final_sequence()] == ['World', 'Hello']
 
-def test_protocol_server_client_interleaved_swapped_reply():
-    a0 = FakeAddress(0, 10)
-    a1 = FakeAddress(0, 20)
-
-    server = VASPPairChannel(a0, a1)
-    client = VASPPairChannel(a1, a0)
-
-    server = monkey_tap(server)
-    client = monkey_tap(client)
+def test_protocol_server_client_interleaved_swapped_reply(server_client):
+    server, client = server_client
 
     client.sequence_command_local(SampleCommand('Hello'))
     client_request = client.tap()[0]
@@ -432,13 +419,8 @@ def test_protocol_server_client_interleaved_swapped_reply():
     assert [c.item() for c in client.get_final_sequence()] == ['World', 'Hello']
     assert [c.item() for c in server.get_final_sequence()] == ['World', 'Hello']
 
-def test_random_interleave_no_drop():
-
-    a0 = FakeAddress(0, 10)
-    a1 = FakeAddress(0, 20)
-
-    server = VASPPairChannel(a0, a1)
-    client = VASPPairChannel(a1, a0)
+def test_random_interleave_no_drop(server_client):
+    server, client = server_client
 
     NUMBER = 20
     commands = list(range(NUMBER))
@@ -448,14 +430,10 @@ def test_random_interleave_no_drop():
     R.DROP = False
     R.run()
 
+    R.checks(NUMBER)
+
     client = R.client
     server = R.server
-
-    client_seq = [c.item() for c in client.get_final_sequence()]
-    server_seq = [c.item() for c in server.get_final_sequence()]
-
-    assert client_seq == server_seq
-    assert len(client_seq) == NUMBER
 
     # Print stats:
     print()
@@ -463,14 +441,8 @@ def test_random_interleave_no_drop():
     print("Server: Requests #%d  Responses #%d" % (server.xx_requests_stats, server.xx_replies_stats))
 
 
-def test_random_interleave_and_drop():
-
-    a0 = FakeAddress(0, 10)
-    a1 = FakeAddress(0, 20)
-
-    server = VASPPairChannel(a0, a1)
-    client = VASPPairChannel(a1, a0)
-
+def test_random_interleave_and_drop(server_client):
+    server, client = server_client
 
     NUMBER = 20
     commands = list(range(NUMBER))
@@ -478,36 +450,18 @@ def test_random_interleave_and_drop():
 
     R = RandomRun(server, client, commands, seed='drop')
     R.run()
+    R.checks(NUMBER)
 
     client = R.client
     server = R.server
-
-    client_seq = [c.item() for c in client.get_final_sequence()]
-    server_seq = [c.item() for c in server.get_final_sequence()]
-
-    assert len(client_seq) == NUMBER
-    assert client_seq == server_seq
-    assert set(range(NUMBER)) ==  set(client_seq)
 
     # Print stats:
     print()
     print("Client: Requests #%d  Responses #%d" % (client.xx_requests_stats, client.xx_replies_stats))
     print("Server: Requests #%d  Responses #%d" % (server.xx_requests_stats, server.xx_replies_stats))
 
-
-    # Now test if executor has the same set
-    client_exec_seq = client_seq = [c.item() for c in client.executor.seq]
-    server_exec_seq = client_seq = [c.item() for c in server.executor.seq]
-    assert set(client_seq) == set(client_exec_seq)
-    assert set(server_seq) == set(server_exec_seq)
-
-def test_random_interleave_and_drop_and_invalid():
-
-    a0 = FakeAddress(0, 10)
-    a1 = FakeAddress(0, 20)
-
-    server = VASPPairChannel(a0, a1)
-    client = VASPPairChannel(a1, a0)
+def test_random_interleave_and_drop_and_invalid(server_client):
+    server, client = server_client
 
     NUMBER = 20
     commands = list(range(NUMBER))
@@ -517,6 +471,7 @@ def test_random_interleave_and_drop_and_invalid():
 
     R = RandomRun(server, client, commands, seed='drop')
     R.run()
+    R.checks(NUMBER)
 
     client = R.client
     server = R.server
@@ -524,30 +479,15 @@ def test_random_interleave_and_drop_and_invalid():
     client_seq = [c.item() for c in client.get_final_sequence()]
     server_seq = [c.item() for c in server.get_final_sequence()]
 
-    assert len(client_seq) == NUMBER
-    assert client_seq == server_seq
-    assert set(range(NUMBER)) ==  set(client_seq)
-
     # Print stats:
     print()
     print("Client: Requests #%d  Responses #%d" % (client.xx_requests_stats, client.xx_replies_stats))
     print("Server: Requests #%d  Responses #%d" % (server.xx_requests_stats, server.xx_replies_stats))
 
-
-    # Now test if executor has the same set
-    client_exec_seq = client_seq = [c.item() for c in client.executor.seq]
-    server_exec_seq = client_seq = [c.item() for c in server.executor.seq]
-    assert set(client_seq) == set(client_exec_seq)
-    assert set(server_seq) == set(server_exec_seq)
-
     assert set(server.executor.object_store.keys()) == set(client.executor.object_store.keys())
 
-def test_dependencies():
-    a0 = FakeAddress(0, 10)
-    a1 = FakeAddress(0, 20)
-
-    server = VASPPairChannel(a0, a1)
-    client = VASPPairChannel(a1, a0)
+def test_dependencies(server_client):
+    server, client = server_client
 
     # Commands with dependencies
     cmd = [ (0, []),
@@ -567,21 +507,10 @@ def test_dependencies():
 
     R = RandomRun(server, client, commands, seed='deps')
     R.run()
+    R.checks(NUMBER)
 
     client = R.client
     server = R.server
-
-    client_seq = [c.item() for c in client.get_final_sequence()]
-    server_seq = [c.item() for c in server.get_final_sequence()]
-
-    assert len(client_seq) == NUMBER
-    assert client_seq == server_seq
-    assert set(range(NUMBER)) ==  set(client_seq)
-
-    client_seq_success = [c.commit_status for c in client.get_final_sequence()]
-    server_seq_success = [c.commit_status for c in server.get_final_sequence()]
-
-    assert client_seq_success == server_seq_success
 
     mapcmd = { c.item():c.commit_status for c in  client.get_final_sequence()}
     # Only one of the items with common dependency commits

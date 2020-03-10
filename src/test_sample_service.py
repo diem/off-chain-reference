@@ -99,17 +99,19 @@ def settled_payment_as_receiver():
     payment.data['sender'].change_status(Status.settled)
     return payment
 
-
+@pytest.fixture
+def addr_bc_proc():
+    a0 = FakeAddress(0, 40)
+    bc = sample_business(a0)
+    proc = PaymentProcessor(bc)
+    return (a0, bc, proc)
 
 def test_business_simple():
     a0 = FakeAddress(0, 40)
     bc = sample_business(a0)
 
-def test_business_is_related(basic_payment_as_receiver):
-    a0 = FakeAddress(0, 40)
-    bc = sample_business(a0)
-
-    proc = PaymentProcessor(bc)
+def test_business_is_related(basic_payment_as_receiver, addr_bc_proc):
+    a0, bc, proc = addr_bc_proc
     payment = basic_payment_as_receiver
 
     kyc_level = bc.next_kyc_level_to_request(payment)
@@ -119,11 +121,8 @@ def test_business_is_related(basic_payment_as_receiver):
     assert ret_payment.has_changed()
     assert ret_payment.data['receiver'].data['status'] == Status.needs_kyc_data
 
-def test_business_is_kyc_provided(kyc_payment_as_receiver):
-    a0 = FakeAddress(0, 40)
-    bc = sample_business(a0)
-
-    proc = PaymentProcessor(bc)
+def test_business_is_kyc_provided(kyc_payment_as_receiver, addr_bc_proc):
+    a0, bc, proc = addr_bc_proc
     payment = kyc_payment_as_receiver
     
     kyc_level = bc.next_kyc_level_to_request(payment)
@@ -136,11 +135,8 @@ def test_business_is_kyc_provided(kyc_payment_as_receiver):
     assert ready
     assert ret_payment.data['receiver'].data['status'] == Status.ready_for_settlement
 
-def test_business_is_kyc_provided_sender(kyc_payment_as_sender):
-    a0 = FakeAddress(0, 40)
-    bc = sample_business(a0)
-
-    proc = PaymentProcessor(bc)
+def test_business_is_kyc_provided_sender(kyc_payment_as_sender, addr_bc_proc):
+    a0, bc, proc = addr_bc_proc
     payment = kyc_payment_as_sender
     assert payment.data['sender'] is not None
     assert bc.is_sender(payment)
@@ -156,11 +152,8 @@ def test_business_is_kyc_provided_sender(kyc_payment_as_sender):
     assert bc.get_account('1')['balance'] == 5.0
 
 
-def test_business_settled(settled_payment_as_receiver):
-    a0 = FakeAddress(0, 40)
-    bc = sample_business(a0)
-
-    proc = PaymentProcessor(bc)
+def test_business_settled(settled_payment_as_receiver,addr_bc_proc):
+    a0, bc, proc = addr_bc_proc
     payment = settled_payment_as_receiver
 
     ret_payment = proc.payment_process(payment)

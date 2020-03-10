@@ -1,7 +1,7 @@
 from business import BusinessContext, BusinessAsyncInterupt, BusinessForceAbort, BusinessValidationFailure
 from protocol import OffChainVASP
 from protocol_messages import CommandRequestObject
-from payment_logic import PaymentCommand
+from payment_logic import PaymentCommand, PaymentProcessor
 from status_logic import Status
 from utils import JSON_NET
 
@@ -226,14 +226,30 @@ class sample_vasp:
 
         CommandRequestObject.register_command_type(PaymentCommand)
         self.vasp         = OffChainVASP(self.my_addr, self.bc)
+        self.pp           = PaymentProcessor(self.bc)
+    
+    def get_channel(self, other_vasp):
+        channel = self.vasp.get_channel(other_vasp)
+        channel.executor.set_outcome_handler(self.process_new_command)
+        return channel
 
+    def process_new_command(self, payment_command, success):
+        if success:
+            new_obj = self.pp.payment_process(payment_command.payment)
+            if new_obj.has_changed():
+                new_cmd = PaymentCommand(new_obj)
+                # TODO: insert it back into channel
+        else:
+            # TODO: log the command failure.
+            pass
+    
     def process_request(self, other_vasp, request_json):
         # Get the channel 
-        channel = self.vasp.get_channel(other_vasp)
+        channel = self.get_channel(other_vasp)
         channel.parse_handle_request(request_json)
         return channel.net_queue.pop()
         
 
     def process_response(self, other_vasp, request_json):
-        channel = self.vasp.get_channel(other_vasp)
+        channel = self.get_channel(other_vasp)
         channel.parse_handle_response(request_json)

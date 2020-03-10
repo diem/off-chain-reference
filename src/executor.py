@@ -100,9 +100,19 @@ class ProtocolCommand(JSONSerializable):
             self.commit_status = data["commit_status"]
         return self
 
+class CommandProcessor:
+
+    def business_context(self):
+        pass
+
+    def check_command(self, vasp, channel, executor, command):
+        pass
+
+    def process_command(self, vasp, channel, executor, command, status, error=None):
+        pass
 
 class ProtocolExecutor:
-    def __init__(self):
+    def __init__(self, business_context=None, handlers=None):
         # <STARTS to persist>
         self.seq = []
         self.last_confirmed = 0
@@ -111,8 +121,8 @@ class ProtocolExecutor:
         self.object_store = { } # TODO: persist this structure
         # <ENDS to persist>
 
-        self.context = None
-        self.handlers = None
+        self.context = business_context
+        self.handlers = handlers
     
     def set_outcome_handler(self, handler):
         ''' Set an external handler to deal with success of failure of commands '''

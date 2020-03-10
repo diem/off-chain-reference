@@ -4,8 +4,6 @@ from business import BusinessContext, BusinessAsyncInterupt, \
 from executor import ProtocolCommand
 from payment import Status, PaymentObject
 from status_logic import status_heights_MUST
-# Checks on diffs to ensure consistency with logic.
-
 
 class PaymentCommand(ProtocolCommand):
     def __init__(self, payment):
@@ -50,15 +48,12 @@ class PaymentCommand(ProtocolCommand):
 
         # Ensure that the update to the object is correct
         self.get_object(self.creates[0], dependencies)
-
-        # TODO TODO TODO: Connect with the functions to check new payments
-        #                 But those need a business. Hmmm?
-
         if self.depend_on == []:
-            check_new_payment(context, self.command)
+            new_obj = check_new_payment(context, self.command)
         else:
-            check_new_update(context, dependencies[self.depend_on[0]], self.command)
+            new_obj = check_new_update(context, dependencies[self.depend_on[0]], self.command)
 
+        self.payment = new_obj
         return True
 
     def get_json_data_dict(self, flag):
@@ -80,6 +75,8 @@ class PaymentCommand(ProtocolCommand):
 class PaymentLogicError(Exception):
     pass
 
+
+# Functions to check incoming diffs
 
 def check_status(role, old_status, new_status, other_status):
     ''' Check that the new status is valid.

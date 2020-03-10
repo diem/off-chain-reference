@@ -6,6 +6,7 @@ from utils import JSONParsingError, JSON_NET
 import base64
 import json
 
+
 class OffChainVASP:
     """Manages the off-chain protocol on behalf of one VASP"""
     
@@ -27,7 +28,7 @@ class OffChainVASP:
         other_address = other_vasp_addr
         store_key = (my_address, other_address)
         if store_key not in self.channel_store:
-            channel = VASPPairChannel(self.my_vasp_addr(), other_vasp_addr, self.business_context)
+            channel = VASPPairChannel(self.my_vasp_addr(), other_vasp_addr)
             channel.set_business_context(self.business_context)
             self.channel_store[store_key] = channel
     
@@ -37,12 +38,16 @@ class OffChainVASP:
 class VASPPairChannel:
     """Represents the state of an off-chain bi-directional channel bewteen two VASPs"""
 
-    def __init__(self, myself, other, CommandExecutor = None):
+    def __init__(self, myself, other):
         """ Initialize the channel between two VASPs.
 
         * Myself is the VASP initializing the local object (VASPInfo)
         * Other is the other VASP (VASPInfo).
         """
+
+        if __debug__:
+            assert isinstance(myself, LibraAddress)
+            assert isinstance(other, LibraAddress)
 
         self.myself = myself
         self.other = other
@@ -95,10 +100,6 @@ class VASPPairChannel:
         """ A hook to send a response to other VASP"""
         json_string = json.dumps(response.get_json_data_dict(JSON_NET))
         self.net_queue += [ json_string ]
-
-    def get_protocol_version(self):
-        """ Returns the protocol version of this channel."""
-        pass
 
     def is_client(self):
         """ Is the local VASP a client for this pair?"""
@@ -161,7 +162,7 @@ class VASPPairChannel:
                 do_not_sequence_errors = True, own=True)
 
         self.my_next_seq += 1
-        self.my_requests += [request]
+        self.my_requests += [ request ]
         self.send_request(request)
         self.persist()
 
