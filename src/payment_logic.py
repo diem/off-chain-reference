@@ -92,66 +92,6 @@ def check_status(role, old_status, new_status, other_status):
             (role, Status.ready_for_settlement)
         )
 
-
-def check_new_payment(business, initial_diff):
-    ''' Checks a diff for a new payment from the other VASP, and returns
-        a valid payemnt. If a validation error occurs, then an exception
-        is thrown.
-
-        NOTE: the VASP may be the RECEIVER of the new payment, for example for
-              person to person payment initiated by the sender. The VASP may
-              also be the SENDER for the payment, such as in cases where a
-              merchant is charging an account, a refund, or a standing order.
-
-              The only real check is that that status for the VASP that has
-              not created the payment must be none, to allow for checks and
-              potential aborts. However, KYC information on both sides may
-              be included by the other party, and should be checked.
-        '''
-    assert business is not None
-    new_payment = PaymentObject.create_from_record(initial_diff)
-
-    role = ['sender', 'receiver'][business.is_recipient(new_payment)]
-    other_role = ['sender', 'receiver'][role == 'sender']
-    other_status = new_payment.data[other_role].data['status']
-    if new_payment.data[role].data['status'] != Status.none:
-        raise PaymentLogicError('Sender set receiver status or vice-versa.')
-
-    if other_role == 'receiver' and other_status == Status.needs_recipient_signature:
-        raise PaymentLogicError(
-            'Receiver cannot be in %s.' % Status.needs_recipient_signature
-        )
-
-    business.validate_kyc_signature(new_payment)
-    business.validate_recipient_signature(new_payment)
-
-
-def check_new_update(business, payment, diff):
-    ''' Checks a diff updating an existing payment. On success
-        returns the new payment object. All check are fast to ensure
-        a timely response (cannot support async operations).
-    '''
-
-    new_payment = payment.new_version()
-    PaymentObject.from_full_record(diff, base_instance=new_payment)
-
-    role = ['sender', 'receiver'][business.is_recipient(new_payment)]
-    status = payment.data[role].data['status']
-    other_role = ['sender', 'receiver'][role == 'sender']
-    old_other_status = payment.data[other_role].data['status']
-    other_status = new_payment.data[other_role].data['status']
-
-    # Ensure nothing on our side was changed by this update
-    if payment.data[role] != new_payment.data[role]:
-        raise PaymentLogicError('Cannot change %s information.' % role)
-
-    # Ensure valid transitions
-    check_status(other_role, old_other_status, other_status, status)
-
-    business.validate_kyc_signature(new_payment)
-    business.validate_recipient_signature(new_payment)
-
-
 # The logic to process a payment from either side.
 class PaymentProcessor(CommandProcessor):
 
@@ -165,40 +105,95 @@ class PaymentProcessor(CommandProcessor):
     def business_context(self):
         return self.business
 
+    def check_new_payment(self, new_payment):
+        ''' Checks a diff for a new payment from the other VASP, and returns
+            a valid payemnt. If a validation error occurs, then an exception
+            is thrown.
+
+            NOTE: the VASP may be the RECEIVER of the new payment, for example for
+                person to person payment initiated by the sender. The VASP may
+                also be the SENDER for the payment, such as in cases where a
+                merchant is charging an account, a refund, or a standing order.
+
+                The only real check is that that status for the VASP that has
+                not created the payment must be none, to allow for checks and
+                potential aborts. However, KYC information on both sides may
+                be included by the other party, and should be checked.
+            '''
+        business = self.business
+        # new_payment = PaymentObject.create_from_record(initial_diff)
+
+        role = ['sender', 'receiver'][business.is_recipient(new_payment)]
+        other_role = ['sender', 'receiver'][role == 'sender']
+        other_status = new_payment.data[other_role].data['status']
+        if new_payment.data[role].data['status'] != Status.none:
+            raise PaymentLogicError('Sender set receiver status or vice-versa.')
+
+        if other_role == 'receiver' and other_status == Status.needs_recipient_signature:
+            raise PaymentLogicError(
+                'Receiver cannot be in %s.' % Status.needs_recipient_signature
+            )
+        # TODO: CHeck status here according to status_logic
+
+        business.validate_kyc_signature(new_payment)
+        business.validate_recipient_signature(new_payment)
+
+    def check_new_update(self, payment, new_payment):
+        ''' Checks a diff updating an existing payment. On success
+            returns the new payment object. All check are fast to ensure
+            a timely response (cannot support async operations).
+        '''
+        business = self.business
+
+        role = ['sender', 'receiver'][business.is_recipient(new_payment)]
+        status = payment.data[role].data['status']
+        other_role = ['sender', 'receiver'][role == 'sender']
+        old_other_status = payment.data[other_role].data['status']
+        other_status = new_payment.data[other_role].data['status']
+
+        # Ensure nothing on our side was changed by this update
+        if payment.data[role] != new_payment.data[role]:
+            raise PaymentLogicError('Cannot change %s information.' % role)
+
+        # Ensure valid transitions
+        check_status(other_role, old_other_status, other_status, status)
+
+        business.validate_kyc_signature(new_payment)
+        business.validate_recipient_signature(new_payment)
+
     def check_command(self, vasp, channel, executor, command, own):
         context = self.business_context()
         dependencies = executor.object_store
 
-        new_obj = command.get_object(command.creates[0], dependencies)
-        assert new_obj.get_version() == command.creates[0]
+        new_payment = command.get_object(command.creates[0], dependencies)
+        assert new_payment.get_version() == command.creates[0]
 
         ## Ensure that the two parties involved are in the VASP channel
-        new_obj_parties = set([new_obj.data['sender'].data['address'], 
-                            new_obj.data['receiver'].data['address'] ])
+        parties = set([new_payment.data['sender'].data['address'], 
+                            new_payment.data['receiver'].data['address'] ])
 
-        if len(new_obj_parties) != 2:
-            raise PaymentLogicError('Wrong number of parties to payment: ' + str(new_obj_parties))
+        if len(parties) != 2:
+            raise PaymentLogicError('Wrong number of parties to payment: ' + str(parties))
 
         my_addr = channel.myself.plain()
-        if my_addr not in new_obj_parties:
-            raise PaymentLogicError('Payment parties does not include own VASP (%s): %s' % (my_addr, str(new_obj_parties)))
+        if my_addr not in parties:
+            raise PaymentLogicError('Payment parties does not include own VASP (%s): %s' % (my_addr, str(parties)))
 
         other_addr = channel.other.plain()
-        if other_addr not in new_obj_parties:
-            raise PaymentLogicError('Payment parties does not include other party (%s): %s' % (other_addr, str(new_obj_parties)))
+        if other_addr not in parties:
+            raise PaymentLogicError('Payment parties does not include other party (%s): %s' % (other_addr, str(parties)))
 
         origin = command.get_origin().plain()
-        if origin not in new_obj_parties:
+        if origin not in parties:
             raise PaymentLogicError('Command originates from wrong party')
 
         if origin == other_addr:
             # Only check the commands we get from others.
             if command.depend_on == []:
-                check_new_payment(context, command.command)
+                self.check_new_payment(new_payment)
             else:
-                check_new_update(context, dependencies[command.depend_on[0]], command.command)
-
-        command.payment = new_obj
+                old_payment = dependencies[command.depend_on[0]]
+                self.check_new_update(old_payment, new_payment)
 
     def process_command(self, vasp, channel, executor, command, status_success, error=None):
         if status_success:
