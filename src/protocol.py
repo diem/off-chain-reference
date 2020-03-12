@@ -357,17 +357,15 @@ class VASPPairChannel:
 
     def retransmit(self):
         """ Re-sends the earlierst request that has not yet got a response, if any """
-        for request in self.my_requests:
-            assert isinstance(request, CommandRequestObject)
-            if not request.has_response():
-                self.send_request(request)
-                break
+        self.would_retransmit(do_retransmit=True)
 
-    def would_retransmit(self):
+    def would_retransmit(self, do_retransmit=False):
         """ Returns true if there are any pending re-transmits, namely
             requests for which the response has not yet been received. """
         for request in self.my_requests:
             assert isinstance(request, CommandRequestObject)
             if not request.has_response():
+                if do_retransmit:
+                    self.send_request(request)
                 return True
         return False
