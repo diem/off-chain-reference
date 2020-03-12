@@ -1,16 +1,11 @@
 ''' These interfaces are heavily WIP, as we decide how to best implement the
     above state machines '''
 
-from utils import JSONSerializable, JSON_NET, JSON_STORE
+from utils import JSONSerializable, JSON_NET, JSON_STORE, get_unique_string
 from command_processor import CommandProcessor
 
-import random
-from os import urandom
-from base64 import standard_b64encode
 from copy import deepcopy
 
-def get_unique_string():
-    return standard_b64encode(urandom(16)).decode('ascii')
 
 # Generic interface to a shared object
 
