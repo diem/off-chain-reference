@@ -1,7 +1,7 @@
 ''' These interfaces are heavily WIP, as we decide how to best implement the
     above state machines '''
 
-from utils import JSONSerializable, JSON_NET, JSON_STORE, get_unique_string
+from utils import JSONSerializable, JSONFlag, get_unique_string
 from command_processor import CommandProcessor
 
 # Interface we need to do commands:
@@ -40,7 +40,7 @@ class ProtocolCommand(JSONSerializable):
             "creates"    : self.creates,
         }
 
-        if flag == JSON_STORE:
+        if flag == JSONFlag.STORE:
             data_dict["commit_status"] = self.commit_status
             data_dict["origin"] = self.origin
 
@@ -57,7 +57,7 @@ class ProtocolCommand(JSONSerializable):
         ProtocolCommand.__init__(self)
         self.depend_on = list(data['depend_on'])
         self.creates = list(data['creates'])
-        if flag == JSON_STORE:
+        if flag == JSONFlag.STORE:
             self.commit_status = data["commit_status"]
             self.origin = data["origin"]
         return self

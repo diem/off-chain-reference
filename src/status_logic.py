@@ -32,7 +32,6 @@ V1 States (TODO)
 """
 
 from collections import defaultdict
-from utils import StructureException
 
 class TypeEnumeration:
     ''' Express & Validate status values '''
@@ -43,6 +42,7 @@ class TypeEnumeration:
         #only called what self.attr doesn't exist
         if attr in self._allowed:
             return attr
+        from utils import StructureException
         raise StructureException('Status %s not supported' % attr)
 
     def __contains__(self, item):

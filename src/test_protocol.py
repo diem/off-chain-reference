@@ -540,8 +540,8 @@ def test_json_serlialize():
     # Test Commands (to ensure correct debug)
     cmd = SampleCommand(1, [2, 3])
     cmd2 = SampleCommand(10, [2, 3])
-    data = cmd.get_json_data_dict(JSON_NET)
-    cmd2 = SampleCommand.from_json_data_dict(data, JSON_NET)
+    data = cmd.get_json_data_dict(JSONFlag.NET)
+    cmd2 = SampleCommand.from_json_data_dict(data, JSONFlag.NET)
     assert cmd == cmd2
 
     # First register the SimpleCommand class
@@ -554,17 +554,17 @@ def test_json_serlialize():
     req0.command_seq = 15
     req0.status = 'success'
 
-    data = req0.get_json_data_dict(JSON_STORE)
+    data = req0.get_json_data_dict(JSONFlag.STORE)
     assert data is not None
-    req1 = CommandRequestObject.from_json_data_dict(data, JSON_STORE)
+    req1 = CommandRequestObject.from_json_data_dict(data, JSONFlag.STORE)
     assert req0 == req1
     assert req1 != req2
 
     req0.response = make_protocol_error(req0, 'The error code')
-    data_err = req0.get_json_data_dict(JSON_STORE)
+    data_err = req0.get_json_data_dict(JSONFlag.STORE)
     assert data_err is not None
     assert data_err['response'] is not None
-    req_err = CommandRequestObject.from_json_data_dict(data_err, JSON_STORE)
+    req_err = CommandRequestObject.from_json_data_dict(data_err, JSONFlag.STORE)
     assert req0 == req_err
 
 def test_VASProot():
