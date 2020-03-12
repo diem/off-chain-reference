@@ -163,7 +163,7 @@ class PaymentProcessor(CommandProcessor):
         business.validate_kyc_signature(new_payment)
         business.validate_recipient_signature(new_payment)
 
-    def check_command(self, vasp, channel, executor, command, own):
+    def check_command(self, vasp, channel, executor, command):
         context = self.business_context()
         dependencies = executor.object_store
 

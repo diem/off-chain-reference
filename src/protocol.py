@@ -86,6 +86,8 @@ class VASPPairChannel:
         # Network handler
         self.net_queue = []
 
+    def get_my_address(self):
+        return self.myself
 
     def get_vasp(self):
         ''' Get the OffChainVASP to which this channel is attached. '''
@@ -169,7 +171,7 @@ class VASPPairChannel:
     def sequence_command_local(self, off_chain_command):
         """ The local VASP attempts to sequence a new off-chain command."""
 
-        off_chain_command.set_origin(self.myself)
+        off_chain_command.set_origin(self.get_my_address())
         request = CommandRequestObject(off_chain_command)
         request.seq = self.my_next_seq
 
@@ -177,7 +179,7 @@ class VASPPairChannel:
             request.command_seq = self.next_final_sequence()
             # Raises and exits on error -- does not sequence
             self.executor.sequence_next_command(off_chain_command,
-                do_not_sequence_errors = True, own=True)
+                do_not_sequence_errors = True)
 
         self.my_next_seq += 1
         self.my_requests += [ request ]
@@ -245,8 +247,8 @@ class VASPPairChannel:
             seq = self.next_final_sequence()
             old_len = len(self.executor.seq)
             try:
-                self.executor.sequence_next_command(request.command, \
-                    do_not_sequence_errors = False, own=False)
+                self.executor.sequence_next_command(request.command, 
+                                                    do_not_sequence_errors = False)
                 response = make_success_response(request)
             except ExecutorException as e:
                 response = make_command_error(request, str(e))
@@ -312,7 +314,7 @@ class VASPPairChannel:
 
                 try:
                     self.executor.sequence_next_command(request.command, \
-                        do_not_sequence_errors = False, own=True)
+                        do_not_sequence_errors = False)
                 except:
                     # We ignore the outcome since the response is what matters.
                     # TODO: something buggy has happened, if we return an error
