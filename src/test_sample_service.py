@@ -2,7 +2,7 @@ from sample_service import *
 from test_protocol import FakeAddress, FakeVASPInfo
 from payment_logic import PaymentProcessor
 from payment import *
-from protocol import LibraAddress
+from libra_address import LibraAddress
 from utils import *
 from protocol_messages import *
 
