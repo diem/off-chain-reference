@@ -1,3 +1,6 @@
+from os import urandom
+from base64 import standard_b64encode
+
 REQUIRED = True
 OPTIONAL = False
 
@@ -180,3 +183,8 @@ class JSONSerializable:
     def from_json_data_dict(cls, data, flag):
         ''' Construct the object from a serlialized JSON data dictionary (from json.loads). '''
         raise NotImplementedError()
+
+# Get unique base64 encoded random 16-byte strings
+
+def get_unique_string():
+    return standard_b64encode(urandom(16)).decode('ascii')
