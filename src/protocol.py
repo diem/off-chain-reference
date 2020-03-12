@@ -118,7 +118,9 @@ class VASPPairChannel:
     def send_response(self, response):
         """ A hook to send a response to other VASP"""
         json_string = json.dumps(response.get_json_data_dict(JSONFlag.NET))
-        self.net_queue += [ NetMessage(self.myself, self.other, CommandResponseObject,json_string) ]
+        net_message = NetMessage(self.myself, self.other, CommandResponseObject,json_string)
+        self.net_queue += [ net_message ]
+        return net_message
 
     def is_client(self):
         """ Is the local VASP a client for this pair?"""
@@ -199,7 +201,16 @@ class VASPPairChannel:
 
 
     def handle_request(self, request):
-        """ Handles a request received by this VASP """
+        """ Handles a request received by this VASP.
+        
+            Returns a network record of the response if one can be constructed,
+            or None in case they are scheduled for later processing. If none is
+            returned then this function must be called again once the condition
+
+                self.pending_responses() == 0
+            
+            becomes true.
+        """
         request.command.set_origin(self.other)
 
         # Always answer old requests
@@ -208,29 +219,27 @@ class VASPPairChannel:
             if previous_request.is_same_command(request):
                 # Re-send the response
                 response = previous_request.response
-                self.send_response(response)
-                return
+                return self.send_response(response)
+                
             else:
                 # There is a conflict, and it will have to be resolved
                 #  TODO[issue 8]: How are conflicts meant to be resolved? With only
                 #        two participants we cannot tolerate errors.
                 response = make_protocol_error(request, code='conflict')
                 response.previous_command = previous_request.command
-                self.send_response(response)
-                return
-
+                return self.send_response(response)
+                
         # Clients are not to suggest sequence numbers.
         if self.is_server() and request.command_seq is not None:
             response = make_protocol_error(request, code='malformed')
-            self.send_response(response)
-            return
+            return self.send_response(response)
 
         # As a server we first wait for the status of all server
         # requests to sequence any new client requests.
         if self.is_server() and self.pending_responses() > 0:
             self.pending_requests += [request]
-            return
-
+            return None
+            
         # Sequence newer requests
         if request.seq == self.other_next_seq:
 
@@ -238,9 +247,8 @@ class VASPPairChannel:
                 # We must wait, since we cannot give an answer before sequencing
                 # previous commands.
                 response = make_protocol_error(request, code='wait')
-                self.send_response(response)
-                return
-
+                return self.send_response(response)
+                
             self.other_next_seq += 1
             self.other_requests += [request]
 
@@ -260,17 +268,18 @@ class VASPPairChannel:
             self.apply_response_to_executor(request)
 
             self.persist()
-            self.send_response(request.response)
+            return self.send_response(request.response)
 
         elif request.seq > self.other_next_seq:
             # We have received the other side's request without receiving the
             # previous one
             response = make_protocol_error(request, code='missing')
-            self.send_response(response)
+            return self.send_response(response)
 
             # NOTE: the protocol is still correct without persisiting the cache
             self.persist()
         else:
+            # OK: Previous cases are exhaustive
             assert False
     
     def parse_handle_response(self, json_response):
