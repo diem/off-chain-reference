@@ -1,5 +1,5 @@
 from utils import JSONSerializable, JSONParsingError, JSON_NET, JSON_STORE
-from executor import SampleCommand
+# from executor import SampleCommand
 
 class OffChainError(JSONSerializable):
     def __init__(self, protocol_error=True, code=None):
