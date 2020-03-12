@@ -1,5 +1,6 @@
-from executor import SharedObject, ProtocolCommand
+from executor import ProtocolCommand
 from utils import JSON_STORE
+from shared_object import SharedObject
 
 class SampleObject(SharedObject):
     def __init__(self, item):
