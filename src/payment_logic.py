@@ -275,7 +275,7 @@ class PaymentProcessor(CommandProcessor):
                     extended_kyc = business.get_extended_kyc(new_payment)
                     new_payment.data[role].add_kyc_data(*extended_kyc)
 
-                if role == 'receiver' and other_status == Status.needs_recipient_signature:
+                if Status.needs_recipient_signature in kyc_to_provide:
                     signature = business.get_recipient_signature(new_payment)
                     new_payment.add_recipient_signature(signature)
 

@@ -95,6 +95,7 @@ class ProtocolCommand(JSONSerializable):
 
         if flag == JSON_STORE:
             data_dict["commit_status"] = self.commit_status
+            data_dict["origin"] = self.origin
 
         return data_dict
 
@@ -111,6 +112,7 @@ class ProtocolCommand(JSONSerializable):
         self.creates = list(data['creates'])
         if flag == JSON_STORE:
             self.commit_status = data["commit_status"]
+            self.origin = data["origin"]
         return self
 
 class CommandProcessor:
