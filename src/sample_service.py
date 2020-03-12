@@ -1,12 +1,8 @@
 from business import BusinessContext, BusinessAsyncInterupt, BusinessForceAbort, BusinessValidationFailure
 from protocol import OffChainVASP
-from libra_address import LibraAddress
 from protocol_messages import CommandRequestObject
 from payment_logic import PaymentCommand, PaymentProcessor
 from status_logic import Status
-from utils import JSONFlag
-
-from test_protocol import FakeAddress
 
 import json
 import decimal
