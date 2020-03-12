@@ -181,7 +181,7 @@ def simple_request_json():
     command = PaymentCommand(payment)
     request = CommandRequestObject(command)
     request.seq = 0
-    request_json = json.dumps(request.get_json_data_dict(JSON_NET))
+    request_json = json.dumps(request.get_json_data_dict(JSONFlag.NET))
     return request_json
 
 @pytest.fixture(params=[
@@ -200,7 +200,7 @@ def simple_response_json_error(request):
     resp.command_seq = cmd_seq
     if status == 'failure':
         resp.error = OffChainError(protoerr, errcode)
-    json_obj = json.dumps(resp.get_json_data_dict(JSON_NET))
+    json_obj = json.dumps(resp.get_json_data_dict(JSONFlag.NET))
     return json_obj
 
 def test_vasp_simple(simple_request_json):

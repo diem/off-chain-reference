@@ -1,3 +1,5 @@
+from status_logic import TypeEnumeration
+
 from os import urandom
 from base64 import standard_b64encode
 
@@ -168,8 +170,12 @@ class StructureChecker:
                     raise StructureException('Missing field: %s' % field)
 
 # define serializaqtion flags
-JSON_NET = 0
-JSON_STORE = 1
+JSONFlag = TypeEnumeration([
+    'NET',
+    'STORE'
+])
+#JSON_NET = 0
+#JSON_STORE = 1
 
 class JSONParsingError(Exception):
     pass

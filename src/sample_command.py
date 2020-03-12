@@ -1,5 +1,5 @@
 from executor import ProtocolCommand
-from utils import JSON_STORE
+from utils import JSONFlag
 from shared_object import SharedObject
 
 class SampleObject(SharedObject):
@@ -42,7 +42,7 @@ class SampleCommand(ProtocolCommand):
     def from_json_data_dict(cls, data, flag):
         ''' Construct the object from a serlialized JSON data dictionary (from json.loads). '''
         self = SampleCommand(data['command'], data['depend_on'])
-        if flag == JSON_STORE:
+        if flag == JSONFlag.STORE:
             self.commit_status = data["commit_status"]
         return self
 

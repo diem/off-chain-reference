@@ -21,15 +21,15 @@ def basic_payment():
 
 def test_payment_command_serialization_net(basic_payment):
     cmd = PaymentCommand(basic_payment)
-    data = cmd.get_json_data_dict(JSON_NET)
-    cmd2 = PaymentCommand.from_json_data_dict(data, JSON_NET)
+    data = cmd.get_json_data_dict(JSONFlag.NET)
+    cmd2 = PaymentCommand.from_json_data_dict(data, JSONFlag.NET)
     assert cmd == cmd2
 
 
 def test_payment_command_serialization_store(basic_payment):
     cmd = PaymentCommand(basic_payment)
-    data = cmd.get_json_data_dict(JSON_STORE)
-    cmd2 = PaymentCommand.from_json_data_dict(data, JSON_STORE)
+    data = cmd.get_json_data_dict(JSONFlag.STORE)
+    cmd2 = PaymentCommand.from_json_data_dict(data, JSONFlag.STORE)
     assert cmd == cmd2
 
 
@@ -41,8 +41,8 @@ def test_payment_end_to_end_serialization(basic_payment):
     request = CommandRequestObject(cmd)
     request.seq = 10
     request.response = make_success_response(request)
-    data = request.get_json_data_dict(JSON_STORE)
-    request2 = CommandRequestObject.from_json_data_dict(data, JSON_STORE)
+    data = request.get_json_data_dict(JSONFlag.STORE)
+    request2 = CommandRequestObject.from_json_data_dict(data, JSONFlag.STORE)
     assert request == request2
 
 

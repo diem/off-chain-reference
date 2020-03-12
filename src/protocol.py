@@ -1,7 +1,7 @@
 from executor import ProtocolExecutor, ExecutorException, CommandProcessor
 from protocol_messages import CommandRequestObject, CommandResponseObject, \
     make_success_response, make_protocol_error, make_parsing_error, make_command_error
-from utils import JSONParsingError, JSON_NET
+from utils import JSONParsingError, JSONFlag
 from libra_address import LibraAddress
 
 import json
@@ -110,12 +110,12 @@ class VASPPairChannel:
 
     def send_request(self, request):
         """ A hook to send a request to other VASP"""
-        json_string = request.get_json_data_dict(JSON_NET)
+        json_string = request.get_json_data_dict(JSONFlag.NET)
         self.net_queue += [ NetMessage(self.myself, self.other, CommandRequestObject, json_string) ]
 
     def send_response(self, response):
         """ A hook to send a response to other VASP"""
-        json_string = json.dumps(response.get_json_data_dict(JSON_NET))
+        json_string = json.dumps(response.get_json_data_dict(JSONFlag.NET))
         self.net_queue += [ NetMessage(self.myself, self.other, CommandResponseObject,json_string) ]
 
     def is_client(self):
@@ -189,7 +189,7 @@ class VASPPairChannel:
         ''' Handles a request provided as a json_string '''
         try:
             req_dict = json.loads(json_command)
-            request = CommandRequestObject.from_json_data_dict(req_dict, JSON_NET)
+            request = CommandRequestObject.from_json_data_dict(req_dict, JSONFlag.NET)
             self.handle_request(request)
         except JSONParsingError:
             response = make_parsing_error()
@@ -275,7 +275,7 @@ class VASPPairChannel:
         ''' Handles a response provided as a json string. '''
         try:
             resp_dict = json.loads(json_response)
-            response = CommandResponseObject.from_json_data_dict(resp_dict, JSON_NET)
+            response = CommandResponseObject.from_json_data_dict(resp_dict, JSONFlag.NET)
             self.handle_response(response)
         except JSONParsingError:
             # Log, but cannot reply: TODO
