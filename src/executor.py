@@ -1,6 +1,3 @@
-''' These interfaces are heavily WIP, as we decide how to best implement the
-    above state machines '''
-
 from utils import JSONSerializable, JSONFlag
 from command_processor import CommandProcessor
 

@@ -15,7 +15,6 @@ class LibraAddress:
                 self.encoded_address = encoded_address.decode('ascii')
             self.decoded_address = base64.b64decode(self.encoded_address)
         except:
-            raise
             raise LibraAddressError()
     
     def plain(self):
