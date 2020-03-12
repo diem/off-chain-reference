@@ -1,6 +1,5 @@
-from copy import deepcopy
 from executor import ProtocolExecutor, ExecutorException, CommandProcessor
-from protocol_messages import CommandRequestObject, CommandResponseObject, OffChainError, \
+from protocol_messages import CommandRequestObject, CommandResponseObject, \
     make_success_response, make_protocol_error, make_parsing_error, make_command_error
 from utils import JSONParsingError, JSON_NET
 from libra_address import LibraAddress
@@ -11,11 +10,12 @@ from collections import namedtuple
 NetMessage = namedtuple('NetMessage', ['src', 'dst', 'type', 'content'])
 
 class OffChainVASP:
-    """Manages the off-chain protocol on behalf of one VASP"""
+    """Manages the off-chain protocol on behalf of one VASP. """
     
     def __init__(self, vasp_addr, processor):
-        assert isinstance(processor, CommandProcessor)
-        assert isinstance(vasp_addr, LibraAddress)
+        if __debug__:
+            assert isinstance(processor, CommandProcessor)
+            assert isinstance(vasp_addr, LibraAddress)
 
         self.vasp_addr = vasp_addr
         self.business_context = processor.business_context()
@@ -25,7 +25,7 @@ class OffChainVASP:
         self.channel_store = {}
     
     def my_vasp_addr(self):
-        ''' Return our own VASP info record '''
+        ''' Return our own VASP Libra Address. '''
         return self.vasp_addr
 
     def get_channel(self, other_vasp_addr):
@@ -63,6 +63,7 @@ class VASPPairChannel:
         self.processor = processor
         self.vasp = vasp
 
+        # Check we are not making a channel with ourselves
         if self.myself.plain() == self.other.plain():
             raise Exception('Must talk to another VASP:', self.myself.plain(), self.other.plain())
 
@@ -78,6 +79,7 @@ class VASPPairChannel:
         # <ENDS to persist>
 
         # Ephemeral state that can be forgotten upon a crash
+        
         # Response cache
         self.response_cache = {}
         self.pending_requests = []
@@ -86,6 +88,7 @@ class VASPPairChannel:
 
 
     def get_vasp(self):
+        ''' Get the OffChainVASP to which this channel is attached. '''
         return self.vasp
 
     # Define a stub here to make the linter happy
@@ -183,6 +186,7 @@ class VASPPairChannel:
 
 
     def parse_handle_request(self, json_command):
+        ''' Handles a request provided as a json_string '''
         try:
             req_dict = json.loads(json_command)
             request = CommandRequestObject.from_json_data_dict(req_dict, JSON_NET)
@@ -268,6 +272,7 @@ class VASPPairChannel:
             assert False
     
     def parse_handle_response(self, json_response):
+        ''' Handles a response provided as a json string. '''
         try:
             resp_dict = json.loads(json_response)
             response = CommandResponseObject.from_json_data_dict(resp_dict, JSON_NET)
