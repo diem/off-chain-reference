@@ -10,28 +10,29 @@ class ProtocolCommand(JSONSerializable):
         self.origin = None # takes values 'local' and 'remote'
     
     def set_origin(self, origin):
-        #assert isinstance(origin, LibraAddress)
+        ''' Sets the serialized address that proposed this command '''
         assert self.origin == None or origin == self.origin
         self.origin = origin
     
     def get_origin(self):
+        ''' Gets the serialized address that proposed this command '''
         return self.origin
 
     def get_dependencies(self):
+        ''' Get the list of dependencies. This is a list of version numbers. '''
         return set(self.depend_on)
 
     def new_object_versions(self):
+        ''' Get the list of version numbers created by this command. '''
         return set(self.creates)
 
-    def validity_checks(self, dependencies, maybe_own=True):
-        raise NotImplementedError('You need to subclass and override this method')
-
     def get_object(self, version_number, dependencies):
+        ''' Returns the actual shared object with this version number. '''
         assert version_number in self.new_object_versions()
         raise NotImplementedError('You need to subclass and override this method')
 
     def get_json_data_dict(self, flag):
-        ''' Get a data disctionary compatible with JSON serilization (json.dumps) '''
+        ''' Get a data dictionary compatible with JSON serilization (json.dumps) '''
         data_dict = {
             "depend_on" : self.depend_on,
             "creates"    : self.creates,
@@ -45,6 +46,7 @@ class ProtocolCommand(JSONSerializable):
 
     @classmethod
     def json_type(cls):
+        ''' Overwrite this method to have a nicer json type identifier.'''
         return str(cls)
 
     @classmethod
@@ -99,6 +101,7 @@ class ProtocolExecutor:
         self.processor.process_command(vasp, channel, executor, command, status, error=None)
 
     def next_seq(self):
+        ''' Returns the next sequence number in the common sequence.'''
         return len(self.seq)
 
     def count_potentially_live(self):
@@ -118,6 +121,7 @@ class ProtocolExecutor:
         return True
 
     def sequence_next_command(self, command, do_not_sequence_errors = False, own=True):
+        ''' Sequence the next command in the shared sequence. '''
         dependencies = command.get_dependencies()
         all_good = False
         pos = None
@@ -165,6 +169,7 @@ class ProtocolExecutor:
         return pos
 
     def set_success(self, seq_no):
+        ''' Sets the command at a specific sequence number to be a success. '''
         assert seq_no == self.last_confirmed
         self.last_confirmed += 1
 
@@ -200,6 +205,7 @@ class ProtocolExecutor:
         
 
     def set_fail(self, seq_no):
+        ''' Sets the command at a specific sequence number to be a failure. '''
         assert seq_no == self.last_confirmed
         self.last_confirmed += 1
 
