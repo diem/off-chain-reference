@@ -1,6 +1,7 @@
 from copy import deepcopy
 from executor import ProtocolExecutor, ExecutorException, CommandProcessor
-from protocol_messages import CommandRequestObject, CommandResponseObject, OffChainError
+from protocol_messages import CommandRequestObject, CommandResponseObject, OffChainError, \
+    make_success_response, make_protocol_error, make_parsing_error, make_command_error
 from utils import JSONParsingError, JSON_NET
 from libra_address import LibraAddress
 
@@ -363,45 +364,3 @@ class VASPPairChannel:
             if not request.has_response():
                 return True
         return False
-
-
-def make_success_response(request):
-    """ Constructs a CommandResponse signaling success"""
-    response = CommandResponseObject()
-    response.seq = request.seq
-    response.status = 'success'
-    return response
-
-
-def make_protocol_error(request, code=None):
-    """ Constructs a CommandResponse signaling a protocol failure.
-        We do not sequence or store such responses since we can recover
-        from them.
-    """
-    response = CommandResponseObject()
-    response.seq = request.seq
-    response.status = 'failure'
-    response.error = OffChainError(protocol_error=True, code=code)
-    return response
-
-def make_parsing_error():
-    """ Constructs a CommandResponse signaling a protocol failure.
-        We do not sequence or store such responses since we can recover
-        from them.
-    """
-    response = CommandResponseObject()
-    response.seq = None
-    response.status = 'failure'
-    response.error = OffChainError(protocol_error=True, code='parsing')
-    return response
-
-
-def make_command_error(request, code=None):
-    """ Constructs a CommandResponse signaling a command failure.
-        Those failures lead to a command being sequenced as a failure.
-    """
-    response = CommandResponseObject()
-    response.seq = request.seq
-    response.status = 'failure'
-    response.error = OffChainError(protocol_error=False, code=code)
-    return response
