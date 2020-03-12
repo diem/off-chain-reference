@@ -104,7 +104,7 @@ def test_payment_create_from_sender_fail(basic_payment):
     basic_payment.data['receiver'].update({'status': Status.ready_for_settlement})
     pp = PaymentProcessor(bcm)
     with pytest.raises(PaymentLogicError):
-        _ = pp.check_new_payment(basic_payment)
+        pp.check_new_payment(basic_payment)
 
 
 def test_payment_create_from_receiver_fail(basic_payment):
@@ -115,7 +115,7 @@ def test_payment_create_from_receiver_fail(basic_payment):
     basic_payment.data['receiver'].update({'status': Status.ready_for_settlement})
     pp = PaymentProcessor(bcm)
     with pytest.raises(PaymentLogicError):
-        _ = pp.check_new_payment(basic_payment)
+        pp.check_new_payment(basic_payment)
 
 
 def test_payment_create_from_receiver_bad_state_fail(basic_payment):
@@ -125,7 +125,7 @@ def test_payment_create_from_receiver_bad_state_fail(basic_payment):
     basic_payment.data['receiver'].update({'status': Status.needs_recipient_signature})
     pp = PaymentProcessor(bcm)
     with pytest.raises(PaymentLogicError):
-        _ = pp.check_new_payment(basic_payment)
+        pp.check_new_payment(basic_payment)
 
 
 # ----- check_new_update -----
@@ -150,7 +150,7 @@ def test_payment_update_from_sender_modify_receiver_fail(basic_payment):
     pp = PaymentProcessor(bcm)
     assert new_obj.data['receiver'].data['status'] != basic_payment.data['receiver'].data['status']
     with pytest.raises(PaymentLogicError):
-        _ = pp.check_new_update(basic_payment, new_obj)
+        pp.check_new_update(basic_payment, new_obj)
 
 
 def test_payment_update_from_receiver_invalid_state_fail(basic_payment):
@@ -161,7 +161,7 @@ def test_payment_update_from_receiver_invalid_state_fail(basic_payment):
     new_obj = basic_payment.new_version()
     new_obj = PaymentObject.from_full_record(diff, base_instance=new_obj)
     with pytest.raises(PaymentLogicError):
-        _ = pp.check_new_update(basic_payment, new_obj)
+        pp.check_new_update(basic_payment, new_obj)
 
 
 def test_payment_update_from_receiver_invalid_transition_fail(basic_payment):
@@ -173,7 +173,7 @@ def test_payment_update_from_receiver_invalid_transition_fail(basic_payment):
     new_obj = basic_payment.new_version()
     new_obj = PaymentObject.from_full_record(diff, base_instance=new_obj)
     with pytest.raises(PaymentLogicError):
-        _ = pp.check_new_update(basic_payment, new_obj)
+        pp.check_new_update(basic_payment, new_obj)
 
 
 def test_payment_update_from_receiver_unilateral_abort_fail(basic_payment):
@@ -185,7 +185,7 @@ def test_payment_update_from_receiver_unilateral_abort_fail(basic_payment):
     new_obj = basic_payment.new_version()
     new_obj = PaymentObject.from_full_record(diff, base_instance=new_obj)
     with pytest.raises(PaymentLogicError):
-        _ = pp.check_new_update(basic_payment, new_obj)
+        pp.check_new_update(basic_payment, new_obj)
 
 
 # ----- payment_process -----
