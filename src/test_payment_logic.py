@@ -210,7 +210,6 @@ def test_payment_processor_check(states, basic_payment):
     channel.other.plain.side_effect = [ src_addr ] 
     channel.myself.plain.side_effect = [ dst_addr ] 
     executor = MagicMock()
-    own = False
     command = PaymentCommand(basic_payment)
     origin = MagicMock(spec=LibraAddress)
     origin.plain.return_value = origin_addr
@@ -218,10 +217,10 @@ def test_payment_processor_check(states, basic_payment):
     pp = PaymentProcessor(bcm)
 
     if res:
-        pp.check_command(vasp, channel, executor, command, own)
+        pp.check_command(vasp, channel, executor, command)
     else:
         with pytest.raises(PaymentLogicError):
-            pp.check_command(vasp, channel, executor, command, own)
+            pp.check_command(vasp, channel, executor, command)
 
 def test_payment_process_receiver_new_payment(basic_payment):
     bcm = MagicMock(spec=BusinessContext)

@@ -1,21 +1,23 @@
 from utils import JSONSerializable, JSONFlag
 from command_processor import CommandProcessor
 
+
+
 # Interface we need to do commands:
 class ProtocolCommand(JSONSerializable):
     def __init__(self):
         self.depend_on = []
         self.creates   = []
         self.commit_status = None
-        self.origin = None # takes values 'local' and 'remote'
+        self.origin = None # Takes a LibraAddress
     
     def set_origin(self, origin):
-        ''' Sets the serialized address that proposed this command '''
+        ''' Sets the Libra address that proposed this command '''
         assert self.origin == None or origin == self.origin
         self.origin = origin
     
     def get_origin(self):
-        ''' Gets the serialized address that proposed this command '''
+        ''' Gets the Libra address that proposed this command '''
         return self.origin
 
     def get_dependencies(self):
@@ -67,9 +69,12 @@ class ExecutorException(Exception):
 
 class ProtocolExecutor:
     def __init__(self, channel, processor, handlers=None):
-        assert isinstance(processor, CommandProcessor)
-        from protocol import VASPPairChannel
-        assert isinstance(channel, VASPPairChannel)
+
+        if __debug__:
+            # No need for this import unless we are debugging
+            from protocol import VASPPairChannel
+            assert isinstance(processor, CommandProcessor)
+            assert isinstance(channel, VASPPairChannel)
 
         self.processor = processor
         self.channel   = channel
@@ -93,11 +98,8 @@ class ProtocolExecutor:
         if self.handlers is not None:
             self.handlers(command, success=success)
 
-        vasp    = self.channel.get_vasp()
-        channel = self.channel
-        executor = self
+        vasp, channel, executor = self.get_context()
         status   = success
-
         self.processor.process_command(vasp, channel, executor, command, status, error=None)
 
     def next_seq(self):
@@ -119,12 +121,19 @@ class ProtocolExecutor:
             if not res:
                 return False
         return True
+    
+    def get_context(self):
+        """ Returns a (vasp, channel, executor) context. """
+        return (self.channel.get_vasp(), self.channel, self)
 
-    def sequence_next_command(self, command, do_not_sequence_errors = False, own=True):
+    def sequence_next_command(self, command, do_not_sequence_errors = False):
         ''' Sequence the next command in the shared sequence. '''
         dependencies = command.get_dependencies()
         all_good = False
         pos = None
+
+        myself = self.channel.get_my_address()
+        own = (command.origin == myself)
 
         try:
             # For our own commands we do speculative execution
@@ -137,11 +146,8 @@ class ProtocolExecutor:
             if not all_good:
                 raise ExecutorException('Required objects do not exist')
 
-
-            vasp = self.channel.get_vasp()
-            channel = self.channel
-            executor = self            
-            self.processor.check_command(vasp, channel, executor, command, own)
+            vasp, channel, executor = self.get_context()
+            self.processor.check_command(vasp, channel, executor, command)
 
             if all_good:
                 new_versions = command.new_object_versions()
@@ -191,16 +197,6 @@ class ProtocolExecutor:
         
         if command.commit_status is None:
             command.commit_status = True
-
-            # DEBUG
-            if __debug__:
-                for version in new_versions:
-                    assert version in self.object_store
-                    obj = self.object_store[version]
-                    assert obj.get_actually_live()
-                for version in dependencies:
-                    assert version in self.object_store
-                
             self.set_outcome(command, success=True)
         
 

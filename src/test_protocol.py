@@ -28,10 +28,13 @@ class FakeAddress(LibraAddress):
 
     def equal(self, other):
         return isinstance(other, FakeAddress) \
-            and self.addr >= other.addr
+            and self.addr == other.addr
     
     def plain(self):
         return str(self.addr)
+    
+    def __repr__(self):
+        return f'FakeAddr({self.addr},{self.bit})'
 
 class FakeVASPInfo(VASPInfo):
     def __init__(self, parent_addr, own_address = None):
