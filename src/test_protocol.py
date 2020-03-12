@@ -7,6 +7,7 @@ from executor import *
 from protocol_messages import *
 from business import BusinessContext, VASPInfo
 import random
+from sample_command import *
 
 from unittest.mock import MagicMock
 import pytest
