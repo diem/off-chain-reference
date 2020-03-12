@@ -184,3 +184,45 @@ class CommandResponseObject(JSONSerializable):
             return self
         except Exception as e:
             raise JSONParsingError(*e.args)
+
+
+def make_success_response(request):
+    """ Constructs a CommandResponse signaling success"""
+    response = CommandResponseObject()
+    response.seq = request.seq
+    response.status = 'success'
+    return response
+
+
+def make_protocol_error(request, code=None):
+    """ Constructs a CommandResponse signaling a protocol failure.
+        We do not sequence or store such responses since we can recover
+        from them.
+    """
+    response = CommandResponseObject()
+    response.seq = request.seq
+    response.status = 'failure'
+    response.error = OffChainError(protocol_error=True, code=code)
+    return response
+
+def make_parsing_error():
+    """ Constructs a CommandResponse signaling a protocol failure.
+        We do not sequence or store such responses since we can recover
+        from them.
+    """
+    response = CommandResponseObject()
+    response.seq = None
+    response.status = 'failure'
+    response.error = OffChainError(protocol_error=True, code='parsing')
+    return response
+
+
+def make_command_error(request, code=None):
+    """ Constructs a CommandResponse signaling a command failure.
+        Those failures lead to a command being sequenced as a failure.
+    """
+    response = CommandResponseObject()
+    response.seq = request.seq
+    response.status = 'failure'
+    response.error = OffChainError(protocol_error=False, code=code)
+    return response
