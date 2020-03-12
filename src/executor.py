@@ -116,6 +116,10 @@ class ProtocolCommand(JSONSerializable):
             self.origin = data["origin"]
         return self
 
+
+class ExecutorException(Exception):
+    pass
+
 class ProtocolExecutor:
     def __init__(self, channel, processor, handlers=None):
         assert isinstance(processor, CommandProcessor)
@@ -269,9 +273,3 @@ class ProtocolExecutor:
         if command.commit_status is None:
             command.commit_status = False
             self.set_outcome(command, success=False)
-
-
-class ExecutorException(Exception):
-    pass
-
-# Define mock classes

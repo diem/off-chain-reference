@@ -4,6 +4,7 @@ from protocol_messages import *
 from protocol import *
 from business import BusinessAsyncInterupt
 from utils import *
+from libra_address import *
 
 from unittest.mock import MagicMock
 import pytest

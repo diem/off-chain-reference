@@ -2,6 +2,7 @@ import pytest
 import types
 from copy import deepcopy
 
+from libra_address import LibraAddress, LibraAddressError
 from protocol import *
 from executor import *
 from protocol_messages import *
