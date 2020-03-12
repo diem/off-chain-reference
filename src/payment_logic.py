@@ -25,6 +25,8 @@ class PaymentCommand(ProtocolCommand):
             raise PaymentLogicError("A payment can only depend on a single previous payment")
         if len(self.creates) != 1:
             raise PaymentLogicError("A payment always creates a new payment")
+        if self.creates[0] != version_number:
+            raise PaymentLogicError("Unknown object %s (only know %s)" % (version_number, self.creates[0]))
         new_version = self.creates[0]
 
         if len(self.depend_on) == 0:
