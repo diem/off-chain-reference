@@ -38,6 +38,7 @@ class BusinessContext:
 
     def open_channel_to(self, other_vasp_info):
         ''' Requests authorization to other a channel to another VASP.
+            If it is authorized nothing is returned. If not an exception is raised.
 
             Can raise:
                 BusinessNotAuthorized
@@ -53,19 +54,21 @@ class BusinessContext:
     # ----- Actors -----
 
     def is_sender(self, payment):
-        ''' Returns true is the VASP is the sender '''
+        ''' Returns true is the VASP is the sender of a payment.'''
         raise NotImplementedError()
 
     def is_recipient(self, payment):
-        ''' Returns true is the VASP is the recipient '''
+        ''' Returns true is the VASP is the recipient of a payment.'''
         return not self.is_sender(payment)
 
     def check_account_existence(self, payment):
         ''' Checks that the actor on this VASP exists. This may be either
             the recipient or the sender, since VASPs can initiate payments
-            in both directions.
+            in both directions. If not throw a BuninessValidationFailure.
+            
+            Can raise:
+                BuninessValidationFailure'''
 
-            If not throw a BuninessValidationFailure.'''
         raise NotImplementedError()
 
 
@@ -74,13 +77,15 @@ class BusinessContext:
 
     def validate_recipient_signature(self, payment):
         ''' Validates the recipient signature is correct. If there is no
-            signature or the signature is correct do nothing.
-
-            Throw a BuninessValidationFailure is not. '''
+            signature or the signature is correct do nothing. Throw a 
+            BuninessValidationFailure is not. 
+            
+            Can raise:
+                BuninessValidationFailure'''
         raise NotImplementedError()
 
     def get_recipient_signature(self, payment):
-        ''' Gets a recipient signature on the payment ID'''
+        ''' Gets a recipient signature on the payment ID. '''
         raise NotImplementedError()
 
 # ----- KYC/Compliance checks -----
@@ -95,6 +100,7 @@ class BusinessContext:
             that can include:
                 - needs_stable_id
                 - needs_kyc_data
+                - needs_recipient_signature
             an empty set indicates no KYC should be provided at this moment.
 
             Can raise:
@@ -121,13 +127,17 @@ class BusinessContext:
 
     def validate_kyc_signature(self, payment):
         ''' Validates the kyc signature is correct. If the signature is correct,
-            or there is no signature, then do nothing.
-
-            Throw a BuninessValidationFailure if signature verification fails. '''
+            or there is no signature, then do nothing. Throw a 
+            BuninessValidationFailure if signature verification fails. 
+            
+            Can raise:
+                BuninessValidationFailure'''
         raise NotImplementedError()
 
     def get_extended_kyc(self, payment):
-        ''' Gets the extended KYC information for this payment.
+        ''' Returns the extended KYC information for this payment.
+            In the format: (kyc_data, kyc_signature, kyc_certificate), where
+            all fields are of type str.
 
             Can raise:
                    BusinessAsyncInterupt
@@ -137,7 +147,6 @@ class BusinessContext:
 
     def get_stable_id(self, payment):
         ''' Provides a stable ID for the payment.
-
             Returns: a stable ID for the VASP user.
 
             Can raise:
