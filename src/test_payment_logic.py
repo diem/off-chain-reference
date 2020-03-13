@@ -4,6 +4,7 @@ from protocol_messages import *
 from protocol import *
 from business import BusinessAsyncInterupt
 from utils import *
+from libra_address import *
 
 from unittest.mock import MagicMock
 import pytest
@@ -20,15 +21,15 @@ def basic_payment():
 
 def test_payment_command_serialization_net(basic_payment):
     cmd = PaymentCommand(basic_payment)
-    data = cmd.get_json_data_dict(JSON_NET)
-    cmd2 = PaymentCommand.from_json_data_dict(data, JSON_NET)
+    data = cmd.get_json_data_dict(JSONFlag.NET)
+    cmd2 = PaymentCommand.from_json_data_dict(data, JSONFlag.NET)
     assert cmd == cmd2
 
 
 def test_payment_command_serialization_store(basic_payment):
     cmd = PaymentCommand(basic_payment)
-    data = cmd.get_json_data_dict(JSON_STORE)
-    cmd2 = PaymentCommand.from_json_data_dict(data, JSON_STORE)
+    data = cmd.get_json_data_dict(JSONFlag.STORE)
+    cmd2 = PaymentCommand.from_json_data_dict(data, JSONFlag.STORE)
     assert cmd == cmd2
 
 
@@ -40,8 +41,8 @@ def test_payment_end_to_end_serialization(basic_payment):
     request = CommandRequestObject(cmd)
     request.seq = 10
     request.response = make_success_response(request)
-    data = request.get_json_data_dict(JSON_STORE)
-    request2 = CommandRequestObject.from_json_data_dict(data, JSON_STORE)
+    data = request.get_json_data_dict(JSONFlag.STORE)
+    request2 = CommandRequestObject.from_json_data_dict(data, JSONFlag.STORE)
     assert request == request2
 
 
@@ -209,7 +210,6 @@ def test_payment_processor_check(states, basic_payment):
     channel.other.plain.side_effect = [ src_addr ] 
     channel.myself.plain.side_effect = [ dst_addr ] 
     executor = MagicMock()
-    own = False
     command = PaymentCommand(basic_payment)
     origin = MagicMock(spec=LibraAddress)
     origin.plain.return_value = origin_addr
@@ -217,10 +217,10 @@ def test_payment_processor_check(states, basic_payment):
     pp = PaymentProcessor(bcm)
 
     if res:
-        pp.check_command(vasp, channel, executor, command, own)
+        pp.check_command(vasp, channel, executor, command)
     else:
         with pytest.raises(PaymentLogicError):
-            pp.check_command(vasp, channel, executor, command, own)
+            pp.check_command(vasp, channel, executor, command)
 
 def test_payment_process_receiver_new_payment(basic_payment):
     bcm = MagicMock(spec=BusinessContext)

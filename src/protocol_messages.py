@@ -1,5 +1,5 @@
-from utils import JSONSerializable, JSONParsingError, JSON_NET, JSON_STORE
-from executor import SampleCommand
+from utils import JSONSerializable, JSONParsingError, JSONFlag
+# from executor import SampleCommand
 
 class OffChainError(JSONSerializable):
     def __init__(self, protocol_error=True, code=None):
@@ -84,8 +84,8 @@ class CommandRequestObject(JSONSerializable):
         if self.command_seq is not None:
             data_dict["command_seq"] = self.command_seq
 
-        if flag == JSON_STORE and self.response is not None:
-            data_dict["response"] = self.response.get_json_data_dict(JSON_STORE)
+        if flag == JSONFlag.STORE and self.response is not None:
+            data_dict["response"] = self.response.get_json_data_dict(JSONFlag.STORE)
 
         if __debug__:
             import json
@@ -103,7 +103,7 @@ class CommandRequestObject(JSONSerializable):
             self.seq = int(data["seq"])
             if 'command_seq' in data:
                 self.command_seq = int(data['command_seq'])
-            if flag == JSON_STORE and 'response' in data:
+            if flag == JSONFlag.STORE and 'response' in data:
                 self.response = CommandResponseObject.from_json_data_dict(data['response'], flag)
             return self
         except Exception as e:
@@ -184,3 +184,45 @@ class CommandResponseObject(JSONSerializable):
             return self
         except Exception as e:
             raise JSONParsingError(*e.args)
+
+
+def make_success_response(request):
+    """ Constructs a CommandResponse signaling success"""
+    response = CommandResponseObject()
+    response.seq = request.seq
+    response.status = 'success'
+    return response
+
+
+def make_protocol_error(request, code=None):
+    """ Constructs a CommandResponse signaling a protocol failure.
+        We do not sequence or store such responses since we can recover
+        from them.
+    """
+    response = CommandResponseObject()
+    response.seq = request.seq
+    response.status = 'failure'
+    response.error = OffChainError(protocol_error=True, code=code)
+    return response
+
+def make_parsing_error():
+    """ Constructs a CommandResponse signaling a protocol failure.
+        We do not sequence or store such responses since we can recover
+        from them.
+    """
+    response = CommandResponseObject()
+    response.seq = None
+    response.status = 'failure'
+    response.error = OffChainError(protocol_error=True, code='parsing')
+    return response
+
+
+def make_command_error(request, code=None):
+    """ Constructs a CommandResponse signaling a command failure.
+        Those failures lead to a command being sequenced as a failure.
+    """
+    response = CommandResponseObject()
+    response.seq = request.seq
+    response.status = 'failure'
+    response.error = OffChainError(protocol_error=False, code=code)
+    return response

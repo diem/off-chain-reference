@@ -1,3 +1,9 @@
+from status_logic import TypeEnumeration
+
+from os import urandom
+from base64 import standard_b64encode
+from copy import deepcopy
+
 REQUIRED = True
 OPTIONAL = False
 
@@ -10,10 +16,15 @@ class StructureException(Exception):
 
 
 class StructureChecker:
+    ''' A class that allows us to keep track of objects in terms of 
+    diffs, namely operations that mutate their fields. Also does 
+    automatic type checking and checking for mutability/immutability
+    and required / optional fields.'''
 
     fields = {}
 
     def __init__(self):
+        ''' Initialize the class. Presumes a class level variable fields is defined. '''
         assert self.fields
         self.data = {}
         self.update_record = []
@@ -29,25 +40,35 @@ class StructureChecker:
             if isinstance(self.data[field], StructureChecker):
                 self.data[field].flatten()
 
+    @classmethod
+    def parse_map(cls):
+        ''' Returns a map of fields to their respective type, and whether
+            the type is a subclass of StructureChecker. '''
+        parse_map = {
+                field: (field_type, issubclass(field_type, StructureChecker))
+                for field, field_type, _, _ 
+                in cls.fields
+            }
+        return parse_map
+
+
     def get_full_record(self):
         ''' Returns a hierarchy of diffs applied to this object and children'''
-        parse_further = {
-            field: field_type for field,
-            field_type,
-            _,
-            _ in self.fields if issubclass(
-                field_type,
-                StructureChecker)}
+        parse = self.parse_map()
         diff = {}
         for new_diff in self.update_record:
             for field in new_diff:
-                if not isinstance(new_diff[field], StructureChecker):
-                    if type(new_diff[field]) in {str, int, list}:
+                xtype, parse_more = parse[field]
+                if not parse_more:
+                    # We serialize JSON native types directly
+                    if xtype in {str, int, list, dict}:
                         diff[field] = new_diff[field]
                     else:
                         diff[field] = str(new_diff[field])
-        for field in parse_further:
-            if field in self.data:
+
+        for field in parse:
+            xtype, parse_more = parse[field]
+            if field in self.data and parse_more:
                 inner_diff = self.data[field].get_full_record()
                 if inner_diff != {}:
                     diff[field] = inner_diff
@@ -58,56 +79,54 @@ class StructureChecker:
         ''' Define equality as equality between data fields only '''
         if not isinstance(other, type(self)):
             return False
+        if set(self.data) != set(other.data):
+            return False
         for field, value in self.data.items():
-            if field not in other.data or not value == other.data[field]:
+            if not value == other.data[field]:
                 return False
         return True
 
+
     @classmethod
     def from_full_record(cls, diff, base_instance = None):
-        ''' Constructs an instance from a diff '''
-        parse_further = {
-            field: field_type for field,
-            field_type,
-            _,
-            _ in cls.fields if issubclass(
-                field_type,
-                StructureChecker)}
-        constructors = {
-            field: field_type for field,
-            field_type,
-            _,
-            _ in cls.fields if not issubclass(
-                field_type,
-                StructureChecker)}
+        ''' Constructs an instance from a diff. '''
+        
         if base_instance is None:
             self = cls.__new__(cls)
             StructureChecker.__init__(self)
         else:
-            self = base_instance
+            self = deepcopy(base_instance)
+        
+        parse = cls.parse_map()
         new_diff = {}
         for field in diff:
-            if field in parse_further:
-                nested_class = parse_further[field]
+            if field in parse:
+                xtype, parse_further = parse[field]
 
-                existing_instance = None
-                if field in self.data:
-                    # When the instance exists we update it in place, and
-                    # We do not register this as an field update
-                    # (to respect WRITE ONCE).
-                    existing_instance = self.data[field]
-                    self.data[field] = nested_class.from_full_record(diff[field], existing_instance)
+                if parse_further:
+
+                    if field in self.data:
+                        # When the instance exists we update it in place, and
+                        # We do not register this as a field update
+                        # (to respect WRITE ONCE).
+                        existing_instance = self.data[field]
+                        self.data[field] = xtype.from_full_record(diff[field], existing_instance)
+                    else:
+                        new_diff[field] = xtype.from_full_record(diff[field])
                 else:
-                    new_diff[field] = nested_class.from_full_record(diff[field])
+                    # Use default constructor of the type
+                    new_diff[field] = xtype(diff[field])
             else:
-                # Use default constructor of the type
-                cons = constructors[field]
-                new_diff[field] = cons(diff[field])
+                # We tolerate fielse we do not know about, but ignore them
+                # TODO: log unknown fields?
+                pass
 
         self.update(new_diff)
         return self
 
     def custom_update_checks(self, diff):
+        ''' Overwrite this class to implement more complex 
+            custom checks on a diff. '''
         pass
 
     def update(self, diff):
@@ -165,8 +184,10 @@ class StructureChecker:
                     raise StructureException('Missing field: %s' % field)
 
 # define serializaqtion flags
-JSON_NET = 0
-JSON_STORE = 1
+JSONFlag = TypeEnumeration([
+    'NET',
+    'STORE'
+])
 
 class JSONParsingError(Exception):
     pass
@@ -180,3 +201,9 @@ class JSONSerializable:
     def from_json_data_dict(cls, data, flag):
         ''' Construct the object from a serlialized JSON data dictionary (from json.loads). '''
         raise NotImplementedError()
+
+# Utilities
+
+def get_unique_string():
+    ''' Returns a strong random 16 byte string encoded in base64. '''
+    return standard_b64encode(urandom(16)).decode('ascii')

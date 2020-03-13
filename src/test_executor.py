@@ -25,14 +25,18 @@ def test_exec(basic_payment):
 
 
     cmd1 = PaymentCommand(basic_payment)
+    cmd1.set_origin(channel.get_my_address())
+    assert channel.get_my_address() == channel.get_my_address()
 
     pay2 = basic_payment.new_version()
     pay2.data['sender'].change_status(Status.needs_stable_id)
     cmd2 = PaymentCommand(pay2)
+    cmd2.set_origin(channel.get_my_address())
 
     pay3 = pay2.new_version()
     pay3.data['sender'].change_status(Status.needs_stable_id)
     cmd3 = PaymentCommand(pay3)
+    cmd3.set_origin(channel.get_my_address())
 
     assert cmd1.depend_on == []
     assert cmd2.depend_on == cmd1.creates
@@ -49,10 +53,13 @@ def test_exec(basic_payment):
     pay4a = pay3.new_version()
     pay4a.data['sender'].change_status(Status.ready_for_settlement)
     cmd4a = PaymentCommand(pay4a)
+    cmd4a.set_origin(channel.get_my_address())
 
     pay5a = pay4a.new_version()
     pay5a.data['sender'].change_status(Status.settled)
     cmd5a = PaymentCommand(pay5a)
+    cmd5a.set_origin(channel.get_my_address())
+
 
     pe.sequence_next_command(cmd4a)
     pe.sequence_next_command(cmd5a)
@@ -62,10 +69,12 @@ def test_exec(basic_payment):
     pay4b = pay3.new_version()
     pay4b.data['sender'].change_status(Status.needs_kyc_data)
     cmd4b = PaymentCommand(pay4b)
+    cmd4b.set_origin(channel.get_my_address())
 
     pay5b = pay4b.new_version()
     pay5b.data['sender'].change_status(Status.abort)
     cmd5b = PaymentCommand(pay5b)
+    cmd5b.set_origin(channel.get_my_address())
 
     pe.sequence_next_command(cmd4b)
     pe.sequence_next_command(cmd5b)
@@ -77,6 +86,7 @@ def test_exec(basic_payment):
     pay_bad.data['sender'].change_status(Status.abort)
     cmd_bad = PaymentCommand(pay_bad)
     cmd_bad.command['action'] = {'amount':  1000000}
+    cmd_bad.set_origin(channel.get_my_address())
     with pytest.raises(ExecutorException):
         pe.sequence_next_command(cmd_bad, do_not_sequence_errors=True)
 
@@ -120,14 +130,18 @@ def test_handlers(basic_payment):
     pe.set_outcome_handler(stat.handle)
 
     cmd1 = PaymentCommand(basic_payment)
+    cmd1.set_origin(channel.get_my_address())
 
     pay2 = basic_payment.new_version()
     pay2.data['sender'].change_status(Status.needs_stable_id)
     cmd2 = PaymentCommand(pay2)
+    cmd2.set_origin(channel.get_my_address())
+
 
     pay3 = basic_payment.new_version()
     pay3.data['sender'].change_status(Status.needs_stable_id)
     cmd3 = PaymentCommand(pay3)
+    cmd3.set_origin(channel.get_my_address())
 
     assert cmd1.depend_on == []
     assert cmd2.depend_on == list(cmd1.creates)

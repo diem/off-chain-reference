@@ -1,8 +1,8 @@
 from decimal import Decimal
 
-from executor import SharedObject
 from utils import StructureException, StructureChecker, \
     REQUIRED, OPTIONAL, WRITE_ONCE, UPDATABLE
+from shared_object import SharedObject
 
 from status_logic import Status
 import json

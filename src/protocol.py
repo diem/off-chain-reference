@@ -1,30 +1,32 @@
-from copy import deepcopy
 from executor import ProtocolExecutor, ExecutorException, CommandProcessor
-from protocol_messages import CommandRequestObject, CommandResponseObject, OffChainError
-from utils import JSONParsingError, JSON_NET
+from protocol_messages import CommandRequestObject, CommandResponseObject, \
+    make_success_response, make_protocol_error, make_parsing_error, make_command_error
+from utils import JSONParsingError, JSONFlag
+from libra_address import LibraAddress
 
-import base64
 import json
 from collections import namedtuple
 
 NetMessage = namedtuple('NetMessage', ['src', 'dst', 'type', 'content'])
 
 class OffChainVASP:
-    """Manages the off-chain protocol on behalf of one VASP"""
+    """Manages the off-chain protocol on behalf of one VASP. """
     
     def __init__(self, vasp_addr, processor):
-        assert isinstance(processor, CommandProcessor)
-        assert isinstance(vasp_addr, LibraAddress)
+        if __debug__:
+            assert isinstance(processor, CommandProcessor)
+            assert isinstance(vasp_addr, LibraAddress)
 
         self.vasp_addr = vasp_addr
         self.business_context = processor.business_context()
         self.processor = processor
+        self.processor.notify = self.notify_new_commands
 
         # TODO: this should be a persistent store
         self.channel_store = {}
     
     def my_vasp_addr(self):
-        ''' Return our own VASP info record '''
+        ''' Return our own VASP Libra Address. '''
         return self.vasp_addr
 
     def get_channel(self, other_vasp_addr):
@@ -38,6 +40,11 @@ class OffChainVASP:
             self.channel_store[store_key] = channel
     
         return self.channel_store[store_key]
+    
+    def notify_new_commands(self):
+        ''' The processor calls this method to notify the VASP that new
+            commands are available for processing. '''
+        self.processor.process_command_backlog(self)
 
 
 class VASPPairChannel:
@@ -62,6 +69,7 @@ class VASPPairChannel:
         self.processor = processor
         self.vasp = vasp
 
+        # Check we are not making a channel with ourselves
         if self.myself.plain() == self.other.plain():
             raise Exception('Must talk to another VASP:', self.myself.plain(), self.other.plain())
 
@@ -77,14 +85,18 @@ class VASPPairChannel:
         # <ENDS to persist>
 
         # Ephemeral state that can be forgotten upon a crash
+        
         # Response cache
         self.response_cache = {}
         self.pending_requests = []
         # Network handler
         self.net_queue = []
 
+    def get_my_address(self):
+        return self.myself
 
     def get_vasp(self):
+        ''' Get the OffChainVASP to which this channel is attached. '''
         return self.vasp
 
     # Define a stub here to make the linter happy
@@ -106,13 +118,15 @@ class VASPPairChannel:
 
     def send_request(self, request):
         """ A hook to send a request to other VASP"""
-        json_string = request.get_json_data_dict(JSON_NET)
+        json_string = request.get_json_data_dict(JSONFlag.NET)
         self.net_queue += [ NetMessage(self.myself, self.other, CommandRequestObject, json_string) ]
 
     def send_response(self, response):
         """ A hook to send a response to other VASP"""
-        json_string = json.dumps(response.get_json_data_dict(JSON_NET))
-        self.net_queue += [ NetMessage(self.myself, self.other, CommandResponseObject,json_string) ]
+        json_string = json.dumps(response.get_json_data_dict(JSONFlag.NET))
+        net_message = NetMessage(self.myself, self.other, CommandResponseObject,json_string)
+        self.net_queue += [ net_message ]
+        return net_message
 
     def is_client(self):
         """ Is the local VASP a client for this pair?"""
@@ -165,7 +179,7 @@ class VASPPairChannel:
     def sequence_command_local(self, off_chain_command):
         """ The local VASP attempts to sequence a new off-chain command."""
 
-        off_chain_command.set_origin(self.myself)
+        off_chain_command.set_origin(self.get_my_address())
         request = CommandRequestObject(off_chain_command)
         request.seq = self.my_next_seq
 
@@ -173,7 +187,7 @@ class VASPPairChannel:
             request.command_seq = self.next_final_sequence()
             # Raises and exits on error -- does not sequence
             self.executor.sequence_next_command(off_chain_command,
-                do_not_sequence_errors = True, own=True)
+                do_not_sequence_errors = True)
 
         self.my_next_seq += 1
         self.my_requests += [ request ]
@@ -182,9 +196,10 @@ class VASPPairChannel:
 
 
     def parse_handle_request(self, json_command):
+        ''' Handles a request provided as a json_string '''
         try:
             req_dict = json.loads(json_command)
-            request = CommandRequestObject.from_json_data_dict(req_dict, JSON_NET)
+            request = CommandRequestObject.from_json_data_dict(req_dict, JSONFlag.NET)
             self.handle_request(request)
         except JSONParsingError:
             response = make_parsing_error()
@@ -192,7 +207,16 @@ class VASPPairChannel:
 
 
     def handle_request(self, request):
-        """ Handles a request received by this VASP """
+        """ Handles a request received by this VASP.
+        
+            Returns a network record of the response if one can be constructed,
+            or None in case they are scheduled for later processing. If none is
+            returned then this function must be called again once the condition
+
+                self.pending_responses() == 0
+            
+            becomes true.
+        """
         request.command.set_origin(self.other)
 
         # Always answer old requests
@@ -201,29 +225,27 @@ class VASPPairChannel:
             if previous_request.is_same_command(request):
                 # Re-send the response
                 response = previous_request.response
-                self.send_response(response)
-                return
+                return self.send_response(response)
+                
             else:
                 # There is a conflict, and it will have to be resolved
                 #  TODO[issue 8]: How are conflicts meant to be resolved? With only
                 #        two participants we cannot tolerate errors.
                 response = make_protocol_error(request, code='conflict')
                 response.previous_command = previous_request.command
-                self.send_response(response)
-                return
-
+                return self.send_response(response)
+                
         # Clients are not to suggest sequence numbers.
         if self.is_server() and request.command_seq is not None:
             response = make_protocol_error(request, code='malformed')
-            self.send_response(response)
-            return
+            return self.send_response(response)
 
         # As a server we first wait for the status of all server
         # requests to sequence any new client requests.
         if self.is_server() and self.pending_responses() > 0:
             self.pending_requests += [request]
-            return
-
+            return None
+            
         # Sequence newer requests
         if request.seq == self.other_next_seq:
 
@@ -231,17 +253,16 @@ class VASPPairChannel:
                 # We must wait, since we cannot give an answer before sequencing
                 # previous commands.
                 response = make_protocol_error(request, code='wait')
-                self.send_response(response)
-                return
-
+                return self.send_response(response)
+                
             self.other_next_seq += 1
             self.other_requests += [request]
 
             seq = self.next_final_sequence()
             old_len = len(self.executor.seq)
             try:
-                self.executor.sequence_next_command(request.command, \
-                    do_not_sequence_errors = False, own=False)
+                self.executor.sequence_next_command(request.command, 
+                                                    do_not_sequence_errors = False)
                 response = make_success_response(request)
             except ExecutorException as e:
                 response = make_command_error(request, str(e))
@@ -253,23 +274,25 @@ class VASPPairChannel:
             self.apply_response_to_executor(request)
 
             self.persist()
-            self.send_response(request.response)
+            return self.send_response(request.response)
 
         elif request.seq > self.other_next_seq:
             # We have received the other side's request without receiving the
             # previous one
             response = make_protocol_error(request, code='missing')
-            self.send_response(response)
+            return self.send_response(response)
 
             # NOTE: the protocol is still correct without persisiting the cache
             self.persist()
         else:
+            # OK: Previous cases are exhaustive
             assert False
     
     def parse_handle_response(self, json_response):
+        ''' Handles a response provided as a json string. '''
         try:
             resp_dict = json.loads(json_response)
-            response = CommandResponseObject.from_json_data_dict(resp_dict, JSON_NET)
+            response = CommandResponseObject.from_json_data_dict(resp_dict, JSONFlag.NET)
             self.handle_response(response)
         except JSONParsingError:
             # Log, but cannot reply: TODO
@@ -306,7 +329,7 @@ class VASPPairChannel:
 
                 try:
                     self.executor.sequence_next_command(request.command, \
-                        do_not_sequence_errors = False, own=True)
+                        do_not_sequence_errors = False)
                 except:
                     # We ignore the outcome since the response is what matters.
                     # TODO: something buggy has happened, if we return an error
@@ -349,101 +372,15 @@ class VASPPairChannel:
 
     def retransmit(self):
         """ Re-sends the earlierst request that has not yet got a response, if any """
-        for request in self.my_requests:
-            assert isinstance(request, CommandRequestObject)
-            if not request.has_response():
-                self.send_request(request)
-                break
+        self.would_retransmit(do_retransmit=True)
 
-    def would_retransmit(self):
+    def would_retransmit(self, do_retransmit=False):
         """ Returns true if there are any pending re-transmits, namely
             requests for which the response has not yet been received. """
         for request in self.my_requests:
             assert isinstance(request, CommandRequestObject)
             if not request.has_response():
+                if do_retransmit:
+                    self.send_request(request)
                 return True
         return False
-
-
-def make_success_response(request):
-    """ Constructs a CommandResponse signaling success"""
-    response = CommandResponseObject()
-    response.seq = request.seq
-    response.status = 'success'
-    return response
-
-
-def make_protocol_error(request, code=None):
-    """ Constructs a CommandResponse signaling a protocol failure.
-        We do not sequence or store such responses since we can recover
-        from them.
-    """
-    response = CommandResponseObject()
-    response.seq = request.seq
-    response.status = 'failure'
-    response.error = OffChainError(protocol_error=True, code=code)
-    return response
-
-def make_parsing_error():
-    """ Constructs a CommandResponse signaling a protocol failure.
-        We do not sequence or store such responses since we can recover
-        from them.
-    """
-    response = CommandResponseObject()
-    response.seq = None
-    response.status = 'failure'
-    response.error = OffChainError(protocol_error=True, code='parsing')
-    return response
-
-
-def make_command_error(request, code=None):
-    """ Constructs a CommandResponse signaling a command failure.
-        Those failures lead to a command being sequenced as a failure.
-    """
-    response = CommandResponseObject()
-    response.seq = request.seq
-    response.status = 'failure'
-    response.error = OffChainError(protocol_error=False, code=code)
-    return response
-
-
-# Helper classes
-class LibraAddressError(Exception):
-    pass
-
-class LibraAddress:
-    """ An interface that abstracts a Libra Address and bit manipulations on it."""
-
-    def __init__(self, encoded_address):
-        try:
-            if type(encoded_address) == str:
-                self.encoded_address = encoded_address
-            else:
-                self.encoded_address = encoded_address.decode('ascii')
-            self.decoded_address = base64.b64decode(self.encoded_address)
-        except:
-            raise
-            raise LibraAddressError()
-    
-    def plain(self):
-        return self.encoded_address
-
-    @classmethod
-    def encode_to_Libra_address(cls, raw_bytes):
-        return LibraAddress(base64.b64encode(raw_bytes))
-
-    def last_bit(self):
-        return self.decoded_address[-1] & 1
-
-    def greater_than_or_equal(self, other):
-        return self.decoded_address >= other.decoded_address
-
-    def equal(self, other):
-        return isinstance(other, LibraAddress) \
-            and self.decoded_address == other.decoded_address
-    
-    def __eq__(self, other):
-        return self.equal(other)
-    
-    def __hash__(self):
-        return self.decoded_address.__hash__()
