@@ -1,7 +1,9 @@
 from sample_service import sample_vasp
 from protocol import LibraAddress
+from protocol_messages import CommandResponseObject
 
 from flask import Flask, jsonify, request
+from markupsafe import escape
 import json
 
 app = Flask(__name__)
@@ -13,18 +15,17 @@ def index():
     return jsonify(status='OK', message='Hello, world!')
 
 
-@app.route('/process', methods=['POST'])
-def process():
+@app.route('/'+app.vasp.my_addr.plain()+'/<other_addr>/process/', methods=['POST'])
+def process(other_addr):
+    other_addr = escape(other_addr).striptags()
     request_json = request.get_json()
-
-    # Recover client's address
-    # This seems ugly -- fix it.
-    diff = json.loads(request_json)['command']['diff']
-    sender_addr = diff['sender']['address']
-    receiver_addr = diff['receiver']['address']
-    other_addr = [sender_addr, receiver_addr][app.vasp.my_addr == sender_addr]
-
     app.vasp.process_request(LibraAddress(other_addr), request_json)
     responses = app.vasp.collect_messages()
-    responses_json = [command.content for command in responses]
-    return jsonify(responses_json)
+
+    responses_json = []
+    for command in responses:
+        if str(command.type) == str(CommandResponseObject):
+            responses_json.append(command.content)
+
+    assert len(responses_json) == 1
+    return responses_json[0]
