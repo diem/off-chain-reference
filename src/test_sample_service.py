@@ -230,3 +230,29 @@ def test_vasp_response(simple_response_json_error):
     AddrOther = LibraAddress.encode_to_Libra_address(b'A'*16)
     vc = sample_vasp(AddrThis)
     vc.process_response(AddrOther, simple_response_json_error)
+
+from unittest.mock import patch
+
+def test_vasp_simple_interrupt(simple_request_json):
+    AddrThis   = LibraAddress.encode_to_Libra_address(b'B'*16)
+    AddrOther = LibraAddress.encode_to_Libra_address(b'A'*16)
+
+    # Patch business context to first return an exception
+    vc = sample_vasp(AddrThis)
+    with patch.object(vc.bc, 'ready_for_settlement', side_effect = [ BusinessAsyncInterupt(1234) ]) as mock_thing:        
+        assert vc.bc.ready_for_settlement == mock_thing
+        vc.process_request(AddrOther, simple_request_json)
+        responses = vc.collect_messages()
+
+    assert len(responses) == 2
+    assert responses[0].type is CommandRequestObject
+    assert responses[1].type is CommandResponseObject
+    assert 'success' in responses[1].content
+
+    with patch.object(vc.bc, 'ready_for_settlement', return_value = True ) as mock_thing:        
+        assert vc.bc.ready_for_settlement == mock_thing
+        vc.vasp.processor.notify_callback(1234)
+        responses = vc.collect_messages()
+    
+    assert len(responses) > 0
+    assert 'ready_for' in str(responses[0].content)

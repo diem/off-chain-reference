@@ -20,6 +20,7 @@ class OffChainVASP:
         self.vasp_addr = vasp_addr
         self.business_context = processor.business_context()
         self.processor = processor
+        self.processor.notify = self.notify_new_commands
 
         # TODO: this should be a persistent store
         self.channel_store = {}
@@ -39,6 +40,11 @@ class OffChainVASP:
             self.channel_store[store_key] = channel
     
         return self.channel_store[store_key]
+    
+    def notify_new_commands(self):
+        ''' The processor calls this method to notify the VASP that new
+            commands are available for processing. '''
+        self.processor.process_command_backlog(self)
 
 
 class VASPPairChannel:

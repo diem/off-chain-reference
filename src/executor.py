@@ -158,10 +158,6 @@ class ProtocolExecutor:
 
         # TODO: have a less catch-all exception here to detect expected vs. unexpected exceptions
         except Exception as e:
-            if __debug__:
-                import traceback
-                traceback.print_exc()
-
             all_good = False
             type_str = str(type(e)) +": "+str(e)
             raise ExecutorException(type_str)
