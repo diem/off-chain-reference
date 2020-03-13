@@ -280,10 +280,11 @@ class VASPPairChannel:
             # We have received the other side's request without receiving the
             # previous one
             response = make_protocol_error(request, code='missing')
-            return self.send_response(response)
-
             # NOTE: the protocol is still correct without persisiting the cache
             self.persist()
+            return self.send_response(response)
+
+            
         else:
             # OK: Previous cases are exhaustive
             assert False
