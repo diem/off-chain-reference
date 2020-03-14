@@ -21,19 +21,20 @@ class Storable:
 class StorableFactory:
     ''' This class maintains an overview of the full storage subsystem.'''
 
-    def all_made(self):
-        ''' A list of all open Storable objects'''
-        pass
+    def __init__(self, db):
+        self.db = db
 
-    def make_Value(self, root, name, xtype = None):
+    def make_value(self, name, xtype, root = None):
         ''' A new value-like storable'''
-        pass
-    def make_List(self, root, name):
+        return StorableValue(self.db, name, xtype, root)
+
+    def make_list(self, name, xtype, root):
         ''' A new list-like storable'''
-        pass
-    def make_dict(self, root, name):
+        return StorableList(self.db, name, xtype, root)
+
+    def make_dict(self, name, xtype, root):
         ''' A new map-like storable'''
-        pass
+        return StorableDict(self.db, name, xtype, root)
 
 class StorableDict(Storable):
 

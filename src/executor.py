@@ -183,6 +183,7 @@ class ProtocolExecutor:
             obj = self.object_store[version]
             obj.set_actually_live(False)
             obj.set_potentially_live(False)
+            self.object_store[version] = obj
 
         # Creates new objects
         new_versions = command.new_object_versions()
@@ -190,9 +191,11 @@ class ProtocolExecutor:
             obj = self.object_store[version]
             obj.set_potentially_live(True)
             obj.set_actually_live(True)
+            self.object_store[version] = obj
         
         if command.commit_status is None:
             command.commit_status = True
+            self.seq[seq_no] = command
             self.set_outcome(command, success=True)
         
 
@@ -213,4 +216,5 @@ class ProtocolExecutor:
         
         if command.commit_status is None:
             command.commit_status = False
+            self.seq[seq_no] = command
             self.set_outcome(command, success=False)
