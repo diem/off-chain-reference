@@ -103,9 +103,12 @@ def test_payment_actor_update_kyc():
     actor = PaymentActor('ABCD', 'XYZ', 'none', [])
     actor.add_kyc_data(kyc, 'sigXXXX', 'certXXX')
 
+    # We tolerate writing again strictly the same record
+    actor.add_kyc_data(kyc, 'sigXXXX', 'certXXX')
+
     with pytest.raises(StructureException):
         # Cannot change KYC data once set
-        actor.add_kyc_data(kyc, 'sigXXXX', 'certXXX')
+        actor.add_kyc_data(kyc, 'sigYYYY', 'certYYYY')
 
     with pytest.raises(StructureException):
         # Wrong type for kyc data

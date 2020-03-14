@@ -46,8 +46,7 @@ class StructureChecker:
             the type is a subclass of StructureChecker. '''
         parse_map = {
                 field: (field_type, issubclass(field_type, StructureChecker))
-                for field, field_type, _, _ 
-                in cls.fields
+                for field, field_type, _, _ in cls.fields
             }
         return parse_map
 
@@ -148,8 +147,9 @@ class StructureChecker:
 
                 # Check you can write again
                 if field in self.data and write_mode == WRITE_ONCE:
-                    raise StructureException(
-                        'Wrong update: field %s cannot be changed' % field)
+                    if self.data[field] !=  diff[field]:
+                        raise StructureException(
+                            'Wrong update: field %s cannot be changed' % field)
 
         # Check we are not updating unknown fields
         for key in diff:
@@ -193,8 +193,8 @@ class JSONParsingError(Exception):
     pass
 
 class JSONSerializable:
-    def get_json_data_dict(self, flag):
-        ''' Get a data disctionary compatible with JSON serilization (json.dumps) '''
+    def get_json_data_dict(self, flag, update_dict = None):
+        ''' Get a data dictionary compatible with JSON serilization (json.dumps) '''
         raise NotImplementedError()
 
     @classmethod
