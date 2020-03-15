@@ -79,7 +79,6 @@ def test_value(db):
     assert val.exists() is False
     val.set_value(10)
     assert val.exists() is True
-    val.persist()
 
     val2 = StorableValue(db, 'counter', int)
     assert val2.exists() is True
@@ -91,7 +90,6 @@ def test_value_dict():
     assert val.exists() is False
     val.set_value(10)
     assert val.exists() is True
-    val.persist()
 
     val2 = StorableValue(db, 'counter', int)
     assert val2.exists() is True
@@ -101,7 +99,6 @@ def test_value_dict():
 def test_hierarchy(db):
     val = StorableValue(db, 'counter', int)
     val.set_value(10)
-    val.persist()
 
     val2 = StorableValue(db, 'counter', int, root=val)
     assert val2.exists() is False

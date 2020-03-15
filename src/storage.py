@@ -5,18 +5,7 @@ import json
 from pathlib import PosixPath
 
 class Storable:
-
-    def get_name(self):
-        pass
-
-    def get_root(self):
-        pass
-
-    def persist(self):
-        pass
-
-    def dirty(self):
-        pass
+    pass
 
 class StorableFactory:
     ''' This class maintains an overview of the full storage subsystem.'''
@@ -149,13 +138,11 @@ class StorableValue(Storable):
         self.name = name
         self.type = xtype
         self.db = db
-        self.dirty = False
 
         # self.db = dbm.open(str(fname), 'c')
 
     def set_value(self, value):
         self.db[str(self.base_key())] = json.dumps(value)
-        self.dirty = True
 
     def get_value(self):
         val = json.loads(self.db[str(self.base_key())])
@@ -166,17 +153,3 @@ class StorableValue(Storable):
 
     def base_key(self):
         return self.root / self.name
-    
-    def get_name(self):
-        return self.name
-
-    def get_root(self):
-        return self.root
-
-    def persist(self):
-        if self.dirty:
-            # self.db.sync()
-            self.dirty = False
-
-    def get_dirty(self):
-        return self.dirty
