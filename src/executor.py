@@ -41,9 +41,10 @@ class ProtocolCommand(JSONSerializable):
         }
 
         if flag == JSONFlag.STORE:
-            data_dict["commit_status"] = self.commit_status
-            data_dict["origin"] = self.origin
-
+            data_dict.update({
+                "commit_status" : self.commit_status,
+                "origin" : self.origin
+            })
         return data_dict
 
     @classmethod

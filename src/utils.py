@@ -55,24 +55,30 @@ class StructureChecker:
         ''' Returns a hierarchy of diffs applied to this object and children'''
         parse = self.parse_map()
         diff = {}
+        for field in self.data:
+            xtype, parse_more = parse[field]
+            if parse_more:
+                diff[field] = self.data[field].get_full_record()
+            else:
+                if xtype in {str, int, list, dict}:
+                    diff[field] = self.data[field]
+                else:
+                    diff[field] = str(self.data[field])
+        return diff
+    
+    def has_changed(self):
+        parse = self.parse_map()
         for new_diff in self.update_record:
             for field in new_diff:
-                xtype, parse_more = parse[field]
-                if not parse_more:
-                    # We serialize JSON native types directly
-                    if xtype in {str, int, list, dict}:
-                        diff[field] = new_diff[field]
-                    else:
-                        diff[field] = str(new_diff[field])
+                return True
 
-        for field in parse:
+        for field in self.data:
             xtype, parse_more = parse[field]
-            if field in self.data and parse_more:
-                inner_diff = self.data[field].get_full_record()
-                if inner_diff != {}:
-                    diff[field] = inner_diff
-
-        return diff
+            if parse_more:
+                if self.data[field].has_changed():
+                    return True
+        
+        return False
 
     def __eq__(self, other):
         ''' Define equality as equality between data fields only '''
@@ -198,7 +204,7 @@ class JSONSerializable:
         raise NotImplementedError()
 
     @classmethod
-    def from_json_data_dict(cls, data, flag):
+    def from_json_data_dict(cls, data, flag, self=None):
         ''' Construct the object from a serlialized JSON data dictionary (from json.loads). '''
         raise NotImplementedError()
 
