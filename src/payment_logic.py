@@ -61,6 +61,11 @@ class PaymentCommand(ProtocolCommand):
         assert isinstance(self, PaymentCommand)
         self.command = data['diff']
         return self
+    
+    @classmethod
+    def json_type(cls):
+        ''' Overwrite this method to have a nicer json type identifier.'''
+        return "PaymentCommandObject"
 
 
 class PaymentLogicError(Exception):

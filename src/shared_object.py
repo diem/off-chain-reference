@@ -1,9 +1,9 @@
 from copy import deepcopy
-from utils import get_unique_string
+from utils import get_unique_string,JSONSerializable
 
 # Generic interface to a shared object
 
-class SharedObject:
+class SharedObject(JSONSerializable):
     def __init__(self):
         ''' All objects have a version number and their commit status '''
         self.version = get_unique_string()
@@ -45,3 +45,26 @@ class SharedObject:
 
     def set_actually_live(self, flag):
         self.actually_live = flag
+
+    def get_json_data_dict(self, flag, update_dict = None):
+        ''' Get a data dictionary compatible with JSON serilization (json.dumps) '''
+        if update_dict is None:
+            update_dict = {}
+
+        update_dict.update({
+            'version' : self.version,
+            'extends' : self.extends,
+            'potentially_live' : self.potentially_live,
+            'actually_live' : self.actually_live
+        })
+
+        return update_dict
+
+    @classmethod
+    def from_json_data_dict(cls, data, flag, self):
+        ''' Construct the object from a serlialized JSON data dictionary (from json.loads). '''
+        assert self is not None
+        self.version = data['version']
+        self.extends = data['extends']
+        self.potentially_live = bool(data['potentially_live'])
+        self.actually_live = bool(data['actually_live'])

@@ -1,7 +1,8 @@
 from decimal import Decimal
 
 from utils import StructureException, StructureChecker, \
-    REQUIRED, OPTIONAL, WRITE_ONCE, UPDATABLE
+    REQUIRED, OPTIONAL, WRITE_ONCE, UPDATABLE, \
+    JSONSerializable
 from shared_object import SharedObject
 
 from status_logic import Status
@@ -130,7 +131,7 @@ class PaymentAction(StructureChecker):
         # TODO[issue #1]: Check timestamp format?
 
 
-class PaymentObject(SharedObject, StructureChecker):
+class PaymentObject(SharedObject, StructureChecker, JSONSerializable):
 
     fields = [
         ('sender', PaymentActor, REQUIRED, WRITE_ONCE),
@@ -174,6 +175,16 @@ class PaymentObject(SharedObject, StructureChecker):
             'recipient_signature': signature
         })
 
-    def has_changed(self):
-        ret = not self.get_full_record() == {}
-        return ret
+    def get_json_data_dict(self, flag, update_dict = None):
+        ''' Get a data dictionary compatible with JSON serilization (json.dumps) '''
+        json_data = {}
+        json_data = SharedObject.get_json_data_dict(self, flag, json_data)
+        json_data['data'] = self.get_full_record()
+        return json_data
+
+    @classmethod
+    def from_json_data_dict(cls, data, flag, self=None):
+        ''' Construct the object from a serlialized JSON data dictionary (from json.loads). '''
+        self = PaymentObject.from_full_record(data['data'])
+        SharedObject.from_json_data_dict(data, flag, self)
+        return self
