@@ -4,8 +4,23 @@ import dbm
 import json
 from pathlib import PosixPath
 
+from utils import JSONFlag
+
 class Storable:
-    pass
+    def __init__(self, xtype):
+        self.xtype = xtype
+
+    def pre_proc(self, val):
+        try:
+            return val.get_json_data_dict(JSONFlag.STORE)
+        except:
+            return self.xtype(val)
+    
+    def post_proc(self, val):
+        try:
+            return self.xtype.from_json_data_dict(val, JSONFlag.STORE)
+        except:
+            return self.xtype(val)
 
 class StorableFactory:
     ''' This class maintains an overview of the full storage subsystem.'''
@@ -45,14 +60,14 @@ class StorableDict(Storable):
 
     def __getitem__(self, key):
         db_key = str(self.base_key() / str(key))
-        return self.xtype(json.loads(self.db[db_key]))
+        return self.post_proc(json.loads(self.db[db_key]))
 
     def __setitem__(self, key, value):
         db_key = str(self.base_key() / str(key))
         if db_key not in self.db:
             xlen = self.length.get_value()
             self.length.set_value(xlen+1)
-        self.db[db_key] = json.dumps(value)
+        self.db[db_key] = json.dumps(self.pre_proc(value))
 
     def __len__(self):
         xlen =  self.length.get_value()
@@ -99,7 +114,7 @@ class StorableList(Storable):
             raise KeyError('Key does not exist')
 
         db_key = str(self.base_key() / str(key))
-        return self.xtype(json.loads(self.db[db_key]))
+        return self.post_proc(json.loads(self.db[db_key]))
 
     def __setitem__(self, key, value):
         if type(key) is not int:
@@ -108,7 +123,7 @@ class StorableList(Storable):
         if not 0<= key < xlen:
             raise KeyError('Key does not exist')
         db_key = str(self.base_key() / str(key))
-        self.db[db_key] = json.dumps(value)
+        self.db[db_key] = json.dumps(self.pre_proc(value))
 
     def __len__(self):
         xlen =  self.length.get_value()
@@ -136,17 +151,17 @@ class StorableValue(Storable):
         else:
             self.root = root.base_key()
         self.name = name
-        self.type = xtype
+        self.xtype = xtype
         self.db = db
 
         # self.db = dbm.open(str(fname), 'c')
 
     def set_value(self, value):
-        self.db[str(self.base_key())] = json.dumps(value)
+        self.db[str(self.base_key())] = json.dumps(self.pre_proc(value))
 
     def get_value(self):
         val = json.loads(self.db[str(self.base_key())])
-        return self.type(val)
+        return self.post_proc(val)
     
     def exists(self):
         return str(self.base_key()) in self.db
