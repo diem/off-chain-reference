@@ -1,8 +1,6 @@
 from utils import JSONSerializable, JSONFlag
 from command_processor import CommandProcessor
 
-
-
 # Interface we need to do commands:
 class ProtocolCommand(JSONSerializable):
     def __init__(self):

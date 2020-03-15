@@ -14,12 +14,14 @@ class Storable:
         try:
             return val.get_json_data_dict(JSONFlag.STORE)
         except:
+            # assert not self.xtype.issubclass(JSONSerializable)
             return self.xtype(val)
     
     def post_proc(self, val):
         try:
             return self.xtype.from_json_data_dict(val, JSONFlag.STORE)
         except:
+            # assert not self.xtype.issubclass(JSONSerializable)
             return self.xtype(val)
 
 class StorableFactory:
@@ -157,7 +159,9 @@ class StorableValue(Storable):
         # self.db = dbm.open(str(fname), 'c')
 
     def set_value(self, value):
-        self.db[str(self.base_key())] = json.dumps(self.pre_proc(value))
+        json_data = json.dumps(self.pre_proc(value))
+        key = str(self.base_key())
+        self.db[key] = json_data
 
     def get_value(self):
         val = json.loads(self.db[str(self.base_key())])

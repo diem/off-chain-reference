@@ -15,7 +15,8 @@ class PaymentCommand(ProtocolCommand):
         self.command = payment.get_full_record()
 
     def __eq__(self, other):
-        return self.depend_on == other.depend_on \
+        return ProtocolCommand.__eq__(self, other) \
+            and self.depend_on == other.depend_on \
             and self.creates == other.creates \
             and self.command == other.command
 
