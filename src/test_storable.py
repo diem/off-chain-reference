@@ -105,3 +105,30 @@ def test_hierarchy(db):
     val2.set_value(20)
     assert val.get_value() == 10
     assert val2.get_value() == 20
+
+from payment import *
+
+@pytest.fixture
+def basic_payment():
+    sender = PaymentActor('AAAA', 'aaaa', 'none', [])
+    receiver = PaymentActor('BBBB', 'bbbb', 'none', [])
+    action = PaymentAction(Decimal('10.00'), 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
+
+    payment = PaymentObject(sender, receiver, 'ref', 'orig_ref', 'desc', action)
+    return payment
+
+def test_value_payment(db, basic_payment):
+    val = StorableValue(db, 'payment', basic_payment.__class__)
+    assert val.exists() is False
+    val.set_value(basic_payment)
+    assert val.exists() is True
+    pay2 = val.get_value()
+    assert basic_payment == pay2
+
+    lst = StorableList(db, 'jacklist', basic_payment.__class__)
+    lst += [ basic_payment ]
+    assert lst[0] == pay2
+
+    D = StorableDict(db, 'mary', basic_payment.__class__)
+    D[pay2.version] = pay2
+    assert D[pay2.version] == basic_payment
