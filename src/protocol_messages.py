@@ -7,8 +7,9 @@ class OffChainError(JSONSerializable):
         self.code = code
 
     def __eq__(self, other):
-        return self.protocol_error == other.protocol_error \
-           and self.code == other.code
+        return isinstance(other, OffChainError) \
+            and self.protocol_error == other.protocol_error \
+            and self.code == other.code
 
     def get_json_data_dict(self, flag):
         ''' Get a data dictionary compatible with JSON serilization (json.dumps) '''
@@ -51,7 +52,8 @@ class CommandRequestObject(JSONSerializable):
 
     def __eq__(self, other):
         ''' Define equality as field equality '''
-        return self.seq == other.seq \
+        return isinstance(other, CommandRequestObject) \
+           and self.seq == other.seq \
            and self.command_seq == other.command_seq \
            and self.command == other.command \
            and self.command_type == other.command_type \
@@ -120,10 +122,11 @@ class CommandResponseObject(JSONSerializable):
         self.error = None
 
     def __eq__(self, other):
-        return self.seq == other.seq \
-           and self.command_seq == other.command_seq \
-           and self.status == other.status \
-           and self.error  == other.error
+        return isinstance(other, CommandResponseObject) \
+            and self.seq == other.seq \
+            and self.command_seq == other.command_seq \
+            and self.status == other.status \
+            and self.error  == other.error
 
 
     def not_protocol_failure(self):

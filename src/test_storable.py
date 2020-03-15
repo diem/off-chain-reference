@@ -132,3 +132,43 @@ def test_value_payment(db, basic_payment):
     D = StorableDict(db, 'mary', basic_payment.__class__)
     D[pay2.version] = pay2
     assert D[pay2.version] == basic_payment
+
+def test_value_command(db, basic_payment):
+    from payment_logic import PaymentCommand
+    from protocol_messages import make_success_response, CommandRequestObject, make_command_error
+
+    cmd = PaymentCommand(basic_payment)
+ 
+    val = StorableValue(db, 'command', PaymentCommand)
+    val.set_value(cmd)
+    assert val.get_value() == cmd
+
+    cmd.creates = 'xxxxxxxx'
+    assert val.get_value() != cmd
+    val.set_value(cmd)
+    assert val.get_value() == cmd
+
+
+def test_value_request(db, basic_payment):
+    from payment_logic import PaymentCommand
+    from protocol_messages import make_success_response, CommandRequestObject, make_command_error
+    CommandRequestObject.register_command_type(PaymentCommand)
+    cmd = CommandRequestObject(PaymentCommand(basic_payment))
+    cmd.seq = 10
+ 
+    val = StorableValue(db, 'command', CommandRequestObject)
+    val.set_value(cmd)
+    assert val.get_value() == cmd
+
+    cmd.response = make_success_response(cmd)
+    assert cmd.response is not None
+    assert val.get_value() != cmd
+    assert val.get_value().response is None
+
+    val.set_value(cmd)
+    assert val.get_value() == cmd
+
+    cmd.response = make_command_error(cmd, code='Something went wrong')
+    assert val.get_value() != cmd
+    val.set_value(cmd)
+    assert val.get_value() == cmd
