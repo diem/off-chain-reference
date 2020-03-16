@@ -58,6 +58,7 @@ class SharedObject(JSONSerializable):
             'actually_live' : self.actually_live
         })
 
+        self.add_object_type(update_dict)
         return update_dict
 
     @classmethod

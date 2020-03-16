@@ -514,9 +514,6 @@ def test_json_serlialize():
     cmd2 = SampleCommand.from_json_data_dict(data, JSONFlag.NET)
     assert cmd == cmd2
 
-    # First register the SimpleCommand class
-    CommandRequestObject.register_command_type(SampleCommand)
-
     # Test Request, Response
     req0 = CommandRequestObject(cmd)
     req2 = CommandRequestObject(cmd2)
