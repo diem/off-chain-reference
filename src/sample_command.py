@@ -41,11 +41,15 @@ class SampleCommand(ProtocolCommand):
     @classmethod
     def from_json_data_dict(cls, data, flag):
         ''' Construct the object from a serlialized JSON data dictionary (from json.loads). '''
-        self = SampleCommand(data['command'], data['dependencies'])
-        if flag == JSONFlag.STORE:
-            self.commit_status = data["commit_status"]
+        self = super().from_json_data_dict(data, flag)
+        self.command = SampleObject(data['command'])
+        self.dependencies = data['dependencies']
+        assert type(self) == cls
         return self
 
     @classmethod
     def json_type(self):
         return "SampleCommand"
+
+from protocol_messages import CommandRequestObject
+CommandRequestObject.register_command_type(SampleCommand)

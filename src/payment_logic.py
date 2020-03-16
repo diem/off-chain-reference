@@ -6,6 +6,8 @@ from payment import Status, PaymentObject
 from status_logic import status_heights_MUST
 from libra_address import LibraAddress
 
+from storage import StorableFactory
+
 class PaymentCommand(ProtocolCommand):
     def __init__(self, payment):
         ''' Creates a new Payment command based on the diff from the given payment'''
@@ -68,6 +70,8 @@ class PaymentCommand(ProtocolCommand):
         ''' Overwrite this method to have a nicer json type identifier.'''
         return "PaymentCommandObject"
 
+from protocol_messages import CommandRequestObject
+CommandRequestObject.register_command_type(PaymentCommand)
 
 class PaymentLogicError(Exception):
     pass
@@ -104,12 +108,13 @@ def check_status(role, old_status, new_status, other_status):
 # The logic to process a payment from either side.
 class PaymentProcessor(CommandProcessor):
 
-    def __init__(self, business):
+    def __init__(self, business, storage_db=None):
         self.business = business
 
         # TODO: Persit callbacks?
         self.callbacks = {}
         self.ready = {}
+
     
     # -------- Implements CommandProcessor interface ---------
     
