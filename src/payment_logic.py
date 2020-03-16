@@ -10,19 +10,19 @@ class PaymentCommand(ProtocolCommand):
     def __init__(self, payment):
         ''' Creates a new Payment command based on the diff from the given payment'''
         ProtocolCommand.__init__(self)
-        self.depend_on = list(payment.extends)
+        self.dependencies = list(payment.extends)
         self.creates = [payment.get_version()]
         self.command = payment.get_full_record()
 
     def __eq__(self, other):
-        return self.depend_on == other.depend_on \
+        return self.dependencies == other.dependencies \
             and self.creates == other.creates \
             and self.command == other.command
 
     def get_object(self, version_number, dependencies):
         ''' Constructs the new or updated objects '''
         # First find dependencies & created objects
-        if len(self.depend_on) > 1:
+        if len(self.dependencies) > 1:
             raise PaymentLogicError("A payment can only depend on a single previous payment")
         if len(self.creates) != 1:
             raise PaymentLogicError("A payment always creates a new payment")
@@ -30,13 +30,13 @@ class PaymentCommand(ProtocolCommand):
             raise PaymentLogicError("Unknown object %s (only know %s)" % (version_number, self.creates[0]))
         new_version = self.creates[0]
 
-        if len(self.depend_on) == 0:
+        if len(self.dependencies) == 0:
             payment = PaymentObject.create_from_record(self.command)
             payment.set_version(new_version)
             return payment
 
-        elif len(self.depend_on) == 1:
-            dep = self.depend_on[0]
+        elif len(self.dependencies) == 1:
+            dep = self.dependencies[0]
             if dep not in dependencies:
                 raise PaymentLogicError('Cound not find payment dependency: %s' % dep)
             dep_object = dependencies[dep]
@@ -138,10 +138,10 @@ class PaymentProcessor(CommandProcessor):
 
         if origin == other_addr:
             # Only check the commands we get from others.
-            if command.depend_on == []:
+            if command.dependencies == []:
                 self.check_new_payment(new_payment)
             else:
-                old_payment = dependencies[command.depend_on[0]]
+                old_payment = dependencies[command.dependencies[0]]
                 self.check_new_update(old_payment, new_payment)
 
     def process_command(self, vasp, channel, executor, command, status_success, error=None):

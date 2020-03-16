@@ -6,7 +6,7 @@ from command_processor import CommandProcessor
 # Interface we need to do commands:
 class ProtocolCommand(JSONSerializable):
     def __init__(self):
-        self.depend_on = []
+        self.dependencies = []
         self.creates   = []
         self.commit_status = None
         self.origin = None # Takes a LibraAddress
@@ -22,7 +22,7 @@ class ProtocolCommand(JSONSerializable):
 
     def get_dependencies(self):
         ''' Get the list of dependencies. This is a list of version numbers. '''
-        return set(self.depend_on)
+        return set(self.dependencies)
 
     def new_object_versions(self):
         ''' Get the list of version numbers created by this command. '''
@@ -36,7 +36,7 @@ class ProtocolCommand(JSONSerializable):
     def get_json_data_dict(self, flag):
         ''' Get a data dictionary compatible with JSON serilization (json.dumps) '''
         data_dict = {
-            "depend_on" : self.depend_on,
+            "dependencies" : self.dependencies,
             "creates"    : self.creates,
         }
 
@@ -56,7 +56,7 @@ class ProtocolCommand(JSONSerializable):
         ''' Construct the object from a serlialized JSON data dictionary (from json.loads). '''
         self = cls.__new__(cls)
         ProtocolCommand.__init__(self)
-        self.depend_on = list(data['depend_on'])
+        self.dependencies = list(data['dependencies'])
         self.creates = list(data['creates'])
         if flag == JSONFlag.STORE:
             self.commit_status = data["commit_status"]
