@@ -83,7 +83,7 @@ def check_status(role, old_status, new_status, other_status):
             'Invalid transition: %s: %s -> %s' % (role, old_status, new_status)
         )
 
-    # Prevent unilateral aborts after the finality barrier
+    # Prevent unilateral aborts after the finality barrier:
     finality_barrier = status_heights_MUST[Status.ready_for_settlement]
     cond = status_heights_MUST[old_status] >= finality_barrier
     cond &= new_status == Status.abort
