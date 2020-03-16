@@ -68,7 +68,7 @@ class ExecutorException(Exception):
     pass
 
 class ProtocolExecutor:
-    def __init__(self, channel, processor, handlers=None):
+    def __init__(self, channel, processor):
 
         if __debug__:
             # No need for this import unless we are debugging
@@ -86,18 +86,9 @@ class ProtocolExecutor:
         # It maps version numbers -> objects
         self.object_store = { } # TODO: persist this structure
         # <ENDS to persist>
-
-        self.handlers = handlers
-    
-    def set_outcome_handler(self, handler):
-        ''' Set an external handler to deal with success of failure of commands '''
-        self.handlers = handler
     
     def set_outcome(self, command, success):
         ''' Execute successful commands, and notify of failed commands'''
-        if self.handlers is not None:
-            self.handlers(command, success=success)
-
         vasp, channel, executor = self.get_context()
         status   = success
         self.processor.process_command(vasp, channel, executor, command, status, error=None)
