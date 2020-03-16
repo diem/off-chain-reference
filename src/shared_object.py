@@ -7,7 +7,7 @@ class SharedObject(JSONSerializable):
     def __init__(self):
         ''' All objects have a version number and their commit status '''
         self.version = get_unique_string()
-        self.extends = [] # Strores the version of the previous object
+        self.extends = [] # Stores the previous version of the object
 
         # Flags indicate the state of the object in the store
         self.potentially_live = False   # Pending commands could make it live

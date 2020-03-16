@@ -4,7 +4,7 @@ from command_processor import CommandProcessor
 # Interface we need to do commands:
 class ProtocolCommand(JSONSerializable):
     def __init__(self):
-        self.depend_on = []
+        self.dependencies = []
         self.creates   = []
         self.commit_status = None
         self.origin = None # Takes a LibraAddress
@@ -20,7 +20,7 @@ class ProtocolCommand(JSONSerializable):
 
     def get_dependencies(self):
         ''' Get the list of dependencies. This is a list of version numbers. '''
-        return set(self.depend_on)
+        return set(self.dependencies)
 
     def new_object_versions(self):
         ''' Get the list of version numbers created by this command. '''
@@ -34,7 +34,7 @@ class ProtocolCommand(JSONSerializable):
     def get_json_data_dict(self, flag):
         ''' Get a data dictionary compatible with JSON serilization (json.dumps) '''
         data_dict = {
-            "depend_on" : self.depend_on,
+            "dependencies" : self.dependencies,
             "creates"    : self.creates,
         }
 
@@ -55,7 +55,7 @@ class ProtocolCommand(JSONSerializable):
         ''' Construct the object from a serlialized JSON data dictionary (from json.loads). '''
         self = cls.__new__(cls)
         ProtocolCommand.__init__(self)
-        self.depend_on = list(data['depend_on'])
+        self.dependencies = list(data['dependencies'])
         self.creates = list(data['creates'])
         if flag == JSONFlag.STORE:
             self.commit_status = data["commit_status"]
@@ -67,7 +67,7 @@ class ExecutorException(Exception):
     pass
 
 class ProtocolExecutor:
-    def __init__(self, channel, processor, handlers=None):
+    def __init__(self, channel, processor):
 
         if __debug__:
             # No need for this import unless we are debugging
@@ -79,31 +79,27 @@ class ProtocolExecutor:
         self.channel   = channel
 
         # <STARTS to persist>
-        self.seq = []
+
+        # The common sequence of commands 
+        self.command_sequence = []
+
+        # The highest sequence command confirmed as success of failure.
         self.last_confirmed = 0
+
         # This is the primary store of shared objects.
         # It maps version numbers -> objects
         self.object_store = { } # TODO: persist this structure
+
         # <ENDS to persist>
-
-        self.handlers = handlers
     
-    def set_outcome_handler(self, handler):
-        ''' Set an external handler to deal with success of failure of commands '''
-        self.handlers = handler
-    
-    def set_outcome(self, command, success):
+    def set_outcome(self, command, is_success):
         ''' Execute successful commands, and notify of failed commands'''
-        if self.handlers is not None:
-            self.handlers(command, success=success)
-
         vasp, channel, executor = self.get_context()
-        status   = success
-        self.processor.process_command(vasp, channel, executor, command, status, error=None)
+        self.processor.process_command(vasp, channel, executor, command, is_success)
 
     def next_seq(self):
         ''' Returns the next sequence number in the common sequence.'''
-        return len(self.seq)
+        return len(self.command_sequence)
 
     def count_potentially_live(self):
         return sum(1 for obj in self.object_store.values() if obj.get_potentially_live())
@@ -164,8 +160,8 @@ class ProtocolExecutor:
         finally:
             # Sequence if all is good, or if we were asked to
             if all_good or not do_not_sequence_errors:
-                pos = len(self.seq)
-                self.seq += [ command ]
+                pos = len(self.command_sequence)
+                self.command_sequence += [ command ]
 
         return pos
 
@@ -174,7 +170,7 @@ class ProtocolExecutor:
         assert seq_no == self.last_confirmed
         self.last_confirmed += 1
 
-        command = self.seq[seq_no]
+        command = self.command_sequence[seq_no]
         
         # Consumes old objects
         dependencies = command.get_dependencies()
@@ -194,8 +190,8 @@ class ProtocolExecutor:
         
         if command.commit_status is None:
             command.commit_status = True
-            self.seq[seq_no] = command
-            self.set_outcome(command, success=True)
+            self.command_sequence[seq_no] = command
+            self.set_outcome(command, is_success=True)
         
 
     def set_fail(self, seq_no):
@@ -203,7 +199,7 @@ class ProtocolExecutor:
         assert seq_no == self.last_confirmed
         self.last_confirmed += 1
 
-        command = self.seq[seq_no]
+        command = self.command_sequence[seq_no]
 
         new_versions = command.new_object_versions()
         for version in new_versions:
@@ -215,5 +211,5 @@ class ProtocolExecutor:
         
         if command.commit_status is None:
             command.commit_status = False
-            self.seq[seq_no] = command
-            self.set_outcome(command, success=False)
+            self.command_sequence[seq_no] = command
+            self.set_outcome(command, is_success=False)

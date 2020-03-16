@@ -12,7 +12,7 @@ import pytest
 def basic_payment():
     sender = PaymentActor('AAAA', 'aaaa', Status.none, [])
     receiver = PaymentActor('BBBB', 'bbbb', Status.none, [])
-    action = PaymentAction(Decimal('10.00'), 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
+    action = PaymentAction(10, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
     payment = PaymentObject(sender, receiver, 'ref', 'orig_ref', 'desc', action)
     return payment
 
@@ -38,9 +38,9 @@ def test_exec(basic_payment):
     cmd3 = PaymentCommand(pay3)
     cmd3.set_origin(channel.get_my_address())
 
-    assert cmd1.depend_on == []
-    assert cmd2.depend_on == cmd1.creates
-    assert cmd3.depend_on == cmd2.creates
+    assert cmd1.dependencies == []
+    assert cmd2.dependencies == cmd1.creates
+    assert cmd3.dependencies == cmd2.creates
 
     pe.sequence_next_command(cmd1)
     pe.sequence_next_command(cmd2)
@@ -112,22 +112,24 @@ def test_handlers(basic_payment):
     channel = MagicMock(spec=VASPPairChannel)
     bcm = MagicMock(spec=BusinessContext)
     proc = MagicMock(spec=CommandProcessor)
-    pe = ProtocolExecutor(channel, proc)
-
-    class Stats:
-        def __init__(self):
+    
+    class Stats(CommandProcessor):
+        def __init__(self, bc):
             self.success_no = 0
             self.failure_no = 0
+            self.bc = bc
+        
+        def business_context(self):
+            return self.bc
 
-        def handle(self, command, success):
-            global success_no, failure_no
-            if success:
+        def process_command(self, vasp, channel, executor, command, status, error=None):
+            if status:
                 self.success_no += 1
             else:
                 self.failure_no += 1
 
-    stat = Stats()
-    pe.set_outcome_handler(stat.handle)
+    stat = Stats(bcm)
+    pe = ProtocolExecutor(channel, stat)
 
     cmd1 = PaymentCommand(basic_payment)
     cmd1.set_origin(channel.get_my_address())
@@ -143,9 +145,9 @@ def test_handlers(basic_payment):
     cmd3 = PaymentCommand(pay3)
     cmd3.set_origin(channel.get_my_address())
 
-    assert cmd1.depend_on == []
-    assert cmd2.depend_on == list(cmd1.creates)
-    assert cmd3.depend_on == list(cmd1.creates)
+    assert cmd1.dependencies == []
+    assert cmd2.dependencies == list(cmd1.creates)
+    assert cmd3.dependencies == list(cmd1.creates)
 
     pe.sequence_next_command(cmd1)
     pe.sequence_next_command(cmd2)
