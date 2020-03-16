@@ -72,9 +72,6 @@ class PaymentCommand(ProtocolCommand):
         ''' Overwrite this method to have a nicer json type identifier.'''
         return "PaymentCommandObject"
 
-from protocol_messages import CommandRequestObject
-CommandRequestObject.register_command_type(PaymentCommand)
-
 class PaymentLogicError(Exception):
     pass
 

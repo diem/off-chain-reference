@@ -5,6 +5,7 @@ from protocol import *
 from business import BusinessAsyncInterupt
 from utils import *
 from libra_address import *
+from sample_command import *
 
 from unittest.mock import MagicMock
 import pytest
@@ -26,6 +27,18 @@ def test_payment_command_serialization_net(basic_payment):
     assert cmd == cmd2
 
 
+def test_payment_command_serialization_parse(basic_payment):
+    cmd = PaymentCommand(basic_payment)
+    data = cmd.get_json_data_dict(JSONFlag.NET)
+    obj = JSONSerializable.parse(data, JSONFlag.NET)
+    assert obj == cmd
+
+    cmd_s = SampleCommand('Hello', deps=['World'])
+    data2 = cmd_s.get_json_data_dict(JSONFlag.NET)
+    cmd_s2 = JSONSerializable.parse(data2, JSONFlag.NET)
+    assert cmd_s == cmd_s2
+
+
 def test_payment_command_serialization_store(basic_payment):
     cmd = PaymentCommand(basic_payment)
     data = cmd.get_json_data_dict(JSONFlag.STORE)
@@ -35,8 +48,6 @@ def test_payment_command_serialization_store(basic_payment):
 
 def test_payment_end_to_end_serialization(basic_payment):
     # Define a full request/reply with a Payment and test serialization
-    CommandRequestObject.register_command_type(PaymentCommand)
-
     cmd = PaymentCommand(basic_payment)
     request = CommandRequestObject(cmd)
     request.seq = 10

@@ -51,6 +51,3 @@ class SampleCommand(ProtocolCommand):
     @classmethod
     def json_type(self):
         return "SampleCommand"
-
-from protocol_messages import CommandRequestObject
-CommandRequestObject.register_command_type(SampleCommand)

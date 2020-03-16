@@ -219,8 +219,6 @@ class sample_vasp:
     def __init__(self, my_addr):
         self.my_addr = my_addr
         self.bc      = sample_business(self.my_addr)
-
-        CommandRequestObject.register_command_type(PaymentCommand)
         self.pp           = PaymentProcessor(self.bc)
         self.vasp         = OffChainVASP(self.my_addr, self.pp)
         

@@ -152,7 +152,6 @@ def test_value_command(db, basic_payment):
 def test_value_request(db, basic_payment):
     from payment_logic import PaymentCommand
     from protocol_messages import make_success_response, CommandRequestObject, make_command_error
-    CommandRequestObject.register_command_type(PaymentCommand)
     cmd = CommandRequestObject(PaymentCommand(basic_payment))
     cmd.seq = 10
  

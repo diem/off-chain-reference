@@ -47,6 +47,8 @@ class ProtocolCommand(JSONSerializable):
                 data_dict.update({
                     "origin" : self.origin.plain()
                 })
+
+        self.add_object_type(data_dict)
         return data_dict
 
     @classmethod
