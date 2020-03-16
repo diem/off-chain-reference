@@ -207,6 +207,11 @@ class JSONParsingError(Exception):
     pass
 
 class JSONSerializable:
+
+    # Define a type map for decoding
+    # It maps ObjectType attributes to a JSONSerializable subclass
+    json_type_map = {}
+
     def get_json_data_dict(self, flag, update_dict = None):
         ''' Get a data dictionary compatible with JSON serilization (json.dumps) '''
         raise NotImplementedError()
@@ -215,6 +220,33 @@ class JSONSerializable:
     def from_json_data_dict(cls, data, flag, self=None):
         ''' Construct the object from a serlialized JSON data dictionary (from json.loads). '''
         raise NotImplementedError()
+    
+    @classmethod
+    def json_type(cls):
+        ''' Overwrite this method to have a nicer json type identifier.'''
+        return str(cls)
+    
+    @classmethod
+    def register(cls, other_cls):
+        cls.json_type_map[other_cls.json_type()] = other_cls
+        return other_cls
+    
+    @classmethod
+    def add_object_type(cls, value_dict):
+        assert 'ObjectType' not in value_dict
+        value_dict['ObjectType'] = cls.json_type()
+        return value_dict
+    
+    @classmethod
+    def parse(cls, data, flag):
+        if 'ObjectType' not in data:
+            raise JSONParsingError('No object type information')
+
+        if data['ObjectType'] not in cls.json_type_map:
+            raise JSONParsingError('Unknown object type: %s' % data['ObjectType'])
+
+        new_cls = cls.json_type_map[data['ObjectType']]
+        return new_cls.from_json_data_dict(data, flag)
 
 # Utilities
 
