@@ -578,7 +578,7 @@ def test_VASProot():
     vasp = OffChainVASP(a0, proc)
 
     # Check our own address is good
-    assert vasp.my_vasp_addr() == a0
+    assert vasp.get_vasp_address() == a0
     # Calling twice gives the same instance (use 'is')
     assert vasp.get_channel(a1) is vasp.get_channel(a1)
     # Different VASPs have different objects
@@ -594,7 +594,7 @@ def test_VASProot_diff_object():
     vasp = OffChainVASP(a0, proc)
 
     # Check our own address is good
-    assert vasp.my_vasp_addr() == a0
+    assert vasp.get_vasp_address() == a0
     # Calling twice gives the same instance (use 'is')
     assert vasp.get_channel(b1) is vasp.get_channel(b2)
 

@@ -167,7 +167,7 @@ class PaymentProcessor(CommandProcessor):
                             payment.data['receiver'].data['address'] ]
 
             # Determine the other address
-            my_addr = vasp.my_vasp_addr().plain()
+            my_addr = vasp.get_vasp_address().plain()
             assert my_addr in parties
             parties.remove(my_addr)
             other_addr = LibraAddress(parties[0])
