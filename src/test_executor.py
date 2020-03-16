@@ -112,22 +112,24 @@ def test_handlers(basic_payment):
     channel = MagicMock(spec=VASPPairChannel)
     bcm = MagicMock(spec=BusinessContext)
     proc = MagicMock(spec=CommandProcessor)
-    pe = ProtocolExecutor(channel, proc)
-
-    class Stats:
-        def __init__(self):
+    
+    class Stats(CommandProcessor):
+        def __init__(self, bc):
             self.success_no = 0
             self.failure_no = 0
+            self.bc = bc
+        
+        def business_context(self):
+            return self.bc
 
-        def handle(self, command, success):
-            global success_no, failure_no
-            if success:
+        def process_command(self, vasp, channel, executor, command, status, error=None):
+            if status:
                 self.success_no += 1
             else:
                 self.failure_no += 1
 
-    stat = Stats()
-    pe.set_outcome_handler(stat.handle)
+    stat = Stats(bcm)
+    pe = ProtocolExecutor(channel, stat)
 
     cmd1 = PaymentCommand(basic_payment)
     cmd1.set_origin(channel.get_my_address())
