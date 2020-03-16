@@ -193,8 +193,8 @@ class RandomRun(object):
         assert client_seq == server_seq
         assert set(range(NUMBER)) ==  set(client_seq)
 
-        client_exec_seq = [c.item() for c in client.executor.seq]
-        server_exec_seq = [c.item() for c in server.executor.seq]
+        client_exec_seq = [c.item() for c in client.executor.command_sequence]
+        server_exec_seq = [c.item() for c in server.executor.command_sequence]
         assert set(client_seq) == set(client_exec_seq)
         assert set(server_seq) == set(server_exec_seq)
 

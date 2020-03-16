@@ -80,22 +80,27 @@ class ProtocolExecutor:
         self.channel   = channel
 
         # <STARTS to persist>
-        self.seq = []
+
+        # The common sequence of commands 
+        self.command_sequence = []
+
+        # The highest sequence command confirmed as success of failure.
         self.last_confirmed = 0
+
         # This is the primary store of shared objects.
         # It maps version numbers -> objects
         self.object_store = { } # TODO: persist this structure
+
         # <ENDS to persist>
     
-    def set_outcome(self, command, success):
+    def set_outcome(self, command, is_success):
         ''' Execute successful commands, and notify of failed commands'''
         vasp, channel, executor = self.get_context()
-        status   = success
-        self.processor.process_command(vasp, channel, executor, command, status, error=None)
+        self.processor.process_command(vasp, channel, executor, command, is_success)
 
     def next_seq(self):
         ''' Returns the next sequence number in the common sequence.'''
-        return len(self.seq)
+        return len(self.command_sequence)
 
     def count_potentially_live(self):
         return sum(1 for obj in self.object_store.values() if obj.get_potentially_live())
@@ -156,8 +161,8 @@ class ProtocolExecutor:
         finally:
             # Sequence if all is good, or if we were asked to
             if all_good or not do_not_sequence_errors:
-                pos = len(self.seq)
-                self.seq += [ command ]
+                pos = len(self.command_sequence)
+                self.command_sequence += [ command ]
 
         return pos
 
@@ -166,7 +171,7 @@ class ProtocolExecutor:
         assert seq_no == self.last_confirmed
         self.last_confirmed += 1
 
-        command = self.seq[seq_no]
+        command = self.command_sequence[seq_no]
         
         # Consumes old objects
         dependencies = command.get_dependencies()
@@ -184,7 +189,7 @@ class ProtocolExecutor:
         
         if command.commit_status is None:
             command.commit_status = True
-            self.set_outcome(command, success=True)
+            self.set_outcome(command, is_success=True)
         
 
     def set_fail(self, seq_no):
@@ -192,7 +197,7 @@ class ProtocolExecutor:
         assert seq_no == self.last_confirmed
         self.last_confirmed += 1
 
-        command = self.seq[seq_no]
+        command = self.command_sequence[seq_no]
 
         new_versions = command.new_object_versions()
         for version in new_versions:
@@ -204,4 +209,4 @@ class ProtocolExecutor:
         
         if command.commit_status is None:
             command.commit_status = False
-            self.set_outcome(command, success=False)
+            self.set_outcome(command, is_success=False)
