@@ -14,7 +14,7 @@ import pytest
 def basic_payment():
     sender = PaymentActor('AAAA', 'aaaa', Status.none, [])
     receiver = PaymentActor('BBBB', 'bbbb', Status.none, [])
-    action = PaymentAction(Decimal('10.00'), 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
+    action = PaymentAction(10, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
     payment = PaymentObject(sender, receiver, 'ref', 'orig_ref', 'desc', action)
     return payment
 
