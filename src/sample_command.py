@@ -1,5 +1,5 @@
 from executor import ProtocolCommand
-from utils import JSONFlag
+from utils import JSONFlag, JSONSerializable
 from shared_object import SharedObject
 
 class SampleObject(SharedObject):
@@ -7,6 +7,7 @@ class SampleObject(SharedObject):
         SharedObject.__init__(self)
         self.item = item
 
+@JSONSerializable.register
 class SampleCommand(ProtocolCommand):
     def __init__(self, command, deps=None):
         ProtocolCommand.__init__(self)

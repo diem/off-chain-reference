@@ -7,7 +7,9 @@ from status_logic import status_heights_MUST
 from libra_address import LibraAddress
 
 from storage import StorableFactory
+from utils import JSONSerializable
 
+@JSONSerializable.register
 class PaymentCommand(ProtocolCommand):
     def __init__(self, payment):
         ''' Creates a new Payment command based on the diff from the given payment'''

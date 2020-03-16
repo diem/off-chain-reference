@@ -50,11 +50,6 @@ class ProtocolCommand(JSONSerializable):
         return data_dict
 
     @classmethod
-    def json_type(cls):
-        ''' Overwrite this method to have a nicer json type identifier.'''
-        return str(cls)
-
-    @classmethod
     def from_json_data_dict(cls, data, flag):
         ''' Construct the object from a serlialized JSON data dictionary (from json.loads). '''
         self = cls.__new__(cls)
@@ -87,7 +82,6 @@ class ProtocolExecutor:
 
         # The common sequence of commands 
         self.command_sequence = []
-
 
         # The highest sequence command confirmed as success of failure.
         self.last_confirmed = 0
