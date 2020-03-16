@@ -13,42 +13,6 @@ from sample_command import *
 from unittest.mock import MagicMock
 import pytest
 
-
-class FakeAddress(LibraAddress):
-    def __init__(self, bit, addr):
-        self.bit = bit
-        self.addr = addr
-        self.encoded_address = str(addr)
-
-    def last_bit(self):
-        return self.bit
-
-    def greater_than_or_equal(self, other):
-        return self.addr >= other.addr
-
-    def equal(self, other):
-        return isinstance(other, FakeAddress) \
-            and self.addr == other.addr
-    
-    def plain(self):
-        return str(self.addr)
-    
-    def __repr__(self):
-        return f'FakeAddr({self.addr},{self.bit})'
-
-class FakeVASPInfo(VASPInfo):
-    def __init__(self, parent_addr, own_address = None):
-        self.parent = parent_addr
-        self.own_address = own_address
-
-    def get_parent_address(self):
-        return self.parent
-    
-    def get_libra_address(self):
-        """ The settlement Libra address for this channel"""
-        return self.own_address
-
-
 def monkey_tap(pair):
     pair.msg = []
 
@@ -200,9 +164,9 @@ class RandomRun(object):
 
 @pytest.fixture
 def three_address():
-    a0 = FakeAddress(0, 10)
-    a1 = FakeAddress(0, 20)
-    a2 = FakeAddress(1, 30)
+    a0 = LibraAddress.encode_to_Libra_address(b'A'*16) 
+    a1 = LibraAddress.encode_to_Libra_address(b'B' + b'A'*15)
+    a2 = LibraAddress.encode_to_Libra_address(b'B'*16)
     return (a0, a1, a2)
 
 @pytest.fixture
@@ -218,8 +182,8 @@ def mockProcessor():
 def test_client_server_role_definition(three_address, mockVASP, mockProcessor):
     a0, a1, a2 = three_address
 
-    # Lower address is server (xor bit = 0)
-    channel = VASPPairChannel(a0, a1, mockVASP, mockProcessor)
+    vasp = OffChainVASP(a0, mockProcessor)
+    channel = VASPPairChannel(a0, a1, vasp, mockProcessor)
     assert channel.is_server()
     assert not channel.is_client()
 
@@ -241,8 +205,11 @@ def test_client_server_role_definition(three_address, mockVASP, mockProcessor):
 def server_client(three_address, mockVASP, mockProcessor):
     a0, a1, a2 = three_address
 
-    server = VASPPairChannel(a0, a1, mockVASP, mockProcessor)
-    client = VASPPairChannel(a1, a0, mockVASP, mockProcessor)
+
+    vasp_server = OffChainVASP(a0, mockProcessor)
+    server = VASPPairChannel(a0, a1, vasp_server, mockProcessor)
+    vasp_client = OffChainVASP(a1, mockProcessor)
+    client = VASPPairChannel(a1, a0, vasp_client, mockProcessor)
 
     server = monkey_tap(server)
     client = monkey_tap(client)
@@ -260,16 +227,16 @@ def test_protocol_server_client_benign(server_client):
     assert len(msg_list) == 1
     request = msg_list.pop()
     assert isinstance(request, CommandRequestObject)
-    assert server.my_next_seq == 1
+    assert server.my_next_seq() == 1
 
     # Pass the request to the client
-    assert client.other_next_seq == 0
+    assert client.other_next_seq() == 0
     client.handle_request(request)
     msg_list = client.tap()
     assert len(msg_list) == 1
     reply = msg_list.pop()
     assert isinstance(reply, CommandResponseObject)
-    assert client.other_next_seq == 1
+    assert client.other_next_seq() == 1
     assert reply.status == 'success'
 
     # Pass the reply back to the server
@@ -302,7 +269,7 @@ def test_protocol_server_conflicting_sequence(server_client):
     reply_conflict = client.tap()[0]
 
     # We only sequence one command.
-    assert client.other_next_seq == 1
+    assert client.other_next_seq() == 1
     assert reply.status == 'success'
 
     # The response to the second command is a failure
@@ -328,17 +295,17 @@ def test_protocol_client_server_benign(server_client):
     assert len(msg_list) == 1
     request = msg_list.pop()
     assert isinstance(request, CommandRequestObject)
-    assert client.other_next_seq == 0
-    assert client.my_next_seq == 1
+    assert client.other_next_seq() == 0
+    assert client.my_next_seq() == 1
 
     # Send to server
-    assert server.other_next_seq == 0
+    assert server.other_next_seq() == 0
     server.handle_request(request)
     msg_list = server.tap()
     assert len(msg_list) == 1
     reply = msg_list.pop()
     assert isinstance(reply, CommandResponseObject)
-    assert server.other_next_seq == 1
+    assert server.other_next_seq() == 1
     assert server.next_final_sequence() == 1
     assert server.get_final_sequence()[0].commit_status is not None
     assert reply.status == 'success'
@@ -353,8 +320,8 @@ def test_protocol_client_server_benign(server_client):
     assert client.my_requests[0].response is not None
     assert client.get_final_sequence()[0].item() == 'Hello'
     assert client.next_final_sequence() == 1
-    assert client.my_next_seq == 1
-    assert server.my_next_seq == 0
+    assert client.my_next_seq() == 1
+    assert server.my_next_seq() == 0
 
 
 def test_protocol_server_client_interleaved_benign(server_client):

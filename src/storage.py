@@ -4,23 +4,23 @@ import dbm
 import json
 from pathlib import PosixPath
 
-from utils import JSONFlag
+from utils import JSONFlag, JSONSerializable
 
 class Storable:
     def __init__(self, xtype):
         self.xtype = xtype
 
     def pre_proc(self, val):
-        try:
+        if issubclass(self.xtype, JSONSerializable):
             return val.get_json_data_dict(JSONFlag.STORE)
-        except:
+        else:
             # assert not self.xtype.issubclass(JSONSerializable)
             return self.xtype(val)
     
     def post_proc(self, val):
-        try:
+        if issubclass(self.xtype, JSONSerializable):
             return self.xtype.from_json_data_dict(val, JSONFlag.STORE)
-        except:
+        else:
             # assert not self.xtype.issubclass(JSONSerializable)
             return self.xtype(val)
 

@@ -1,5 +1,6 @@
 from utils import JSONSerializable, JSONFlag
 from command_processor import CommandProcessor
+from libra_address import LibraAddress
 
 # Interface we need to do commands:
 class ProtocolCommand(JSONSerializable):
@@ -41,8 +42,11 @@ class ProtocolCommand(JSONSerializable):
         if flag == JSONFlag.STORE:
             data_dict.update({
                 "commit_status" : self.commit_status,
-                "origin" : self.origin
             })
+            if self.origin is not None:
+                data_dict.update({
+                    "origin" : self.origin.plain()
+                })
         return data_dict
 
     @classmethod
@@ -59,7 +63,8 @@ class ProtocolCommand(JSONSerializable):
         self.creates = list(data['creates'])
         if flag == JSONFlag.STORE:
             self.commit_status = data["commit_status"]
-            self.origin = data["origin"]
+            if "origin" in data:
+                self.origin = LibraAddress(data["origin"])
         return self
 
 
@@ -82,6 +87,7 @@ class ProtocolExecutor:
 
         # The common sequence of commands 
         self.command_sequence = []
+
 
         # The highest sequence command confirmed as success of failure.
         self.last_confirmed = 0

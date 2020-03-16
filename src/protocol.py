@@ -3,6 +3,7 @@ from protocol_messages import CommandRequestObject, CommandResponseObject, \
     make_success_response, make_protocol_error, make_parsing_error, make_command_error
 from utils import JSONParsingError, JSONFlag
 from libra_address import LibraAddress
+from storage import StorableFactory
 
 import json
 from collections import namedtuple
@@ -12,7 +13,7 @@ NetMessage = namedtuple('NetMessage', ['src', 'dst', 'type', 'content'])
 class OffChainVASP:
     """Manages the off-chain protocol on behalf of one VASP. """
     
-    def __init__(self, vasp_addr, processor):
+    def __init__(self, vasp_addr, processor, db=None):
         if __debug__:
             assert isinstance(processor, CommandProcessor)
             assert isinstance(vasp_addr, LibraAddress)
@@ -30,6 +31,11 @@ class OffChainVASP:
 
         # TODO: this should be a persistent store
         self.channel_store = {}
+
+        # Manage storage
+        if db is None:
+            db = {}
+        self.storage_factory = StorableFactory(db)
     
     def get_vasp_address(self):
         ''' Return our own VASP Libra Address. '''
@@ -51,6 +57,10 @@ class OffChainVASP:
         ''' The processor calls this method to notify the VASP that new
             commands are available for processing. '''
         self.processor.process_command_backlog(self)
+    
+    def get_storage_factory(self):
+        ''' Returns a storage factory for this system. '''
+        return self.storage_factory
 
 
 class VASPPairChannel:
@@ -81,10 +91,12 @@ class VASPPairChannel:
 
         # TODO[issue #7]: persist and recover the command sequences
         # <STARTS to persist>
-        self.my_requests = []
-        self.my_next_seq = 0
-        self.other_requests = []
-        self.other_next_seq = 0
+        storage_factory = self.vasp.get_storage_factory()
+        root = storage_factory.make_value(self.myself.plain(), None)
+        other_vasp = storage_factory.make_value(self.other.plain(), None, root=root)
+
+        self.my_requests = storage_factory.make_list('my_requests', CommandRequestObject, root=other_vasp)
+        self.other_requests = storage_factory.make_list('other_requests', CommandRequestObject, root=other_vasp)
 
         # The final sequence
         self.executor = ProtocolExecutor(self, self.processor)
@@ -97,6 +109,12 @@ class VASPPairChannel:
         self.pending_requests = []
         # Network handler
         self.net_queue = []
+
+    def my_next_seq(self):
+        return len(self.my_requests)
+    
+    def other_next_seq(self):
+        return len(self.other_requests)
 
     def get_my_address(self):
         return self.myself
@@ -187,7 +205,7 @@ class VASPPairChannel:
 
         off_chain_command.set_origin(self.get_my_address())
         request = CommandRequestObject(off_chain_command)
-        request.seq = self.my_next_seq
+        request.seq = self.my_next_seq()
 
         if self.is_server():
             request.command_seq = self.next_final_sequence()
@@ -195,7 +213,7 @@ class VASPPairChannel:
             self.executor.sequence_next_command(off_chain_command,
                 do_not_sequence_errors = True)
 
-        self.my_next_seq += 1
+        # self.my_next_seq += 1
         self.my_requests += [ request ]
         self.send_request(request)
         self.persist()
@@ -226,7 +244,7 @@ class VASPPairChannel:
         request.command.set_origin(self.other)
 
         # Always answer old requests
-        if request.seq < self.other_next_seq:
+        if request.seq < self.other_next_seq():
             previous_request = self.other_requests[request.seq]
             if previous_request.is_same_command(request):
                 # Re-send the response
@@ -253,7 +271,7 @@ class VASPPairChannel:
             return None
             
         # Sequence newer requests
-        if request.seq == self.other_next_seq:
+        if request.seq == self.other_next_seq():
 
             if self.is_client() and request.command_seq > self.next_final_sequence():
                 # We must wait, since we cannot give an answer before sequencing
@@ -261,8 +279,7 @@ class VASPPairChannel:
                 response = make_protocol_error(request, code='wait')
                 return self.send_response(response)
                 
-            self.other_next_seq += 1
-            self.other_requests += [request]
+            
 
             seq = self.next_final_sequence()
             try:
@@ -274,12 +291,16 @@ class VASPPairChannel:
             
             request.response = response
             request.response.command_seq = seq
+
+            # self.other_next_seq += 1
+            self.other_requests += [request]
+
             self.apply_response_to_executor(request)
 
             self.persist()
             return self.send_response(request.response)
 
-        elif request.seq > self.other_next_seq:
+        elif request.seq > self.other_next_seq():
             # We have received the other side's request without receiving the
             # previous one
             response = make_protocol_error(request, code='missing')
@@ -329,6 +350,9 @@ class VASPPairChannel:
                 # Next command to commit -- do commit it.
                 request.response = response
 
+                # Write back the request to storage
+                self.my_requests[request_seq] = request
+
                 try:
                     self.executor.sequence_next_command(request.command, \
                         do_not_sequence_errors = False)
@@ -346,6 +370,10 @@ class VASPPairChannel:
                 # Request already in the sequence: happens to the leader.
                 #  No chance to register an error, since we do not reply.
                 request.response = response
+
+                # Write back the request to storage
+                self.my_requests[request_seq] = request
+
                 self.apply_response_to_executor(request)
                 self.process_pending_requests_response()
 
