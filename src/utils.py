@@ -76,7 +76,7 @@ class StructureChecker:
                 return True
 
         for field in self.data:
-            xtype, parse_more = parse[field]
+            _, parse_more = parse[field]
             if parse_more:
                 if self.data[field].has_changed():
                     return True

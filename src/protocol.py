@@ -286,8 +286,6 @@ class VASPPairChannel:
             # NOTE: the protocol is still correct without persisiting the cache
             self.persist()
             return self.send_response(response)
-
-            
         else:
             # OK: Previous cases are exhaustive
             assert False
