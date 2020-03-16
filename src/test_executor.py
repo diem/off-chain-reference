@@ -38,9 +38,9 @@ def test_exec(basic_payment):
     cmd3 = PaymentCommand(pay3)
     cmd3.set_origin(channel.get_my_address())
 
-    assert cmd1.depend_on == []
-    assert cmd2.depend_on == cmd1.creates
-    assert cmd3.depend_on == cmd2.creates
+    assert cmd1.dependencies == []
+    assert cmd2.dependencies == cmd1.creates
+    assert cmd3.dependencies == cmd2.creates
 
     pe.sequence_next_command(cmd1)
     pe.sequence_next_command(cmd2)
@@ -143,9 +143,9 @@ def test_handlers(basic_payment):
     cmd3 = PaymentCommand(pay3)
     cmd3.set_origin(channel.get_my_address())
 
-    assert cmd1.depend_on == []
-    assert cmd2.depend_on == list(cmd1.creates)
-    assert cmd3.depend_on == list(cmd1.creates)
+    assert cmd1.dependencies == []
+    assert cmd2.dependencies == list(cmd1.creates)
+    assert cmd3.dependencies == list(cmd1.creates)
 
     pe.sequence_next_command(cmd1)
     pe.sequence_next_command(cmd2)
