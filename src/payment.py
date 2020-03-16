@@ -58,15 +58,9 @@ class PaymentActor(StructureChecker):
     def custom_update_checks(self, diff):
         # If any of kyc data, signature or certificate is provided, we expect
         # all the other fields as well
-        if 'kyc_data' in diff and 'kyc_signature' not in diff \
-                or 'kyc_certificate' in diff and 'kyc_signature' not in diff:
-            raise StructureException('Missing: field kyc_signature')
-        if 'kyc_data' in diff and 'kyc_certificate' not in diff \
-                or 'kyc_signature' in diff and 'kyc_certificate' not in diff:
-            raise StructureException('Missing: field kyc_certificate')
-        if 'kyc_signature' in diff and 'kyc_data' not in diff \
-                or 'kyc_certificate' in diff and 'kyc_data' not in diff:
-            raise StructureException('Missing: field kyc_data')
+        missing = set(["kyc_data", "kyc_signature", "kyc_certificate"]) - set(diff.keys())
+        if len(missing) !=0 and len(missing)!=3:
+            raise StructureException('Missing: field %s' % (str(missing),))
 
         if 'status' in diff and not isinstance(diff['status'], Status):
             raise StructureException('Wrong status: %s' % diff['status'])
