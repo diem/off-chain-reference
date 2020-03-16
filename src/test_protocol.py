@@ -577,3 +577,16 @@ def test_real_address():
     assert not B.equal(Ap)
     assert A.last_bit() ^ B.last_bit() == 1
     assert A.last_bit() ^ A.last_bit() == 0
+
+
+def test_sample_command():
+    store = {}
+    cmd1 = SampleCommand('hello')
+    store['hello'] = cmd1.get_object('hello', store)
+    cmd2 = SampleCommand('World', deps=[ 'hello' ])
+    obj = cmd2.get_object('World', store)
+
+    data = obj.get_json_data_dict(JSONFlag.STORE)
+    obj2 = JSONSerializable.parse(data, JSONFlag.STORE)
+    assert obj2.version == obj.version
+    assert obj2.extends == obj.extends
