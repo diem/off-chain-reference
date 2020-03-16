@@ -62,10 +62,12 @@ class SharedObject(JSONSerializable):
         return update_dict
 
     @classmethod
-    def from_json_data_dict(cls, data, flag, self):
+    def from_json_data_dict(cls, data, flag, self=None):
         ''' Construct the object from a serlialized JSON data dictionary (from json.loads). '''
-        assert self is not None
+        if self is None:
+            self = cls.__new__(cls)
         self.version = data['version']
         self.extends = data['extends']
         self.potentially_live = bool(data['potentially_live'])
         self.actually_live = bool(data['actually_live'])
+        return self

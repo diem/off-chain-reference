@@ -2,6 +2,7 @@ from executor import ProtocolCommand
 from utils import JSONFlag, JSONSerializable
 from shared_object import SharedObject
 
+@JSONSerializable.register
 class SampleObject(SharedObject):
     def __init__(self, item):
         SharedObject.__init__(self)
