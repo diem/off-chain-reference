@@ -17,26 +17,32 @@ class OffChainVASP:
             assert isinstance(processor, CommandProcessor)
             assert isinstance(vasp_addr, LibraAddress)
 
+        # The LibraAddress of the VASP
         self.vasp_addr = vasp_addr
+        # The business context provided by the processor
         self.business_context = processor.business_context()
+
+        # The command processor that checks and processes commands
+        # We attach the notify member to this class to trigger
+        # processing of resumed commands.
         self.processor = processor
         self.processor.notify = self.notify_new_commands
 
         # TODO: this should be a persistent store
         self.channel_store = {}
     
-    def my_vasp_addr(self):
+    def get_vasp_address(self):
         ''' Return our own VASP Libra Address. '''
         return self.vasp_addr
 
     def get_channel(self, other_vasp_addr):
         ''' Returns a VASPPairChannel with the other VASP '''
         self.business_context.open_channel_to(other_vasp_addr)
-        my_address = self.my_vasp_addr()
-        other_address = other_vasp_addr
-        store_key = (my_address, other_address)
+        my_address = self.get_vasp_address()
+        store_key = (my_address, other_vasp_addr)
+
         if store_key not in self.channel_store:
-            channel = VASPPairChannel(self.my_vasp_addr(), other_vasp_addr, self, self.processor)
+            channel = VASPPairChannel(my_address, other_vasp_addr, self, self.processor)
             self.channel_store[store_key] = channel
     
         return self.channel_store[store_key]
@@ -110,7 +116,7 @@ class VASPPairChannel:
 
     def get_final_sequence(self):
         """ Returns a list of commands in the common sequence. """
-        return self.executor.seq
+        return self.executor.command_sequence
 
     def persist(self):
         """ A hook to block until state of channel is persisted """
@@ -259,16 +265,13 @@ class VASPPairChannel:
             self.other_requests += [request]
 
             seq = self.next_final_sequence()
-            old_len = len(self.executor.seq)
             try:
                 self.executor.sequence_next_command(request.command, 
                                                     do_not_sequence_errors = False)
                 response = make_success_response(request)
             except ExecutorException as e:
                 response = make_command_error(request, str(e))
-            new_len = len(self.executor.seq)
-            assert new_len == old_len + 1
-
+            
             request.response = response
             request.response.command_seq = seq
             self.apply_response_to_executor(request)

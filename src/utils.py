@@ -1,8 +1,9 @@
-from status_logic import TypeEnumeration
-
+from enum import Enum
 from os import urandom
 from base64 import standard_b64encode
 from copy import deepcopy
+
+
 
 REQUIRED = True
 OPTIONAL = False
@@ -62,6 +63,8 @@ class StructureChecker:
             else:
                 if xtype in {str, int, list, dict}:
                     diff[field] = self.data[field]
+                elif issubclass(xtype, Enum):
+                    diff[field] = self.data[field].name
                 else:
                     diff[field] = str(self.data[field])
         return diff
@@ -120,7 +123,13 @@ class StructureChecker:
                         new_diff[field] = xtype.from_full_record(diff[field])
                 else:
                     # Use default constructor of the type
-                    new_diff[field] = xtype(diff[field])
+                    if xtype in {int, str, list}:
+                        new_diff[field] = xtype(diff[field])
+                    elif issubclass(xtype, Enum):
+                        new_diff[field] = xtype[diff[field]]
+                    else:
+                        new_diff[field] = xtype(diff[field])
+
             else:
                 # We tolerate fielse we do not know about, but ignore them
                 # TODO: log unknown fields?
@@ -149,7 +158,7 @@ class StructureChecker:
                     actual_type = type(value)
                     raise StructureException(
                         'Wrong type: field %s, expected %s but got %s' %
-                        (field, field_type, type(actual_type)))
+                        (field, field_type, actual_type))
 
                 # Check you can write again
                 if field in self.data and write_mode == WRITE_ONCE:
@@ -190,10 +199,9 @@ class StructureChecker:
                     raise StructureException('Missing field: %s' % field)
 
 # define serializaqtion flags
-JSONFlag = TypeEnumeration([
-    'NET',
-    'STORE'
-])
+class JSONFlag(Enum):
+    NET = 'NET'
+    STORE = 'STORE'
 
 class JSONParsingError(Exception):
     pass

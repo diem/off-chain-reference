@@ -110,9 +110,9 @@ from payment import *
 
 @pytest.fixture
 def basic_payment():
-    sender = PaymentActor('AAAA', 'aaaa', 'none', [])
-    receiver = PaymentActor('BBBB', 'bbbb', 'none', [])
-    action = PaymentAction(Decimal('10.00'), 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
+    sender = PaymentActor('AAAA', 'aaaa', Status.none, [])
+    receiver = PaymentActor('BBBB', 'bbbb', Status.none, [])
+    action = PaymentAction(10, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
 
     payment = PaymentObject(sender, receiver, 'ref', 'orig_ref', 'desc', action)
     return payment
