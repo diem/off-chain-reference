@@ -14,7 +14,6 @@ class Storable:
         if issubclass(self.xtype, JSONSerializable):
             return val.get_json_data_dict(JSONFlag.STORE)
         else:
-            # assert not self.xtype.issubclass(JSONSerializable)
             return self.xtype(val)
     
     def post_proc(self, val):
