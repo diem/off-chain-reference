@@ -5,7 +5,6 @@ from payment_logic import PaymentCommand, PaymentProcessor
 from status_logic import Status
 
 import json
-import decimal
 
 business_config = """[
     {
@@ -29,7 +28,7 @@ business_config = """[
 class sample_business(BusinessContext):
     def __init__(self, my_addr):
         self.my_addr = my_addr
-        self.accounts_db = json.loads(business_config, parse_float=decimal.Decimal)
+        self.accounts_db = json.loads(business_config)
     
     # Helper functions for the business
 

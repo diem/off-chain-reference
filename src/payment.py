@@ -1,5 +1,3 @@
-from decimal import Decimal
-
 from utils import StructureException, StructureChecker, \
     REQUIRED, OPTIONAL, WRITE_ONCE, UPDATABLE
 from shared_object import SharedObject
@@ -102,7 +100,7 @@ class PaymentActor(StructureChecker):
 
 class PaymentAction(StructureChecker):
     fields = [
-        ('amount', Decimal, REQUIRED, WRITE_ONCE),
+        ('amount', int, REQUIRED, WRITE_ONCE),
         ('currency', str, REQUIRED, WRITE_ONCE),
         ('action', str, REQUIRED, WRITE_ONCE),
         ('timestamp', str, REQUIRED, WRITE_ONCE)
