@@ -50,15 +50,15 @@ with pytest.raises(StructureException):
 
 
 def test_payment_actor_creation():
-    actor = PaymentActor('ABCD', 'XYZ', 'none', [])
+    actor = PaymentActor('ABCD', 'XYZ', Status.none, [])
 
     with pytest.raises(StructureException):
         # Bad address type
-        _ = PaymentActor(0, 'XYZ', 'none', [])
+        _ = PaymentActor(0, 'XYZ', Status.none, [])
 
     with pytest.raises(StructureException):
         # Bad subaddress type
-        _ = PaymentActor('ABCD', 0, 'none', [])
+        _ = PaymentActor('ABCD', 0, Status.none, [])
 
     with pytest.raises(StructureException):
         # Bad status type
@@ -66,11 +66,11 @@ def test_payment_actor_creation():
 
     with pytest.raises(StructureException):
         # Bad metadata type
-        _ = PaymentActor('ABCD', 'XYZ', 'none', 0)
+        _ = PaymentActor('ABCD', 'XYZ', Status.none, 0)
 
 
 def test_payment_actor_update_stable_id():
-    actor = PaymentActor('ABCD', 'XYZ', 'none', [])
+    actor = PaymentActor('ABCD', 'XYZ', Status.none, [])
     actor.add_stable_id('AAAA')
     assert actor.data['stable_id'] == 'AAAA'
 
@@ -80,14 +80,14 @@ def test_payment_actor_update_stable_id():
 
     with pytest.raises(StructureException):
         # Wrong type of stable ID
-        actor = PaymentActor('ABCD', 'XYZ', 'none', [])
+        actor = PaymentActor('ABCD', 'XYZ', Status.none, [])
         actor.add_stable_id(0)
 
 
 def test_payment_actor_update_status():
-    actor = PaymentActor('ABCD', 'XYZ', 'none', [])
-    actor.change_status('needs_kyc_data')
-    actor.change_status('ready_for_settlement')
+    actor = PaymentActor('ABCD', 'XYZ', Status.none, [])
+    actor.change_status(Status.needs_kyc_data)
+    actor.change_status(Status.ready_for_settlement)
 
     with pytest.raises(StructureException):
         actor.change_status(0)
@@ -100,7 +100,7 @@ def test_payment_actor_update_kyc():
         "other_field" : "other data"
     }""")
 
-    actor = PaymentActor('ABCD', 'XYZ', 'none', [])
+    actor = PaymentActor('ABCD', 'XYZ', Status.none, [])
     actor.add_kyc_data(kyc, 'sigXXXX', 'certXXX')
 
     with pytest.raises(StructureException):
@@ -109,31 +109,31 @@ def test_payment_actor_update_kyc():
 
     with pytest.raises(StructureException):
         # Wrong type for kyc data
-        actor = PaymentActor('ABCD', 'XYZ', 'none', [])
+        actor = PaymentActor('ABCD', 'XYZ', Status.none, [])
         actor.add_kyc_data(0, 'sigXXXX', 'certXXX')
 
     with pytest.raises(StructureException):
         # Wrong type for sig data
-        actor = PaymentActor('ABCD', 'XYZ', 'none', [])
+        actor = PaymentActor('ABCD', 'XYZ', Status.none, [])
         actor.add_kyc_data(kyc, 0, 'certXXX')
 
     with pytest.raises(StructureException):
         # Wrong type for cert data
-        actor = PaymentActor('ABCD', 'XYZ', 'none', [])
+        actor = PaymentActor('ABCD', 'XYZ', Status.none, [])
         actor.add_kyc_data(kyc, 'sigXXXX', 0)
 
 
 def test_payment_object_creation():
-    sender = PaymentActor('AAAA', 'aaaa', 'none', [])
-    receiver = PaymentActor('BBBB', 'bbbb', 'none', [])
+    sender = PaymentActor('AAAA', 'aaaa', Status.none, [])
+    receiver = PaymentActor('BBBB', 'bbbb', Status.none, [])
     action = PaymentAction(Decimal('10.00'), 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
 
     payment = PaymentObject(sender, receiver, 'ref', 'orig_ref', 'desc', action)
 
 
 def test_payment_object_update():
-    sender = PaymentActor('AAAA', 'aaaa', 'none', [])
-    receiver = PaymentActor('BBBB', 'bbbb', 'none', [])
+    sender = PaymentActor('AAAA', 'aaaa', Status.none, [])
+    receiver = PaymentActor('BBBB', 'bbbb', Status.none, [])
     action = PaymentAction(Decimal('10.00'), 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
 
     payment = PaymentObject(sender, receiver, 'ref', 'orig_ref', 'desc', action)
@@ -144,8 +144,8 @@ def test_payment_object_update():
 
 
 def test_payment_to_diff():
-    sender = PaymentActor('AAAA', 'aaaa', 'none', [])
-    receiver = PaymentActor('BBBB', 'bbbb', 'none', [])
+    sender = PaymentActor('AAAA', 'aaaa', Status.none, [])
+    receiver = PaymentActor('BBBB', 'bbbb', Status.none, [])
     action = PaymentAction(Decimal('10.00'), 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
 
     payment = PaymentObject(sender, receiver, 'ref', 'orig_ref', 'desc', action)
@@ -164,7 +164,7 @@ def test_to_json():
         "other_field" : "other data SENDER"
     }""")
 
-    sender = PaymentActor('AAAA', 'aaaa', 'none', [])
+    sender = PaymentActor('AAAA', 'aaaa', Status.none, [])
     sender.add_kyc_data(kyc_sender, "sigSENDER", 'certSENDER')
 
     kyc_receiver = KYCData("""{
@@ -173,7 +173,7 @@ def test_to_json():
         "other_field" : "other data RECEIVER"
     }""")
 
-    receiver = PaymentActor('BBBB', 'bbbb', 'none', [])
+    receiver = PaymentActor('BBBB', 'bbbb', Status.none, [])
     receiver.add_kyc_data(kyc_receiver, "sigSENDER", 'certSENDER')
 
     action = PaymentAction(Decimal('10.00'), 'TIK', 'charge', '2020-01-02 18:00:00 UTC')

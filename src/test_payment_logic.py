@@ -145,7 +145,7 @@ def test_payment_update_from_sender(basic_payment):
 def test_payment_update_from_sender_modify_receiver_fail(basic_payment):
     bcm = MagicMock(spec=BusinessContext)
     bcm.is_recipient.side_effect = [True]
-    diff = {'receiver': {'status': Status.settled}}
+    diff = {'receiver': {'status': "settled"}}
     new_obj = basic_payment.new_version()
     new_obj = PaymentObject.from_full_record(diff, base_instance=new_obj)
     pp = PaymentProcessor(bcm)
@@ -158,7 +158,7 @@ def test_payment_update_from_receiver_invalid_state_fail(basic_payment):
     bcm = MagicMock(spec=BusinessContext)
     bcm.is_recipient.side_effect = [False]
     pp = PaymentProcessor(bcm)
-    diff = {'receiver': {'status': Status.needs_recipient_signature}}
+    diff = {'receiver': {'status': "needs_recipient_signature"}}
     new_obj = basic_payment.new_version()
     new_obj = PaymentObject.from_full_record(diff, base_instance=new_obj)
     with pytest.raises(PaymentLogicError):
@@ -170,7 +170,7 @@ def test_payment_update_from_receiver_invalid_transition_fail(basic_payment):
     bcm.is_recipient.side_effect = [False]
     pp = PaymentProcessor(bcm)
     basic_payment.data['receiver'].update({'status': Status.ready_for_settlement})
-    diff = {'receiver': {'status': Status.needs_kyc_data}}
+    diff = {'receiver': {'status': "needs_kyc_data"}}
     new_obj = basic_payment.new_version()
     new_obj = PaymentObject.from_full_record(diff, base_instance=new_obj)
     with pytest.raises(PaymentLogicError):
@@ -182,7 +182,7 @@ def test_payment_update_from_receiver_unilateral_abort_fail(basic_payment):
     bcm.is_recipient.side_effect = [False]
     pp = PaymentProcessor(bcm)
     basic_payment.data['receiver'].update({'status': Status.ready_for_settlement})
-    diff = {'receiver': {'status': Status.abort}}
+    diff = {'receiver': {'status': "abort"}}
     new_obj = basic_payment.new_version()
     new_obj = PaymentObject.from_full_record(diff, base_instance=new_obj)
     with pytest.raises(PaymentLogicError):
@@ -324,7 +324,7 @@ def test_payment_process_abort_from_sender(basic_payment):
 def test_payment_process_get_stable_id(basic_payment):
     bcm = MagicMock(spec=BusinessContext)
     bcm.is_recipient.side_effect = [True]
-    bcm.next_kyc_to_provide.side_effect = [Status.needs_stable_id]
+    bcm.next_kyc_to_provide.side_effect = [ set([ Status.needs_stable_id ]) ]
     bcm.get_stable_id.side_effect = ['stable_id']
     pp = PaymentProcessor(bcm)
     new_payment = pp.payment_process(basic_payment)
@@ -334,7 +334,7 @@ def test_payment_process_get_stable_id(basic_payment):
 def test_payment_process_get_extended_kyc(basic_payment):
     bcm = MagicMock(spec=BusinessContext)
     bcm.is_recipient.side_effect = [True]
-    bcm.next_kyc_to_provide.side_effect = [Status.needs_kyc_data]
+    bcm.next_kyc_to_provide.side_effect = [ set([Status.needs_kyc_data]) ]
     kyc_data = KYCData('{"payment_reference_id": "123", "type": "A"}')
     bcm.get_extended_kyc.side_effect = [
         (kyc_data, 'sig', 'cert')
