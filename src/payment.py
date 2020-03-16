@@ -42,7 +42,7 @@ class PaymentActor(StructureChecker):
         ('kyc_data', KYCData, OPTIONAL, WRITE_ONCE),
         ('kyc_signature', str, OPTIONAL, WRITE_ONCE),
         ('kyc_certificate', str, OPTIONAL, WRITE_ONCE),
-        ('status', str, REQUIRED, UPDATABLE),
+        ('status', Status, REQUIRED, UPDATABLE),
         ('metadata', list, REQUIRED, UPDATABLE)
     ]
 
@@ -68,7 +68,7 @@ class PaymentActor(StructureChecker):
                 or 'kyc_certificate' in diff and 'kyc_data' not in diff:
             raise StructureException('Missing: field kyc_data')
 
-        if 'status' in diff and not diff['status'] in Status:
+        if 'status' in diff and not isinstance(diff['status'], Status):
             raise StructureException('Wrong status: %s' % diff['status'])
 
         # Metadata can only be strings
