@@ -110,7 +110,7 @@ class VASPPairChannel:
 
     def get_final_sequence(self):
         """ Returns a list of commands in the common sequence. """
-        return self.executor.seq
+        return self.executor.command_sequence
 
     def persist(self):
         """ A hook to block until state of channel is persisted """
@@ -259,16 +259,13 @@ class VASPPairChannel:
             self.other_requests += [request]
 
             seq = self.next_final_sequence()
-            old_len = len(self.executor.seq)
             try:
                 self.executor.sequence_next_command(request.command, 
                                                     do_not_sequence_errors = False)
                 response = make_success_response(request)
             except ExecutorException as e:
                 response = make_command_error(request, str(e))
-            new_len = len(self.executor.seq)
-            assert new_len == old_len + 1
-
+            
             request.response = response
             request.response.command_seq = seq
             self.apply_response_to_executor(request)
