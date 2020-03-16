@@ -56,7 +56,7 @@ class PaymentActor(StructureChecker):
         })
 
     def custom_update_checks(self, diff):
-        # If any of kyc data, signarure or certificate is provided, we expect
+        # If any of kyc data, signature or certificate is provided, we expect
         # all the other fields as well
         if 'kyc_data' in diff and 'kyc_signature' not in diff \
                 or 'kyc_certificate' in diff and 'kyc_signature' not in diff:
