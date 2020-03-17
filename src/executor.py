@@ -82,23 +82,35 @@ class ProtocolExecutor:
         self.channel   = channel
 
         # <STARTS to persist>
+
+        # Configure storage hierarchy
         vasp = channel.get_vasp()
         storage_factory = vasp.get_storage_factory()
         root = storage_factory.make_value(channel.myself.plain(), None)
         other_vasp = storage_factory.make_value(channel.other.plain(), None, root=root)
 
-
         # The common sequence of commands 
         self.command_sequence = storage_factory.make_list('command_sequence', ProtocolCommand, root=other_vasp)
 
         # The highest sequence command confirmed as success of failure.
-        self.last_confirmed = 0
+        self._last_confirmed = storage_factory.make_value('last_confirmed', int, root=other_vasp)
+        if not self._last_confirmed.exists():
+            self.last_confirmed = 0
 
         # This is the primary store of shared objects.
         # It maps version numbers -> objects
         self.object_store = storage_factory.make_dict('object_store', SharedObject, root=other_vasp) # TODO: persist this structure
 
         # <ENDS to persist>
+    
+    @property
+    def last_confirmed(self):
+        return self._last_confirmed.get_value()
+    
+    @last_confirmed.setter
+    def last_confirmed(self, value):
+        self._last_confirmed.set_value(value)
+
     
     def set_outcome(self, command, is_success):
         ''' Execute successful commands, and notify of failed commands'''

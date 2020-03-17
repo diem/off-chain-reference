@@ -52,8 +52,9 @@ class StorableDict(Storable):
         self.db = db
         self.xtype = xtype
 
-        self.first_key = StorableValue(db, '__FIRST_KEY', str, root=self)
-        self.length = StorableValue(db, '__LEN', int, root=self)
+        meta = StorableValue(db, '__META', str, root=self)
+        self.first_key = StorableValue(db, '__FIRST_KEY', str, root=meta)
+        self.length = StorableValue(db, '__LEN', int, root=meta)
         if not self.length.exists():
             self.length.set_value(0)
         
