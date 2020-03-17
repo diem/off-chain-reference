@@ -18,9 +18,13 @@ def basic_payment():
 
 
 def test_exec(basic_payment):
-    channel = MagicMock(spec=VASPPairChannel)
-    bcm = MagicMock(spec=BusinessContext)
+    a0 = LibraAddress.encode_to_Libra_address(b'A'*16)
+    a1 = LibraAddress.encode_to_Libra_address(b'B'*16)
     proc = MagicMock(spec=CommandProcessor)
+    vasp = OffChainVASP(a0, proc)
+    channel = VASPPairChannel(a0, a1, vasp, proc)
+    bcm = MagicMock(spec=BusinessContext)
+    
     pe = ProtocolExecutor(channel, proc)
 
 
@@ -109,9 +113,14 @@ def test_exec(basic_payment):
     assert pe.count_actually_live() == 1
 
 def test_handlers(basic_payment):
-    channel = MagicMock(spec=VASPPairChannel)
-    bcm = MagicMock(spec=BusinessContext)
+
+    a0 = LibraAddress.encode_to_Libra_address(b'A'*16)
+    a1 = LibraAddress.encode_to_Libra_address(b'B'*16)
     proc = MagicMock(spec=CommandProcessor)
+    vasp = OffChainVASP(a0, proc)
+    channel = VASPPairChannel(a0, a1, vasp, proc)
+
+    bcm = MagicMock(spec=BusinessContext)
     
     class Stats(CommandProcessor):
         def __init__(self, bc):

@@ -122,7 +122,7 @@ class PaymentAction(StructureChecker):
 
         # TODO[issue #1]: Check timestamp format?
 
-
+@JSONSerializable.register
 class PaymentObject(SharedObject, StructureChecker, JSONSerializable):
 
     fields = [
