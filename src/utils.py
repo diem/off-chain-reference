@@ -29,6 +29,15 @@ class StructureChecker:
         assert self.fields
         self.data = {}
         self.update_record = []
+    
+    def __getattr__(self, name):
+        ''' Provide a more humaine interface to the data '''
+        if name == "data":
+            raise AttributeError()
+        if name in self.data:
+            return self.data[name]
+        raise AttributeError()
+
 
     def record(self, diff):
         ''' Record all diffs applied to the object '''
