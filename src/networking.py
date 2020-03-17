@@ -31,6 +31,7 @@ class Networking:
         return urljoin(base_url, url)
 
     def send_request(self, url, other_addr, json_request):
+        # TODO: Where to handle network errors? Here or in channel?
         response = requests.post(url, json=json_request)
         channel = self.vasp.get_channel(other_addr)
         channel.parse_handle_response(json.dumps(response.json()))
