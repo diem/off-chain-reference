@@ -131,8 +131,8 @@ class PaymentProcessor(CommandProcessor):
         assert new_payment.get_version() == command.creates[0]
 
         ## Ensure that the two parties involved are in the VASP channel
-        parties = set([new_payment.data['sender'].data['address'], 
-                            new_payment.data['receiver'].data['address'] ])
+        parties = set([new_payment.sender.address, 
+                            new_payment.receiver.address ])
 
         if len(parties) != 2:
             raise PaymentLogicError('Wrong number of parties to payment: ' + str(parties))
@@ -176,8 +176,8 @@ class PaymentProcessor(CommandProcessor):
             VASPs.'''
         updated_payments = self.payment_process_ready()
         for payment in updated_payments:
-            parties = [payment.data['sender'].data['address'], 
-                            payment.data['receiver'].data['address'] ]
+            parties = [payment.sender.address, 
+                            payment.receiver.address ]
 
             # Determine the other address
             my_addr = vasp.get_vasp_address().plain()
@@ -233,10 +233,10 @@ class PaymentProcessor(CommandProcessor):
         business = self.business
 
         role = ['sender', 'receiver'][business.is_recipient(new_payment)]
-        status = payment.data[role].data['status']
+        status = payment.data[role].status
         other_role = ['sender', 'receiver'][role == 'sender']
-        old_other_status = payment.data[other_role].data['status']
-        other_status = new_payment.data[other_role].data['status']
+        old_other_status = payment.data[other_role].status
+        other_status = new_payment.data[other_role].status
 
         # Ensure nothing on our side was changed by this update
         if payment.data[role] != new_payment.data[role]:
@@ -279,9 +279,9 @@ class PaymentProcessor(CommandProcessor):
         role = ['sender', 'receiver'][is_receiver]
         other_role = ['sender', 'receiver'][not is_receiver]
 
-        status = payment.data[role].data['status']
+        status = payment.data[role].status
         current_status = status
-        other_status = payment.data[other_role].data['status']
+        other_status = payment.data[other_role].status
 
         new_payment = payment.new_version()
 

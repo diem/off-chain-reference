@@ -106,6 +106,8 @@ class StorableDict(Storable):
         ll_value_key = self.first_key.get_value()
         while True:
             ll_entry = json.loads(self.db[ll_value_key])
+            #if len(ll_entry) < 2:
+            #    print('DEBUG'*3, ll_entry)
             ll_value_key = ll_entry[1]
             yield ll_entry[3]
             if ll_value_key is None:
