@@ -32,32 +32,17 @@ V1 States (TODO)
 """
 
 from collections import defaultdict
+from enum import Enum
 
-class TypeEnumeration:
-    ''' Express & Validate status values '''
-    def __init__(self, allowed):
-        self._allowed = set(allowed)
-
-    def __getattr__(self, attr):
-        #only called what self.attr doesn't exist
-        if attr in self._allowed:
-            return attr
-        from utils import StructureException
-        raise StructureException('Status %s not supported' % attr)
-
-    def __contains__(self, item):
-        return item in self._allowed
-
-Status = TypeEnumeration([
-    'none',
-    'needs_stable_id',
-    'needs_kyc_data',
-    'needs_recipient_signature', # Sender only
-    'signed',                    # Receiver only: this is a virtual flag
-    'ready_for_settlement',
-    'settled',
-    'abort'
-])
+class Status(Enum):
+    none = 'none',
+    needs_stable_id = 'needs_stable_id',
+    needs_kyc_data = 'needs_kyc_data',
+    needs_recipient_signature = 'needs_recipient_signature', # Sender only
+    signed = 'signed',                    # Receiver only: this is a virtual flag
+    ready_for_settlement = 'ready_for_settlement',
+    settled = 'settled',
+    abort = 'abort'
 
 # Sequence of status for sender
 sender_payment_valid_lattice = \

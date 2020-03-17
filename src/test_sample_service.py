@@ -12,7 +12,7 @@ import pytest
 def basic_payment_as_receiver():
     sender = PaymentActor(str(100), 'C', Status.none, [])
     receiver = PaymentActor(str(40), '1', Status.none, [])
-    action = PaymentAction(Decimal('5.00'), 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
+    action = PaymentAction(5, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
     payment = PaymentObject(sender, receiver, 'ref', 'orig_ref', 'desc', action)
     return payment
 
@@ -20,7 +20,7 @@ def basic_payment_as_receiver():
 def kyc_payment_as_receiver():
     sender = PaymentActor(str(100), 'C', Status.none, [])
     receiver = PaymentActor(str(40), '1', Status.none, [])
-    action = PaymentAction(Decimal('5.00'), 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
+    action = PaymentAction(5, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
     payment = PaymentObject(sender, receiver, 'ref', 'orig_ref', 'desc', action)
     
     kyc = """{
@@ -47,7 +47,7 @@ def kyc_payment_as_receiver():
 def kyc_payment_as_sender():
     sender = PaymentActor(str(40), '1', Status.none, [])
     receiver = PaymentActor(str(100), 'C', Status.none, [])
-    action = PaymentAction(Decimal('5.00'), 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
+    action = PaymentAction(5, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
     payment = PaymentObject(sender, receiver, 'ref', 'orig_ref', 'desc', action)
     
     kyc = """{
@@ -76,7 +76,7 @@ def kyc_payment_as_sender():
 def settled_payment_as_receiver():
     sender = PaymentActor(str(100), 'C', Status.none, [])
     receiver = PaymentActor(str(40), '1', Status.none, [])
-    action = PaymentAction(Decimal('5.00'), 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
+    action = PaymentAction(5, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
     payment = PaymentObject(sender, receiver, 'ref', 'orig_ref', 'desc', action)
     
     kyc = """{
@@ -176,7 +176,7 @@ def simple_request_json():
 
     sender = PaymentActor(sender_addr, 'C', Status.none, [])
     receiver = PaymentActor(receiver_addr, '1', Status.none, [])
-    action = PaymentAction(Decimal('5.00'), 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
+    action = PaymentAction(5, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
     payment = PaymentObject(sender, receiver, 'ref_payment_1', 'orig_ref...', 'description ...', action)
     command = PaymentCommand(payment)
     request = CommandRequestObject(command)

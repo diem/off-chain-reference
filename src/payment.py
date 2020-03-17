@@ -1,5 +1,3 @@
-from decimal import Decimal
-
 from utils import StructureException, StructureChecker, \
     REQUIRED, OPTIONAL, WRITE_ONCE, UPDATABLE
 from shared_object import SharedObject
@@ -42,7 +40,7 @@ class PaymentActor(StructureChecker):
         ('kyc_data', KYCData, OPTIONAL, WRITE_ONCE),
         ('kyc_signature', str, OPTIONAL, WRITE_ONCE),
         ('kyc_certificate', str, OPTIONAL, WRITE_ONCE),
-        ('status', str, REQUIRED, UPDATABLE),
+        ('status', Status, REQUIRED, UPDATABLE),
         ('metadata', list, REQUIRED, UPDATABLE)
     ]
 
@@ -56,19 +54,13 @@ class PaymentActor(StructureChecker):
         })
 
     def custom_update_checks(self, diff):
-        # If any of kyc data, signarure or certificate is provided, we expect
+        # If any of kyc data, signature or certificate is provided, we expect
         # all the other fields as well
-        if 'kyc_data' in diff and 'kyc_signature' not in diff \
-                or 'kyc_certificate' in diff and 'kyc_signature' not in diff:
-            raise StructureException('Missing: field kyc_signature')
-        if 'kyc_data' in diff and 'kyc_certificate' not in diff \
-                or 'kyc_signature' in diff and 'kyc_certificate' not in diff:
-            raise StructureException('Missing: field kyc_certificate')
-        if 'kyc_signature' in diff and 'kyc_data' not in diff \
-                or 'kyc_certificate' in diff and 'kyc_data' not in diff:
-            raise StructureException('Missing: field kyc_data')
+        missing = set(["kyc_data", "kyc_signature", "kyc_certificate"]) - set(diff.keys())
+        if len(missing) !=0 and len(missing)!=3:
+            raise StructureException('Missing: field %s' % (str(missing),))
 
-        if 'status' in diff and not diff['status'] in Status:
+        if 'status' in diff and not isinstance(diff['status'], Status):
             raise StructureException('Wrong status: %s' % diff['status'])
 
         # Metadata can only be strings
@@ -108,7 +100,7 @@ class PaymentActor(StructureChecker):
 
 class PaymentAction(StructureChecker):
     fields = [
-        ('amount', Decimal, REQUIRED, WRITE_ONCE),
+        ('amount', int, REQUIRED, WRITE_ONCE),
         ('currency', str, REQUIRED, WRITE_ONCE),
         ('action', str, REQUIRED, WRITE_ONCE),
         ('timestamp', str, REQUIRED, WRITE_ONCE)
