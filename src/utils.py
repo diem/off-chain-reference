@@ -240,6 +240,7 @@ class JSONSerializable:
     @classmethod
     def parse(cls, data, flag):
         if 'ObjectType' not in data:
+            print(data)
             raise JSONParsingError('No object type information')
 
         if data['ObjectType'] not in cls.json_type_map:

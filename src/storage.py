@@ -18,7 +18,7 @@ class Storable:
     
     def post_proc(self, val):
         if issubclass(self.xtype, JSONSerializable):
-            return self.xtype.from_json_data_dict(val, JSONFlag.STORE)
+            return self.xtype.parse(val, JSONFlag.STORE)
         else:
             # assert not self.xtype.issubclass(JSONSerializable)
             return self.xtype(val)
@@ -52,6 +52,7 @@ class StorableDict(Storable):
         self.db = db
         self.xtype = xtype
 
+        self.first_key = StorableValue(db, '__FIRST_KEY', str, root=self)
         self.length = StorableValue(db, '__LEN', int, root=self)
         if not self.length.exists():
             self.length.set_value(0)
@@ -65,10 +66,53 @@ class StorableDict(Storable):
 
     def __setitem__(self, key, value):
         db_key = str(self.base_key() / str(key))
+        db_key_LL = str(self.base_key() / 'LL' / str(key))
+        data = json.dumps(self.pre_proc(value))
+
+        # Ensure nothing fails after that
+
         if db_key not in self.db:
+            assert db_key_LL not in self.db
             xlen = self.length.get_value()
             self.length.set_value(xlen+1)
-        self.db[db_key] = json.dumps(self.pre_proc(value))
+
+            # Make the linked list entry
+            if self.first_key.exists():
+                # All new entries to the front
+                first_value_key = self.first_key.get_value()
+
+                # Format of the LL_entry is:
+                # [prev_LL_key, next_LL_key, db_key, key]
+                ll_entry = [None, first_value_key, str(db_key), key]
+
+                # Modify the record of first value
+                first_ll_entry = json.loads(self.db[first_value_key])
+                first_ll_entry[0] = db_key_LL
+                self.db[first_value_key] = json.dumps(first_ll_entry)
+
+            else:
+                # This is the first entry, setup the record and first key
+                ll_entry = [None, None, str(db_key), key]
+            
+            self.first_key.set_value(str(db_key_LL))
+            self.db[db_key_LL] = json.dumps(ll_entry)
+
+        self.db[db_key] = data
+    
+    def keys(self):
+        if not self.first_key.exists():
+            return
+        ll_value_key = self.first_key.get_value()
+        while True:
+            ll_entry = json.loads(self.db[ll_value_key])
+            ll_value_key = ll_entry[1]
+            yield ll_entry[3]
+            if ll_value_key is None:
+                break
+    
+    def values(self):
+        for k in self.keys():
+            yield self[k]
 
     def __len__(self):
         xlen =  self.length.get_value()
@@ -80,6 +124,30 @@ class StorableDict(Storable):
             xlen = self.length.get_value()
             self.length.set_value(xlen-1)
             del self.db[db_key]
+
+            # Now fix the LL structure
+            db_key_LL = str(self.base_key() / 'LL' / str(key))
+            ll_entry = json.loads(self.db[db_key_LL])
+            prev_key, next_key, _, _ = tuple(ll_entry)
+
+            prev_entry = None
+            if prev_key is not None:
+                prev_entry = json.loads(self.db[prev_key])
+                prev_entry[1] = next_key
+                self.db[prev_key] = json.dumps(prev_entry)
+            
+            next_entry = None
+            if next_key is not None:
+                next_entry = json.loads(self.db[next_key])
+                next_entry[0] = prev_key
+                self.db[next_key] = json.dumps(next_entry)
+                if prev_key is None:
+                    self.first_key.set_value(next_key)
+            
+            del  self.db[db_key_LL]
+            
+
+
     
     def __contains__(self, item):
         db_key = str(self.base_key() / str(item))
@@ -133,7 +201,7 @@ class StorableList(Storable):
     
     def __iadd__(self, other):
         for item in other:
-            assert type(item) is self.xtype
+            assert isinstance(item, self.xtype)
             xlen = self.length.get_value()
             self.length.set_value(xlen+1)
             self[xlen] = item

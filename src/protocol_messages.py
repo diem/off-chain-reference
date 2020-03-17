@@ -29,7 +29,7 @@ class OffChainError(JSONSerializable):
         except Exception as e:
             raise JSONParsingError(*e.args)
 
-
+@JSONSerializable.register
 class CommandRequestObject(JSONSerializable):
     """Represents a command of the Off chain protocol"""
 
@@ -74,6 +74,8 @@ class CommandRequestObject(JSONSerializable):
             "command" : self.command.get_json_data_dict(flag),
             "command_type" : self.command_type
             }
+        
+        self.add_object_type(data_dict)
 
         if self.command_seq is not None:
             data_dict["command_seq"] = self.command_seq
@@ -141,6 +143,7 @@ class CommandResponseObject(JSONSerializable):
         if self.error is not None:
             data_dict["error"] = self.error.get_json_data_dict(flag)
         
+        self.add_object_type(data_dict)
         if __debug__:
             import json
             assert json.dumps(data_dict)
@@ -152,14 +155,13 @@ class CommandResponseObject(JSONSerializable):
         ''' Construct the object from a serlialized JSON data dictionary (from json.loads). '''
         try:
             self = CommandResponseObject()
-            try:
+
+            if 'seq' in data and data['seq'] is not None:
                 self.seq = int(data['seq'])
-            except:
-                self.seq = None
-            try:
+
+            if 'command_seq' in data and data['command_seq'] is not None:
                 self.command_seq = data['command_seq']
-            except:
-                self.command_seq = None
+
             self.status = str(data['status'])
 
             # Only None or int allowed

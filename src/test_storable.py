@@ -27,6 +27,35 @@ def test_dict(db):
 def test_dict_dict():
     db = {}
     D = StorableDict(db, 'mary', int)
+    assert list(D.keys()) == []
+
+    D['x'] = 10
+    D['y'] = 20
+    D['z'] = 30
+    D['a'] = 40
+    D['b'] = 50
+
+    assert len(list(D.keys())) == 5
+    assert set(D.keys()) == {'x', 'y', 'z', 'a', 'b'}
+
+    D = StorableDict(db, 'anna', int)
+    D['x'] = 10
+    D['y'] = 20
+    D['z'] = 30
+    D['a'] = 40
+    D['b'] = 50
+
+    del D['x']
+    assert set(D.keys()) == {'y', 'z', 'a', 'b'}
+    del D['b']
+    assert set(D.keys()) == {'y', 'z', 'a'}
+
+    assert set(D.values()) == {20, 30, 40}
+
+
+def test_dict_index():
+    db = {}
+    D = StorableDict(db, 'mary', int)
     D['x'] = 10
     assert D['x'] == 10 
     assert len(D) == 1

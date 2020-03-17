@@ -1,6 +1,7 @@
 from utils import JSONSerializable, JSONFlag
 from command_processor import CommandProcessor
 from libra_address import LibraAddress
+from shared_object import SharedObject
 
 # Interface we need to do commands:
 class ProtocolCommand(JSONSerializable):
@@ -81,16 +82,21 @@ class ProtocolExecutor:
         self.channel   = channel
 
         # <STARTS to persist>
+        vasp = channel.get_vasp()
+        storage_factory = vasp.get_storage_factory()
+        root = storage_factory.make_value(channel.myself.plain(), None)
+        other_vasp = storage_factory.make_value(channel.other.plain(), None, root=root)
+
 
         # The common sequence of commands 
-        self.command_sequence = []
+        self.command_sequence = storage_factory.make_list('command_sequence', ProtocolCommand, root=other_vasp)
 
         # The highest sequence command confirmed as success of failure.
         self.last_confirmed = 0
 
         # This is the primary store of shared objects.
         # It maps version numbers -> objects
-        self.object_store = { } # TODO: persist this structure
+        self.object_store = storage_factory.make_dict('object_store', SharedObject, root=other_vasp) # TODO: persist this structure
 
         # <ENDS to persist>
     
