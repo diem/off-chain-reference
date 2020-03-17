@@ -11,7 +11,7 @@ NetMessage = namedtuple('NetMessage', ['src', 'dst', 'type', 'content'])
 
 class OffChainVASP:
     """Manages the off-chain protocol on behalf of one VASP. """
-    
+
     def __init__(self, vasp_addr, processor):
         if __debug__:
             assert isinstance(processor, CommandProcessor)
@@ -30,7 +30,7 @@ class OffChainVASP:
 
         # TODO: this should be a persistent store
         self.channel_store = {}
-    
+
     def get_vasp_address(self):
         ''' Return our own VASP Libra Address. '''
         return self.vasp_addr
@@ -44,9 +44,9 @@ class OffChainVASP:
         if store_key not in self.channel_store:
             channel = VASPPairChannel(my_address, other_vasp_addr, self, self.processor)
             self.channel_store[store_key] = channel
-    
+
         return self.channel_store[store_key]
-    
+
     def notify_new_commands(self):
         ''' The processor calls this method to notify the VASP that new
             commands are available for processing. '''
@@ -91,7 +91,7 @@ class VASPPairChannel:
         # <ENDS to persist>
 
         # Ephemeral state that can be forgotten upon a crash
-        
+
         # Response cache
         self.response_cache = {}
         self.pending_requests = []
@@ -206,21 +206,21 @@ class VASPPairChannel:
         try:
             req_dict = json.loads(json_command)
             request = CommandRequestObject.from_json_data_dict(req_dict, JSONFlag.NET)
-            self.handle_request(request)
+            return self.handle_request(request)
         except JSONParsingError:
             response = make_parsing_error()
-            self.send_response(response)
+            return self.send_response(response)
 
 
     def handle_request(self, request):
         """ Handles a request received by this VASP.
-        
+
             Returns a network record of the response if one can be constructed,
             or None in case they are scheduled for later processing. If none is
             returned then this function must be called again once the condition
 
                 self.pending_responses() == 0
-            
+
             becomes true.
         """
         request.command.set_origin(self.other)
@@ -232,7 +232,7 @@ class VASPPairChannel:
                 # Re-send the response
                 response = previous_request.response
                 return self.send_response(response)
-                
+
             else:
                 # There is a conflict, and it will have to be resolved
                 #  TODO[issue 8]: How are conflicts meant to be resolved? With only
@@ -240,7 +240,7 @@ class VASPPairChannel:
                 response = make_protocol_error(request, code='conflict')
                 response.previous_command = previous_request.command
                 return self.send_response(response)
-                
+
         # Clients are not to suggest sequence numbers.
         if self.is_server() and request.command_seq is not None:
             response = make_protocol_error(request, code='malformed')
@@ -251,7 +251,7 @@ class VASPPairChannel:
         if self.is_server() and self.pending_responses() > 0:
             self.pending_requests += [request]
             return None
-            
+
         # Sequence newer requests
         if request.seq == self.other_next_seq:
 
@@ -260,18 +260,18 @@ class VASPPairChannel:
                 # previous commands.
                 response = make_protocol_error(request, code='wait')
                 return self.send_response(response)
-                
+
             self.other_next_seq += 1
             self.other_requests += [request]
 
             seq = self.next_final_sequence()
             try:
-                self.executor.sequence_next_command(request.command, 
+                self.executor.sequence_next_command(request.command,
                                                     do_not_sequence_errors = False)
                 response = make_success_response(request)
             except ExecutorException as e:
                 response = make_command_error(request, str(e))
-            
+
             request.response = response
             request.response.command_seq = seq
             self.apply_response_to_executor(request)
@@ -290,7 +290,7 @@ class VASPPairChannel:
         else:
             # OK: Previous cases are exhaustive
             assert False
-    
+
     def parse_handle_response(self, json_response):
         ''' Handles a response provided as a json string. '''
         try:
@@ -311,7 +311,7 @@ class VASPPairChannel:
             # even be parsed. TODO: log the request/reply for debugging.
             assert response.status == 'failure'
             return
-        
+
         # Check this is the next expected response
         if not request_seq < len(self.my_requests):
             # Caught a bug on the other side
