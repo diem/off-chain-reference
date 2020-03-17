@@ -98,6 +98,10 @@ class VASPPairChannel:
         self.my_requests = storage_factory.make_list('my_requests', CommandRequestObject, root=other_vasp)
         self.other_requests = storage_factory.make_list('other_requests', CommandRequestObject, root=other_vasp)
 
+        self.next_retransmit = storage_factory.make_value('next_retransmit', int, root=other_vasp)
+        if not self.next_retransmit.exists():
+            self.next_retransmit.set_value(0)
+
         # The final sequence
         self.executor = ProtocolExecutor(self, self.processor)
         # <ENDS to persist>
@@ -407,10 +411,24 @@ class VASPPairChannel:
     def would_retransmit(self, do_retransmit=False):
         """ Returns true if there are any pending re-transmits, namely
             requests for which the response has not yet been received. """
-        for request in self.my_requests:
-            assert isinstance(request, CommandRequestObject)
-            if not request.has_response():
+        #for request in self.my_requests:
+        #    assert isinstance(request, CommandRequestObject)
+        #    if not request.has_response():
+        #        if do_retransmit:
+        #            self.send_request(request)
+        #        return True
+        
+        answer = False
+        next_retransmit = self.next_retransmit.get_value()
+        my_request_len  = len(self.my_requests)
+        while next_retransmit < my_request_len:
+            request = self.my_requests[next_retransmit]
+            if request.has_response():
+                next_retransmit += 1
+            else:
+                answer = True
                 if do_retransmit:
                     self.send_request(request)
-                return True
-        return False
+                break
+        self.next_retransmit.set_value(next_retransmit)
+        return answer

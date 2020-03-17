@@ -590,3 +590,27 @@ def test_sample_command():
     obj2 = JSONSerializable.parse(data, JSONFlag.STORE)
     assert obj2.version == obj.version
     assert obj2.extends == obj.extends
+
+if __name__ == "__main__":
+    a0 = LibraAddress.encode_to_Libra_address(b'A'*16) 
+    a1 = LibraAddress.encode_to_Libra_address(b'B' + b'A'*15)
+    a2 = LibraAddress.encode_to_Libra_address(b'B'*16)
+
+    proc = MagicMock(spec=CommandProcessor)
+    vasp_server = OffChainVASP(a0, proc)
+    server = VASPPairChannel(a0, a1, vasp_server, proc)
+    vasp_client = OffChainVASP(a1, proc)
+    client = VASPPairChannel(a1, a0, vasp_client, proc)
+
+    server = monkey_tap(server)
+    client = monkey_tap(client)
+
+    NUMBER = 200
+    commands = list(range(NUMBER))
+    commands = [SampleCommand(c) for c in commands]
+    for c in commands:
+        c.always_happy = False
+
+    R = RandomRun(server, client, commands, seed='drop')
+    R.run()
+    R.checks(NUMBER)

@@ -226,19 +226,34 @@ class StorableValue(Storable):
         self.xtype = xtype
         self.db = db
 
+        self.has_value = False
+        if self.exists():
+            self.has_value = True
+            self.value = self.get_value()
+        else:
+            self.value = None
+
         # self.db = dbm.open(str(fname), 'c')
 
     def set_value(self, value):
+        if self.has_value and value == self.value:
+            return
+
         json_data = json.dumps(self.pre_proc(value))
         key = str(self.base_key())
         self.db[key] = json_data
 
+        self.has_value = True
+        self.value = value
+
     def get_value(self):
+        if self.has_value:
+            return self.value
         val = json.loads(self.db[str(self.base_key())])
         return self.post_proc(val)
     
     def exists(self):
-        return str(self.base_key()) in self.db
+        return self.has_value or str(self.base_key()) in self.db
 
     def base_key(self):
         return self.root / self.name
