@@ -37,7 +37,7 @@ class BusinessForceAbort(Exception):
 class BusinessContext:
 
     def open_channel_to(self, other_vasp_info):
-        ''' Requests authorization to open a channel to another VASP.
+        ''' Requests authorization to other a channel to another VASP.
             If it is authorized nothing is returned. If not an exception is raised.
 
             Can raise:

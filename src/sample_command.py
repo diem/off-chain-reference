@@ -12,9 +12,9 @@ class SampleCommand(ProtocolCommand):
         ProtocolCommand.__init__(self)
         command = SampleObject(command)
         if deps is None:
-            self.dependencies = []
+            self.depend_on = []
         else:
-            self.dependencies = deps
+            self.depend_on = deps
         self.creates   = [ command.item ]
         self.command   = command
         self.always_happy = True
@@ -26,7 +26,7 @@ class SampleCommand(ProtocolCommand):
         return self.command.item
 
     def __eq__(self, other):
-        return self.dependencies == other.dependencies \
+        return self.depend_on == other.depend_on \
             and self.creates == other.creates \
             and self.command.item == other.command.item
 
@@ -41,7 +41,7 @@ class SampleCommand(ProtocolCommand):
     @classmethod
     def from_json_data_dict(cls, data, flag):
         ''' Construct the object from a serlialized JSON data dictionary (from json.loads). '''
-        self = SampleCommand(data['command'], data['dependencies'])
+        self = SampleCommand(data['command'], data['depend_on'])
         if flag == JSONFlag.STORE:
             self.commit_status = data["commit_status"]
         return self

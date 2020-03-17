@@ -193,8 +193,8 @@ class RandomRun(object):
         assert client_seq == server_seq
         assert set(range(NUMBER)) ==  set(client_seq)
 
-        client_exec_seq = [c.item() for c in client.executor.command_sequence]
-        server_exec_seq = [c.item() for c in server.executor.command_sequence]
+        client_exec_seq = [c.item() for c in client.executor.seq]
+        server_exec_seq = [c.item() for c in server.executor.seq]
         assert set(client_seq) == set(client_exec_seq)
         assert set(server_seq) == set(server_exec_seq)
 
@@ -578,7 +578,7 @@ def test_VASProot():
     vasp = OffChainVASP(a0, proc)
 
     # Check our own address is good
-    assert vasp.get_vasp_address() == a0
+    assert vasp.my_vasp_addr() == a0
     # Calling twice gives the same instance (use 'is')
     assert vasp.get_channel(a1) is vasp.get_channel(a1)
     # Different VASPs have different objects
@@ -594,7 +594,7 @@ def test_VASProot_diff_object():
     vasp = OffChainVASP(a0, proc)
 
     # Check our own address is good
-    assert vasp.get_vasp_address() == a0
+    assert vasp.my_vasp_addr() == a0
     # Calling twice gives the same instance (use 'is')
     assert vasp.get_channel(b1) is vasp.get_channel(b2)
 
