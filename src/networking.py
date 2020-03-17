@@ -17,7 +17,7 @@ class Networking:
 
         # Register paths.
         self.app.add_url_rule(
-            '/'+self.vasp.my_vasp_addr().plain()+'/<other_addr>/process/',
+            '/'+self.vasp.get_vasp_address().plain()+'/<other_addr>/process/',
             view_func=VASPOffChainApi.as_view('vasp_api', self.vasp)
         )
 
@@ -26,7 +26,7 @@ class Networking:
 
     def get_url(self, other_addr):
         base_url = self.info_context.get_base_url()
-        my_addr = self.vasp.my_vasp_addr()
+        my_addr = self.vasp.get_vasp_address()
         url = other_addr.plain() + '/' + my_addr.plain() + '/process/'
         return urljoin(base_url, url)
 
