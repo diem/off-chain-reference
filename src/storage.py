@@ -3,7 +3,6 @@
 import dbm
 import json
 from pathlib import PosixPath
-from copy import deepcopy
 
 from utils import JSONFlag, JSONSerializable
 
@@ -241,6 +240,8 @@ class StorableValue(Storable):
         self.name = name
         self.xtype = xtype
         self.db = db
+        self._base_key = self.root / self.name
+        self._base_key_str = str(self._base_key)
 
         self.has_value = False
         if self.exists():
@@ -250,6 +251,7 @@ class StorableValue(Storable):
             self.value = None
 
         self.immut_type = xtype in {int, str, float}
+        
 
         # self.db = dbm.open(str(fname), 'c')
 
@@ -259,7 +261,7 @@ class StorableValue(Storable):
             return
 
         json_data = json.dumps(self.pre_proc(value))
-        key = str(self.base_key())
+        key = self._base_key_str
         self.db[key] = json_data
 
         self.has_value = True
@@ -271,11 +273,11 @@ class StorableValue(Storable):
         if self.has_value and self.immut_type:
             return self.value
 
-        val = json.loads(self.db[str(self.base_key())])
+        val = json.loads(self.db[self._base_key_str])
         return self.post_proc(val)
     
     def exists(self):
-        return self.has_value or str(self.base_key()) in self.db
+        return self.has_value or self._base_key_str in self.db
 
     def base_key(self):
-        return self.root / self.name
+        return self._base_key
