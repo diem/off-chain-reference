@@ -1,6 +1,7 @@
 from utils import JSONSerializable, JSONParsingError, JSONFlag
 # from executor import SampleCommand
 
+
 class OffChainError(JSONSerializable):
     def __init__(self, protocol_error=True, code=None):
         self.protocol_error = protocol_error
@@ -8,14 +9,14 @@ class OffChainError(JSONSerializable):
 
     def __eq__(self, other):
         return self.protocol_error == other.protocol_error \
-           and self.code == other.code
+            and self.code == other.code
 
     def get_json_data_dict(self, flag):
         ''' Get a data dictionary compatible with JSON serilization (json.dumps) '''
         data_dict = {
-            "protocol_error" : self.protocol_error,
-            "code" : self.code
-            }
+            "protocol_error": self.protocol_error,
+            "code": self.code
+        }
         if __debug__:
             import json
             assert json.dumps(data_dict)
@@ -52,10 +53,10 @@ class CommandRequestObject(JSONSerializable):
     def __eq__(self, other):
         ''' Define equality as field equality '''
         return self.seq == other.seq \
-           and self.command_seq == other.command_seq \
-           and self.command == other.command \
-           and self.command_type == other.command_type \
-           and self.response == other.response
+            and self.command_seq == other.command_seq \
+            and self.command == other.command \
+            and self.command_type == other.command_type \
+            and self.response == other.response
 
     def is_same_command(self, other):
         """ Returns true if the other command is the same as this one,
@@ -76,10 +77,10 @@ class CommandRequestObject(JSONSerializable):
     def get_json_data_dict(self, flag):
         ''' Get a data dictionary compatible with JSON serilization (json.dumps) '''
         data_dict = {
-            "seq" : self.seq,
-            "command" : self.command.get_json_data_dict(flag),
-            "command_type" : self.command_type
-            }
+            "seq": self.seq,
+            "command": self.command.get_json_data_dict(flag),
+            "command_type": self.command_type
+        }
 
         if self.command_seq is not None:
             data_dict["command_seq"] = self.command_seq
@@ -109,6 +110,7 @@ class CommandRequestObject(JSONSerializable):
         except Exception as e:
             raise JSONParsingError(*e.args)
 
+
 class CommandResponseObject(JSONSerializable):
     """Represents a response to a command in the Off chain protocol"""
 
@@ -121,31 +123,30 @@ class CommandResponseObject(JSONSerializable):
 
     def __eq__(self, other):
         return self.seq == other.seq \
-           and self.command_seq == other.command_seq \
-           and self.status == other.status \
-           and self.error  == other.error
-
+            and self.command_seq == other.command_seq \
+            and self.status == other.status \
+            and self.error == other.error
 
     def not_protocol_failure(self):
         """ Returns True if the request has a response that is not a protocol
             failure (and we can recover from it)
         """
         return self.status == 'success' or (
-                self.status == 'failure' and not self.error.protocol_error)
+            self.status == 'failure' and not self.error.protocol_error)
 
     # define serialization interface
 
     def get_json_data_dict(self, flag):
         ''' Get a data disctionary compatible with JSON serilization (json.dumps) '''
         data_dict = {
-            "seq" : self.seq,
-            "command_seq" : self.command_seq,
-            "status" : self.status
+            "seq": self.seq,
+            "command_seq": self.command_seq,
+            "status": self.status
         }
 
         if self.error is not None:
             data_dict["error"] = self.error.get_json_data_dict(flag)
-        
+
         if __debug__:
             import json
             assert json.dumps(data_dict)
@@ -180,7 +181,7 @@ class CommandResponseObject(JSONSerializable):
 
             if self.status == 'failure':
                 self.error = OffChainError.from_json_data_dict(data['error'], flag)
-                
+
             return self
         except Exception as e:
             raise JSONParsingError(*e.args)
@@ -204,6 +205,7 @@ def make_protocol_error(request, code=None):
     response.status = 'failure'
     response.error = OffChainError(protocol_error=True, code=code)
     return response
+
 
 def make_parsing_error():
     """ Constructs a CommandResponse signaling a protocol failure.
