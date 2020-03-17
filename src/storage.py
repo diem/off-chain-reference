@@ -242,6 +242,7 @@ class StorableValue(Storable):
         self.db = db
         self._base_key = self.root / self.name
         self._base_key_str = str(self._base_key)
+        self.immut_type = xtype in {int, str, float}
 
         self.has_value = False
         if self.exists():
@@ -249,11 +250,6 @@ class StorableValue(Storable):
             self.has_value = True
         else:
             self.value = None
-
-        self.immut_type = xtype in {int, str, float}
-        
-
-        # self.db = dbm.open(str(fname), 'c')
 
     def set_value(self, value):
         # Optimization for immutable types: no need to write if same.
@@ -272,9 +268,11 @@ class StorableValue(Storable):
         # we can cache and return them.
         if self.has_value and self.immut_type:
             return self.value
-
+        
         val = json.loads(self.db[self._base_key_str])
-        return self.post_proc(val)
+        self.value = self.post_proc(val)
+        self.has_value = True
+        return self.value
     
     def exists(self):
         return self.has_value or self._base_key_str in self.db
