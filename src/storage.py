@@ -3,6 +3,7 @@
 import dbm
 import json
 from pathlib import PosixPath
+from copy import deepcopy
 
 from utils import JSONFlag, JSONSerializable
 
@@ -243,15 +244,18 @@ class StorableValue(Storable):
 
         self.has_value = False
         if self.exists():
-            self.has_value = True
             self.value = self.get_value()
+            self.has_value = True
         else:
             self.value = None
+
+        self.immut_type = xtype in {int, str, float}
 
         # self.db = dbm.open(str(fname), 'c')
 
     def set_value(self, value):
-        if self.has_value and value == self.value:
+        # Optimization for immutable types: no need to write if same.
+        if self.has_value and self.immut_type and value == self.value:
             return
 
         json_data = json.dumps(self.pre_proc(value))
@@ -262,8 +266,11 @@ class StorableValue(Storable):
         self.value = value
 
     def get_value(self):
-        if self.has_value:
+        # Optimization for immutable types: since they cannot change
+        # we can cache and return them.
+        if self.has_value and self.immut_type:
             return self.value
+
         val = json.loads(self.db[str(self.base_key())])
         return self.post_proc(val)
     
