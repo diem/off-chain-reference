@@ -7,16 +7,27 @@ from pathlib import PosixPath
 from utils import JSONFlag, JSONSerializable
 
 class Storable:
+    """ Base class for objects that can be stored """
+
     def __init__(self, xtype):
+        """ Specify the type (or base type) of the objects to be stored """
         self.xtype = xtype
 
     def pre_proc(self, val):
+        """ Pre-processing of objects before storage. By default 
+            it calls get_json_data_dict for JSONSerializable objects or
+            their base type. eg int('10'). The result must be a structure
+            that can be passed to json.dumps.
+        """
         if issubclass(self.xtype, JSONSerializable):
             return val.get_json_data_dict(JSONFlag.STORE)
         else:
             return self.xtype(val)
     
     def post_proc(self, val):
+        """ Post-processing to convert a json parsed structure into a Python
+            object. It uses parse on JSONSerializable objects, and otherwise
+            the type constructor. """
         if issubclass(self.xtype, JSONSerializable):
             return self.xtype.parse(val, JSONFlag.STORE)
         else:
@@ -44,6 +55,9 @@ class StorableFactory:
 class StorableDict(Storable):
 
     def __init__(self, db, name, xtype, root=None):
+        """ Implements a persistent dictionary like type. Entries are stored
+            by key directly, and a separate doubly linked list structure is
+            stored to enable traversal of keys and values. """
         if root is None:
             self.root = PosixPath('/')
         else:
@@ -52,6 +66,8 @@ class StorableDict(Storable):
         self.db = db
         self.xtype = xtype
 
+        # We create a doubly linked list to support traveral with O(1) lookup
+        # addition and creation.
         meta = StorableValue(db, '__META', str, root=self)
         self.first_key = StorableValue(db, '__FIRST_KEY', str, root=meta)
         self.length = StorableValue(db, '__LEN', int, root=meta)
@@ -149,14 +165,10 @@ class StorableDict(Storable):
             
             del  self.db[db_key_LL]
             
-
-
     
     def __contains__(self, item):
         db_key = str(self.base_key() / str(item))
         return db_key in self.db
-
-
 
 
 class StorableList(Storable):
@@ -216,6 +228,9 @@ class StorableList(Storable):
 
 
 class StorableValue(Storable):
+    """ Implements a cached persistent value. The value is stored to storage
+        but a cached variant is stored for quick reads. 
+    """
 
     def __init__(self, db, name, xtype, root=None):
         if root is None:
