@@ -33,7 +33,7 @@ def simple_response_json():
     return {"seq": 0, "command_seq": 0, "status": "success"}
 
 
-def test_process_request(client, simple_request_json):
+def test_process_request(network, client, simple_request_json):
     CommandRequestObject.register_command_type(PaymentCommand)
     addr = LibraAddress.encode_to_Libra_address(b'B'*16)
     other_addr = LibraAddress.encode_to_Libra_address(b'A'*16)
@@ -49,3 +49,11 @@ def test_send_request(network, httpserver, simple_request_json, simple_response_
     url = '/process'
     httpserver.expect_request(url).respond_with_json(simple_response_json)
     network.send_request(httpserver.url_for(url), other_addr, simple_request_json)
+
+
+def test_get_url(network):
+    addr = LibraAddress.encode_to_Libra_address(b'B'*16)
+    other_addr = LibraAddress.encode_to_Libra_address(b'A'*16)
+    network.info_context.get_base_url.return_value = '/'
+    url = network.get_url(other_addr)
+    assert url == '/'+other_addr.plain()+'/'+addr.plain()+'/process/'
