@@ -42,11 +42,11 @@ class sample_business(BusinessContext):
         raise BusinessValidationFailure('Account %s does not exist' % subaddress)
 
     def assert_payment_for_vasp(self, payment):
-        sender = payment.data['sender']
-        receiver = payment.data['receiver']
+        sender = payment.sender
+        receiver = payment.receiver
 
-        if sender.data['address'] == self.get_address() or \
-            receiver.data['address'] == self.get_address():
+        if sender.address == self.get_address() or \
+            receiver.address == self.get_address():
             return
         raise BusinessValidationFailure()
 
@@ -63,20 +63,20 @@ class sample_business(BusinessContext):
         self.assert_payment_for_vasp(payment)
         accounts = {acc['account'] for acc in self.accounts_db}
         if self.is_sender(payment):
-            if payment.data['sender'].data['subaddress'] in accounts:
+            if payment.sender.subaddress in accounts:
                 return
         else:
-            if payment.data['receiver'].data['subaddress'] in accounts:
+            if payment.receiver.subaddress in accounts:
                 return
         raise BusinessForceAbort('Subaccount does not exist.')
 
     def is_sender(self, payment):
         self.assert_payment_for_vasp(payment)
-        return payment.data['sender'].data['address'] == self.get_address()
+        return payment.sender.address == self.get_address()
     
     def validate_recipient_signature(self, payment):
         if 'recipient_signature' in payment.data:
-            if payment.data['recipient_signature'] == 'VALID':
+            if payment.recipient_signature == 'VALID':
                 return
             raise BusinessValidationFailure('Invalid signature: %s' % payment.data.get('recipient_signature', 'Not present'))
 
@@ -87,21 +87,21 @@ class sample_business(BusinessContext):
         my_role = ['receiver', 'sender'][self.is_sender(payment)]
         other_role = ['sender', 'receiver'][self.is_sender(payment)]
 
-        subaddress = payment.data[my_role].data['subaddress']
+        subaddress = payment.data[my_role].subaddress
         account = self.get_account(subaddress)
 
         if account['business']:
             return { Status.needs_kyc_data }
 
         to_provide = set()
-        if payment.data[other_role].data['status'] == Status.needs_stable_id:
+        if payment.data[other_role].status == Status.needs_stable_id:
                 to_provide.add(Status.needs_stable_id) 
         
-        if payment.data[other_role].data['status'] == Status.needs_kyc_data:
+        if payment.data[other_role].status == Status.needs_kyc_data:
                 to_provide.add(Status.needs_stable_id) 
                 to_provide.add(Status.needs_kyc_data) 
         
-        if payment.data[other_role].data['status'] == Status.needs_recipient_signature:
+        if payment.data[other_role].status == Status.needs_recipient_signature:
                 if my_role == 'receiver':
                     to_provide.add(Status.needs_recipient_signature) 
         
@@ -111,7 +111,7 @@ class sample_business(BusinessContext):
     def next_kyc_level_to_request(self, payment):
         my_role = ['receiver', 'sender'][self.is_sender(payment)]
         other_role = ['sender', 'receiver'][self.is_sender(payment)]
-        subaddress = payment.data[my_role].data['subaddress']
+        subaddress = payment.data[my_role].subaddress
         account = self.get_account(subaddress)
 
         if account['business']:
@@ -124,12 +124,12 @@ class sample_business(BusinessContext):
         if 'recipient_signature' not in payment.data and my_role == 'sender':
                 return Status.needs_recipient_signature
             
-        return payment.data[my_role].data['status']
+        return payment.data[my_role].status
 
     def validate_kyc_signature(self, payment):
         other_role = ['sender', 'receiver'][self.is_sender(payment)]
         if 'kyc_signature' in payment.data[other_role].data:
-            if not payment.data[other_role].data['kyc_signature'] == 'KYC_SIG':
+            if not payment.data[other_role].kyc_signature == 'KYC_SIG':
                 raise BusinessValidationFailure()
 
     def get_extended_kyc(self, payment):
@@ -140,14 +140,14 @@ class sample_business(BusinessContext):
                    BusinessNotAuthorized.
         '''
         my_role = ['receiver', 'sender'][self.is_sender(payment)]
-        subaddress = payment.data[my_role]['subaddress']
+        subaddress = payment.data[my_role].subaddress
         account = self.get_account(subaddress)
         return (account["kyc_data"], 'KYC_SIG', 'KYC_CERT')
 
 
     def get_stable_id(self, payment):
         my_role = ['receiver', 'sender'][self.is_sender(payment)]
-        subaddress = payment.data[my_role]['subaddress']
+        subaddress = payment.data[my_role].subaddress
         account = self.get_account(subaddress)
         return account["stable_id"]
     
@@ -155,19 +155,19 @@ class sample_business(BusinessContext):
     def ready_for_settlement(self, payment):
         my_role = ['receiver', 'sender'][self.is_sender(payment)]
         other_role = ['sender', 'receiver'][self.is_sender(payment)]
-        subaddress = payment.data[my_role].data['subaddress']
+        subaddress = payment.data[my_role].subaddress
         account = self.get_account(subaddress)
 
         if my_role == 'sender': 
-            if account["balance"] >= payment.data['action'].data['amount']:
+            if account["balance"] >= payment.action.amount:
                 
                 # Reserve the amount for this payment
-                reference = payment.data['reference_id']
+                reference = payment.reference_id
                 if reference not in account['pending_transactions']:
                     account['pending_transactions'][reference] = {
-                        "amount": payment.data['action'].data['amount']
+                        "amount": payment.action.amount
                     }
-                    account["balance"] -= payment.data['action'].data['amount']
+                    account["balance"] -= payment.action.amount
 
             else:
                 raise BusinessForceAbort('Insufficient Balance')
@@ -179,7 +179,7 @@ class sample_business(BusinessContext):
         
         # The other VASP subaccount is a business
         if 'kyc_data' in payment.data[other_role].data and \
-            payment.data[other_role].data['kyc_data'].parse()['type'] == 'business':
+            payment.data[other_role].kyc_data.parse()['type'] == 'business':
             # Put the money aside for this payment ... 
             return self.has_sig(payment)
         
@@ -194,19 +194,19 @@ class sample_business(BusinessContext):
         return True
     
     def has_settled(self, payment):
-        if payment.data['sender'].data['status'] == Status.settled:
+        if payment.sender.status == Status.settled:
             # In this VASP we consider we are ready to settle when the sender
             # says so (in reality we would check on-chain as well.)
             my_role = ['receiver', 'sender'][self.is_sender(payment)]
-            subaddress = payment.data[my_role].data['subaddress']
+            subaddress = payment.data[my_role].subaddress
             account = self.get_account(subaddress)
-            reference = payment.data['reference_id']
+            reference = payment.reference_id
 
             if reference not in account['pending_transactions']:
                 account['pending_transactions'][reference] = { 'settled':False }
 
             if not account['pending_transactions'][reference]['settled']:
-                account["balance"] += payment.data['action'].data['amount']
+                account["balance"] += payment.action.amount
                 account['pending_transactions'][reference]['settled'] = True
 
             return True
