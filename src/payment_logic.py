@@ -111,6 +111,9 @@ class PaymentProcessor(CommandProcessor):
         self.business = business
 
         # TODO: Persit callbacks?
+        # Either we persit them, or we have to go through all
+        # active payment objects in the executor payment store
+        # and ask for re-processing.
         self.callbacks = {}
         self.ready = {}
 

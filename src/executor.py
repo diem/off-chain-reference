@@ -121,11 +121,13 @@ class ProtocolExecutor:
         ''' Returns the next sequence number in the common sequence.'''
         return len(self.command_sequence)
 
-    def count_potentially_live(self):
-        return sum(1 for obj in self.object_store.values() if obj.get_potentially_live())
+    # Helper functions for testing.
+    if __debug__:
+        def count_potentially_live(self):
+            return sum(1 for obj in self.object_store.values() if obj.get_potentially_live())
 
-    def count_actually_live(self):
-        return sum(1 for obj in self.object_store.values() if obj.get_actually_live())
+        def count_actually_live(self):
+            return sum(1 for obj in self.object_store.values() if obj.get_actually_live())
 
     def all_true(self, versions, predicate):
         for version in versions:
