@@ -344,6 +344,11 @@ class VASPPairChannel:
 
         if response.not_protocol_failure():
 
+            # Optimization
+            next_expected = self.next_retransmit.get_value()
+            if next_expected == request_seq:
+                self.next_retransmit.set_value(next_expected + 1)
+
             # Idenpotent: We have already processed the response
             if self.my_requests[request_seq].has_response():
                 # TODO: Check the reponse is the same and log warning otherwise.
@@ -411,12 +416,6 @@ class VASPPairChannel:
     def would_retransmit(self, do_retransmit=False):
         """ Returns true if there are any pending re-transmits, namely
             requests for which the response has not yet been received. """
-        #for request in self.my_requests:
-        #    assert isinstance(request, CommandRequestObject)
-        #    if not request.has_response():
-        #        if do_retransmit:
-        #            self.send_request(request)
-        #        return True
         
         answer = False
         next_retransmit = self.next_retransmit.get_value()
