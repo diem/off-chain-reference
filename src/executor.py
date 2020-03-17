@@ -70,7 +70,18 @@ class ExecutorException(Exception):
     pass
 
 class ProtocolExecutor:
+    """ The protocol executor managed the common sequence of commands
+        between two VASPs, tracks dependencies of commands and status 
+        of shared objects, and calls into a CommandProcessor to check
+        the commands for validity, as well as to determine what further
+        processing objects they should subject to.
+    """
+
     def __init__(self, channel, processor):
+        """ Initialize the executor with the channel to which it is 
+            attached and the processor to check and further process
+            the commands.
+        """
 
         if __debug__:
             # No need for this import unless we are debugging
@@ -105,6 +116,7 @@ class ProtocolExecutor:
     
     @property
     def last_confirmed(self):
+        """ The index of the last confirmed (success or fail) command in the sequence """
         return self._last_confirmed.get_value()
     
     @last_confirmed.setter
@@ -130,6 +142,7 @@ class ProtocolExecutor:
             return sum(1 for obj in self.object_store.values() if obj.get_actually_live())
 
     def all_true(self, versions, predicate):
+        ''' Helper function for testing status of objects in bulk '''
         for version in versions:
             if version not in self.object_store:
                 return False

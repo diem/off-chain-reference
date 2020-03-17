@@ -12,7 +12,7 @@ class OffChainError(JSONSerializable):
             and self.code == other.code
 
     def get_json_data_dict(self, flag):
-        ''' Get a data dictionary compatible with JSON serilization (json.dumps) '''
+        ''' Get a data dictionary compatible with JSON serialization (json.dumps) '''
         data_dict = {
             "protocol_error" : self.protocol_error,
             "code" : self.code
