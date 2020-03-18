@@ -11,24 +11,20 @@ class PaymentCommand(ProtocolCommand):
         ''' Creates a new Payment command based on the diff from the given payment'''
         ProtocolCommand.__init__(self)
         self.dependencies = list(payment.extends)
-        self.creates = [payment.get_version()]
+        self.creates_versions = [ payment.get_version() ]
         self.command = payment.get_full_diff_record()
 
     def __eq__(self, other):
         return self.dependencies == other.dependencies \
-            and self.creates == other.creates \
+            and self.creates_versions == other.creates_versions \
             and self.command == other.command
 
     def get_object(self, version_number, dependencies):
         ''' Constructs the new or updated objects '''
         # First find dependencies & created objects
-        if len(self.dependencies) > 1:
-            raise PaymentLogicError("A payment can only depend on a single previous payment")
-        if len(self.creates) != 1:
-            raise PaymentLogicError("A payment always creates a new payment")
-        if self.creates[0] != version_number:
-            raise PaymentLogicError("Unknown object %s (only know %s)" % (version_number, self.creates[0]))
-        new_version = self.creates[0]
+        new_version = self.get_new_version()
+        if new_version != version_number:
+            raise PaymentLogicError("Unknown object %s (only know %s)" % (version_number, new_version))
 
         if len(self.dependencies) == 0:
             payment = PaymentObject.create_from_record(self.command)
@@ -62,6 +58,24 @@ class PaymentCommand(ProtocolCommand):
         self.command = data['diff']
         return self
 
+    # Helper functions for payment commands specifically
+
+    def get_previous_version(self):
+        ''' Returns the version of the previous payment, or None if this 
+            command creates a new payment '''
+        dep_len = len(self.dependencies)
+        if dep_len > 1:
+            raise PaymentLogicError("A payment can only depend on a single previous payment")
+        if dep_len == 0:
+            return None
+        else:
+            return self.dependencies[0]
+
+    def get_new_version(self):
+        ''' Returns the version number of the payment created or updated '''
+        if len(self.creates_versions) != 1:
+            raise PaymentLogicError("A payment always creates a new payment")
+        return self.creates_versions[0]
 
 class PaymentLogicError(Exception):
     pass
@@ -114,8 +128,8 @@ class PaymentProcessor(CommandProcessor):
         context = self.business_context()
         dependencies = executor.object_store
 
-        new_payment = command.get_object(command.creates[0], dependencies)
-        assert new_payment.get_version() == command.creates[0]
+        new_version = command.get_new_version()
+        new_payment = command.get_object(new_version, dependencies)
 
         ## Ensure that the two parties involved are in the VASP channel
         parties = set([new_payment.data['sender'].data['address'], 
@@ -141,13 +155,15 @@ class PaymentProcessor(CommandProcessor):
             if command.dependencies == []:
                 self.check_new_payment(new_payment)
             else:
-                old_payment = dependencies[command.dependencies[0]]
+                old_version = command.get_previous_version()
+                old_payment = dependencies[old_version]
                 self.check_new_update(old_payment, new_payment)
 
     def process_command(self, vasp, channel, executor, command, status_success, error=None):
         if status_success:
             dependencies = executor.object_store
-            payment = command.get_object(command.creates[0], dependencies)
+            new_version = command.get_new_version()
+            payment = command.get_object(new_version, dependencies)
             new_payment = self.payment_process(payment)
             if new_payment.has_changed():
                 new_cmd = PaymentCommand(new_payment)
