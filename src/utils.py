@@ -53,7 +53,7 @@ class StructureChecker:
         return parse_map
 
 
-    def get_full_record(self):
+    def get_full_diff_record(self):
         ''' Returns a hierarchy of diffs applied to this object and children'''
         parse = self.parse_map()
         diff = {}
@@ -72,7 +72,7 @@ class StructureChecker:
         for field in parse:
             xtype, parse_more = parse[field]
             if field in self.data and parse_more:
-                inner_diff = self.data[field].get_full_record()
+                inner_diff = self.data[field].get_full_diff_record()
                 if inner_diff != {}:
                     diff[field] = inner_diff
 

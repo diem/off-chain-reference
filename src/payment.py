@@ -167,5 +167,5 @@ class PaymentObject(SharedObject, StructureChecker):
         })
 
     def has_changed(self):
-        ret = not self.get_full_record() == {}
+        ret = not self.get_full_diff_record() == {}
         return ret

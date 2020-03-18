@@ -12,7 +12,7 @@ class PaymentCommand(ProtocolCommand):
         ProtocolCommand.__init__(self)
         self.dependencies = list(payment.extends)
         self.creates = [payment.get_version()]
-        self.command = payment.get_full_record()
+        self.command = payment.get_full_diff_record()
 
     def __eq__(self, other):
         return self.dependencies == other.dependencies \
