@@ -45,6 +45,8 @@ class PaymentCommand(ProtocolCommand):
             if dep not in dependencies:
                 raise PaymentLogicError('Cound not find payment dependency: %s' % dep)
             dep_object = dependencies[dep]
+
+            # Need to get a deepcopy new version
             updated_payment = dep_object.new_version(new_version)
             PaymentObject.from_full_record(self.command, base_instance=updated_payment)
             assert updated_payment.version == new_version
