@@ -113,7 +113,7 @@ class StructureChecker:
             StructureChecker.__init__(self)
         else:
             # TODO: Profile and see if this deep copy is necessary.
-            self = deepcopy(base_instance)
+            self = base_instance
         
         parse = cls.parse_map()
         new_diff = {}

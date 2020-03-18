@@ -181,10 +181,13 @@ class VASPPairChannel:
         """ Counts the number of responses this VASP is waiting for """
         return len([1 for req in self.my_requests if not req.has_response()])
 
+    def has_pending_responses(self):
+        return self.would_retransmit()
+
     def process_pending_requests_response(self):
         """ The server re-schedules and executes pending requests, and cached
             responses. """
-        if self.pending_responses() == 0:
+        if not self.has_pending_responses():
             requests = self.pending_requests
             self.pending_requests = []
             for req in requests:
@@ -270,7 +273,7 @@ class VASPPairChannel:
 
         # As a server we first wait for the status of all server
         # requests to sequence any new client requests.
-        if self.is_server() and self.pending_responses() > 0:
+        if self.is_server() and self.has_pending_responses():
             self.pending_requests += [request]
             return None
             
@@ -282,13 +285,11 @@ class VASPPairChannel:
                 # previous commands.
                 response = make_protocol_error(request, code='wait')
                 return self.send_response(response)
-                
-            
 
             seq = self.next_final_sequence()
             try:
                 self.executor.sequence_next_command(request.command, 
-                                                    do_not_sequence_errors = False)
+                                    do_not_sequence_errors = False)
                 response = make_success_response(request)
             except ExecutorException as e:
                 response = make_command_error(request, str(e))
