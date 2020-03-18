@@ -171,7 +171,9 @@ class StructureChecker:
                 self.data[key] = diff[key]
                 updates = True
 
-        self.check_structure()
+        for field, field_type, required, _ in self.fields:
+            if required and field not in self.data:
+                raise StructureException('Missing field: %s' % field)
 
         # Do custom checks on object
         self.custom_update_checks(diff)
@@ -179,18 +181,6 @@ class StructureChecker:
         if updates:
             self.record(diff)
 
-    def check_structure(self):
-        ''' Checks all structural requirements are met '''
-        for field, field_type, required, _ in self.fields:
-            if field in self.data:
-                if not isinstance(self.data[field], field_type):
-                    actual_type = type(self.data[field])
-                    raise StructureException(
-                        'Wrong type: field %s, expected %s but got %s' %
-                        (field, field_type, type(actual_type)))
-            else:
-                if required == REQUIRED:
-                    raise StructureException('Missing field: %s' % field)
 
 # define serializaqtion flags
 class JSONFlag(Enum):
