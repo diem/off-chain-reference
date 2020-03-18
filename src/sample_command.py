@@ -17,7 +17,7 @@ class SampleCommand(ProtocolCommand):
             self.dependencies = []
         else:
             self.dependencies = deps
-        self.creates   = [ command.item ]
+        self.creates_versions   = [ command.item ]
         self.command   = command
         self.always_happy = True
 
@@ -29,7 +29,7 @@ class SampleCommand(ProtocolCommand):
 
     def __eq__(self, other):
         return self.dependencies == other.dependencies \
-            and self.creates == other.creates \
+            and self.creates_versions == other.creates_versions \
             and self.command.item == other.command.item
 
     def __str__(self):

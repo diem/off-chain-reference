@@ -7,7 +7,7 @@ from shared_object import SharedObject
 class ProtocolCommand(JSONSerializable):
     def __init__(self):
         self.dependencies = []
-        self.creates   = []
+        self.creates_versions   = []
         self.commit_status = None
         self.origin = None # Takes a LibraAddress
     
@@ -26,7 +26,7 @@ class ProtocolCommand(JSONSerializable):
 
     def new_object_versions(self):
         ''' Get the list of version numbers created by this command. '''
-        return set(self.creates)
+        return set(self.creates_versions)
 
     def get_object(self, version_number, dependencies):
         ''' Returns the actual shared object with this version number. '''
@@ -37,7 +37,7 @@ class ProtocolCommand(JSONSerializable):
         ''' Get a data dictionary compatible with JSON serilization (json.dumps) '''
         data_dict = {
             "dependencies" : self.dependencies,
-            "creates"    : self.creates,
+            "creates_versions"    : self.creates_versions,
         }
 
         if flag == JSONFlag.STORE:
@@ -58,7 +58,7 @@ class ProtocolCommand(JSONSerializable):
         self = cls.__new__(cls)
         ProtocolCommand.__init__(self)
         self.dependencies = list(data['dependencies'])
-        self.creates = list(data['creates'])
+        self.creates_versions = list(data['creates_versions'])
         if flag == JSONFlag.STORE:
             self.commit_status = data["commit_status"]
             if "origin" in data:

@@ -122,7 +122,7 @@ class sample_business(BusinessContext):
             return Status.needs_kyc_data
         
         if 'recipient_signature' not in payment.data and my_role == 'sender':
-                return Status.needs_recipient_signature
+            return Status.needs_recipient_signature
             
         return payment.data[my_role].status
 

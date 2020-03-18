@@ -67,7 +67,7 @@ def test_payment_command_multiple_dependencies_fail(basic_payment):
 
 def test_payment_command_create_fail(basic_payment):
     cmd = PaymentCommand(basic_payment)
-    cmd.creates += [basic_payment.get_version()]
+    cmd.creates_versions += [basic_payment.get_version()]
     with pytest.raises(PaymentLogicError):
         cmd.get_object(None, [])
 

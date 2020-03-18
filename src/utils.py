@@ -61,14 +61,14 @@ class StructureChecker:
         return parse_map
 
 
-    def get_full_record(self):
+    def get_full_diff_record(self):
         ''' Returns a hierarchy of diffs applied to this object and children'''
         parse = self.parse_map()
         diff = {}
         for field in self.data:
             xtype, parse_more = parse[field]
             if parse_more:
-                diff[field] = self.data[field].get_full_record()
+                diff[field] = self.data[field].get_full_diff_record()
             else:
                 if xtype in {str, int, list, dict}:
                     diff[field] = self.data[field]
@@ -91,6 +91,7 @@ class StructureChecker:
                     return True
         
         return False
+
 
     def __eq__(self, other):
         ''' Define equality as equality between data fields only '''
@@ -187,7 +188,9 @@ class StructureChecker:
                 self.data[key] = diff[key]
                 updates = True
 
-        self.check_structure()
+        for field, field_type, required, _ in self.fields:
+            if required and field not in self.data:
+                raise StructureException('Missing field: %s' % field)
 
         # Do custom checks on object
         self.custom_update_checks(diff)
@@ -195,18 +198,6 @@ class StructureChecker:
         if updates:
             self.record(diff)
 
-    def check_structure(self):
-        ''' Checks all structural requirements are met '''
-        for field, field_type, required, _ in self.fields:
-            if field in self.data:
-                if not isinstance(self.data[field], field_type):
-                    actual_type = type(self.data[field])
-                    raise StructureException(
-                        'Wrong type: field %s, expected %s but got %s' %
-                        (field, field_type, type(actual_type)))
-            else:
-                if required == REQUIRED:
-                    raise StructureException('Missing field: %s' % field)
 
 # define serializaqtion flags
 class JSONFlag(Enum):
