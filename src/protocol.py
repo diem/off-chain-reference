@@ -95,15 +95,16 @@ class VASPPairChannel:
         root = storage_factory.make_value(self.myself.plain(), None)
         other_vasp = storage_factory.make_value(self.other.plain(), None, root=root)
 
-        self.my_requests = storage_factory.make_list('my_requests', CommandRequestObject, root=other_vasp)
-        self.other_requests = storage_factory.make_list('other_requests', CommandRequestObject, root=other_vasp)
+        with self.get_vasp().get_storage_factory() as tx_no: 
+            self.my_requests = storage_factory.make_list('my_requests', CommandRequestObject, root=other_vasp)
+            self.other_requests = storage_factory.make_list('other_requests', CommandRequestObject, root=other_vasp)
 
-        self.next_retransmit = storage_factory.make_value('next_retransmit', int, root=other_vasp)
-        if not self.next_retransmit.exists():
-            self.next_retransmit.set_value(0)
+            self.next_retransmit = storage_factory.make_value('next_retransmit', int, root=other_vasp)
+            if not self.next_retransmit.exists():
+                self.next_retransmit.set_value(0)
 
-        # The final sequence
-        self.executor = ProtocolExecutor(self, self.processor)
+            # The final sequence
+            self.executor = ProtocolExecutor(self, self.processor)
         # <ENDS to persist>
 
         # Ephemeral state that can be forgotten upon a crash
@@ -212,32 +213,39 @@ class VASPPairChannel:
 
         off_chain_command.set_origin(self.get_my_address())
         request = CommandRequestObject(off_chain_command)
-        request.seq = self.my_next_seq()
 
-        if self.is_server():
-            request.command_seq = self.next_final_sequence()
-            # Raises and exits on error -- does not sequence
-            self.executor.sequence_next_command(off_chain_command,
-                do_not_sequence_errors = True)
+        # Ensure all storage operations are written atomically.
+        with self.get_vasp().get_storage_factory() as tx_no:
+            request.seq = self.my_next_seq()
 
-        # self.my_next_seq += 1
-        self.my_requests += [ request ]
-        self.send_request(request)
+            if self.is_server():
+                request.command_seq = self.next_final_sequence()
+                # Raises and exits on error -- does not sequence
+                self.executor.sequence_next_command(off_chain_command,
+                    do_not_sequence_errors = True)
+
+            self.my_requests += [ request ]
+            self.send_request(request)
+            
         self.persist()
-
 
     def parse_handle_request(self, json_command):
         ''' Handles a request provided as a json_string '''
         try:
             req_dict = json.loads(json_command)
             request = CommandRequestObject.from_json_data_dict(req_dict, JSONFlag.NET)
-            self.handle_request(request)
+            return self.handle_request(request)
         except JSONParsingError:
             response = make_parsing_error()
             self.send_response(response)
+            return None
 
 
     def handle_request(self, request):
+        with  self.get_vasp().get_storage_factory() as tx_no:
+            return self._handle_request(request)
+
+    def _handle_request(self, request):
         """ Handles a request received by this VASP.
         
             Returns a network record of the response if one can be constructed,
@@ -327,6 +335,10 @@ class VASPPairChannel:
             raise # To close the channel
 
     def handle_response(self, response):
+        with self.get_vasp().get_storage_factory() as tx_no:
+            self._handle_response(response)
+
+    def _handle_response(self, response):
         """ Handles a response to a request by this VASP """
         assert isinstance(response, CommandResponseObject)
 
@@ -417,18 +429,18 @@ class VASPPairChannel:
     def would_retransmit(self, do_retransmit=False):
         """ Returns true if there are any pending re-transmits, namely
             requests for which the response has not yet been received. """
-        
-        answer = False
-        next_retransmit = self.next_retransmit.get_value()
-        my_request_len  = len(self.my_requests)
-        while next_retransmit < my_request_len:
-            request = self.my_requests[next_retransmit]
-            if request.has_response():
-                next_retransmit += 1
-            else:
-                answer = True
-                if do_retransmit:
-                    self.send_request(request)
-                break
-        self.next_retransmit.set_value(next_retransmit)
-        return answer
+        with self.get_vasp().get_storage_factory() as tx_no:
+            answer = False
+            next_retransmit = self.next_retransmit.get_value()
+            my_request_len  = len(self.my_requests)
+            while next_retransmit < my_request_len:
+                request = self.my_requests[next_retransmit]
+                if request.has_response():
+                    next_retransmit += 1
+                else:
+                    answer = True
+                    if do_retransmit:
+                        self.send_request(request)
+                    break
+            self.next_retransmit.set_value(next_retransmit)
+            return answer

@@ -4,7 +4,7 @@ import dbm
 import json
 from pathlib import PosixPath
 
-from utils import JSONFlag, JSONSerializable
+from utils import JSONFlag, JSONSerializable, get_unique_string
 
 class Storable:
     """ Base class for objects that can be stored """
@@ -12,6 +12,7 @@ class Storable:
     def __init__(self, xtype):
         """ Specify the type (or base type) of the objects to be stored """
         self.xtype = xtype
+        self.factory = None
 
     def pre_proc(self, val):
         """ Pre-processing of objects before storage. By default 
@@ -39,18 +40,61 @@ class StorableFactory:
 
     def __init__(self, db):
         self.db = db
+        self.current_transaction = None
+        self.levels = 0
 
     def make_value(self, name, xtype, root = None):
         ''' A new value-like storable'''
-        return StorableValue(self.db, name, xtype, root)
+        v = StorableValue(self, name, xtype, root)
+        v.factory = self
+        return v
 
     def make_list(self, name, xtype, root):
         ''' A new list-like storable'''
-        return StorableList(self.db, name, xtype, root)
+        v = StorableList(self, name, xtype, root)
+        v.factory = self
+        return v
 
     def make_dict(self, name, xtype, root):
         ''' A new map-like storable'''
-        return StorableDict(self.db, name, xtype, root)
+        v = StorableDict(self, name, xtype, root)
+        v.factory = self
+        return v
+
+    # Define central interfaces as a dictionary structure 
+    # (with no keys or value enumeration)
+
+    def __getitem__(self, key):
+        return self.db[key]
+
+    def __setitem__(self, key, value):
+        # Ensure all writes are within a  transaction.
+        if self.current_transaction is None:
+            raise RuntimeError('Writes must happen within a transaction context')
+        self.db[key] = value
+    
+    def __contains__(self, item):
+        return item in self.db
+    
+    def __delitem__(self, key):
+        del self.db[key]
+
+    # Define the interfaces as a context manager
+
+    def __enter__(self):
+        if self.levels == 0:
+            self.current_transaction = get_unique_string()
+
+        #print('Enter Tx %s (%s)' % (self.current_transaction, self.levels))
+        self.levels += 1
+
+    def __exit__(self, type, value, traceback):
+        #print('Exit Tx', self.current_transaction)
+        self.levels -= 1
+        if self.levels == 0:
+            self.current_transaction = None
+            # print('Commit')
+            # TODO: commit state
 
 class StorableDict(Storable):
 
