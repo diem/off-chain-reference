@@ -183,7 +183,7 @@ def test_payment_to_diff():
     action = PaymentAction(10, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
 
     payment = PaymentObject(sender, receiver, 'ref', 'orig_ref', 'desc', action)
-    record = payment.get_full_record()
+    record = payment.get_full_diff_record()
     new_payment = PaymentObject.create_from_record(record)
     assert payment == new_payment
 
@@ -214,7 +214,7 @@ def test_to_json():
     payment = PaymentObject(sender, receiver, 'ref', 'orig_ref', 'desc', action)
 
     import json
-    json_payment = json.dumps(payment.get_full_record())
+    json_payment = json.dumps(payment.get_full_diff_record())
     new_payment = PaymentObject.create_from_record(json.loads(json_payment))
     assert payment == new_payment
 

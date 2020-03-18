@@ -130,7 +130,7 @@ class PaymentObject(SharedObject, StructureChecker, JSONSerializable):
         ('receiver', PaymentActor, REQUIRED, WRITE_ONCE),
         ('reference_id', str, REQUIRED, WRITE_ONCE),
         ('original_payment_reference_id', str, REQUIRED, WRITE_ONCE),
-        ('description', str, REQUIRED, WRITE_ONCE),
+        ('description', str, OPTIONAL, WRITE_ONCE),
         ('action', PaymentAction, REQUIRED, WRITE_ONCE),
         ('recipient_signature', str, OPTIONAL, WRITE_ONCE)
     ]
@@ -167,11 +167,12 @@ class PaymentObject(SharedObject, StructureChecker, JSONSerializable):
             'recipient_signature': signature
         })
 
+
     def get_json_data_dict(self, flag, update_dict = None):
         ''' Get a data dictionary compatible with JSON serilization (json.dumps) '''
         json_data = {}
         json_data = SharedObject.get_json_data_dict(self, flag, json_data)
-        json_data['data'] = self.get_full_record()
+        json_data['data'] = self.get_full_diff_record()
         return json_data
 
     @classmethod
