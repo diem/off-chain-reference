@@ -46,9 +46,10 @@ def test_exec(basic_payment):
     assert cmd2.dependencies == cmd1.creates
     assert cmd3.dependencies == cmd2.creates
 
-    pe.sequence_next_command(cmd1)
-    pe.sequence_next_command(cmd2)
-    pe.sequence_next_command(cmd3)
+    with vasp.get_storage_factory() as tx_no: 
+        pe.sequence_next_command(cmd1)
+        pe.sequence_next_command(cmd2)
+        pe.sequence_next_command(cmd3)
 
     assert pe.count_potentially_live() == 3
 
@@ -64,9 +65,9 @@ def test_exec(basic_payment):
     cmd5a = PaymentCommand(pay5a)
     cmd5a.set_origin(channel.get_my_address())
 
-
-    pe.sequence_next_command(cmd4a)
-    pe.sequence_next_command(cmd5a)
+    with vasp.get_storage_factory() as tx_no: 
+        pe.sequence_next_command(cmd4a)
+        pe.sequence_next_command(cmd5a)
 
     # Diverge -- branch B
 
@@ -80,8 +81,9 @@ def test_exec(basic_payment):
     cmd5b = PaymentCommand(pay5b)
     cmd5b.set_origin(channel.get_my_address())
 
-    pe.sequence_next_command(cmd4b)
-    pe.sequence_next_command(cmd5b)
+    with vasp.get_storage_factory() as tx_no: 
+        pe.sequence_next_command(cmd4b)
+        pe.sequence_next_command(cmd5b)
 
     assert pe.count_potentially_live() == 7
 
@@ -94,20 +96,21 @@ def test_exec(basic_payment):
     with pytest.raises(ExecutorException):
         pe.sequence_next_command(cmd_bad, do_not_sequence_errors=True)
 
-    pe.set_success(0)
-    pe.set_success(1)
-    pe.set_success(2)
-    assert pe.count_potentially_live() == 5
-    assert pe.count_actually_live() == 1
+    with vasp.get_storage_factory() as tx_no: 
+        pe.set_success(0)
+        pe.set_success(1)
+        pe.set_success(2)
+        assert pe.count_potentially_live() == 5
+        assert pe.count_actually_live() == 1
 
-    pe.set_success(3)
-    pe.set_success(4)
+        pe.set_success(3)
+        pe.set_success(4)
 
-    assert pe.count_potentially_live() == 3
-    assert pe.count_actually_live() == 1
+        assert pe.count_potentially_live() == 3
+        assert pe.count_actually_live() == 1
 
-    pe.set_fail(5)
-    pe.set_fail(6)
+        pe.set_fail(5)
+        pe.set_fail(6)
 
     assert pe.count_potentially_live() == 1
     assert pe.count_actually_live() == 1
@@ -158,12 +161,13 @@ def test_handlers(basic_payment):
     assert cmd2.dependencies == list(cmd1.creates)
     assert cmd3.dependencies == list(cmd1.creates)
 
-    pe.sequence_next_command(cmd1)
-    pe.sequence_next_command(cmd2)
-    pe.sequence_next_command(cmd3)
-    pe.set_success(0)
-    pe.set_success(1)
-    pe.set_fail(2)
+    with vasp.get_storage_factory() as tx_no: 
+        pe.sequence_next_command(cmd1)
+        pe.sequence_next_command(cmd2)
+        pe.sequence_next_command(cmd3)
+        pe.set_success(0)
+        pe.set_success(1)
+        pe.set_fail(2)
 
     assert stat.success_no == 2
     assert stat.failure_no == 1
