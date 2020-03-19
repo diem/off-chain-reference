@@ -269,7 +269,7 @@ class PaymentProcessor(CommandProcessor):
         # TODO: should we retrive here the latest version of the object?
         self.ready[callback_ID] = obj
         self.notify()
-
+        
     def payment_process_ready(self):
         ''' Processes any objects for which the callbacks have returned '''
         updated_objects = []
