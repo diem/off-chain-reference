@@ -112,7 +112,7 @@ class StorableFactory:
             if key in self.db:
                 old_entries[key] = self.db[key]
             else:
-                non_existent_entries += [key]
+                non_existent_entries += [ key ]
         
         backup_data = json.dumps([old_entries, non_existent_entries])
         self.db['__backup_recovery'] = backup_data

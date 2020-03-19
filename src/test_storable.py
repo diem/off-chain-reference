@@ -200,3 +200,60 @@ def test_value_request(db, basic_payment):
     assert val.get_value() != cmd
     val.set_value(cmd)
     assert val.get_value() == cmd
+
+def test_recovery():
+
+    class CrashNow(Exception):
+        pass
+
+    # Define an underlying storage that crashes
+    class CrashDict(dict):
+        
+        def __init__(self, *args, **kwargs):
+            dict.__init__(self, *args, **kwargs)
+            self.crash = None
+
+        def __setitem__(self, key, value):
+            if self.crash is not None:
+                self.crash -= 1
+                if self.crash == 0:
+                    self.crash = None
+                    raise CrashNow()
+            dict.__setitem__(self, key, value)
+    
+    # Test the crashing dict itself.
+    cd = CrashDict()
+    cd.crash = 2
+
+    cd['A'] = 1
+    with pytest.raises(CrashNow):
+        cd['B'] = 2
+
+    cd2 = CrashDict()
+    assert cd2.crash is None
+    sf = StorableFactory(cd2)
+
+    with sf as tx_id:
+        sf["1"] = 1
+        assert "1" in sf.cache
+        sf["2"] = 2
+        assert "2" in sf.cache
+        sf["4"] = 4
+    
+    assert sf.cache == {}
+    assert cd2 == {"1":1, "2":2, '4':4}
+    sf.__enter__()
+    sf["1"] = 10
+    assert "1" in sf.cache
+    sf["3"] = 30
+    assert "3" in sf.cache
+    del sf['4']
+
+    cd2.crash = 3
+    with pytest.raises(CrashNow):
+        sf.persist_cache()
+    assert '__backup_recovery' in cd2
+
+    sf2 = StorableFactory(cd2)
+    assert '__backup_recovery' not in cd2
+    assert cd2 == {"1":1, "2":2, '4':4}
