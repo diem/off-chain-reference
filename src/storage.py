@@ -43,6 +43,14 @@ class StorableFactory:
         self.current_transaction = None
         self.levels = 0
 
+        # Transaction cache: keep data in memory
+        # until the transaction completes.
+        self.cache = {}
+        self.del_cache = set()
+
+        # Check and fix the database, if this is needed
+        self.crash_recovery()
+
     def make_value(self, name, xtype, root = None):
         ''' A new value-like storable'''
         v = StorableValue(self, name, xtype, root)
@@ -65,19 +73,87 @@ class StorableFactory:
     # (with no keys or value enumeration)
 
     def __getitem__(self, key):
+        # First look into the cache
+        if key in self.del_cache:
+            raise KeyError('The key is to be deleted.')
+        if key in self.cache:
+            return self.cache[key]
         return self.db[key]
 
     def __setitem__(self, key, value):
         # Ensure all writes are within a  transaction.
         if self.current_transaction is None:
             raise RuntimeError('Writes must happen within a transaction context')
-        self.db[key] = value
+        self.cache[key] = value
+        if key in self.del_cache:
+            self.del_cache.remove(key)
     
     def __contains__(self, item):
+        if item in self.cache:
+            return True
         return item in self.db
     
     def __delitem__(self, key):
-        del self.db[key]
+        if self.current_transaction is None:
+            raise RuntimeError('Writes must happen within a transaction context')
+        if key in self.cache:
+            del self.cache[key]
+        self.del_cache.add(key)
+        
+    def persist_cache(self):
+        ''' Safely persist the cache once the transaction is over. '''
+        
+        from itertools import chain
+
+        # Create a backup of all affected values.
+        old_entries = {}
+        non_existent_entries = []
+        for key in chain(self.cache.keys(), self.del_cache):
+            if key in self.db:
+                old_entries[key] = self.db[key]
+            else:
+                non_existent_entries += [key]
+        
+        backup_data = json.dumps([old_entries, non_existent_entries])
+        self.db['__backup_recovery'] = backup_data
+        # TODO: call to flush to disk
+
+        # Write new values to the database
+        for item in self.cache:
+            assert item not in self.del_cache
+            self.db[item] = self.cache[item]
+        for item in self.del_cache:
+            assert item not in self.cache
+            if item in self.db:
+                del self.db[item]
+        
+        # upon completion of write, clean up
+        del self.db['__backup_recovery']
+        self.cache = {}
+        self.del_cache = set()
+
+    def crash_recovery(self):
+        ''' Detects whether a database contains potentially inconsistent state
+            and recovers a good state of the database. '''
+
+        if '__backup_recovery' not in self.db:
+            return
+        
+        # Recover the old good state.
+        backup_data = json.loads(self.db['__backup_recovery'])
+        old_entries = backup_data[0]
+        non_existent_entries = backup_data[1]
+
+        # Note, this may be executed many times in case of crash during
+        # crash recovery. 
+        for item in old_entries:
+            self.db[item] = old_entries[item]
+        for item in non_existent_entries:
+            if item in self.db:
+                del self.db[item]
+        
+        # TODO: Ensure the writes are complete?
+        del self.db['__backup_recovery']
 
     # Define the interfaces as a context manager
 
@@ -95,6 +171,7 @@ class StorableFactory:
             self.current_transaction = None
             # print('Commit')
             # TODO: commit state
+            self.persist_cache()
 
 class StorableDict(Storable):
 
