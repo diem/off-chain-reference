@@ -118,8 +118,9 @@ def check_status(role, old_status, new_status, other_status):
 # The logic to process a payment from either side.
 class PaymentProcessor(CommandProcessor):
 
-    def __init__(self, business, storage_db=None):
+    def __init__(self, business, storage_factory):
         self.business = business
+        self.storage_factory = storage_factory
 
         # TODO: Persit callbacks?
         # Either we persit them, or we have to go through all

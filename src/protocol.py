@@ -12,7 +12,7 @@ NetMessage = namedtuple('NetMessage', ['src', 'dst', 'type', 'content'])
 
 class OffChainVASP:
     """Manages the off-chain protocol on behalf of one VASP. """
-    def __init__(self, vasp_addr, processor, db=None):
+    def __init__(self, vasp_addr, processor, storage_factory):
 
         if __debug__:
             assert isinstance(processor, CommandProcessor)
@@ -33,9 +33,7 @@ class OffChainVASP:
         self.channel_store = {}
 
         # Manage storage
-        if db is None:
-            db = {}
-        self.storage_factory = StorableFactory(db)
+        self.storage_factory = storage_factory
 
     def get_vasp_address(self):
         ''' Return our own VASP Libra Address. '''

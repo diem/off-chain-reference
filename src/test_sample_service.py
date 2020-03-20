@@ -106,7 +106,8 @@ def settled_payment_as_receiver():
 def addr_bc_proc():
     a0 = LibraAddress.encode_to_Libra_address(b'B'*16)
     bc = sample_business(a0)
-    proc = PaymentProcessor(bc)
+    store = StorableFactory({})
+    proc = PaymentProcessor(bc, store)
     return (a0, bc, proc)
 
 def test_business_simple():

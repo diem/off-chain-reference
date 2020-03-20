@@ -182,7 +182,8 @@ def mockProcessor():
 def test_client_server_role_definition(three_address, mockVASP, mockProcessor):
     a0, a1, a2 = three_address
 
-    vasp = OffChainVASP(a0, mockProcessor)
+    store = StorableFactory({})
+    vasp = OffChainVASP(a0, mockProcessor, store)
     channel = VASPPairChannel(a0, a1, vasp, mockProcessor)
     assert channel.is_server()
     assert not channel.is_client()
@@ -206,9 +207,11 @@ def server_client(three_address, mockVASP, mockProcessor):
     a0, a1, a2 = three_address
 
 
-    vasp_server = OffChainVASP(a0, mockProcessor)
+    store_server = StorableFactory({})
+    vasp_server = OffChainVASP(a0, mockProcessor, store_server)
     server = VASPPairChannel(a0, a1, vasp_server, mockProcessor)
-    vasp_client = OffChainVASP(a1, mockProcessor)
+    store_client = StorableFactory({})
+    vasp_client = OffChainVASP(a1, mockProcessor, store_client)
     client = VASPPairChannel(a1, a0, vasp_client, mockProcessor)
 
     server = monkey_tap(server)
@@ -538,8 +541,9 @@ def test_VASProot():
     a0 = LibraAddress.encode_to_Libra_address(b'A'*16)
     a1 = LibraAddress.encode_to_Libra_address(b'B'*16)
     a2 = LibraAddress.encode_to_Libra_address(b'C'*16)
+    store = StorableFactory({})
     proc = MagicMock(spec=CommandProcessor)
-    vasp = OffChainVASP(a0, proc)
+    vasp = OffChainVASP(a0, proc, store)
 
     # Check our own address is good
     assert vasp.get_vasp_address() == a0
@@ -554,8 +558,9 @@ def test_VASProot_diff_object():
     a0 = LibraAddress.encode_to_Libra_address(b'A'*16)
     b1 = LibraAddress.encode_to_Libra_address(b'B'*16)
     b2 = LibraAddress.encode_to_Libra_address(b'B'*16)
+    store = StorableFactory({})
     proc = MagicMock(spec=CommandProcessor)
-    vasp = OffChainVASP(a0, proc)
+    vasp = OffChainVASP(a0, proc, store)
 
     # Check our own address is good
     assert vasp.get_vasp_address() == a0
@@ -597,9 +602,12 @@ if __name__ == "__main__":
     a2 = LibraAddress.encode_to_Libra_address(b'B'*16)
 
     proc = MagicMock(spec=CommandProcessor)
-    vasp_server = OffChainVASP(a0, proc)
+    store_server = StorableFactory({})
+    vasp_server = OffChainVASP(a0, proc, store_server)
     server = VASPPairChannel(a0, a1, vasp_server, proc)
-    vasp_client = OffChainVASP(a1, proc)
+
+    store_client = StorableFactory({})
+    vasp_client = OffChainVASP(a1, proc, store_client)
     client = VASPPairChannel(a1, a0, vasp_client, proc)
 
     server = monkey_tap(server)

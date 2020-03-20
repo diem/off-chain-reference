@@ -21,7 +21,8 @@ def test_exec(basic_payment):
     a0 = LibraAddress.encode_to_Libra_address(b'A'*16)
     a1 = LibraAddress.encode_to_Libra_address(b'B'*16)
     proc = MagicMock(spec=CommandProcessor)
-    vasp = OffChainVASP(a0, proc)
+    store = StorableFactory({})
+    vasp = OffChainVASP(a0, proc, store)
     channel = VASPPairChannel(a0, a1, vasp, proc)
     bcm = MagicMock(spec=BusinessContext)
     
@@ -120,7 +121,8 @@ def test_handlers(basic_payment):
     a0 = LibraAddress.encode_to_Libra_address(b'A'*16)
     a1 = LibraAddress.encode_to_Libra_address(b'B'*16)
     proc = MagicMock(spec=CommandProcessor)
-    vasp = OffChainVASP(a0, proc)
+    store = StorableFactory({})
+    vasp = OffChainVASP(a0, proc, store)
     channel = VASPPairChannel(a0, a1, vasp, proc)
 
     bcm = MagicMock(spec=BusinessContext)

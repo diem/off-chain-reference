@@ -3,6 +3,7 @@ from protocol import OffChainVASP
 from protocol_messages import CommandRequestObject
 from payment_logic import PaymentCommand, PaymentProcessor
 from status_logic import Status
+from storage import StorableFactory
 
 import json
 
@@ -219,8 +220,9 @@ class sample_vasp:
     def __init__(self, my_addr):
         self.my_addr = my_addr
         self.bc      = sample_business(self.my_addr)
-        self.pp           = PaymentProcessor(self.bc)
-        self.vasp         = OffChainVASP(self.my_addr, self.pp)
+        self.store        = StorableFactory({})
+        self.pp           = PaymentProcessor(self.bc, self.store)
+        self.vasp         = OffChainVASP(self.my_addr, self.pp, self.store)
         
     def collect_messages(self):
         messages = []
@@ -228,7 +230,6 @@ class sample_vasp:
             messages += channel.net_queue
             del channel.net_queue[:]
         return messages
-
 
     def get_channel(self, other_vasp):
         channel = self.vasp.get_channel(other_vasp)
