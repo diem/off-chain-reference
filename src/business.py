@@ -8,11 +8,11 @@
 class BusinessAsyncInterupt(Exception):
     ''' Indicates that the result cannot be produced immediately,
         and the call must be done again once the result is ready. '''
-    
+
     def __init__(self, callback_ID):
         ''' Set a callback ID to signal which call was interupted '''
         self.callback_ID = callback_ID
-    
+
     def get_callback_ID(self):
         ''' Return the callback ID associated with the interrupted call '''
         return self.callback_ID
@@ -47,7 +47,7 @@ class BusinessContext:
 
     def get_vasp_info_by_libra_address(self, libra_address):
         ''' Returns a VASPInfo instance for the other VASP. This requires
-            reading the latest authoritative information from the chain.    
+            reading the latest authoritative information from the chain.
         '''
         raise NotImplementedError()
 
@@ -65,7 +65,7 @@ class BusinessContext:
         ''' Checks that the actor on this VASP exists. This may be either
             the recipient or the sender, since VASPs can initiate payments
             in both directions. If not throw a BuninessValidationFailure.
-            
+
             Can raise:
                 BuninessValidationFailure'''
 
@@ -77,9 +77,9 @@ class BusinessContext:
 
     def validate_recipient_signature(self, payment):
         ''' Validates the recipient signature is correct. If there is no
-            signature or the signature is correct do nothing. Throw a 
-            BuninessValidationFailure is not. 
-            
+            signature or the signature is correct do nothing. Throw a
+            BuninessValidationFailure is not.
+
             Can raise:
                 BuninessValidationFailure'''
         raise NotImplementedError()
@@ -127,9 +127,9 @@ class BusinessContext:
 
     def validate_kyc_signature(self, payment):
         ''' Validates the kyc signature is correct. If the signature is correct,
-            or there is no signature, then do nothing. Throw a 
-            BuninessValidationFailure if signature verification fails. 
-            
+            or there is no signature, then do nothing. Throw a
+            BuninessValidationFailure if signature verification fails.
+
             Can raise:
                 BuninessValidationFailure'''
         raise NotImplementedError()
@@ -230,7 +230,11 @@ class VASPInfo:
         """ Base URL that manages off-chain communications"""
         raise NotImplementedError()
 
-    def is_authorised_VASP(self):
+    def get_peer_base_url(self, other_addr):
+        """ Base URL that manages off-chain communications"""
+        raise NotImplementedError()
+
+    def is_authorised_VASP(self, certificate):
         """ Whether this has the authorised VASP bit set on chain"""
         raise NotImplementedError()
 

@@ -66,6 +66,7 @@ if __name__ == "__main__":
     processor = MagicMock(spec=CommandProcessor)
     vasp = OffChainVASP(addr, processor)
     context = MagicMock(spec=VASPInfo)
+    context.is_authorised_VASP.return_value = True
     network = AuthenticatedNetworking(
         vasp,
         context,
