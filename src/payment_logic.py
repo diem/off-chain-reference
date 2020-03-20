@@ -191,6 +191,9 @@ class PaymentProcessor(CommandProcessor):
     def process_command_backlog(self, vasp):
         ''' Sends commands that have been resumed after being interrupted to other
             VASPs.'''
+
+        # TODO: should we only request the backlog for this specific VASP,
+        #       in case this processor is used for multiple ones?
         updated_payments = self.payment_process_ready()
         for payment in updated_payments:
             parties = [payment.sender.address, 
