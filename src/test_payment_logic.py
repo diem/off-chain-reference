@@ -272,7 +272,8 @@ def test_payment_process_interrupt(basic_payment, ppctx):
     bcm.check_account_existence.side_effect = [None]
     bcm.next_kyc_level_to_request.side_effect = [BusinessAsyncInterupt(1234)]
 
-    new_payment = pp.payment_process(basic_payment)
+    with pp.storage_factory as _:
+        new_payment = pp.payment_process(basic_payment)
     assert not new_payment.has_changed()
     assert new_payment.data['receiver'].data['status'] == Status.none
 
@@ -285,7 +286,8 @@ def test_payment_process_interrupt_resume(basic_payment, ppctx):
     bcm.next_kyc_to_provide.side_effect = [BusinessAsyncInterupt(1234)]
 
     assert basic_payment.data['receiver'].data['status'] == Status.none
-    new_payment = pp.payment_process(basic_payment)
+    with pp.storage_factory as _:
+        new_payment = pp.payment_process(basic_payment)
     assert new_payment.has_changed()
     assert new_payment.data['receiver'].data['status'] == Status.ready_for_settlement
 
@@ -294,7 +296,8 @@ def test_payment_process_interrupt_resume(basic_payment, ppctx):
     bcm.has_settled.side_effect = [True]
 
     pp.notify_callback(1234)
-    L = pp.payment_process_ready()
+    with pp.storage_factory as _:
+        L = pp.payment_process_ready()
     assert len(L) == 1
     assert len(pp.callbacks) == 0
     assert len(pp.ready) == 0
