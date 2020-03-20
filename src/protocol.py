@@ -149,20 +149,20 @@ class VASPPairChannel:
 
     def role(self):
         """ The role of the VASP as a string. For debug output."""
-        return ['Client','Server'][self.is_server()]
+        return ['Server', 'Client'][self.is_client()]
 
     def is_server(self):
         """ Is the local VASP a server for this pair?"""
         return not self.is_client()
 
-    def pending_responses(self):
+    def num_pending_responses(self):
         """ Counts the number of responses this VASP is waiting for """
         return len([1 for req in self.my_requests if not req.has_response()])
 
     def process_pending_requests_response(self):
         """ The server re-schedules and executes pending requests, and cached
             responses. """
-        if self.pending_responses() == 0:
+        if self.num_pending_responses() == 0:
             requests = self.pending_requests
             self.pending_requests = []
             for req in requests:
@@ -174,7 +174,7 @@ class VASPPairChannel:
             self.handle_response(response)
 
     def apply_response_to_executor(self, request):
-        """Signals to the executor the success of failure of a command."""
+        """Signals to the executor the success or failure of a command."""
         assert request.response is not None
         response = request.response
         if request.is_success():
@@ -219,7 +219,7 @@ class VASPPairChannel:
             or None in case they are scheduled for later processing. If none is
             returned then this function must be called again once the condition
 
-                self.pending_responses() == 0
+                self.num_pending_responses() == 0
 
             becomes true.
         """
@@ -248,7 +248,7 @@ class VASPPairChannel:
 
         # As a server we first wait for the status of all server
         # requests to sequence any new client requests.
-        if self.is_server() and self.pending_responses() > 0:
+        if self.is_server() and self.num_pending_responses() > 0:
             self.pending_requests += [request]
             return None
 

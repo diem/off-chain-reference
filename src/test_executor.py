@@ -26,7 +26,7 @@ def test_exec(basic_payment):
 
     cmd1 = PaymentCommand(basic_payment)
     cmd1.set_origin(channel.get_my_address())
-    assert channel.get_my_address() == channel.get_my_address()
+    assert cmd1.get_origin() == channel.get_my_address()
 
     pay2 = basic_payment.new_version()
     pay2.data['sender'].change_status(Status.needs_stable_id)

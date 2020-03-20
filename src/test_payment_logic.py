@@ -48,24 +48,27 @@ def test_payment_end_to_end_serialization(basic_payment):
 
 def test_payment_command_multiple_dependencies_fail(basic_payment):
     new_payment = basic_payment.new_version('v1')
-    new_payment.extends += ['v2']
+    # Error: 2 dependencies
+    new_payment.previous_versions += ['v2']
     cmd = PaymentCommand(new_payment)
     with pytest.raises(PaymentLogicError):
-        cmd.get_object(None, [basic_payment])
+        cmd.get_object(new_payment.get_version(), 
+            { basic_payment.get_version():basic_payment })
 
 
 def test_payment_command_create_fail(basic_payment):
     cmd = PaymentCommand(basic_payment)
-    cmd.creates_versions += [basic_payment.get_version()]
+    # Error: two new versions
+    cmd.creates_versions += [ basic_payment.get_version() ]
     with pytest.raises(PaymentLogicError):
-        cmd.get_object(None, [])
+        cmd.get_object(basic_payment.get_version(), {})
 
 
 def test_payment_command_missing_dependency_fail(basic_payment):
     new_payment = basic_payment.new_version('v1')
     cmd = PaymentCommand(new_payment)
     with pytest.raises(PaymentLogicError):
-        cmd.get_object(None, [])
+        cmd.get_object(new_payment.get_version(), {})
 
 
 # ----- check_new_payment -----
