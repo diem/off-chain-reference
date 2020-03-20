@@ -126,8 +126,11 @@ class PaymentProcessor(CommandProcessor):
         # Either we persit them, or we have to go through all
         # active payment objects in the executor payment store
         # and ask for re-processing.
-        self.callbacks = {}
-        self.ready = {}
+
+        with storage_factory as txid:
+            root = storage_factory.make_value('processor', None)
+            self.callbacks = storage_factory.make_dict('callbacks', PaymentObject, root)
+            self.ready = storage_factory.make_dict('ready', PaymentObject, root)
 
     
     # -------- Implements CommandProcessor interface ---------
@@ -265,16 +268,23 @@ class PaymentProcessor(CommandProcessor):
     def notify_callback(self, callback_ID):
         ''' Notify the processor that the callback with a specific ID has returned, and is ready to provide an answer. '''
         assert callback_ID in self.callbacks
-        obj = self.callbacks[callback_ID]
-        del self.callbacks[callback_ID]
-        # TODO: should we retrive here the latest version of the object?
-        self.ready[callback_ID] = obj
-        self.notify()
         
+        with self.storage_factory as _:
+            obj = self.callbacks[callback_ID]
+            del self.callbacks[callback_ID]
+            # TODO: should we retrive here the latest version of the object?
+            #       Yes we should (opened issue #34)
+            self.ready[callback_ID] = obj
+            self.notify()
+            
     def payment_process_ready(self):
         ''' Processes any objects for which the callbacks have returned '''
         updated_objects = []
-        for (callback_ID, obj) in list(self.ready.items()):
+        # TODO: here some calls to payment process may result in more
+        #       callbacks, should we repeat this undel the ready list len
+        #       is equal to zero. 
+        for callback_ID in list(self.ready.keys()):
+            obj = self.ready[callback_ID]
             new_obj = self.payment_process(obj)
             del self.ready[callback_ID]
             if new_obj.has_changed():

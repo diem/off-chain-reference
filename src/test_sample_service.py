@@ -132,7 +132,8 @@ def test_business_is_kyc_provided(kyc_payment_as_receiver, addr_bc_proc):
     kyc_level = bc.next_kyc_level_to_request(payment)
     assert kyc_level == Status.none
 
-    ret_payment = proc.payment_process(payment)
+    with proc.storage_factory as _:
+        ret_payment = proc.payment_process(payment)
     assert ret_payment.has_changed()
 
     ready = bc.ready_for_settlement(ret_payment)
@@ -147,7 +148,8 @@ def test_business_is_kyc_provided_sender(kyc_payment_as_sender, addr_bc_proc):
     kyc_level = bc.next_kyc_level_to_request(payment)
     assert kyc_level == Status.needs_recipient_signature
 
-    ret_payment = proc.payment_process(payment)
+    with proc.storage_factory as _:
+        ret_payment = proc.payment_process(payment)
     assert ret_payment.has_changed()
 
     ready = bc.ready_for_settlement(ret_payment)

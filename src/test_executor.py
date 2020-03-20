@@ -28,7 +28,6 @@ def test_exec(basic_payment):
     
     pe = ProtocolExecutor(channel, proc)
 
-
     cmd1 = PaymentCommand(basic_payment)
     cmd1.set_origin(channel.get_my_address())
     assert channel.get_my_address() == channel.get_my_address()
