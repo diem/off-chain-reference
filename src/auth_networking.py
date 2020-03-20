@@ -31,7 +31,9 @@ class AuthenticatedNetworking(Networking):
 
         if __debug__:
             self.app.add_url_rule(
-                '/', view_func=VASPOffChainApi.as_view('debug', self.vasp)
+                '/', view_func=VASPOffChainApi.as_view(
+                    'debug', self.vasp, self.context
+                )
             )
 
         # The server's secret key.

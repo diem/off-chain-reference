@@ -16,8 +16,8 @@ def network():
     addr = LibraAddress.encode_to_Libra_address(b'B'*16)
     processor = MagicMock(spec=CommandProcessor)
     vasp = OffChainVASP(addr, processor)
-    info_context = MagicMock(spec=VASPInfo)
-    network = Networking(vasp, info_context)
+    context = MagicMock(spec=VASPInfo)
+    network = Networking(vasp, context)
     return network
 
 
@@ -38,6 +38,7 @@ def test_process_request(network, client, simple_request_json):
     addr = LibraAddress.encode_to_Libra_address(b'B'*16)
     other_addr = LibraAddress.encode_to_Libra_address(b'A'*16)
     url = f'/{addr.plain()}/{other_addr.plain()}/process/'
+    network.context.is_authorised_VASP.return_value = True
     response = client.post(url, json=simple_request_json)
     assert response.status_code == 200
     assert json.loads(response.data)['status'] == 'success'
@@ -54,6 +55,6 @@ def test_send_request(network, httpserver, simple_request_json, simple_response_
 def test_get_url(network):
     addr = LibraAddress.encode_to_Libra_address(b'B'*16)
     other_addr = LibraAddress.encode_to_Libra_address(b'A'*16)
-    network.info_context.get_base_url.return_value = '/'
+    network.context.get_peer_base_url.return_value = '/'
     url = network.get_url(other_addr)
     assert url == f'/{other_addr.plain()}/{addr.plain()}/process/'
