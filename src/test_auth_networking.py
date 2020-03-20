@@ -13,6 +13,23 @@ from unittest.mock import MagicMock
 import sys
 import requests
 
+'''
+Run the following command to create the server's key and certificate:
+    $ openssl req -x509 -newkey rsa:4096 -keyout server_key.pem \
+        -out server_cert.pem -nodes -days 365 -subj "/CN=127.0.0.1"
+
+Run the following commands to create the client's key and certificate:
+    $ openssl req -newkey rsa:4096 -keyout client_key.pem -out client_csr.pem \
+        -nodes -days 365
+    $ openssl x509 -req -in client_csr.pem -signkey client_key.pem \
+        -out client_cert.pem -days 365
+
+For testing the client from a web browser, generate a p12 file and add it to the
+browser (or to the OS Keychain if using Safari):
+    $ openssl pkcs12 -export -in client_cert.pem -inkey client_key.pem \
+        -out client.p12
+'''
+
 def simple_request_json():
     sender_addr = LibraAddress.encode_to_Libra_address(b'A'*16).encoded_address
     receiver_addr   = LibraAddress.encode_to_Libra_address(b'B'*16).encoded_address
