@@ -7,7 +7,7 @@ class SharedObject(JSONSerializable):
     def __init__(self):
         ''' All objects have a version number and their commit status '''
         self.version = get_unique_string()
-        self.extends = [] # Stores the previous version of the object
+        self.previous_versions = [] # Stores the previous version of the object
 
         # Flags indicate the state of the object in the store
         self.potentially_live = False   # Pending commands could make it live
@@ -16,7 +16,7 @@ class SharedObject(JSONSerializable):
     def new_version(self, new_version = None):
         ''' Make a deep copy of an object with a new version number '''
         clone = deepcopy(self)
-        clone.extends = [ self.get_version() ]
+        clone.previous_versions = [ self.get_version() ]
         clone.version = new_version
         if clone.version is None:
             clone.version = get_unique_string()
@@ -53,7 +53,7 @@ class SharedObject(JSONSerializable):
 
         update_dict.update({
             'version' : self.version,
-            'extends' : self.extends,
+            'previous_versions' : self.previous_versions,
             'potentially_live' : self.potentially_live,
             'actually_live' : self.actually_live
         })
@@ -67,7 +67,7 @@ class SharedObject(JSONSerializable):
         if self is None:
             self = cls.__new__(cls)
         self.version = data['version']
-        self.extends = data['extends']
+        self.previous_versions = data['previous_versions']
         self.potentially_live = bool(data['potentially_live'])
         self.actually_live = bool(data['actually_live'])
         return self

@@ -594,7 +594,7 @@ def test_sample_command():
     data = obj.get_json_data_dict(JSONFlag.STORE)
     obj2 = JSONSerializable.parse(data, JSONFlag.STORE)
     assert obj2.version == obj.version
-    assert obj2.extends == obj.extends
+    assert obj2.previous_versions == obj.previous_versions
 
 if __name__ == "__main__":
     a0 = LibraAddress.encode_to_Libra_address(b'A'*16) 
