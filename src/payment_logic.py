@@ -8,9 +8,14 @@ from libra_address import LibraAddress
 
 class PaymentCommand(ProtocolCommand):
     def __init__(self, payment):
-        ''' Creates a new Payment command based on the diff from the given payment'''
+        ''' Creates a new Payment command based on the diff from the given payment.
+        
+            It depedends on the payment object that the payment diff extends 
+            (in case it updates a previous payment). It creates the object 
+            with the version number of the payment provided.
+        '''
         ProtocolCommand.__init__(self)
-        self.dependencies = list(payment.extends)
+        self.dependencies = list(payment.previous_versions)
         self.creates_versions = [ payment.get_version() ]
         self.command = payment.get_full_diff_record()
 
@@ -20,17 +25,22 @@ class PaymentCommand(ProtocolCommand):
             and self.command == other.command
 
     def get_object(self, version_number, dependencies):
-        ''' Constructs the new or updated objects '''
+        ''' Returns the new payment object defined by this command. Since this
+            may depend on a previous payment (when it is an update) we need to
+            provide a dictionary of its dependencies.
+        '''
         # First find dependencies & created objects
         new_version = self.get_new_version()
         if new_version != version_number:
             raise PaymentLogicError("Unknown object %s (only know %s)" % (version_number, new_version))
 
+        # This indicates the command creates a fresh payment.
         if len(self.dependencies) == 0:
             payment = PaymentObject.create_from_record(self.command)
             payment.set_version(new_version)
             return payment
 
+        # This command updates a previous payment.
         elif len(self.dependencies) == 1:
             dep = self.dependencies[0]
             if dep not in dependencies:
@@ -38,13 +48,13 @@ class PaymentCommand(ProtocolCommand):
             dep_object = dependencies[dep]
             updated_payment = dep_object.new_version(new_version)
             PaymentObject.from_full_record(self.command, base_instance=updated_payment)
-            assert updated_payment.version == new_version
             return updated_payment
 
-        assert False
+        raise PaymentLogicError("Can depdend on no or one other payemnt")
+
 
     def get_json_data_dict(self, flag):
-        ''' Get a data disctionary compatible with JSON serilization (json.dumps) '''
+        ''' Get a data dictionary compatible with JSON serilization (json.dumps) '''
         data_dict = ProtocolCommand.get_json_data_dict(self, flag)
         data_dict['diff'] = self.command
         return data_dict
@@ -294,7 +304,7 @@ class PaymentProcessor(CommandProcessor):
                 # TODO: ensure valid abort from the other side elsewhere
                 current_status = Status.abort
 
-            if current_status in {Status.none}:
+            if current_status == Status.none:
                 business.check_account_existence(new_payment)
 
             if current_status in {Status.none,
@@ -321,9 +331,10 @@ class PaymentProcessor(CommandProcessor):
                     new_payment.add_recipient_signature(signature)
 
             # Check if we have all the KYC we need
-            ready = business.ready_for_settlement(new_payment)
-            if ready:
-                current_status = Status.ready_for_settlement
+            if current_status not in { Status.ready_for_settlement, Status.settled }:
+                ready = business.ready_for_settlement(new_payment)
+                if ready:
+                    current_status = Status.ready_for_settlement
 
             if current_status == Status.ready_for_settlement and business.has_settled(new_payment):
                 current_status = Status.settled

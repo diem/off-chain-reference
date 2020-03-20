@@ -11,7 +11,7 @@ business_config = """[
         "account": "1",
         "stable_id": "A",
         "balance": 10.0,
-        "business": false,
+        "entity": false,
         "kyc_data" : "{ 'name' : 'Alice' }",
         "pending_transactions" : {}
     },
@@ -19,7 +19,7 @@ business_config = """[
         "account": "2",
         "stable_id": "B",
         "balance": 100.0,
-        "business": true,
+        "entity": true,
         "kyc_data" : "{ 'name' : 'Bob' }",
         "pending_transactions" : {}
     }
@@ -90,7 +90,7 @@ class sample_business(BusinessContext):
         subaddress = payment.data[my_role].data['subaddress']
         account = self.get_account(subaddress)
 
-        if account['business']:
+        if account['entity']:
             return { Status.needs_kyc_data }
 
         to_provide = set()
@@ -114,7 +114,7 @@ class sample_business(BusinessContext):
         subaddress = payment.data[my_role].data['subaddress']
         account = self.get_account(subaddress)
 
-        if account['business']:
+        if account['entity']:
             # Put the money aside for this payment ... 
             return Status.none
         
@@ -170,22 +170,20 @@ class sample_business(BusinessContext):
                     account["balance"] -= payment.data['action'].data['amount']
 
             else:
-                raise BusinessForceAbort('Insufficient Balance')
+                if reference not in account['pending_transactions']:
+                    raise BusinessForceAbort('Insufficient Balance')
 
         # This VASP subaccount is a business
-        if account['business']:
-            # Put the money aside for this payment ... 
+        if account['entity']:
             return self.has_sig(payment)
         
         # The other VASP subaccount is a business
         if 'kyc_data' in payment.data[other_role].data and \
-            payment.data[other_role].data['kyc_data'].parse()['type'] == 'business':
-            # Put the money aside for this payment ... 
+            payment.data[other_role].data['kyc_data'].parse()['type'] == 'entity':
             return self.has_sig(payment)
         
         # Simple VASP, always requires kyc data for individuals
         if 'kyc_data' in payment.data[other_role].data and 'kyc_data' in payment.data[my_role].data:
-            # Put the money aside for this payment ... 
             return self.has_sig(payment)
         
         return False
