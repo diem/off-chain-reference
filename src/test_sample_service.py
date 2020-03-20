@@ -119,7 +119,7 @@ def test_business_is_related(basic_payment_as_receiver, addr_bc_proc):
     payment = basic_payment_as_receiver
 
     kyc_level = bc.next_kyc_level_to_request(payment)
-    assert kyc_level != Status.none
+    assert kyc_level == Status.needs_kyc_data
 
     ret_payment = proc.payment_process(payment)
     assert ret_payment.has_changed()

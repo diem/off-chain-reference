@@ -30,7 +30,6 @@ class ProtocolCommand(JSONSerializable):
 
     def get_object(self, version_number, dependencies):
         ''' Returns the actual shared object with this version number. '''
-        assert version_number in self.new_object_versions()
         raise NotImplementedError('You need to subclass and override this method')
 
     def get_json_data_dict(self, flag):
@@ -70,19 +69,32 @@ class ExecutorException(Exception):
     pass
 
 class ProtocolExecutor:
-    """ The protocol executor managed the common sequence of commands
-        between two VASPs, tracks dependencies of commands and status 
-        of shared objects, and calls into a CommandProcessor to check
-        the commands for validity, as well as to determine what further
-        processing objects they should subject to.
+    """ An instance of this class managed the common sequence of commands
+        between two VASPs, and whether they are a success of failure. It 
+        uses a CommandProcessor to determine if the command itself is 
+        valid by itslef, and also to then 'execute' the command, and
+        possibly generate more commands as a result.
+
+        A command in the sequence is a success if:
+            (0) All the shared objects it depends on are active.
+            (1) Both sides consider it a valid (according to the command
+                processor checks.) 
+        
+        All successful commands see the objects they create become valid,
+        and are passed on to the CommandProcessor, to drive the higher
+        level protocol forward.
     """
 
-    def __init__(self, channel, processor):
-        """ Initialize the executor with the channel to which it is 
-            attached and the processor to check and further process
-            the commands.
-        """
 
+    def __init__(self, channel, processor):
+        """ Initialize the ProtocolExecutor with a Command Processor
+            that checks the commands, and then executes the protocol for
+            successful commands.
+
+            The channel provides the context (vasp, channel) to pass on to
+            the executor, as well as the storage context to persist 
+            the command sequence.
+        """
         if __debug__:
             # No need for this import unless we are debugging
             from protocol import VASPPairChannel
@@ -162,8 +174,7 @@ class ProtocolExecutor:
         all_good = False
         pos = None
 
-        myself = self.channel.get_my_address()
-        own = (command.origin == myself)
+        own = (command.origin == self.channel.get_my_address())
 
         try:
             # For our own commands we do speculative execution
@@ -179,21 +190,27 @@ class ProtocolExecutor:
             vasp, channel, executor = self.get_context()
             self.processor.check_command(vasp, channel, executor, command)
 
-            if all_good:
-                new_versions = command.new_object_versions()
-                for version in new_versions:
-                    obj = command.get_object(version, self.object_store)
-                    obj.set_potentially_live(True)
-                    self.object_store[version] = obj
+            # Since the processor has not thrown an error, we assume the
+            # command is valid and tag the objects as potentially live.
+            # (We still need a successful response from the other side to
+            # ensure they are actually live.)
+            new_versions = command.new_object_versions()
+            for version in new_versions:
+                obj = command.get_object(version, self.object_store)
+                obj.set_potentially_live(True)
+                self.object_store[version] = obj
 
         # TODO: have a less catch-all exception here to detect expected vs. unexpected exceptions
+        #       (Issue #33)
         except Exception as e:
             all_good = False
             type_str = str(type(e)) +": "+str(e)
             raise ExecutorException(type_str)
 
         finally:
-            # Sequence if all is good, or if we were asked to
+            # Sequence if all is good, or if we were asked to. Note that
+            # we do sequence command failure, if the failure is due to a
+            # high level protocol failure (for audit).
             if all_good or not do_not_sequence_errors:
                 pos = len(self.command_sequence)
                 self.command_sequence += [ command ]
@@ -201,7 +218,11 @@ class ProtocolExecutor:
         return pos
 
     def set_success(self, seq_no):
-        ''' Sets the command at a specific sequence number to be a success. '''
+        ''' Sets the command at a specific sequence number to be a success. 
+
+            Turn all objects created to be actually live, and call the 
+            CommandProcessor to drive the protocol forward.
+        '''
         assert seq_no == self.last_confirmed
         self.last_confirmed += 1
 
@@ -223,6 +244,7 @@ class ProtocolExecutor:
             obj.set_actually_live(True)
             self.object_store[version] = obj
         
+        # Call the command processor.
         if command.commit_status is None:
             command.commit_status = True
             self.command_sequence[seq_no] = command
@@ -230,7 +252,11 @@ class ProtocolExecutor:
         
 
     def set_fail(self, seq_no):
-        ''' Sets the command at a specific sequence number to be a failure. '''
+        ''' Sets the command at a specific sequence number to be a failure. 
+        
+            Remove all potentially live objects from the database, to trigger
+            failure of subsequent commands that depend on them.
+        '''
         assert seq_no == self.last_confirmed
         self.last_confirmed += 1
 
@@ -244,6 +270,7 @@ class ProtocolExecutor:
                 obj.set_potentially_live(False)
                 del self.object_store[version]
         
+        # Call the command processor.
         if command.commit_status is None:
             command.commit_status = False
             self.command_sequence[seq_no] = command
