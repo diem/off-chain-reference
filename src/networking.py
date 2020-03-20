@@ -8,7 +8,7 @@ import requests
 from urllib.parse import urljoin
 import json
 
-
+# TODO: Handle re-tries
 class Networking:
     def __init__(self, vasp, info_context):
         self.app = Flask(__name__)
@@ -33,13 +33,19 @@ class Networking:
     def send_request(self, url, other_addr, json_request):
         # TODO: Where to handle network errors? Here or in channel?
         response = requests.post(url, json=json_request)
+        self._handle_response(other_addr, response)
+
+    def _handle_response(self, other_addr, response):
         channel = self.vasp.get_channel(other_addr)
         channel.parse_handle_response(json.dumps(response.json()))
-
 
 class VASPOffChainApi(MethodView):
     def __init__(self, vasp):
         self.vasp = vasp
+
+    def get(self):
+        """ This path is not registered; used for debugging by subclasses. """
+        return {"status": "success"}
 
     def post(self, other_addr):
         request_json = request.get_json()
