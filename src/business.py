@@ -54,11 +54,11 @@ class BusinessContext:
     # ----- Actors -----
 
     def is_sender(self, payment):
-        ''' Returns true is the VASP is the sender of a payment.'''
+        ''' Returns true if the VASP is the sender of a payment.'''
         raise NotImplementedError()
 
     def is_recipient(self, payment):
-        ''' Returns true is the VASP is the recipient of a payment.'''
+        ''' Returns true if the VASP is the recipient of a payment.'''
         return not self.is_sender(payment)
 
     def check_account_existence(self, payment):
