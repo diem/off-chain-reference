@@ -62,12 +62,12 @@ class BusinessContext:
         return not self.is_sender(payment)
 
     def check_account_existence(self, payment):
-        ''' Checks that the actor on this VASP exists. This may be either
+        ''' Checks that the actor (sub-account / sub-address) on this VASP exists. This may be either
             the recipient or the sender, since VASPs can initiate payments
-            in both directions. If not throw a BuninessValidationFailure.
+            in both directions. If not throw a BusinessValidationFailure.
             
             Can raise:
-                BuninessValidationFailure'''
+                BusinessValidationFailure'''
 
         raise NotImplementedError()
 
@@ -78,10 +78,10 @@ class BusinessContext:
     def validate_recipient_signature(self, payment):
         ''' Validates the recipient signature is correct. If there is no
             signature or the signature is correct do nothing. Throw a 
-            BuninessValidationFailure is not. 
+            BusinessValidationFailure is not. 
             
             Can raise:
-                BuninessValidationFailure'''
+                BusinessValidationFailure'''
         raise NotImplementedError()
 
     def get_recipient_signature(self, payment):
@@ -128,10 +128,10 @@ class BusinessContext:
     def validate_kyc_signature(self, payment):
         ''' Validates the kyc signature is correct. If the signature is correct,
             or there is no signature, then do nothing. Throw a 
-            BuninessValidationFailure if signature verification fails. 
+            BusinessValidationFailure if signature verification fails. 
             
             Can raise:
-                BuninessValidationFailure'''
+                BusinessValidationFailure'''
         raise NotImplementedError()
 
     def get_extended_kyc(self, payment):
