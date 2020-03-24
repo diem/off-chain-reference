@@ -76,9 +76,9 @@ class BusinessContext:
 
 
     def validate_recipient_signature(self, payment):
-        ''' Validates the recipient signature is correct. If there is no
-            signature or the signature is correct do nothing. Throw a 
-            BusinessValidationFailure is not. 
+        ''' Validates the recipient signature is correct. Raise a
+            BusinessValidationFailure is the signature is invalid
+            or not present. If the signature is valid no nothing.
             
             Can raise:
                 BusinessValidationFailure'''
@@ -126,9 +126,9 @@ class BusinessContext:
         raise NotImplementedError()
 
     def validate_kyc_signature(self, payment):
-        ''' Validates the kyc signature is correct. If the signature is correct,
-            or there is no signature, then do nothing. Throw a 
-            BusinessValidationFailure if signature verification fails. 
+        ''' Validates the kyc signature is correct. Raise a
+            BusinessValidationFailure is the signature is invalid
+            or not present. If the signature is valid no nothing.
             
             Can raise:
                 BusinessValidationFailure'''

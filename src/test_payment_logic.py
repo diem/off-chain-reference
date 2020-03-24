@@ -76,16 +76,16 @@ def test_payment_command_missing_dependency_fail(basic_payment):
 
 def test_payment_create_from_recipient(basic_payment):
     bcm = MagicMock(spec=BusinessContext)
-    bcm.is_recipient.side_effect = [True]
-
+    bcm.is_recipient.side_effect = [True] * 4
     pp = PaymentProcessor(bcm)
     pp.check_new_payment(basic_payment)
     
 
 def test_payment_create_from_sender_sig_fail(basic_payment):
     bcm = MagicMock(spec=BusinessContext)
-    bcm.is_recipient.side_effect = [True]
-    bcm.validate_recipient_signature.side_effect = [BusinessValidationFailure('Sig fails')]
+    bcm.is_recipient.side_effect = [False] * 4
+    basic_payment.add_recipient_signature('BAD SINGNATURE')
+    bcm.validate_recipient_signature.side_effect = [ BusinessValidationFailure('Sig fails') ] * 4
 
     pp = PaymentProcessor(bcm)
     with pytest.raises(BusinessValidationFailure):
@@ -95,7 +95,7 @@ def test_payment_create_from_sender_sig_fail(basic_payment):
 
 def test_payment_create_from_sender(basic_payment):
     bcm = MagicMock(spec=BusinessContext)
-    bcm.is_recipient.side_effect = [False]
+    bcm.is_recipient.side_effect = [False] * 4
     pp = PaymentProcessor(bcm)
     pp.check_new_payment(basic_payment)
 
@@ -113,7 +113,7 @@ def test_payment_create_from_sender_fail(basic_payment):
 
 def test_payment_create_from_receiver_fail(basic_payment):
     bcm = MagicMock(spec=BusinessContext)
-    bcm.is_recipient.side_effect = [False]
+    bcm.is_recipient.side_effect = [False] * 4
 
     basic_payment.data['sender'].update({'status': Status.ready_for_settlement})
     basic_payment.data['receiver'].update({'status': Status.ready_for_settlement})
@@ -137,7 +137,7 @@ def test_payment_create_from_receiver_bad_state_fail(basic_payment):
 
 def test_payment_update_from_sender(basic_payment):
     bcm = MagicMock(spec=BusinessContext)
-    bcm.is_recipient.side_effect = [False]
+    bcm.is_recipient.side_effect = [False] * 4
     pp = PaymentProcessor(bcm)
     diff = {}
     new_obj = basic_payment.new_version()

@@ -205,6 +205,19 @@ class PaymentProcessor(CommandProcessor):
 
     # ----------- END of CommandProcessor interface ---------
 
+    def check_signatures(self, payment):
+        ''' Utility function that checks all signatures present for validity '''
+        business = self.business
+        role = ['sender', 'receiver'][business.is_recipient(payment)]
+        other_role = ['sender', 'receiver'][role == 'sender']
+
+        if 'kyc_signature' in  payment.data[other_role].data:
+            business.validate_kyc_signature(payment)
+
+        if role == 'sender' and 'recipient_signature' in payment.data:
+            business.validate_recipient_signature(payment)
+
+
     def check_new_payment(self, new_payment):
         ''' Checks a diff for a new payment from the other VASP, and returns
             a valid payemnt. If a validation error occurs, then an exception
@@ -235,8 +248,7 @@ class PaymentProcessor(CommandProcessor):
             )
         # TODO: CHeck status here according to status_logic
 
-        business.validate_kyc_signature(new_payment)
-        business.validate_recipient_signature(new_payment)
+        self.check_signatures(new_payment)
 
     def check_new_update(self, payment, new_payment):
         ''' Checks a diff updating an existing payment. On success
@@ -258,8 +270,7 @@ class PaymentProcessor(CommandProcessor):
         # Ensure valid transitions
         check_status(other_role, old_other_status, other_status, status)
 
-        business.validate_kyc_signature(new_payment)
-        business.validate_recipient_signature(new_payment)
+        self.check_signatures(new_payment)
 
     def notify_callback(self, callback_ID):
         ''' Notify the processor that the callback with a specific ID has returned, and is ready to provide an answer. '''
