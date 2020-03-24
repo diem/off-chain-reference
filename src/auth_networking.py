@@ -25,7 +25,7 @@ class PeerCertWSGIRequestHandler(werkzeug.serving.WSGIRequestHandler):
 
 
 class AuthenticatedNetworking(Networking):
-    def __init__(self, vasp, server_key, server_key_password, server_cert,
+    def __init__(self, vasp, server_key, server_cert,
                  client_cert):
 
         super().__init__(vasp)
@@ -39,7 +39,7 @@ class AuthenticatedNetworking(Networking):
         self.server_key = server_key
 
         # The password to access the server's key.
-        self.server_key_password = server_key_password
+        self.server_key_password = None
 
         # The server's certificate.
         self.server_cert = server_cert
