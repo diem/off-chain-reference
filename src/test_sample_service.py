@@ -111,9 +111,10 @@ def addr_bc_proc():
 @pytest.fixture
 def info_context():
     context = MagicMock(spec=VASPInfo)
-    context.get_TLS_certificate.return_value = 'client_cert.pem'
-    context.get_TLS_key.return_value = 'client_key.pem'
-    context.get_peer_TLS_certificate.return_value = 'server_cert.pem'
+    context.get_TLS_certificate.return_value = 'tls_cert.pem'
+    context.get_TLS_key.return_value = 'tls_key.pem'
+    context.get_peer_TLS_certificate.return_value = 'peer_cert.pem'
+    context.get_all_peers_TLS_certificate.return_value = 'all_peers.pem'
     context.get_peer_base_url.return_value = ''
     return context
 

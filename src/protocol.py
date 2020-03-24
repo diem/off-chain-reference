@@ -33,6 +33,14 @@ class OffChainVASP:
         # such as TLS certificates and keys.
         self.info_context = info_context
 
+        # The networking framework
+        self.tls_cert = self.info_context.get_TLS_certificate()
+        self.tls_key = self.info_context.get_TLS_key()
+        peers_cert = self.info_context.get_all_peers_TLS_certificate()
+        self.network = AuthenticatedNetworking(
+            self, self.tls_key, self.tls_cert, peers_cert
+        )
+
         # TODO: this should be a persistent store
         self.channel_store = {}
 
@@ -56,6 +64,9 @@ class OffChainVASP:
         ''' The processor calls this method to notify the VASP that new
             commands are available for processing. '''
         self.processor.process_command_backlog(self)
+
+    def run(self):
+        self.network.run()
 
 
 class VASPPairChannel:
@@ -395,15 +406,13 @@ class VASPPairChannel:
         return False
 
     def send_network_request(self, request_json):
-        client_cert = self.vasp.info_context.get_TLS_certificate()
-        client_key = self.vasp.info_context.get_TLS_key()
-        server_cert = self.vasp.info_context.get_peer_TLS_certificate(self.other)
+        peer_cert = self.vasp.info_context.get_peer_TLS_certificate(self.other)
         base_url = self.vasp.info_context.get_peer_base_url(self.other)
         url = AuthenticatedNetworking.get_url(
             base_url, self.get_my_address(), self.other
         )
         response = AuthenticatedNetworking.send_request(
-            url, request_json, server_cert, client_cert, client_key
+            url, request_json, peer_cert, self.vasp.tls_cert, self.vasp.tls_key
         )
         if response != None:
             self.parse_handle_response(json.dumps(response.json()))

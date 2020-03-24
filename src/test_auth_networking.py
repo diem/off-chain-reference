@@ -68,7 +68,6 @@ if __name__ == "__main__":
     # Test keys and certificates.
     assets_path = '../assets/'
     server_key = f'{assets_path}server_key.pem'
-    server_key_password = None
     server_cert = f'{assets_path}server_cert.pem'
     client_key = f'{assets_path}client_key.pem'
     client_cert = f'{assets_path}client_cert.pem'
@@ -86,7 +85,6 @@ if __name__ == "__main__":
     network = AuthenticatedNetworking(
         vasp,
         server_key,
-        server_key_password,
         server_cert,
         client_cert
     )
