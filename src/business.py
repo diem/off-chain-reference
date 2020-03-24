@@ -54,20 +54,20 @@ class BusinessContext:
     # ----- Actors -----
 
     def is_sender(self, payment):
-        ''' Returns true is the VASP is the sender of a payment.'''
+        ''' Returns true if the VASP is the sender of a payment.'''
         raise NotImplementedError()
 
     def is_recipient(self, payment):
-        ''' Returns true is the VASP is the recipient of a payment.'''
+        ''' Returns true if the VASP is the recipient of a payment.'''
         return not self.is_sender(payment)
 
     def check_account_existence(self, payment):
-        ''' Checks that the actor on this VASP exists. This may be either
+        ''' Checks that the actor (sub-account / sub-address) on this VASP exists. This may be either
             the recipient or the sender, since VASPs can initiate payments
-            in both directions. If not throw a BuninessValidationFailure.
+            in both directions. If not throw a BusinessValidationFailure.
             
             Can raise:
-                BuninessValidationFailure'''
+                BusinessValidationFailure'''
 
         raise NotImplementedError()
 
@@ -76,12 +76,12 @@ class BusinessContext:
 
 
     def validate_recipient_signature(self, payment):
-        ''' Validates the recipient signature is correct. If there is no
-            signature or the signature is correct do nothing. Throw a 
-            BuninessValidationFailure is not. 
+        ''' Validates the recipient signature is correct. Raise a
+            BusinessValidationFailure is the signature is invalid
+            or not present. If the signature is valid no nothing.
             
             Can raise:
-                BuninessValidationFailure'''
+                BusinessValidationFailure'''
         raise NotImplementedError()
 
     def get_recipient_signature(self, payment):
@@ -126,12 +126,12 @@ class BusinessContext:
         raise NotImplementedError()
 
     def validate_kyc_signature(self, payment):
-        ''' Validates the kyc signature is correct. If the signature is correct,
-            or there is no signature, then do nothing. Throw a 
-            BuninessValidationFailure if signature verification fails. 
+        ''' Validates the kyc signature is correct. Raise a
+            BusinessValidationFailure is the signature is invalid
+            or not present. If the signature is valid no nothing.
             
             Can raise:
-                BuninessValidationFailure'''
+                BusinessValidationFailure'''
         raise NotImplementedError()
 
     def get_extended_kyc(self, payment):

@@ -84,9 +84,17 @@ class sample_business(BusinessContext):
     def get_recipient_signature(self, payment):
         return 'VALID'
 
-    def next_kyc_to_provide(self, payment):
+    def get_my_role(self, payment):
         my_role = ['receiver', 'sender'][self.is_sender(payment)]
+        return my_role
+    
+    def get_other_role(self, payment):
         other_role = ['sender', 'receiver'][self.is_sender(payment)]
+        return other_role
+
+    def next_kyc_to_provide(self, payment):
+        my_role = self.get_my_role(payment)
+        other_role = self.get_other_role(payment)
 
         subaddress = payment.data[my_role].subaddress
         account = self.get_account(subaddress)
@@ -110,8 +118,8 @@ class sample_business(BusinessContext):
         
 
     def next_kyc_level_to_request(self, payment):
-        my_role = ['receiver', 'sender'][self.is_sender(payment)]
-        other_role = ['sender', 'receiver'][self.is_sender(payment)]
+        my_role = self.get_my_role(payment)
+        other_role = self.get_other_role(payment)
         subaddress = payment.data[my_role].subaddress
         account = self.get_account(subaddress)
 
@@ -140,22 +148,22 @@ class sample_business(BusinessContext):
                    BusinessAsyncInterupt
                    BusinessNotAuthorized.
         '''
-        my_role = ['receiver', 'sender'][self.is_sender(payment)]
+        my_role = self.get_my_role(payment)
         subaddress = payment.data[my_role].subaddress
         account = self.get_account(subaddress)
         return (account["kyc_data"], 'KYC_SIG', 'KYC_CERT')
 
 
     def get_stable_id(self, payment):
-        my_role = ['receiver', 'sender'][self.is_sender(payment)]
+        my_role = self.get_my_role(payment)
         subaddress = payment.data[my_role].subaddress
         account = self.get_account(subaddress)
         return account["stable_id"]
     
         
     def ready_for_settlement(self, payment):
-        my_role = ['receiver', 'sender'][self.is_sender(payment)]
-        other_role = ['sender', 'receiver'][self.is_sender(payment)]
+        my_role = self.get_my_role(payment)
+        other_role = self.get_other_role(payment)
         subaddress = payment.data[my_role].subaddress
         account = self.get_account(subaddress)
 
@@ -174,19 +182,25 @@ class sample_business(BusinessContext):
                 if reference not in account['pending_transactions']:
                     raise BusinessForceAbort('Insufficient Balance')
 
+        # This VASP always settles payments on chain, so we always need
+        # a signature to settle on chain.
+        if not self.has_sig(payment):
+            return False
+
         # This VASP subaccount is a business
         if account['entity']:
-            return self.has_sig(payment)
+            return True
         
         # The other VASP subaccount is a business
         if 'kyc_data' in payment.data[other_role].data and \
             payment.data[other_role].data['kyc_data'].parse()['type'] == 'entity':
-            return self.has_sig(payment)
+            return True
         
         # Simple VASP, always requires kyc data for individuals
         if 'kyc_data' in payment.data[other_role].data and 'kyc_data' in payment.data[my_role].data:
-            return self.has_sig(payment)
+            return True
         
+        # We are not ready to settle yet!
         return False
 
     def want_single_payment_settlement(self, payment):
@@ -196,8 +210,9 @@ class sample_business(BusinessContext):
         if payment.sender.status == Status.settled:
             # In this VASP we consider we are ready to settle when the sender
             # says so (in reality we would check on-chain as well.)
-            my_role = ['receiver', 'sender'][self.is_sender(payment)]
+            my_role = self.get_my_role(payment)
             subaddress = payment.data[my_role].subaddress
+
             account = self.get_account(subaddress)
             reference = payment.reference_id
 

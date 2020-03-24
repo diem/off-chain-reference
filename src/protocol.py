@@ -396,7 +396,7 @@ class VASPPairChannel:
                 self.persist()
 
             elif response.command_seq < self.next_final_sequence():
-                # Request already in the sequence: happens to the leader.
+                # Request already in the sequence: happens to the server party.
                 #  No chance to register an error, since we do not reply.
                 request.response = response
 
