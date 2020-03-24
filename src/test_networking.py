@@ -22,10 +22,15 @@ def testee_addr():
 
 
 @pytest.fixture
-def network(testee_addr):
+def context():
+    return MagicMock(spec=VASPInfo)
+
+
+@pytest.fixture
+def network(testee_addr, context):
     processor = MagicMock(spec=CommandProcessor)
-    vasp = OffChainVASP(testee_addr, processor)
-    context = MagicMock(spec=VASPInfo)
+    info_context = MagicMock(spec=VASPInfo)
+    vasp = OffChainVASP(testee_addr, processor, info_context)
     network = Networking(vasp, context)
     return network
 
@@ -79,20 +84,19 @@ def test_process_request_bad_request(network, client, url, bad_request_json):
 # --- Test client ---
 
 
-def test_get_url(network, tester_addr, testee_addr):
-    network.context.get_peer_base_url.return_value = '/'
-    url = network.get_url(tester_addr)
+def test_get_url(tester_addr, testee_addr):
+    base_url = '/'
+    url = Networking.get_url(base_url, testee_addr, tester_addr)
     assert url == f'/{tester_addr.plain()}/{testee_addr.plain()}/process/'
 
 
 # the 'httpserver' fixture comes from the pytest-httpserver package
-def test_send_request(network, tester_addr, httpserver, simple_request_json,
-                      simple_response_json):
+def test_send_request(httpserver, simple_request_json, simple_response_json):
     url = '/process'
     httpserver.expect_request(url).respond_with_json(simple_response_json)
-    network.send_request(httpserver.url_for(url), tester_addr, simple_request_json)
+    Networking.send_request(httpserver.url_for(url), simple_request_json)
 
 
-def test_send_request_unknown_receiver(network, tester_addr, simple_request_json):
+def test_send_request_unknown_receiver(network, simple_request_json):
     url = 'http://bad_url'
-    network.send_request(url, tester_addr, simple_request_json)
+    Networking.send_request(url, simple_request_json)

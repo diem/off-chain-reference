@@ -3,6 +3,7 @@ from protocol_messages import CommandRequestObject, CommandResponseObject, \
     make_success_response, make_protocol_error, make_parsing_error, make_command_error
 from utils import JSONParsingError, JSONFlag
 from libra_address import LibraAddress
+from auth_networking import AuthenticatedNetworking
 
 import json
 from collections import namedtuple
@@ -12,7 +13,7 @@ NetMessage = namedtuple('NetMessage', ['src', 'dst', 'type', 'content'])
 class OffChainVASP:
     """Manages the off-chain protocol on behalf of one VASP. """
 
-    def __init__(self, vasp_addr, processor):
+    def __init__(self, vasp_addr, processor, info_context):
         if __debug__:
             assert isinstance(processor, CommandProcessor)
             assert isinstance(vasp_addr, LibraAddress)
@@ -27,6 +28,10 @@ class OffChainVASP:
         # processing of resumed commands.
         self.processor = processor
         self.processor.notify = self.notify_new_commands
+
+        # The VASPInfo context that contains various network information
+        # such as TLS certificates and keys.
+        self.info_context = info_context
 
         # TODO: this should be a persistent store
         self.channel_store = {}
@@ -126,6 +131,7 @@ class VASPPairChannel:
         """ A hook to send a request to other VASP"""
         json_string = request.get_json_data_dict(JSONFlag.NET)
         self.net_queue += [ NetMessage(self.myself, self.other, CommandRequestObject, json_string) ]
+        self.send_network_request(json_string)
 
     def send_response(self, response):
         """ A hook to send a response to other VASP"""
@@ -387,3 +393,17 @@ class VASPPairChannel:
                     self.send_request(request)
                 return True
         return False
+
+    def send_network_request(self, request_json):
+        client_cert = self.vasp.info_context.get_TLS_certificate()
+        client_key = self.vasp.info_context.get_TLS_key()
+        server_cert = self.vasp.info_context.get_peer_TLS_certificate(self.other)
+        base_url = self.vasp.info_context.get_peer_base_url(self.other)
+        url = AuthenticatedNetworking.get_url(
+            base_url, self.get_my_address(), self.other
+        )
+        response = AuthenticatedNetworking.send_request(
+            url, request_json, server_cert, client_cert, client_key
+        )
+        if response != None:
+            self.parse_handle_response(json.dumps(response.json()))

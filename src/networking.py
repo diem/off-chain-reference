@@ -1,4 +1,4 @@
-from protocol import LibraAddress
+from libra_address import LibraAddress
 from protocol_messages import CommandResponseObject
 from business import VASPInfo
 
@@ -30,22 +30,17 @@ class Networking:
     def run(self):
         self.app.run()
 
-    def get_url(self, other_addr):
-        base_url = self.context.get_peer_base_url(other_addr)
-        my_addr = self.vasp.get_vasp_address()
+    @staticmethod
+    def get_url(base_url, my_addr, other_addr):
         url = f'{other_addr.plain()}/{my_addr.plain()}/process/'
         return urljoin(base_url, url)
 
-    def send_request(self, url, other_addr, json_request):
+    @staticmethod
+    def send_request(url, json_request):
         try:
-            response = requests.post(url, json=json_request)
-            self._handle_response(other_addr, response)
+            return requests.post(url, json=json_request)
         except Exception:
-            pass
-
-    def _handle_response(self, other_addr, response):
-        channel = self.vasp.get_channel(other_addr)
-        channel.parse_handle_response(json.dumps(response.json()))
+            return None
 
 
 class VASPOffChainApi(MethodView):

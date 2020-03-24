@@ -1,17 +1,14 @@
-from auth_networking import *
+from auth_networking import AuthenticatedNetworking
 from protocol import LibraAddress, OffChainVASP
 from executor import CommandProcessor
 from business import VASPInfo
-from payment_logic import PaymentCommand
 from protocol_messages import CommandRequestObject
-
-from payment import PaymentActor, PaymentAction, PaymentObject
-from status_logic import Status
-from utils import JSONFlag
+from payment_logic import PaymentCommand
 
 from unittest.mock import MagicMock
 import sys
 import requests
+import json
 
 '''
 Run the following command to create the server's key and certificate:
@@ -30,21 +27,40 @@ browser (or to the OS Keychain if using Safari):
         -out client.p12
 '''
 
-def simple_request_json():
-    sender_addr = LibraAddress.encode_to_Libra_address(b'A'*16).encoded_address
-    receiver_addr   = LibraAddress.encode_to_Libra_address(b'B'*16).encoded_address
-    assert type(sender_addr) == str
-    assert type(receiver_addr) == str
 
-    sender = PaymentActor(sender_addr, 'C', Status.none, [])
-    receiver = PaymentActor(receiver_addr, '1', Status.none, [])
-    action = PaymentAction(5, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
-    payment = PaymentObject(sender, receiver, 'ref_payment_1', 'orig_ref...', 'description ...', action)
-    command = PaymentCommand(payment)
-    request = CommandRequestObject(command)
-    request.seq = 0
-    request_json = json.dumps(request.get_json_data_dict(JSONFlag.NET))
-    return request_json
+def test_vector_request():
+    request_json = {
+        "seq": 0,
+        "command": {
+            "dependencies": [],
+            "creates": ["TJZb1EwYY/gloKCIfiASHw=="],
+            "diff": {
+                "reference_id": "ref_payment_1",
+                "original_payment_reference_id": "orig_ref...",
+                "description": "description ...",
+                "sender": {
+                    "address": "QUFBQUFBQUFBQUFBQUFBQQ==",
+                    "subaddress": "C",
+                    "status": "none",
+                    "metadata": []
+                },
+                "receiver": {
+                    "address": "QkJCQkJCQkJCQkJCQkJCQg==",
+                    "subaddress": "1",
+                    "status": "none",
+                    "metadata": []
+                },
+                "action": {
+                    "amount": 5,
+                    "currency": "TIK",
+                    "action": "charge",
+                    "timestamp": "2020-01-02 18:00:00 UTC"
+                }
+            }
+        },
+        "command_type": "<class 'payment_logic.PaymentCommand'>"
+    }
+    return json.dumps(request_json)
 
 
 if __name__ == "__main__":
@@ -64,7 +80,8 @@ if __name__ == "__main__":
     CommandRequestObject.register_command_type(PaymentCommand)
     addr = LibraAddress.encode_to_Libra_address(b'B'*16)
     processor = MagicMock(spec=CommandProcessor)
-    vasp = OffChainVASP(addr, processor)
+    info_context = MagicMock(spec=VASPInfo)
+    vasp = OffChainVASP(addr, processor, info_context)
     context = MagicMock(spec=VASPInfo)
     context.is_authorised_VASP.return_value = True
     network = AuthenticatedNetworking(
@@ -73,7 +90,6 @@ if __name__ == "__main__":
         server_key,
         server_key_password,
         server_cert,
-        client_key,
         client_cert
     )
 
@@ -90,7 +106,10 @@ if __name__ == "__main__":
     elif mode == 'client-process':
         other_addr = LibraAddress.encode_to_Libra_address(b'A'*16)
         url = f'{base_url}{addr.plain()}/{other_addr.plain()}/process/'
-        network.send_request(url, other_addr, simple_request_json())
+        response = AuthenticatedNetworking.send_request(
+            url, test_vector_request(), server_cert, client_cert, client_key
+        )
+        print('\nRESPONSE: ', response.json())
 
     elif mode == 'server':
         network.run()

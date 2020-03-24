@@ -251,6 +251,14 @@ class VASPInfo:
         """ TODO: Get the on-chain TLS certificate to authenticate channels. """
         raise NotImplementedError()
 
+    def get_TLS_key(self):
+        """ TODO: Get the on-chain TLS key to authenticate channels. """
+        raise NotImplementedError()
+
+    def get_peer_TLS_certificate(self, other_addr):
+        """ TODO: Get the on-chain TLS certificate of a peer VASP. """
+        raise NotImplementedError()
+
     def is_unhosted(self):
         """ Returns True if the other party is an unhosted wallet """
         raise NotImplementedError()

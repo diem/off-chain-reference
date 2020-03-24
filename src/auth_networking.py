@@ -6,6 +6,7 @@ import OpenSSL
 import requests
 import json
 
+
 class PeerCertWSGIRequestHandler(werkzeug.serving.WSGIRequestHandler):
     def make_environ(self):
         # First call the super class method.
@@ -25,7 +26,7 @@ class PeerCertWSGIRequestHandler(werkzeug.serving.WSGIRequestHandler):
 
 class AuthenticatedNetworking(Networking):
     def __init__(self, vasp, info_context, server_key, server_key_password,
-                 server_cert, client_key, client_cert):
+                 server_cert, client_cert):
 
         super().__init__(vasp, info_context)
 
@@ -45,9 +46,6 @@ class AuthenticatedNetworking(Networking):
         # The server's certificate.
         self.server_cert = server_cert
 
-        # The client's secret key.
-        self.client_key = client_key
-
         # Certificate of the CA that issued the client's certificate.
         self.client_cert = client_cert
 
@@ -65,16 +63,14 @@ class AuthenticatedNetworking(Networking):
             ssl_context=ssl_context, request_handler=PeerCertWSGIRequestHandler
         )
 
-    def send_request(self, url, other_addr, json_request):
+    @staticmethod
+    def send_request(url, json_request, server_cert, client_cert, client_key):
         try:
-            response = requests.post(
+            return requests.post(
                 url,
                 json=json_request,
-                verify=self.server_cert,
-                cert=(self.client_cert, self.client_key)
+                verify=server_cert,
+                cert=(client_cert, client_key)
             )
-            self._handle_response(other_addr, response)
-            if __debug__:
-                print('\nREQUEST: ', response.json())
         except Exception:
-            pass
+            return None

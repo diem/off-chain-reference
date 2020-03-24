@@ -29,10 +29,10 @@ class FakeAddress(LibraAddress):
     def equal(self, other):
         return isinstance(other, FakeAddress) \
             and self.addr == other.addr
-    
+
     def plain(self):
         return str(self.addr)
-    
+
     def __repr__(self):
         return f'FakeAddr({self.addr},{self.bit})'
 
@@ -43,7 +43,7 @@ class FakeVASPInfo(VASPInfo):
 
     def get_parent_address(self):
         return self.parent
-    
+
     def get_libra_address(self):
         """ The settlement Libra address for this channel"""
         return self.own_address
@@ -575,7 +575,8 @@ def test_VASProot():
     a1 = LibraAddress.encode_to_Libra_address(b'B'*16)
     a2 = LibraAddress.encode_to_Libra_address(b'C'*16)
     proc = MagicMock(spec=CommandProcessor)
-    vasp = OffChainVASP(a0, proc)
+    info_context = MagicMock(sepc=VASPInfo)
+    vasp = OffChainVASP(a0, proc, info_context)
 
     # Check our own address is good
     assert vasp.get_vasp_address() == a0
@@ -591,7 +592,8 @@ def test_VASProot_diff_object():
     b1 = LibraAddress.encode_to_Libra_address(b'B'*16)
     b2 = LibraAddress.encode_to_Libra_address(b'B'*16)
     proc = MagicMock(spec=CommandProcessor)
-    vasp = OffChainVASP(a0, proc)
+    info_context = MagicMock(sepc=VASPInfo)
+    vasp = OffChainVASP(a0, proc, info_context)
 
     # Check our own address is good
     assert vasp.get_vasp_address() == a0
