@@ -29,7 +29,7 @@ class sample_business(BusinessContext):
     def __init__(self, my_addr):
         self.my_addr = my_addr
         self.accounts_db = json.loads(business_config)
-    
+
     # Helper functions for the business
 
     def get_address(self):
@@ -73,7 +73,7 @@ class sample_business(BusinessContext):
     def is_sender(self, payment):
         self.assert_payment_for_vasp(payment)
         return payment.data['sender'].data['address'] == self.get_address()
-    
+
     def validate_recipient_signature(self, payment):
         if 'recipient_signature' in payment.data:
             if payment.data['recipient_signature'] == 'VALID':
@@ -95,18 +95,18 @@ class sample_business(BusinessContext):
 
         to_provide = set()
         if payment.data[other_role].data['status'] == Status.needs_stable_id:
-                to_provide.add(Status.needs_stable_id) 
-        
+                to_provide.add(Status.needs_stable_id)
+
         if payment.data[other_role].data['status'] == Status.needs_kyc_data:
-                to_provide.add(Status.needs_stable_id) 
-                to_provide.add(Status.needs_kyc_data) 
-        
+                to_provide.add(Status.needs_stable_id)
+                to_provide.add(Status.needs_kyc_data)
+
         if payment.data[other_role].data['status'] == Status.needs_recipient_signature:
                 if my_role == 'receiver':
-                    to_provide.add(Status.needs_recipient_signature) 
-        
+                    to_provide.add(Status.needs_recipient_signature)
+
         return to_provide
-        
+
 
     def next_kyc_level_to_request(self, payment):
         my_role = ['receiver', 'sender'][self.is_sender(payment)]
@@ -115,15 +115,15 @@ class sample_business(BusinessContext):
         account = self.get_account(subaddress)
 
         if account['business']:
-            # Put the money aside for this payment ... 
+            # Put the money aside for this payment ...
             return Status.none
-        
+
         if 'kyc_data' not in payment.data[other_role].data:
             return Status.needs_kyc_data
-        
+
         if 'recipient_signature' not in payment.data and my_role == 'sender':
                 return Status.needs_recipient_signature
-            
+
         return payment.data[my_role].data['status']
 
     def validate_kyc_signature(self, payment):
@@ -150,17 +150,17 @@ class sample_business(BusinessContext):
         subaddress = payment.data[my_role]['subaddress']
         account = self.get_account(subaddress)
         return account["stable_id"]
-    
-        
+
+
     def ready_for_settlement(self, payment):
         my_role = ['receiver', 'sender'][self.is_sender(payment)]
         other_role = ['sender', 'receiver'][self.is_sender(payment)]
         subaddress = payment.data[my_role].data['subaddress']
         account = self.get_account(subaddress)
 
-        if my_role == 'sender': 
+        if my_role == 'sender':
             if account["balance"] >= payment.data['action'].data['amount']:
-                
+
                 # Reserve the amount for this payment
                 reference = payment.data['reference_id']
                 if reference not in account['pending_transactions']:
@@ -174,25 +174,25 @@ class sample_business(BusinessContext):
 
         # This VASP subaccount is a business
         if account['business']:
-            # Put the money aside for this payment ... 
+            # Put the money aside for this payment ...
             return self.has_sig(payment)
-        
+
         # The other VASP subaccount is a business
         if 'kyc_data' in payment.data[other_role].data and \
             payment.data[other_role].data['kyc_data'].parse()['type'] == 'business':
-            # Put the money aside for this payment ... 
+            # Put the money aside for this payment ...
             return self.has_sig(payment)
-        
+
         # Simple VASP, always requires kyc data for individuals
         if 'kyc_data' in payment.data[other_role].data and 'kyc_data' in payment.data[my_role].data:
-            # Put the money aside for this payment ... 
+            # Put the money aside for this payment ...
             return self.has_sig(payment)
-        
+
         return False
 
     def want_single_payment_settlement(self, payment):
         return True
-    
+
     def has_settled(self, payment):
         if payment.data['sender'].data['status'] == Status.settled:
             # In this VASP we consider we are ready to settle when the sender
@@ -216,14 +216,15 @@ class sample_business(BusinessContext):
 
 class sample_vasp:
 
-    def __init__(self, my_addr):
+    def __init__(self, my_addr, info_context):
         self.my_addr = my_addr
-        self.bc      = sample_business(self.my_addr)
+        self.bc = sample_business(self.my_addr)
+        self.info_context = info_context
 
         CommandRequestObject.register_command_type(PaymentCommand)
         self.pp           = PaymentProcessor(self.bc)
-        self.vasp         = OffChainVASP(self.my_addr, self.pp)
-        
+        self.vasp         = OffChainVASP(self.my_addr, self.pp, self.info_context)
+
     def collect_messages(self):
         messages = []
         for channel in self.vasp.channel_store.values():
@@ -235,15 +236,15 @@ class sample_vasp:
     def get_channel(self, other_vasp):
         channel = self.vasp.get_channel(other_vasp)
         return channel
-    
+
     def process_request(self, other_vasp, request_json):
-        # Get the channel 
+        # Get the channel
         channel = self.get_channel(other_vasp)
         channel.parse_handle_request(request_json)
-    
+
     def insert_local_command(self, other_vasp, command):
         channel = self.get_channel(other_vasp)
-        
+
         if command.depend_on != []:
             assert len(channel.executor.object_store) > 0
         channel.sequence_command_local(command)
