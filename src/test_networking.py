@@ -22,16 +22,11 @@ def testee_addr():
 
 
 @pytest.fixture
-def context():
-    return MagicMock(spec=VASPInfo)
-
-
-@pytest.fixture
-def network(testee_addr, context):
+def network(testee_addr):
     processor = MagicMock(spec=CommandProcessor)
     info_context = MagicMock(spec=VASPInfo)
     vasp = OffChainVASP(testee_addr, processor, info_context)
-    network = Networking(vasp, context)
+    network = Networking(vasp)
     return network
 
 
@@ -63,20 +58,20 @@ def simple_response_json():
 
 def test_process_request(network, client, url, simple_request_json):
     CommandRequestObject.register_command_type(PaymentCommand)
-    network.context.is_authorised_VASP.return_value = True
+    network.vasp.info_context.is_authorised_VASP.return_value = True
     response = client.post(url, json=simple_request_json)
     assert response.status_code == 200
     assert json.loads(response.data)['status'] == 'success'
 
 
 def test_process_request_bad_vasp(network, client, url, simple_request_json):
-    network.context.is_authorised_VASP.return_value = False
+    network.vasp.info_context.is_authorised_VASP.return_value = False
     response = client.post(url, json=simple_request_json)
     assert response.status_code == 401
 
 
 def test_process_request_bad_request(network, client, url, bad_request_json):
-    network.context.is_authorised_VASP.return_value = True
+    network.vasp.info_context.is_authorised_VASP.return_value = True
     response = client.post(url, json=bad_request_json)
     assert response.status_code == 400
 

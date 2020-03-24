@@ -14,17 +14,14 @@ class Networking:
 
     BUSINESS_INTERUPT_RESPONSE = {"status": "interupt"}
 
-    def __init__(self, vasp, context):
+    def __init__(self, vasp):
         self.app = Flask(__name__)
         self.vasp = vasp
-        self.context = context
 
         # Register paths.
         self.app.add_url_rule(
             f'/{self.vasp.get_vasp_address().plain()}/<other_addr>/process/',
-            view_func=VASPOffChainApi.as_view(
-                'vasp_api', self.vasp, self.context
-            )
+            view_func=VASPOffChainApi.as_view('vasp_api', self.vasp)
         )
 
     def run(self):
@@ -44,9 +41,8 @@ class Networking:
 
 
 class VASPOffChainApi(MethodView):
-    def __init__(self, vasp, context):
+    def __init__(self, vasp):
         self.vasp = vasp
-        self.context = context
 
     def get(self):
         """ This path is not registered; used by subclasses for debugging. """
@@ -58,7 +54,7 @@ class VASPOffChainApi(MethodView):
         except Exception as e:
             client_certificate = None
 
-        if not self.context.is_authorised_VASP(client_certificate):
+        if not self.vasp.info_context.is_authorised_VASP(client_certificate):
             abort(401)
         request_json = request.get_json()
         channel = self.vasp.get_channel(LibraAddress(other_addr))

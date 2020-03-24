@@ -25,16 +25,14 @@ class PeerCertWSGIRequestHandler(werkzeug.serving.WSGIRequestHandler):
 
 
 class AuthenticatedNetworking(Networking):
-    def __init__(self, vasp, info_context, server_key, server_key_password,
-                 server_cert, client_cert):
+    def __init__(self, vasp, server_key, server_key_password, server_cert,
+                 client_cert):
 
-        super().__init__(vasp, info_context)
+        super().__init__(vasp)
 
         if __debug__:
             self.app.add_url_rule(
-                '/', view_func=VASPOffChainApi.as_view(
-                    'debug', self.vasp, self.context
-                )
+                '/', view_func=VASPOffChainApi.as_view('debug', self.vasp)
             )
 
         # The server's secret key.
