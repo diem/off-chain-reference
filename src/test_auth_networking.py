@@ -80,13 +80,11 @@ if __name__ == "__main__":
     CommandRequestObject.register_command_type(PaymentCommand)
     addr = LibraAddress.encode_to_Libra_address(b'B'*16)
     processor = MagicMock(spec=CommandProcessor)
-    info_context = MagicMock(spec=VASPInfo)
-    vasp = OffChainVASP(addr, processor, info_context)
     context = MagicMock(spec=VASPInfo)
     context.is_authorised_VASP.return_value = True
+    vasp = OffChainVASP(addr, processor, context)
     network = AuthenticatedNetworking(
         vasp,
-        context,
         server_key,
         server_key_password,
         server_cert,
