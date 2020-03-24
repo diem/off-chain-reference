@@ -66,12 +66,15 @@ class AuthenticatedNetworking(Networking):
         )
 
     def send_request(self, url, other_addr, json_request):
-        response = requests.post(
-            url,
-            json=json_request,
-            verify=self.server_cert,
-            cert=(self.client_cert, self.client_key)
-        )
-        self._handle_response(other_addr, response)
-        if __debug__:
-            print('\nREQUEST: ', response.json())
+        try:
+            response = requests.post(
+                url,
+                json=json_request,
+                verify=self.server_cert,
+                cert=(self.client_cert, self.client_key)
+            )
+            self._handle_response(other_addr, response)
+            if __debug__:
+                print('\nREQUEST: ', response.json())
+        except Exception:
+            pass
