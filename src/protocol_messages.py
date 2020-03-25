@@ -41,7 +41,7 @@ class CommandRequestObject(JSONSerializable):
         self.command = command
         self.command_type = command.json_type()
 
-        # Indicates whether the command was been confirmed by the other VASP
+        # Indicates whether the command was confirmed by the other VASP
         self.response = None
 
     @classmethod

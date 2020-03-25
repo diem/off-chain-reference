@@ -128,7 +128,7 @@ def keep_one_step(jointlattice):
             lattice.add(item)
     return lattice
 
-def filter_for_dependencies(jointlattice, dependencies):
+def filter_for_cross_party_dependencies(jointlattice, dependencies):
     ''' Ensure cross process status dependencies are respected '''
     lattice = set(jointlattice)
     for (post_state, pre_state) in dependencies:
@@ -161,8 +161,7 @@ def filter_for_starting_states(lattice, starting_states):
         while to_explore != set():
             next = to_explore.pop()
             reach.add(next)
-            to_explore = to_explore | lattice_map[next]
-            to_explore = to_explore - reach
+            to_explore |= lattice_map[next] - reach
 
     lattice = [(st, en) for (st, en) in lattice if st in reach]
     return lattice
@@ -180,7 +179,7 @@ def make_payment_status_lattice():
     XSR = cross_product(LS, LR)
     XXSR_abort = add_aborts(XSR)
     step = keep_one_step(XXSR_abort)
-    filtered = filter_for_dependencies(step, dependencies)
+    filtered = filter_for_cross_party_dependencies(step, dependencies)
     process = filter_for_starting_states(filtered, starting_states)
     return process
 

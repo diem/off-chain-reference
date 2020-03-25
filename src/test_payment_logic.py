@@ -48,24 +48,27 @@ def test_payment_end_to_end_serialization(basic_payment):
 
 def test_payment_command_multiple_dependencies_fail(basic_payment):
     new_payment = basic_payment.new_version('v1')
-    new_payment.extends += ['v2']
+    # Error: 2 dependencies
+    new_payment.previous_versions += ['v2']
     cmd = PaymentCommand(new_payment)
     with pytest.raises(PaymentLogicError):
-        cmd.get_object(None, [basic_payment])
+        cmd.get_object(new_payment.get_version(), 
+            { basic_payment.get_version():basic_payment })
 
 
 def test_payment_command_create_fail(basic_payment):
     cmd = PaymentCommand(basic_payment)
-    cmd.creates += [basic_payment.get_version()]
+    # Error: two new versions
+    cmd.creates_versions += [ basic_payment.get_version() ]
     with pytest.raises(PaymentLogicError):
-        cmd.get_object(None, [])
+        cmd.get_object(basic_payment.get_version(), {})
 
 
 def test_payment_command_missing_dependency_fail(basic_payment):
     new_payment = basic_payment.new_version('v1')
     cmd = PaymentCommand(new_payment)
     with pytest.raises(PaymentLogicError):
-        cmd.get_object(None, [])
+        cmd.get_object(new_payment.get_version(), {})
 
 
 # ----- check_new_payment -----
@@ -73,16 +76,16 @@ def test_payment_command_missing_dependency_fail(basic_payment):
 
 def test_payment_create_from_recipient(basic_payment):
     bcm = MagicMock(spec=BusinessContext)
-    bcm.is_recipient.side_effect = [True]
-
+    bcm.is_recipient.side_effect = [True] * 4
     pp = PaymentProcessor(bcm)
     pp.check_new_payment(basic_payment)
     
 
 def test_payment_create_from_sender_sig_fail(basic_payment):
     bcm = MagicMock(spec=BusinessContext)
-    bcm.is_recipient.side_effect = [True]
-    bcm.validate_recipient_signature.side_effect = [BusinessValidationFailure('Sig fails')]
+    bcm.is_recipient.side_effect = [False] * 4
+    basic_payment.add_recipient_signature('BAD SINGNATURE')
+    bcm.validate_recipient_signature.side_effect = [ BusinessValidationFailure('Sig fails') ] * 4
 
     pp = PaymentProcessor(bcm)
     with pytest.raises(BusinessValidationFailure):
@@ -92,7 +95,7 @@ def test_payment_create_from_sender_sig_fail(basic_payment):
 
 def test_payment_create_from_sender(basic_payment):
     bcm = MagicMock(spec=BusinessContext)
-    bcm.is_recipient.side_effect = [False]
+    bcm.is_recipient.side_effect = [False] * 4
     pp = PaymentProcessor(bcm)
     pp.check_new_payment(basic_payment)
 
@@ -110,7 +113,7 @@ def test_payment_create_from_sender_fail(basic_payment):
 
 def test_payment_create_from_receiver_fail(basic_payment):
     bcm = MagicMock(spec=BusinessContext)
-    bcm.is_recipient.side_effect = [False]
+    bcm.is_recipient.side_effect = [False] * 4
 
     basic_payment.data['sender'].update({'status': Status.ready_for_settlement})
     basic_payment.data['receiver'].update({'status': Status.ready_for_settlement})
@@ -134,7 +137,7 @@ def test_payment_create_from_receiver_bad_state_fail(basic_payment):
 
 def test_payment_update_from_sender(basic_payment):
     bcm = MagicMock(spec=BusinessContext)
-    bcm.is_recipient.side_effect = [False]
+    bcm.is_recipient.side_effect = [False] * 4
     pp = PaymentProcessor(bcm)
     diff = {}
     new_obj = basic_payment.new_version()

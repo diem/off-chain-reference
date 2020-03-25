@@ -7,7 +7,7 @@ class SharedObject:
     def __init__(self):
         ''' All objects have a version number and their commit status '''
         self.version = get_unique_string()
-        self.extends = [] # Stores the previous version of the object
+        self.previous_versions = [] # Stores the previous version of the object
 
         # Flags indicate the state of the object in the store
         self.potentially_live = False   # Pending commands could make it live
@@ -16,7 +16,7 @@ class SharedObject:
     def new_version(self, new_version = None):
         ''' Make a deep copy of an object with a new version number '''
         clone = deepcopy(self)
-        clone.extends = [ self.get_version() ]
+        clone.previous_versions = [ self.get_version() ]
         clone.version = new_version
         if clone.version is None:
             clone.version = get_unique_string()
