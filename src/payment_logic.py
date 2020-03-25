@@ -8,33 +8,39 @@ from libra_address import LibraAddress
 
 class PaymentCommand(ProtocolCommand):
     def __init__(self, payment):
-        ''' Creates a new Payment command based on the diff from the given payment'''
+        ''' Creates a new Payment command based on the diff from the given payment.
+        
+            It depedends on the payment object that the payment diff extends 
+            (in case it updates a previous payment). It creates the object 
+            with the version number of the payment provided.
+        '''
         ProtocolCommand.__init__(self)
-        self.dependencies = list(payment.extends)
-        self.creates = [payment.get_version()]
-        self.command = payment.get_full_record()
+        self.dependencies = list(payment.previous_versions)
+        self.creates_versions = [ payment.get_version() ]
+        self.command = payment.get_full_diff_record()
 
     def __eq__(self, other):
         return self.dependencies == other.dependencies \
-            and self.creates == other.creates \
+            and self.creates_versions == other.creates_versions \
             and self.command == other.command
 
     def get_object(self, version_number, dependencies):
-        ''' Constructs the new or updated objects '''
+        ''' Returns the new payment object defined by this command. Since this
+            may depend on a previous payment (when it is an update) we need to
+            provide a dictionary of its dependencies.
+        '''
         # First find dependencies & created objects
-        if len(self.dependencies) > 1:
-            raise PaymentLogicError("A payment can only depend on a single previous payment")
-        if len(self.creates) != 1:
-            raise PaymentLogicError("A payment always creates a new payment")
-        if self.creates[0] != version_number:
-            raise PaymentLogicError("Unknown object %s (only know %s)" % (version_number, self.creates[0]))
-        new_version = self.creates[0]
+        new_version = self.get_new_version()
+        if new_version != version_number:
+            raise PaymentLogicError("Unknown object %s (only know %s)" % (version_number, new_version))
 
+        # This indicates the command creates a fresh payment.
         if len(self.dependencies) == 0:
             payment = PaymentObject.create_from_record(self.command)
             payment.set_version(new_version)
             return payment
 
+        # This command updates a previous payment.
         elif len(self.dependencies) == 1:
             dep = self.dependencies[0]
             if dep not in dependencies:
@@ -42,13 +48,13 @@ class PaymentCommand(ProtocolCommand):
             dep_object = dependencies[dep]
             updated_payment = dep_object.new_version(new_version)
             PaymentObject.from_full_record(self.command, base_instance=updated_payment)
-            assert updated_payment.version == new_version
             return updated_payment
 
-        assert False
+        raise PaymentLogicError("Can depdend on no or one other payemnt")
+
 
     def get_json_data_dict(self, flag):
-        ''' Get a data disctionary compatible with JSON serilization (json.dumps) '''
+        ''' Get a data dictionary compatible with JSON serilization (json.dumps) '''
         data_dict = ProtocolCommand.get_json_data_dict(self, flag)
         data_dict['diff'] = self.command
         return data_dict
@@ -62,6 +68,24 @@ class PaymentCommand(ProtocolCommand):
         self.command = data['diff']
         return self
 
+    # Helper functions for payment commands specifically
+
+    def get_previous_version(self):
+        ''' Returns the version of the previous payment, or None if this 
+            command creates a new payment '''
+        dep_len = len(self.dependencies)
+        if dep_len > 1:
+            raise PaymentLogicError("A payment can only depend on a single previous payment")
+        if dep_len == 0:
+            return None
+        else:
+            return self.dependencies[0]
+
+    def get_new_version(self):
+        ''' Returns the version number of the payment created or updated '''
+        if len(self.creates_versions) != 1:
+            raise PaymentLogicError("A payment always creates a new payment")
+        return self.creates_versions[0]
 
 class PaymentLogicError(Exception):
     pass
@@ -114,8 +138,8 @@ class PaymentProcessor(CommandProcessor):
         context = self.business_context()
         dependencies = executor.object_store
 
-        new_payment = command.get_object(command.creates[0], dependencies)
-        assert new_payment.get_version() == command.creates[0]
+        new_version = command.get_new_version()
+        new_payment = command.get_object(new_version, dependencies)
 
         ## Ensure that the two parties involved are in the VASP channel
         parties = set([new_payment.data['sender'].data['address'], 
@@ -141,13 +165,15 @@ class PaymentProcessor(CommandProcessor):
             if command.dependencies == []:
                 self.check_new_payment(new_payment)
             else:
-                old_payment = dependencies[command.dependencies[0]]
+                old_version = command.get_previous_version()
+                old_payment = dependencies[old_version]
                 self.check_new_update(old_payment, new_payment)
 
     def process_command(self, vasp, channel, executor, command, status_success, error=None):
         if status_success:
             dependencies = executor.object_store
-            payment = command.get_object(command.creates[0], dependencies)
+            new_version = command.get_new_version()
+            payment = command.get_object(new_version, dependencies)
             new_payment = self.payment_process(payment)
             if new_payment.has_changed():
                 new_cmd = PaymentCommand(new_payment)
@@ -179,6 +205,19 @@ class PaymentProcessor(CommandProcessor):
 
     # ----------- END of CommandProcessor interface ---------
 
+    def check_signatures(self, payment):
+        ''' Utility function that checks all signatures present for validity '''
+        business = self.business
+        role = ['sender', 'receiver'][business.is_recipient(payment)]
+        other_role = ['sender', 'receiver'][role == 'sender']
+
+        if 'kyc_signature' in  payment.data[other_role].data:
+            business.validate_kyc_signature(payment)
+
+        if role == 'sender' and 'recipient_signature' in payment.data:
+            business.validate_recipient_signature(payment)
+
+
     def check_new_payment(self, new_payment):
         ''' Checks a diff for a new payment from the other VASP, and returns
             a valid payemnt. If a validation error occurs, then an exception
@@ -209,8 +248,7 @@ class PaymentProcessor(CommandProcessor):
             )
         # TODO: CHeck status here according to status_logic
 
-        business.validate_kyc_signature(new_payment)
-        business.validate_recipient_signature(new_payment)
+        self.check_signatures(new_payment)
 
     def check_new_update(self, payment, new_payment):
         ''' Checks a diff updating an existing payment. On success
@@ -232,8 +270,7 @@ class PaymentProcessor(CommandProcessor):
         # Ensure valid transitions
         check_status(other_role, old_other_status, other_status, status)
 
-        business.validate_kyc_signature(new_payment)
-        business.validate_recipient_signature(new_payment)
+        self.check_signatures(new_payment)
 
     def notify_callback(self, callback_ID):
         ''' Notify the processor that the callback with a specific ID has returned, and is ready to provide an answer. '''
@@ -278,7 +315,7 @@ class PaymentProcessor(CommandProcessor):
                 # TODO: ensure valid abort from the other side elsewhere
                 current_status = Status.abort
 
-            if current_status in {Status.none}:
+            if current_status == Status.none:
                 business.check_account_existence(new_payment)
 
             if current_status in {Status.none,
@@ -305,9 +342,10 @@ class PaymentProcessor(CommandProcessor):
                     new_payment.add_recipient_signature(signature)
 
             # Check if we have all the KYC we need
-            ready = business.ready_for_settlement(new_payment)
-            if ready:
-                current_status = Status.ready_for_settlement
+            if current_status not in { Status.ready_for_settlement, Status.settled }:
+                ready = business.ready_for_settlement(new_payment)
+                if ready:
+                    current_status = Status.ready_for_settlement
 
             if current_status == Status.ready_for_settlement and business.has_settled(new_payment):
                 current_status = Status.settled

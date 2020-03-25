@@ -129,7 +129,7 @@ class PaymentObject(SharedObject, StructureChecker):
         ('receiver', PaymentActor, REQUIRED, WRITE_ONCE),
         ('reference_id', str, REQUIRED, WRITE_ONCE),
         ('original_payment_reference_id', str, REQUIRED, WRITE_ONCE),
-        ('description', str, REQUIRED, WRITE_ONCE),
+        ('description', str, OPTIONAL, WRITE_ONCE),
         ('action', PaymentAction, REQUIRED, WRITE_ONCE),
         ('recipient_signature', str, OPTIONAL, WRITE_ONCE)
     ]
@@ -167,5 +167,5 @@ class PaymentObject(SharedObject, StructureChecker):
         })
 
     def has_changed(self):
-        ret = not self.get_full_record() == {}
+        ret = not self.get_full_diff_record() == {}
         return ret
