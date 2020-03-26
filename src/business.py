@@ -128,7 +128,7 @@ class BusinessContext:
     def validate_kyc_signature(self, payment):
         ''' Validates the kyc signature is correct. Raise a
             BusinessValidationFailure is the signature is invalid
-            or not present. If the signature is valid no nothing.
+            or not present. If the signature is valid do nothing.
             
             Can raise:
                 BusinessValidationFailure'''
