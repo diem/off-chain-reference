@@ -100,7 +100,6 @@ def test_payment_create_from_sender(basic_payment):
     pp.check_new_payment(basic_payment)
 
 
-
 def test_payment_create_from_sender_fail(basic_payment):
     bcm = MagicMock(spec=BusinessContext)
     bcm.is_recipient.side_effect = [True]
