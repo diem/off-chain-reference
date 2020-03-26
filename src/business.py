@@ -78,7 +78,7 @@ class BusinessContext:
     def validate_recipient_signature(self, payment):
         ''' Validates the recipient signature is correct. Raise a
             BusinessValidationFailure is the signature is invalid
-            or not present. If the signature is valid no nothing.
+            or not present. If the signature is valid do nothing.
             
             Can raise:
                 BusinessValidationFailure'''
@@ -128,7 +128,7 @@ class BusinessContext:
     def validate_kyc_signature(self, payment):
         ''' Validates the kyc signature is correct. Raise a
             BusinessValidationFailure is the signature is invalid
-            or not present. If the signature is valid no nothing.
+            or not present. If the signature is valid do nothing.
             
             Can raise:
                 BusinessValidationFailure'''
@@ -170,7 +170,7 @@ class BusinessContext:
 
             If all the above are true, then return True.
             If any of the above are untrue throw an BusinessForceAbort.
-            If any more KYC is necessary theen return False.
+            If any more KYC is necessary then return False.
             If there is a need for more time throw BusinessAsyncInterupt.
 
             In particular BusinessAsyncInterupt supports VASP flows where KYC
