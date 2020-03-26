@@ -170,7 +170,7 @@ class BusinessContext:
 
             If all the above are true, then return True.
             If any of the above are untrue throw an BusinessForceAbort.
-            If any more KYC is necessary theen return False.
+            If any more KYC is necessary then return False.
             If there is a need for more time throw BusinessAsyncInterupt.
 
             In particular BusinessAsyncInterupt supports VASP flows where KYC
