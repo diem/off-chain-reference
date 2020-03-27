@@ -108,16 +108,6 @@ def addr_bc_proc():
     proc = PaymentProcessor(bc)
     return (a0, bc, proc)
 
-@pytest.fixture
-def info_context():
-    context = MagicMock(spec=VASPInfo)
-    context.get_TLS_certificate.return_value = 'tls_cert.pem'
-    context.get_TLS_key.return_value = 'tls_key.pem'
-    context.get_peer_TLS_certificate.return_value = 'peer_cert.pem'
-    context.get_all_peers_TLS_certificate.return_value = 'all_peers.pem'
-    context.get_peer_base_url.return_value = ''
-    return context
-
 def test_business_simple():
     a0 = FakeAddress(0, 40)
     bc = sample_business(a0)
@@ -182,7 +172,7 @@ def test_business_settled(settled_payment_as_receiver,addr_bc_proc):
 @pytest.fixture
 def simple_request_json():
     sender_addr = LibraAddress.encode_to_Libra_address(b'A'*16).encoded_address
-    receiver_addr   = LibraAddress.encode_to_Libra_address(b'B'*16).encoded_address
+    receiver_addr = LibraAddress.encode_to_Libra_address(b'B'*16).encoded_address
     assert type(sender_addr) == str
     assert type(receiver_addr) == str
 
@@ -215,10 +205,10 @@ def simple_response_json_error(request):
     json_obj = json.dumps(resp.get_json_data_dict(JSONFlag.NET))
     return json_obj
 
-def test_vasp_simple(info_context, simple_request_json):
+def test_vasp_simple(simple_request_json):
     AddrThis   = LibraAddress.encode_to_Libra_address(b'B'*16)
     AddrOther = LibraAddress.encode_to_Libra_address(b'A'*16)
-    vc = sample_vasp(AddrThis, info_context)
+    vc = sample_vasp(AddrThis)
     vc.process_request(AddrOther, simple_request_json)
     responses = vc.collect_messages()
     assert len(responses) == 2
@@ -226,10 +216,10 @@ def test_vasp_simple(info_context, simple_request_json):
     assert responses[1].type is CommandResponseObject
     assert 'success' in responses[1].content
 
-def test_vasp_simple_wrong_VASP(info_context, simple_request_json):
+def test_vasp_simple_wrong_VASP(simple_request_json):
     AddrThis   = LibraAddress.encode_to_Libra_address(b'X'*16)
     AddrOther = LibraAddress.encode_to_Libra_address(b'A'*16)
-    vc = sample_vasp(AddrThis, info_context)
+    vc = sample_vasp(AddrThis)
     vc.process_request(AddrOther, simple_request_json)
     responses = vc.collect_messages()
     assert len(responses) == 1
@@ -237,20 +227,20 @@ def test_vasp_simple_wrong_VASP(info_context, simple_request_json):
     assert 'failure' in responses[0].content
 
 
-def test_vasp_response(info_context, simple_response_json_error):
+def test_vasp_response(simple_response_json_error):
     AddrThis   = LibraAddress.encode_to_Libra_address(b'B'*16)
     AddrOther = LibraAddress.encode_to_Libra_address(b'A'*16)
-    vc = sample_vasp(AddrThis, info_context)
+    vc = sample_vasp(AddrThis)
     vc.process_response(AddrOther, simple_response_json_error)
 
 from unittest.mock import patch
 
-def test_vasp_simple_interrupt(info_context, simple_request_json):
+def test_vasp_simple_interrupt(simple_request_json):
     AddrThis   = LibraAddress.encode_to_Libra_address(b'B'*16)
     AddrOther = LibraAddress.encode_to_Libra_address(b'A'*16)
 
     # Patch business context to first return an exception
-    vc = sample_vasp(AddrThis, info_context)
+    vc = sample_vasp(AddrThis)
     with patch.object(vc.bc, 'ready_for_settlement', side_effect = [ BusinessAsyncInterupt(1234) ]) as mock_thing:
         assert vc.bc.ready_for_settlement == mock_thing
         vc.process_request(AddrOther, simple_request_json)
@@ -268,3 +258,16 @@ def test_vasp_simple_interrupt(info_context, simple_request_json):
 
     assert len(responses) > 0
     assert 'ready_for' in str(responses[0].content)
+
+
+def test_sample_vasp_info_is_authorised():
+    cert_file = '../assets/client_cert.pem'
+    with open(cert_file, 'rt') as f:
+        cert_str = f.read()
+    cert = OpenSSL.crypto.load_certificate(
+        OpenSSL.crypto.FILETYPE_PEM, cert_str
+    )
+    my_addr   = LibraAddress.encode_to_Libra_address(b'B'*16)
+    other_addr = LibraAddress.encode_to_Libra_address(b'A'*16)
+    vc = sample_vasp(my_addr)
+    assert vc.bc.info_context.is_authorised_VASP(cert, other_addr)

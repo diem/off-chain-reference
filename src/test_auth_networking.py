@@ -1,4 +1,4 @@
-from auth_networking import AuthenticatedNetworking
+from auth_networking import AuthNetworkClient, AuthNetworkServer
 from protocol import LibraAddress, OffChainVASP
 from executor import CommandProcessor
 from business import VASPInfo
@@ -28,12 +28,11 @@ browser (or to the OS Keychain if using Safari):
 '''
 
 
-def test_vector_request():
-    request_json = {
+test_vector_request = """{
         "seq": 0,
         "command": {
             "dependencies": [],
-            "creates": ["TJZb1EwYY/gloKCIfiASHw=="],
+            "creates_versions": ["TJZb1EwYY/gloKCIfiASHw=="],
             "diff": {
                 "reference_id": "ref_payment_1",
                 "original_payment_reference_id": "orig_ref...",
@@ -59,8 +58,7 @@ def test_vector_request():
             }
         },
         "command_type": "<class 'payment_logic.PaymentCommand'>"
-    }
-    return json.dumps(request_json)
+    }"""
 
 
 if __name__ == "__main__":
@@ -79,14 +77,9 @@ if __name__ == "__main__":
     CommandRequestObject.register_command_type(PaymentCommand)
     addr = LibraAddress.encode_to_Libra_address(b'B'*16)
     processor = MagicMock(spec=CommandProcessor)
-    context = MagicMock(spec=VASPInfo)
-    context.is_authorised_VASP.return_value = True
-    vasp = OffChainVASP(addr, processor, context)
-    network = AuthenticatedNetworking(
-        vasp,
-        server_key,
-        server_cert,
-        client_cert
+    vasp = OffChainVASP(addr, processor)
+    network_server = AuthNetworkServer(
+        vasp, server_key, server_cert, client_cert
     )
 
     # Run either as client or as server
@@ -102,12 +95,14 @@ if __name__ == "__main__":
     elif mode == 'client-process':
         other_addr = LibraAddress.encode_to_Libra_address(b'A'*16)
         url = f'{base_url}{addr.plain()}/{other_addr.plain()}/process/'
-        response = AuthenticatedNetworking.send_request(
-            url, test_vector_request(), server_cert, client_cert, client_key
+        network_client = AuthNetworkClient(
+            addr, other_addr, server_cert, client_cert, client_key
         )
-        print('\nRESPONSE: ', response.json())
+        response = network_client.send_request(url, test_vector_request)
+        response = response.json() if response != None else None
+        print('\nRESPONSE: ', response)
 
     elif mode == 'server':
-        network.run()
+        network_server.run()
     else:
         assert False

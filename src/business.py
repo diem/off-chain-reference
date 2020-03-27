@@ -35,6 +35,8 @@ class BusinessForceAbort(Exception):
 
 
 class BusinessContext:
+    def __init__(self):
+        self.info_context = VASPInfo()
 
     def open_channel_to(self, other_vasp_info):
         ''' Requests authorization to open a channel to another VASP.
@@ -228,16 +230,68 @@ class VASPInfo:
     """Contains information about VASPs"""
 
     def get_base_url(self):
-        """ Base URL that manages off-chain communications"""
+        """ Get the base URL that manages off-chain communications.
+
+            Returns a str: The base url of the VASP.
+
+        """
         raise NotImplementedError()
 
     def get_peer_base_url(self, other_addr):
-        """ Base URL that manages off-chain communications"""
+        """ Get the base URL that manages off-chain communications of an other
+            VASP (identified by `other_addr`).
+
+            Returns a str: The base url of the other VASP.
+        """
         raise NotImplementedError()
 
-    def is_authorised_VASP(self, certificate):
-        """ Whether this has the authorised VASP bit set on chain"""
+    def is_authorised_VASP(self, certificate, other_addr):
+        """ Check wether an incoming network request is authorised or not.
+            This function checks (i) if the certificate comes from one
+            of the authorised VASPS (ie. a that VASP has the authorised bit
+            set on chains), and (ii) if the certificate belongs to the sender
+            of the request (ie. the network client). Check (ii) ensure that a
+            VASP is not impersonating one of the other authorised VASPs.
+
+            The certificate is a pyOpenSSL X509 object:
+            http://pyopenssl.sourceforge.net/pyOpenSSL.html/openssl-x509.html
+
+            Returns a bool: True or False
+        """
         raise NotImplementedError()
+
+    def get_TLS_certificate(self):
+        """ Get the on-chain TLS certificate of the VASP to authenticate channels.
+
+            Returns a str: path to the file containing the TLS certificatre.
+        """
+        raise NotImplementedError()
+
+    def get_TLS_key(self):
+        """ Get the on-chain TLS key of the VASP to authenticate channels.
+
+            Returns a str: path to the file containing the TLS key.
+        """
+        raise NotImplementedError()
+
+    def get_peer_TLS_certificate(self, other_addr):
+        """ Get the on-chain TLS certificate of a peer VASP, identified by
+            `other_addr`.
+
+            Returns a str: path to the file containing the TLS certificate.
+        """
+        raise NotImplementedError()
+
+    def get_all_peers_TLS_certificate(self):
+        """ Get the on-chain TLS certificate of all authorised peer VASPs.
+
+            Returns a str: path to a single file containing all TLS certificates.
+        """
+        raise NotImplementedError()
+
+
+    # --- The functions below are currently unused ---
+
 
     def get_libra_address(self):
         """ The settlement Libra address for this channel"""
@@ -246,22 +300,6 @@ class VASPInfo:
     def get_parent_address(self):
         """ The VASP Parent address for this channel. High level logic is common
         to all Libra addresses under a parent to ensure consistency and compliance."""
-        raise NotImplementedError()
-
-    def get_TLS_certificate(self):
-        """ TODO: Get the on-chain TLS certificate to authenticate channels. """
-        raise NotImplementedError()
-
-    def get_TLS_key(self):
-        """ TODO: Get the on-chain TLS key to authenticate channels. """
-        raise NotImplementedError()
-
-    def get_peer_TLS_certificate(self, other_addr):
-        """ TODO: Get the on-chain TLS certificate of a peer VASP. """
-        raise NotImplementedError()
-
-    def get_all_peers_TLS_certificate(self):
-        """ TODO: Get the on-chain TLS certificate of all peer VASPs. """
         raise NotImplementedError()
 
     def is_unhosted(self):

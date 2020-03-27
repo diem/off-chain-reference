@@ -1,10 +1,13 @@
-from business import BusinessContext, BusinessAsyncInterupt, BusinessForceAbort, BusinessValidationFailure
+from business import BusinessContext, BusinessAsyncInterupt, BusinessForceAbort, \
+BusinessValidationFailure, VASPInfo
 from protocol import OffChainVASP
+from libra_address import LibraAddress
 from protocol_messages import CommandRequestObject
 from payment_logic import PaymentCommand, PaymentProcessor
 from status_logic import Status
 
 import json
+import OpenSSL.crypto
 
 business_config = """[
     {
@@ -25,12 +28,77 @@ business_config = """[
     }
 ]"""
 
+
+class sample_vasp_info(VASPInfo):
+    def __init__(self, tls_cert, tls_key, all_peers_tls_cert, each_peer_tls_cert,
+                 each_peer_base_url):
+        self.tls_cert = tls_cert
+        self.tls_key = tls_key
+        self.all_peers_tls_cert = all_peers_tls_cert
+        self.each_peer_tls_cert = each_peer_tls_cert
+        self.each_peer_base_url = each_peer_base_url
+
+    def get_TLS_certificate(self):
+        return self.tls_cert
+
+    def get_TLS_key(self):
+        return self.tls_key
+
+    def get_peer_TLS_certificate(self, other_addr):
+        assert other_addr.plain() in self.each_peer_tls_cert
+        return self.each_peer_tls_cert[other_addr.plain()]
+
+    def get_all_peers_TLS_certificate(self):
+        return self.all_peers_tls_cert
+
+    def get_peer_base_url(self, other_addr):
+        assert other_addr.plain() in self.each_peer_base_url
+        return self.each_peer_base_url[other_addr.plain()]
+
+    def is_authorised_VASP(self, certificate, other_addr):
+        if other_addr.plain() not in self.each_peer_tls_cert:
+            return False
+
+        cert_file = self.each_peer_tls_cert[other_addr.plain()]
+        with open(cert_file, 'rt') as f:
+            cert_str = f.read()
+        local_cert = OpenSSL.crypto.load_certificate(
+            OpenSSL.crypto.FILETYPE_PEM, cert_str
+        )
+        return local_cert.get_serial_number() == certificate.get_serial_number()
+
+
 class sample_business(BusinessContext):
     def __init__(self, my_addr):
         self.my_addr = my_addr
         self.accounts_db = json.loads(business_config)
+        self.info_context = self.make_vasp_info()
 
     # Helper functions for the business
+
+    def make_vasp_info(self):
+        assets_path = '../assets/'
+
+        tls_cert = f'{assets_path}server_cert.pem'
+        tls_key = f'{assets_path}server_key.pem'
+        all_peers_tls_cert = f'{assets_path}client_cert.pem'
+
+        peerA_addr = LibraAddress.encode_to_Libra_address(b'A'*16).plain()
+        peerB_addr = LibraAddress.encode_to_Libra_address(b'B'*16).plain()
+        each_peer_tls_cert = {
+            peerA_addr: f'{assets_path}client_cert.pem',
+        }
+        each_peer_base_url = {
+            peerA_addr: 'https://peerA.com',
+        }
+
+        return sample_vasp_info(
+            tls_cert,
+            tls_key,
+            all_peers_tls_cert,
+            each_peer_tls_cert,
+            each_peer_base_url
+        )
 
     def get_address(self):
         return self.my_addr.encoded_address
@@ -57,6 +125,9 @@ class sample_business(BusinessContext):
     # Implement the business logic interface
 
     def open_channel_to(self, other_vasp_info):
+        return
+
+    def close_channel_to(self, other_vasp_info):
         return
 
     def check_account_existence(self, payment):
@@ -230,14 +301,13 @@ class sample_business(BusinessContext):
 
 class sample_vasp:
 
-    def __init__(self, my_addr, info_context):
+    def __init__(self, my_addr):
         self.my_addr = my_addr
         self.bc = sample_business(self.my_addr)
-        self.info_context = info_context
 
         CommandRequestObject.register_command_type(PaymentCommand)
         self.pp           = PaymentProcessor(self.bc)
-        self.vasp         = OffChainVASP(self.my_addr, self.pp, self.info_context)
+        self.vasp         = OffChainVASP(self.my_addr, self.pp)
 
     def collect_messages(self):
         messages = []

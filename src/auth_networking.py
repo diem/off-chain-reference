@@ -1,10 +1,33 @@
-from networking import Networking, VASPOffChainApi
+from networking import NetworkClient, NetworkServer, VASPOffChainApi
 
 import werkzeug.serving
 import ssl
 import OpenSSL
 import requests
 import json
+
+
+class AuthNetworkClient(NetworkClient):
+    def __init__(self, my_addr, other_addr, server_cert, client_cert, client_key):
+        super().__init__(my_addr, other_addr)
+
+        self.server_cert = server_cert
+        self.client_cert = client_cert
+        self. client_key = client_key
+
+    def send_request(self, url, json_request):
+        try:
+            return requests.post(
+                url,
+                json=json_request,
+                verify=self.server_cert,
+                cert=(self.client_cert, self.client_key)
+            )
+        except requests.exceptions.RequestException:
+            # This happens in case of a connection error (e.g. DNS failure,
+            # refused connection, etc), timeout, or if the maximum number of
+            # redirections is reached.
+            return None
 
 
 class PeerCertWSGIRequestHandler(werkzeug.serving.WSGIRequestHandler):
@@ -24,9 +47,8 @@ class PeerCertWSGIRequestHandler(werkzeug.serving.WSGIRequestHandler):
         return environ
 
 
-class AuthenticatedNetworking(Networking):
-    def __init__(self, vasp, server_key, server_cert,
-                 client_cert):
+class AuthNetworkServer(NetworkServer):
+    def __init__(self, vasp, server_key, server_cert, client_cert):
 
         super().__init__(vasp)
 
@@ -60,15 +82,3 @@ class AuthenticatedNetworking(Networking):
         self.app.run(
             ssl_context=ssl_context, request_handler=PeerCertWSGIRequestHandler
         )
-
-    @staticmethod
-    def send_request(url, json_request, server_cert, client_cert, client_key):
-        try:
-            return requests.post(
-                url,
-                json=json_request,
-                verify=server_cert,
-                cert=(client_cert, client_key)
-            )
-        except Exception:
-            return None

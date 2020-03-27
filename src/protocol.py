@@ -3,7 +3,7 @@ from protocol_messages import CommandRequestObject, CommandResponseObject, \
     make_success_response, make_protocol_error, make_parsing_error, make_command_error
 from utils import JSONParsingError, JSONFlag
 from libra_address import LibraAddress
-from auth_networking import AuthenticatedNetworking
+from auth_networking import AuthNetworkClient, AuthNetworkServer
 
 import json
 from collections import namedtuple
@@ -13,7 +13,7 @@ NetMessage = namedtuple('NetMessage', ['src', 'dst', 'type', 'content'])
 class OffChainVASP:
     """Manages the off-chain protocol on behalf of one VASP. """
 
-    def __init__(self, vasp_addr, processor, info_context):
+    def __init__(self, vasp_addr, processor):
         if __debug__:
             assert isinstance(processor, CommandProcessor)
             assert isinstance(vasp_addr, LibraAddress)
@@ -31,13 +31,13 @@ class OffChainVASP:
 
         # The VASPInfo context that contains various network information
         # such as TLS certificates and keys.
-        self.info_context = info_context
+        self.info_context = self.business_context.info_context
 
-        # The networking framework
+        # The network server
         self.tls_cert = self.info_context.get_TLS_certificate()
         self.tls_key = self.info_context.get_TLS_key()
         peers_cert = self.info_context.get_all_peers_TLS_certificate()
-        self.network = AuthenticatedNetworking(
+        self.network_server = AuthNetworkServer(
             self, self.tls_key, self.tls_cert, peers_cert
         )
 
@@ -66,7 +66,14 @@ class OffChainVASP:
         self.processor.process_command_backlog(self)
 
     def run(self):
-        self.network.run()
+        self.network_server.run()
+
+    def close_channel(self, other_vasp_addr):
+        # TODO: Is this method useful for other things than networking?
+
+        # Close the TLS channel
+        channel = self.get_channel(other_vasp_addr)
+        channel.network_client.close_connection()
 
 
 class VASPPairChannel:
@@ -113,6 +120,17 @@ class VASPPairChannel:
         self.pending_requests = []
         # Network handler
         self.net_queue = []
+
+        # The network client
+        self.other_base_url = self.vasp.info_context.get_peer_base_url(self.other)
+        other_cert = self.vasp.info_context.get_peer_TLS_certificate(self.other)
+        self.network_client = AuthNetworkClient(
+            self.myself,
+            self.other,
+            other_cert,
+            self.vasp.tls_cert,
+            self.vasp.tls_key
+        )
 
     def get_my_address(self):
         return self.myself
@@ -406,13 +424,7 @@ class VASPPairChannel:
         return False
 
     def send_network_request(self, request_json):
-        peer_cert = self.vasp.info_context.get_peer_TLS_certificate(self.other)
-        base_url = self.vasp.info_context.get_peer_base_url(self.other)
-        url = AuthenticatedNetworking.get_url(
-            base_url, self.get_my_address(), self.other
-        )
-        response = AuthenticatedNetworking.send_request(
-            url, request_json, peer_cert, self.vasp.tls_cert, self.vasp.tls_key
-        )
+        url = self.network_client.get_url(self.other_base_url)
+        response = self.network_client.send_request(url, request_json)
         if response != None:
             self.parse_handle_response(json.dumps(response.json()))
