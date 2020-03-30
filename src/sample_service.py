@@ -1,5 +1,5 @@
 from business import BusinessContext, BusinessAsyncInterupt, BusinessForceAbort, \
-BusinessValidationFailure, VASPInfo, BusinessNotAuthorized
+BusinessValidationFailure, VASPInfo
 from protocol import OffChainVASP
 from libra_address import LibraAddress
 from protocol_messages import CommandRequestObject
@@ -45,16 +45,14 @@ class sample_vasp_info(VASPInfo):
         return self.tls_key
 
     def get_peer_TLS_certificate(self, other_addr):
-        if not other_addr.plain() in self.each_peer_tls_cert:
-            raise BusinessNotAuthorized
+        assert other_addr.plain() in self.each_peer_tls_cert
         return self.each_peer_tls_cert[other_addr.plain()]
 
     def get_all_peers_TLS_certificate(self):
         return self.all_peers_tls_cert
 
     def get_peer_base_url(self, other_addr):
-        if not other_addr.plain() in self.each_peer_base_url:
-            raise BusinessNotAuthorized
+        assert other_addr.plain() in self.each_peer_base_url
         return self.each_peer_base_url[other_addr.plain()]
 
     def is_authorised_VASP(self, certificate, other_addr):
@@ -62,6 +60,8 @@ class sample_vasp_info(VASPInfo):
         # with another VASP, we should have already loaded its certificate.
         assert other_addr.plain() in self.each_peer_tls_cert
 
+        # Check that the certificate provided with the request matches the
+        # certificate we have in store for the given address.
         cert_file = self.each_peer_tls_cert[other_addr.plain()]
         with open(cert_file, 'rt') as f:
             cert_str = f.read()
