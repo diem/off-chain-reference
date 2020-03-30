@@ -16,7 +16,15 @@ def basic_payment():
     sender = PaymentActor('AAAA', 'aaaa', Status.none, [])
     receiver = PaymentActor('BBBB', 'bbbb', Status.none, [])
     action = PaymentAction(10, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
-    payment = PaymentObject(sender, receiver, 'ref', 'orig_ref', 'desc', action)
+    payment = PaymentObject(sender, receiver, 'ref', 'orig_ref1', 'desc', action)
+    return payment
+
+@pytest.fixture
+def basic_payment_DUP():
+    sender = PaymentActor('AAAA', 'aaaa', Status.none, [])
+    receiver = PaymentActor('BBBB', 'bbbb', Status.none, [])
+    action = PaymentAction(10, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
+    payment = PaymentObject(sender, receiver, 'ref', 'orig_ref2', 'desc', action)
     return payment
 
 
@@ -348,3 +356,59 @@ def test_payment_process_get_extended_kyc(basic_payment, ppctx):
     assert new_payment.data['receiver'].data['kyc_data'] == kyc_data
     assert new_payment.data['receiver'].data['kyc_signature'] == 'sig'
     assert new_payment.data['receiver'].data['kyc_certificate'] == 'cert'
+
+def test_process_command_simple(basic_payment, basic_payment_DUP, ppctx):
+    bcm, pp = ppctx
+    pay_cmd1 = PaymentCommand(basic_payment)
+    pay_cmd2 = PaymentCommand(basic_payment_DUP)
+
+    mock_vasp = MagicMock()
+    mock_channel = MagicMock()
+    mock_exec = MagicMock()
+
+    with pp.storage_factory as _:
+        pp.process_command(mock_vasp, mock_channel, mock_exec, pay_cmd1, True)
+    
+    assert basic_payment.reference_id in pp.reference_id_index
+
+    with pp.storage_factory as _:
+        pp.process_command(mock_vasp, mock_channel, mock_exec, pay_cmd2, True)
+    
+    assert basic_payment.reference_id in pp.reference_id_index
+
+    # Check that only the first object with the same ref is recorded.
+    obj = pp.reference_id_index[basic_payment.reference_id]
+    assert obj.original_payment_reference_id == 'orig_ref1'
+
+def test_process_command_next_version(basic_payment, ppctx):
+    bcm, pp = ppctx
+    pay_cmd1 = PaymentCommand(basic_payment)
+
+    mock_vasp = MagicMock()
+    mock_channel = MagicMock()
+    mock_exec = MagicMock()
+    mock_exec.object_store = {}
+
+    with pp.storage_factory as _:
+        pp.process_command(mock_vasp, mock_channel, mock_exec, pay_cmd1, True)
+    
+    assert basic_payment.reference_id in pp.reference_id_index
+    obj = pp.reference_id_index[basic_payment.reference_id]
+    assert obj.original_payment_reference_id == 'orig_ref1'
+    assert obj.sender.status == Status.none
+
+    mock_exec.object_store = { basic_payment.get_version() : basic_payment}
+ 
+    new_payment = basic_payment.new_version()
+    new_payment.sender.change_status(Status.ready_for_settlement)
+    pay_cmd2 = PaymentCommand(new_payment)
+
+    with pp.storage_factory as _:
+        pp.process_command(mock_vasp, mock_channel, mock_exec, pay_cmd2, True)
+    
+    assert basic_payment.reference_id in pp.reference_id_index
+
+    # The second object is now replacing the first, since it is its descendent
+    obj = pp.reference_id_index[basic_payment.reference_id]
+    assert obj.original_payment_reference_id == 'orig_ref1'
+    assert obj.sender.status == Status.ready_for_settlement

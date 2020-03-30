@@ -190,6 +190,23 @@ def simple_request_json():
     request_json = json.dumps(request.get_json_data_dict(JSONFlag.NET))
     return request_json
 
+@pytest.fixture
+def simple_request_json_dup():
+    sender_addr = LibraAddress.encode_to_Libra_address(b'A'*16).encoded_address
+    receiver_addr   = LibraAddress.encode_to_Libra_address(b'B'*16).encoded_address
+    assert type(sender_addr) == str
+    assert type(receiver_addr) == str
+
+    sender = PaymentActor(sender_addr, 'C', Status.none, [])
+    receiver = PaymentActor(receiver_addr, '1', Status.none, [])
+    action = PaymentAction(5, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
+    payment = PaymentObject(sender, receiver, 'ref_payment_1', 'orig_ref...', 'description ...', action)
+    command = PaymentCommand(payment)
+    request = CommandRequestObject(command)
+    request.seq = 1
+    request_json = json.dumps(request.get_json_data_dict(JSONFlag.NET))
+    return request_json
+
 @pytest.fixture(params=[
     (None, None, 'failure', True, 'parsing'),
     (0, 0, 'success', None, None),
@@ -219,6 +236,7 @@ def test_vasp_simple(simple_request_json):
     assert responses[0].type is CommandRequestObject
     assert responses[1].type is CommandResponseObject
     assert 'success' in responses[1].content
+
 
 def test_vasp_simple_wrong_VASP(simple_request_json):
     AddrThis   = LibraAddress.encode_to_Libra_address(b'X'*16)

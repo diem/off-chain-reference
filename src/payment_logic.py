@@ -193,16 +193,12 @@ class PaymentProcessor(CommandProcessor):
             # Update the Index of Reference ID -> Payment
             ref_id = payment.reference_id
 
-            # TODO: test this!!!
             if ref_id in self.reference_id_index:
                 dependencies_versions = command.get_dependencies()
                 old_payment = self.reference_id_index[ref_id]
-                # TODO: here we assume that the other side is correct
-                #       and will not re-use reference IDs. We can also
-                #       check for this and abort(?) if it does. 
-                assert old_payment.get_version() in dependencies_versions
-                # Here we just ignore such commands
-                return
+                if old_payment.get_version() not in dependencies_versions:
+                    # TODO: This is a bug from the other vasp, log an error.
+                    return
 
             self.reference_id_index[ref_id] = payment
 
@@ -226,10 +222,6 @@ class PaymentProcessor(CommandProcessor):
         #       in case this processor is used for multiple ones?
         updated_payments = self.payment_process_ready()
         for payment in updated_payments:
-
-            # TODO: check this is for the latest version of the object
-            #       otherwise either (a) ignore or (b) call with the 
-            #       latest object version.
 
             parties = [payment.sender.address, 
                             payment.receiver.address ]
