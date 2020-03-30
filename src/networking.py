@@ -78,7 +78,12 @@ class VASPOffChainApi(MethodView):
         try:
             channel = self.vasp.get_channel(LibraAddress(other_addr))
         except BusinessNotAuthorized:
+            # Raised if the other VASP is not an authorised business.
             abort(401)
+        except IOError:
+            # Raised if there is an error loading resources associated with
+            # the other VASP; eg. its certificate.
+            abort(500)
 
         # Verify that the other VASP is authorised to submit the request;
         # eg. that 'other_addr' matches the certificate.

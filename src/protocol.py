@@ -69,11 +69,15 @@ class OffChainVASP:
         self.network_server.run()
 
     def close_channel(self, other_vasp_addr):
-        # TODO: Is this method useful for other things than networking?
+        my_address = self.get_vasp_address()
+        store_key = (my_address, other_vasp_addr)
+        if store_key in self.channel_store:
+            # Close the TLS channel.
+            channel = self.channel_store[store_key]
+            channel.network_client.close_connection()
 
-        # Close the TLS channel
-        channel = self.get_channel(other_vasp_addr)
-        channel.network_client.close_connection()
+            # Delete the channel from our store.
+            del self.channel_store[store_key]
 
 
 class VASPPairChannel:
