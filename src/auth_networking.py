@@ -24,15 +24,14 @@ class AuthNetworkClient(NetworkClient):
                 cert=(self.client_cert, self.client_key)
             )
         except requests.exceptions.RequestException:
-            # This happens in case of a connection error (e.g. DNS failure,
-            # refused connection, etc), timeout, or if the maximum number of
-            # redirections is reached.
+            # This happens in case of (i) a connection error (e.g. DNS failure,
+            # refused connection, etc), (ii) timeout, or (iii) if the maximum
+            # number of redirections is reached.
             return None
 
 
 class PeerCertWSGIRequestHandler(werkzeug.serving.WSGIRequestHandler):
     def make_environ(self):
-        # First call the super class method.
         environ = super(PeerCertWSGIRequestHandler, self).make_environ()
 
         # Get the cient's certificate.
@@ -42,7 +41,7 @@ class PeerCertWSGIRequestHandler(werkzeug.serving.WSGIRequestHandler):
         )
 
         # Add the client's certificate to the environment to make it accessible
-        # by Flask's request.
+        # in the Flask's request.
         environ['peercert'] = x509
         return environ
 

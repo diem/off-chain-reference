@@ -1,6 +1,6 @@
 from libra_address import LibraAddress
 from protocol_messages import CommandResponseObject
-from business import VASPInfo
+from business import VASPInfo, BusinessNotAuthorized
 
 from flask import Flask, request, abort
 from flask.views import MethodView
@@ -15,7 +15,7 @@ class NetworkClient:
         self.my_addr = my_addr
         self.other_addr = other_addr
 
-        # We send all requests through a session to reuse the TLS connection.
+        # We send all requests through a session to re-use the TLS connection.
         # Keep-alive is automatic within a session.
         self.session = requests.Session()
 
@@ -27,9 +27,9 @@ class NetworkClient:
         try:
             return self.session.post(url, json=json_request)
         except requests.exceptions.RequestException:
-            # This happens in case of a connection error (e.g. DNS failure,
-            # refused connection, etc), timeout, or if the maximum number of
-            # redirections is reached.
+            # This happens in case of (i) a connection error (e.g. DNS failure,
+            # refused connection, etc), (ii) timeout, or (iii) if the maximum
+            # number of redirections is reached.
             return None
 
     def close_connection(self):
@@ -64,20 +64,30 @@ class VASPOffChainApi(MethodView):
 
     def post(self, other_addr):
         try:
-            # This is a pyOpenSSL X509 object
+            # This is a pyOpenSSL X509 object.
             client_certificate = request.environ['peercert']
         except KeyError:
             # This exception is triggered when there is not client certificate.
             # In this case with continue without it, and it is up to the
-            # context to decide whether the reject the client's request.
+            # context to decide whether to reject the client's request.
             client_certificate = None
 
         request_json = request.get_json()
+
+        # Try to open a channel with the other VASP.
+        try:
+            channel = self.vasp.get_channel(LibraAddress(other_addr))
+        except BusinessNotAuthorized:
+            abort(401)
+
+        # Verify that the other VASP is authorised to submit the request;
+        # eg. that 'other_addr' matches the certificate.
         if not self.vasp.info_context.is_authorised_VASP(
             client_certificate, other_addr
         ):
             abort(401)
-        channel = self.vasp.get_channel(LibraAddress(other_addr))
+
+        # Process the request and send a response back.
         try:
             response = channel.parse_handle_request(request_json)
         except TypeError:

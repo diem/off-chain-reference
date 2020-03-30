@@ -239,16 +239,20 @@ class VASPInfo:
 
     def get_peer_base_url(self, other_addr):
         """ Get the base URL that manages off-chain communications of an other
-            VASP (identified by `other_addr`).
+            VASP (identified by `other_addr`). Raise BusinessNotAuthorized
+            if there is no known base URL associated to the provided address.
 
             Returns a str: The base url of the other VASP.
+
+            Can Raise:
+                BusinessNotAuthorized
         """
         raise NotImplementedError()
 
     def is_authorised_VASP(self, certificate, other_addr):
         """ Check wether an incoming network request is authorised or not.
             This function checks (i) if the certificate comes from one
-            of the authorised VASPS (ie. a that VASP has the authorised bit
+            of the authorised VASPS (ie. that the VASP has the authorised bit
             set on chains), and (ii) if the certificate belongs to the sender
             of the request (ie. the network client). Check (ii) ensure that a
             VASP is not impersonating one of the other authorised VASPs.
@@ -276,9 +280,13 @@ class VASPInfo:
 
     def get_peer_TLS_certificate(self, other_addr):
         """ Get the on-chain TLS certificate of a peer VASP, identified by
-            `other_addr`.
+            `other_addr`. Raise BusinessNotAuthorized if there is no known
+            certificates associated to the provided address.
 
             Returns a str: path to the file containing the TLS certificate.
+
+            Can Riase:
+                BusinessNotAuthorized
         """
         raise NotImplementedError()
 

@@ -1,5 +1,5 @@
 from business import BusinessContext, BusinessAsyncInterupt, BusinessForceAbort, \
-BusinessValidationFailure, VASPInfo
+BusinessValidationFailure, VASPInfo, BusinessNotAuthorized
 from protocol import OffChainVASP
 from libra_address import LibraAddress
 from protocol_messages import CommandRequestObject
@@ -45,19 +45,22 @@ class sample_vasp_info(VASPInfo):
         return self.tls_key
 
     def get_peer_TLS_certificate(self, other_addr):
-        assert other_addr.plain() in self.each_peer_tls_cert
+        if not other_addr.plain() in self.each_peer_tls_cert:
+            raise BusinessNotAuthorized
         return self.each_peer_tls_cert[other_addr.plain()]
 
     def get_all_peers_TLS_certificate(self):
         return self.all_peers_tls_cert
 
     def get_peer_base_url(self, other_addr):
-        assert other_addr.plain() in self.each_peer_base_url
+        if not other_addr.plain() in self.each_peer_base_url:
+            raise BusinessNotAuthorized
         return self.each_peer_base_url[other_addr.plain()]
 
     def is_authorised_VASP(self, certificate, other_addr):
-        if other_addr.plain() not in self.each_peer_tls_cert:
-            return False
+        # The check below should always pass: if we managed to open a channel
+        # with another VASP, we should have already loaded its certificate.
+        assert other_addr.plain() in self.each_peer_tls_cert
 
         cert_file = self.each_peer_tls_cert[other_addr.plain()]
         with open(cert_file, 'rt') as f:
@@ -84,7 +87,6 @@ class sample_business(BusinessContext):
         all_peers_tls_cert = f'{assets_path}client_cert.pem'
 
         peerA_addr = LibraAddress.encode_to_Libra_address(b'A'*16).plain()
-        peerB_addr = LibraAddress.encode_to_Libra_address(b'B'*16).plain()
         each_peer_tls_cert = {
             peerA_addr: f'{assets_path}client_cert.pem',
         }
