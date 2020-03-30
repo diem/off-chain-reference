@@ -139,6 +139,7 @@ class PaymentProcessor(CommandProcessor):
 
         with storage_factory as txid:
             root = storage_factory.make_value('processor', None)
+            self.reference_id_index = storage_factory.make_dict('reference_id_index', PaymentObject, root)
             self.callbacks = storage_factory.make_dict('callbacks', PaymentObject, root)
             self.ready = storage_factory.make_dict('ready', PaymentObject, root)
 
@@ -185,11 +186,30 @@ class PaymentProcessor(CommandProcessor):
 
     def process_command(self, vasp, channel, executor, command, status_success, error=None):
         if status_success:
-            dependencies = executor.object_store
+            dependencies_objects = executor.object_store
             new_version = command.get_new_version()
-            payment = command.get_object(new_version, dependencies)
+            payment = command.get_object(new_version, dependencies_objects)
+
+            # Update the Index of Reference ID -> Payment
+            ref_id = payment.reference_id
+
+            # TODO: test this!!!
+            if ref_id in self.reference_id_index:
+                dependencies_versions = command.get_dependencies()
+                old_payment = self.reference_id_index[ref_id]
+                # TODO: here we assume that the other side is correct
+                #       and will not re-use reference IDs. We can also
+                #       check for this and abort(?) if it does. 
+                assert old_payment.get_version() in dependencies_versions
+                # Here we just ignore such commands
+                return
+
+            self.reference_id_index[ref_id] = payment
+
+            # Process the payment to generate more commands
             new_payment = self.payment_process(payment)
             if new_payment.has_changed():
+                # Apply the new commands:
                 new_cmd = PaymentCommand(new_payment)
                 channel.sequence_command_local(new_cmd)
         else:
@@ -206,6 +226,11 @@ class PaymentProcessor(CommandProcessor):
         #       in case this processor is used for multiple ones?
         updated_payments = self.payment_process_ready()
         for payment in updated_payments:
+
+            # TODO: check this is for the latest version of the object
+            #       otherwise either (a) ignore or (b) call with the 
+            #       latest object version.
+
             parties = [payment.sender.address, 
                             payment.receiver.address ]
 
@@ -221,6 +246,10 @@ class PaymentProcessor(CommandProcessor):
 
 
     # ----------- END of CommandProcessor interface ---------
+
+    def get_latest_payment_by_ref_id(self, ref_id):
+        ''' Returns the latest payment version with the reference ID provided.'''
+        return self.reference_id_index[ref_id]
 
     def check_signatures(self, payment):
         ''' Utility function that checks all signatures present for validity '''
