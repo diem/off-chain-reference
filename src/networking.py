@@ -38,8 +38,6 @@ class NetworkClient:
 
 class NetworkServer:
 
-    BUSINESS_INTERUPT_RESPONSE = {"status": "interupt"}
-
     def __init__(self, vasp):
         self.app = Flask(__name__)
         self.vasp = vasp
@@ -86,7 +84,7 @@ class VASPOffChainApi(MethodView):
             abort(500)
 
         # Verify that the other VASP is authorised to submit the request;
-        # eg. that 'other_addr' matches the certificate.
+        # ie. that 'other_addr' matches the certificate.
         if not self.vasp.info_context.is_authorised_VASP(
             client_certificate, other_addr
         ):
@@ -103,4 +101,4 @@ class VASPOffChainApi(MethodView):
         if response != None:
             return response.content
         else:
-            return Networking.BUSINESS_INTERUPT_RESPONSE
+            return json.dumps({"status": "success"})
