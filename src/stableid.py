@@ -7,7 +7,9 @@
         - No dependence on any external cryptography library to maximize compatibility.
     
     Experimental:
+        - Ability to revoke subaddresses.
         - Support pull authorization flows.
+
 
 '''
 
@@ -66,6 +68,10 @@ class SubAddressResolver:
         raise NotImplementedError()
 
     # Experimental features
+
+    def revoke_subaddress(self, sub_address):
+        # TODO: ...
+        raise NotImplementedError()
 
     def resolve_authenticator(self, sub_address, scope):
         # TODO: ...
