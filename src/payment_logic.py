@@ -353,6 +353,7 @@ class PaymentProcessor(CommandProcessor):
         other_status = payment.data[other_role].status
 
         new_payment = payment.new_version()
+        assert not new_payment.has_changed()
 
         try:
             if other_status == Status.abort:
@@ -398,14 +399,11 @@ class PaymentProcessor(CommandProcessor):
         except BusinessAsyncInterupt as e:
             # The business layer needs to do a long duration check.
             # Cannot make quick progress, and must response with current status.
-            check_status(role, status, current_status, other_status)
-            new_payment.data[role].change_status(current_status)
 
-            # TODO: Should we pass the new or old object here?
-            if new_payment.has_changed():
-                self.callbacks[e.get_callback_ID()] = new_payment
-            else:
-                self.callbacks[e.get_callback_ID()] = payment
+            self.callbacks[e.get_callback_ID()] = payment
+            new_payment = payment.new_version()
+            assert not new_payment.has_changed()
+            return new_payment
 
         except BusinessForceAbort:
 
@@ -413,8 +411,7 @@ class PaymentProcessor(CommandProcessor):
             # However we will catch a wrong change in the check when we change status.
             current_status = Status.abort
 
-        finally:
-            check_status(role, status, current_status, other_status)
-            new_payment.data[role].change_status(current_status)
 
+        check_status(role, status, current_status, other_status)
+        new_payment.data[role].change_status(current_status)
         return new_payment

@@ -224,8 +224,9 @@ class sample_business(BusinessContext):
                 account['pending_transactions'][reference]['settled'] = True
 
             return True
+            
         else:
-            raise BusinessAsyncInterupt(1234)
+            return False
 
 
 class sample_vasp:
