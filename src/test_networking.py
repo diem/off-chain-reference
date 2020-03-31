@@ -70,7 +70,7 @@ def url(tester_addr, testee_addr):
 
 @pytest.fixture
 def bad_request_json():
-    # This requests triggers an exception inside 'json.load' of VASPPairChannel
+    # This requests triggers an exception inside 'json.load' of VASPPairChannel.
     return {"random": "random"}
 
 

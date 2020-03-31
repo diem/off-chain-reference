@@ -289,7 +289,12 @@ class VASPPairChannel:
         # requests to sequence any new client requests.
         if self.is_server() and self.num_pending_responses() > 0:
             self.pending_requests += [request]
-            return None
+            # TODO [issue #38]: Ideally, the channel should return None,
+            # and the server network should wait until a response is available
+            # before answering the client.
+            response = make_protocol_error(request, code='wait')
+            return self.send_response(response)
+            #return None
 
         # Sequence newer requests
         if request.seq == self.other_next_seq:

@@ -98,7 +98,5 @@ class VASPOffChainApi(MethodView):
             # json request; eg. when the clients sends a json dict instead of
             # a json string.
             abort(400)
-        if response != None:
-            return response.content
-        else:
-            return json.dumps({"status": "success"})
+        assert response != None
+        return response.content

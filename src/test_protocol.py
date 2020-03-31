@@ -371,8 +371,8 @@ def test_protocol_server_client_interleaved_benign(server_client):
 
     # The server waits until all own requests are done
     server.handle_request(client_request)
-    no_reply = server.tap()
-    assert no_reply == []
+    server_reply = server.tap()[0]
+    assert server_reply.error.code == 'wait'
 
     client.handle_request(server_request)
     client_reply = client.tap()[0]
@@ -400,8 +400,8 @@ def test_protocol_server_client_interleaved_swapped_request(server_client):
     client.handle_request(server_request)
     client_reply = client.tap()[0]
     server.handle_request(client_request)
-    no_reply = server.tap()
-    assert no_reply == []
+    server_reply = server.tap()[0]
+    assert server_reply.error.code == 'wait'
 
     server.handle_response(client_reply)
     server_reply = server.tap()[0]
@@ -424,8 +424,8 @@ def test_protocol_server_client_interleaved_swapped_reply(server_client):
     server_request = server.tap()[0]
 
     server.handle_request(client_request)
-    server_reply = server.tap()
-    assert server_reply == []
+    server_reply = server.tap()[0]
+    assert server_reply.error.code == 'wait'
 
     client.handle_request(server_request)
     client_reply = client.tap()[0]
