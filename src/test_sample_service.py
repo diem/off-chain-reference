@@ -261,7 +261,7 @@ def test_vasp_simple_interrupt(simple_request_json):
 
 
 def test_sample_vasp_info_is_authorised():
-    cert_file = '../assets/client_cert.pem'
+    cert_file = '../test_vectors/client_cert.pem'
     with open(cert_file, 'rt') as f:
         cert_str = f.read()
     cert = OpenSSL.crypto.load_certificate(

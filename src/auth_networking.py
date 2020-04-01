@@ -13,7 +13,7 @@ class AuthNetworkClient(NetworkClient):
 
         self.server_cert = server_cert
         self.client_cert = client_cert
-        self. client_key = client_key
+        self.client_key = client_key
 
     def send_request(self, url, json_request):
         try:

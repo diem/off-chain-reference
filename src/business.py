@@ -238,7 +238,7 @@ class VASPInfo:
         raise NotImplementedError()
 
     def get_peer_base_url(self, other_addr):
-        """ Get the base URL that manages off-chain communications of an other
+        """ Get the base URL that manages off-chain communications of the other
             VASP (identified by `other_addr`). Raise IOError no base URL can
             be loaded.
 

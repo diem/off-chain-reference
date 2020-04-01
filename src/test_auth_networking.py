@@ -64,7 +64,7 @@ test_vector_request = """{
 if __name__ == "__main__":
 
     # Test keys and certificates.
-    assets_path = '../assets/'
+    assets_path = '../test_vectors/'
     server_key = f'{assets_path}server_key.pem'
     server_cert = f'{assets_path}server_cert.pem'
     client_key = f'{assets_path}client_key.pem'

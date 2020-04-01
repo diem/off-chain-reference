@@ -80,7 +80,7 @@ class sample_business(BusinessContext):
     # Helper functions for the business
 
     def make_vasp_info(self):
-        assets_path = '../assets/'
+        assets_path = '../test_vectors/'
 
         tls_cert = f'{assets_path}server_cert.pem'
         tls_key = f'{assets_path}server_key.pem'
