@@ -126,12 +126,12 @@ class VASPPairChannel:
         self.net_queue = []
 
         # The network client
-        self.other_base_url = self.vasp.info_context.get_peer_base_url(self.other)
-        other_cert = self.vasp.info_context.get_peer_TLS_certificate(self.other)
+        self.peer_base_url = self.vasp.info_context.get_peer_base_url(self.other)
+        peer_cert = self.vasp.info_context.get_peer_TLS_certificate(self.other)
         self.network_client = AuthNetworkClient(
             self.myself,
             self.other,
-            other_cert,
+            peer_cert,
             self.vasp.tls_cert,
             self.vasp.tls_key
         )
@@ -433,7 +433,7 @@ class VASPPairChannel:
         return False
 
     def send_network_request(self, request_json):
-        url = self.network_client.get_url(self.other_base_url)
+        url = self.network_client.get_url(self.peer_base_url)
         response = self.network_client.send_request(url, request_json)
         if response != None:
             self.parse_handle_response(json.dumps(response.json()))
