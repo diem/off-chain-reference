@@ -45,14 +45,23 @@ class SubAddressResolver:
         return self.storage[key]
 
 
-    def get_stable_id_for_account(self, account_number, period_id):
+    def get_stable_id_for_account(self, account_number, period_id, context = ''):
         ''' Return a stable identifier for an account number per period. 
-            Ensure that stable identifiers are not linkable between periods. '''
+            Ensure that stable identifiers are not linkable between periods. 
+            
+            The period_id is an identifier for the period for which the stable ID
+            should be valid. This could be, for example, a specific day (alighed 
+            to UTC). The context can be used to generate different stable IDs for
+            different contexts. For example it could be an identifier for the other
+            VASP if we expect different VASPs to never compare stable IDs (for 
+            privacy). Any immutable object with a str representation can be used
+            as a context (eg. a string, a tuple of strings, etc).
+        '''
         key = (ACCOUNT_TAG, account_number)
         if key not in self.storage:
             raise SubAddressError(f'Account number {account_number} does not exist.')
         
-        key = (STABLEID_TAG, account_number, period_id)
+        key = (STABLEID_TAG, account_number, period_id, context)
         if key not in self.storage:
             self.storage[key] = get_unique_string()
         return self.storage[key]

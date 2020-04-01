@@ -51,17 +51,23 @@ def test_stableid(base):
     db, res = base
 
     # account does not exist
+    context = ('OtherVASPAddr_ABC', )
     with pytest.raises(SubAddressError) as _:
-        res.get_stable_id_for_account('NOTEXIST', period_id = 10)
+        res.get_stable_id_for_account('NOTEXIST', period_id = 10, context=context)
     
     res.register_account_number('ABC', {'hello':'world'})
 
-    id1 = res.get_stable_id_for_account('ABC', period_id = 10)
-    id1p = res.get_stable_id_for_account('ABC', period_id = 10)
-    id2 = res.get_stable_id_for_account('ABC', period_id = 11)
+    id1 = res.get_stable_id_for_account('ABC', period_id = 10, context=context)
+    id1p = res.get_stable_id_for_account('ABC', period_id = 10, context=context)
+    id2 = res.get_stable_id_for_account('ABC', period_id = 11, context=context)
 
     assert id1 == id1p
     assert id1 != id2
+
+    # stable ID for same period but different context is different
+    context2 = ('OtherVASPAddr_XYZ', )
+    id1xyz = res.get_stable_id_for_account('ABC', period_id = 10, context=context2)
+    assert id1 != id1xyz
 
 def test_iter(base):
     db, res = base
