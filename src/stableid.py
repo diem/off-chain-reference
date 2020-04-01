@@ -2,15 +2,11 @@
 
     Key features:
         - Register long term user accounts.
-        - Allows fresh subaddresses to be derived.
-        - Can limit the scope for subaddresses to specific time periods, roles and correspondants.
-        - No dependence on any external cryptography library to maximize compatibility.
-    
-    Experimental:
-        - Ability to revoke subaddresses.
-        - Support pull authorization flows.
-
-
+        - Allows fresh subaddresses to be derived for an account.
+        - Derived a stable ID for any period identifier per account.
+        - Can store the scope for subaddresses to specific time periods, roles and correspondants.
+        - No dependence on any external cryptography library to maximize compatibility 
+          (In fact no use of cryptography in the basic scheme).
 '''
 
 from utils import get_unique_string
@@ -21,6 +17,7 @@ SUBADDRESS_TAG = 'subaddress'
 SUBHEAD_TAG = 'subhead'
 
 class SubAddressError(Exception):
+    ''' An exception from the SubAddress module.'''
     pass
 
 class SubAddressResolver:
@@ -40,6 +37,8 @@ class SubAddressResolver:
         self.storage[key] = meta_data
     
     def get_account_by_number(self, account_number):
+        ''' Returns the meta-data associated with this account, or raises if
+            the account does not exist. '''
         key = (ACCOUNT_TAG, account_number)
         if key not in self.storage:
             raise SubAddressError(f'Account number {account_number} does not exist.')
@@ -90,7 +89,8 @@ class SubAddressResolver:
         return account_number, scope
 
     def get_all_subaddress_by_account(self, account_number):
-        # TODO: Make a list structure to keep track of subaccounts
+        ''' Iterates through the sub-addresses associated with the account
+            number. '''
         key_head = (SUBHEAD_TAG, account_number) 
         if key_head not in self.storage:
             return
@@ -100,13 +100,3 @@ class SubAddressResolver:
             yield curr_subaddress
             key = (SUBADDRESS_TAG, curr_subaddress) 
             _, _, curr_subaddress = self.storage[key]
-
-    # Experimental features
-
-    def revoke_subaddress(self, sub_address):
-        # TODO: ...
-        raise NotImplementedError()
-
-    def resolve_authenticator(self, sub_address, scope):
-        # TODO: ...
-        raise NotImplementedError()
