@@ -120,10 +120,8 @@ class StorableFactory:
 
         # Write new values to the database
         for item in self.cache:
-            assert item not in self.del_cache
             self.db[item] = self.cache[item]
         for item in self.del_cache:
-            assert item not in self.cache
             if item in self.db:
                 del self.db[item]
         

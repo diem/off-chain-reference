@@ -70,7 +70,7 @@ class ExecutorException(Exception):
 
 class ProtocolExecutor:
     """ An instance of this class managed the common sequence of commands
-        between two VASPs, and whether they are a success of failure. It 
+        between two VASPs, and whether they are a success or failure. It 
         uses a CommandProcessor to determine if the command itself is 
         valid by itslef, and also to then 'execute' the command, and
         possibly generate more commands as a result.
