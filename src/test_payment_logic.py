@@ -213,12 +213,12 @@ def test_payment_processor_check(states, basic_payment, ppctx):
     bcm, pp = ppctx
     vasp = MagicMock()
     channel = MagicMock()
-    channel.other.plain.side_effect = [ src_addr ] 
-    channel.myself.plain.side_effect = [ dst_addr ] 
+    channel.other.as_str.side_effect = [ src_addr ] 
+    channel.myself.as_str.side_effect = [ dst_addr ] 
     executor = MagicMock()
     command = PaymentCommand(basic_payment)
     origin = MagicMock(spec=LibraAddress)
-    origin.plain.return_value = origin_addr
+    origin.as_str.return_value = origin_addr
     command.set_origin(origin)
 
     if res:

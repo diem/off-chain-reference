@@ -162,15 +162,15 @@ class PaymentProcessor(CommandProcessor):
         if len(parties) != 2:
             raise PaymentLogicError('Wrong number of parties to payment: ' + str(parties))
 
-        my_addr = channel.myself.plain()
+        my_addr = channel.myself.as_str()
         if my_addr not in parties:
             raise PaymentLogicError('Payment parties does not include own VASP (%s): %s' % (my_addr, str(parties)))
 
-        other_addr = channel.other.plain()
+        other_addr = channel.other.as_str()
         if other_addr not in parties:
             raise PaymentLogicError('Payment parties does not include other party (%s): %s' % (other_addr, str(parties)))
 
-        origin = command.get_origin().plain()
+        origin = command.get_origin().as_str()
         if origin not in parties:
             raise PaymentLogicError('Command originates from wrong party')
 
@@ -210,7 +210,7 @@ class PaymentProcessor(CommandProcessor):
                             payment.receiver.address ]
 
             # Determine the other address
-            my_addr = vasp.get_vasp_address().plain()
+            my_addr = vasp.get_vasp_address().as_str()
             assert my_addr in parties
             parties.remove(my_addr)
             other_addr = LibraAddress(parties[0])

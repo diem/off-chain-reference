@@ -45,7 +45,7 @@ class ProtocolCommand(JSONSerializable):
             })
             if self.origin is not None:
                 data_dict.update({
-                    "origin" : self.origin.plain()
+                    "origin" : self.origin.as_str()
                 })
 
         self.add_object_type(data_dict)
@@ -109,8 +109,8 @@ class ProtocolExecutor:
         # Configure storage hierarchy
         vasp = channel.get_vasp()
         storage_factory = vasp.get_storage_factory()
-        root = storage_factory.make_value(channel.myself.plain(), None)
-        other_vasp = storage_factory.make_value(channel.other.plain(), None, root=root)
+        root = storage_factory.make_value(channel.myself.as_str(), None)
+        other_vasp = storage_factory.make_value(channel.other.as_str(), None, root=root)
 
         # The common sequence of commands 
         self.command_sequence = storage_factory.make_list('command_sequence', ProtocolCommand, root=other_vasp)
