@@ -9,6 +9,7 @@ from libra_address import LibraAddress
 from storage import StorableFactory
 from utils import JSONSerializable
 
+# Note: ProtocolCommand is JSONSerializable, so no need to extend again.
 @JSONSerializable.register
 class PaymentCommand(ProtocolCommand):
     def __init__(self, payment):
@@ -137,7 +138,7 @@ class PaymentProcessor(CommandProcessor):
         # active payment objects in the executor payment store
         # and ask for re-processing.
 
-        with storage_factory as txid:
+        with storage_factory.atomic_writes() as txid:
             root = storage_factory.make_value('processor', None)
             self.callbacks = storage_factory.make_dict('callbacks', PaymentObject, root)
             self.ready = storage_factory.make_dict('ready', PaymentObject, root)
@@ -293,7 +294,7 @@ class PaymentProcessor(CommandProcessor):
         ''' Notify the processor that the callback with a specific ID has returned, and is ready to provide an answer. '''
         assert callback_ID in self.callbacks
         
-        with self.storage_factory as _:
+        with self.storage_factory.atomic_writes() as _:
             obj = self.callbacks[callback_ID]
             del self.callbacks[callback_ID]
             # TODO: should we retrive here the latest version of the object?

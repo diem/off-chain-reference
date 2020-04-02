@@ -155,6 +155,10 @@ class StorableFactory:
 
     # Define the interfaces as a context manager
 
+    def atomic_writes(self):
+        ''' Returns a context that ensures all writes in its body are atomic '''
+        return self
+
     def __enter__(self):
         if self.levels == 0:
             self.current_transaction = get_unique_string()
