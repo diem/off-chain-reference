@@ -85,20 +85,20 @@ def test_payment_command_missing_dependency_fail(basic_payment):
 # ----- check_new_payment -----
 
 @pytest.fixture
-def ppctx():
+def payment_processor_context():
     bcm = MagicMock(spec=BusinessContext)
     store = StorableFactory({})
     proc = PaymentProcessor(bcm, store)
     return (bcm, proc)
 
-def test_payment_create_from_recipient(basic_payment, ppctx):
-    bcm, pp = ppctx
+def test_payment_create_from_recipient(basic_payment, payment_processor_context):
+    bcm, pp = payment_processor_context
     bcm.is_recipient.side_effect = [True] * 4
     pp.check_new_payment(basic_payment)
     
 
-def test_payment_create_from_sender_sig_fail(basic_payment, ppctx):
-    bcm, pp = ppctx
+def test_payment_create_from_sender_sig_fail(basic_payment, payment_processor_context):
+    bcm, pp = payment_processor_context
     bcm.is_recipient.side_effect = [False] * 4
     basic_payment.add_recipient_signature('BAD SINGNATURE')
     bcm.validate_recipient_signature.side_effect = [BusinessValidationFailure('Sig fails')]
@@ -107,22 +107,22 @@ def test_payment_create_from_sender_sig_fail(basic_payment, ppctx):
         pp.check_new_payment(basic_payment)
 
 
-def test_payment_create_from_sender(basic_payment, ppctx):
-    bcm, pp = ppctx
+def test_payment_create_from_sender(basic_payment, payment_processor_context):
+    bcm, pp = payment_processor_context
     bcm.is_recipient.side_effect = [False] * 4
     pp.check_new_payment(basic_payment)
 
 
-def test_payment_create_from_sender_fail(basic_payment, ppctx):
-    bcm, pp = ppctx
+def test_payment_create_from_sender_fail(basic_payment, payment_processor_context):
+    bcm, pp = payment_processor_context
     bcm.is_recipient.side_effect = [True]
 
     basic_payment.data['receiver'].update({'status': Status.ready_for_settlement})
     with pytest.raises(PaymentLogicError):
         pp.check_new_payment(basic_payment)
 
-def test_payment_create_from_receiver_fail(basic_payment, ppctx):
-    bcm, pp = ppctx
+def test_payment_create_from_receiver_fail(basic_payment, payment_processor_context):
+    bcm, pp = payment_processor_context
     bcm.is_recipient.side_effect = [False] * 4
 
     basic_payment.data['sender'].update({'status': Status.ready_for_settlement})
@@ -131,8 +131,8 @@ def test_payment_create_from_receiver_fail(basic_payment, ppctx):
         pp.check_new_payment(basic_payment)
 
 
-def test_payment_create_from_receiver_bad_state_fail(basic_payment, ppctx):
-    bcm, pp = ppctx
+def test_payment_create_from_receiver_bad_state_fail(basic_payment, payment_processor_context):
+    bcm, pp = payment_processor_context
     bcm.is_recipient.side_effect = [False]
 
     basic_payment.data['receiver'].update({'status': Status.needs_recipient_signature})
@@ -143,8 +143,8 @@ def test_payment_create_from_receiver_bad_state_fail(basic_payment, ppctx):
 # ----- check_new_update -----
 
 
-def test_payment_update_from_sender(basic_payment, ppctx):
-    bcm, pp = ppctx
+def test_payment_update_from_sender(basic_payment, payment_processor_context):
+    bcm, pp = payment_processor_context
     bcm.is_recipient.side_effect = [False] * 4
     diff = {}
     new_obj = basic_payment.new_version()
@@ -152,8 +152,8 @@ def test_payment_update_from_sender(basic_payment, ppctx):
     pp.check_new_update(basic_payment, new_obj)
 
 
-def test_payment_update_from_sender_modify_receiver_fail(basic_payment, ppctx):
-    bcm, pp = ppctx
+def test_payment_update_from_sender_modify_receiver_fail(basic_payment, payment_processor_context):
+    bcm, pp = payment_processor_context
     bcm.is_recipient.side_effect = [True]
     diff = {'receiver': {'status': "settled"}}
     new_obj = basic_payment.new_version()
@@ -163,8 +163,8 @@ def test_payment_update_from_sender_modify_receiver_fail(basic_payment, ppctx):
         pp.check_new_update(basic_payment, new_obj)
 
 
-def test_payment_update_from_receiver_invalid_state_fail(basic_payment, ppctx):
-    bcm, pp = ppctx
+def test_payment_update_from_receiver_invalid_state_fail(basic_payment, payment_processor_context):
+    bcm, pp = payment_processor_context
     bcm.is_recipient.side_effect = [False]
     diff = {'receiver': {'status': "needs_recipient_signature"}}
     new_obj = basic_payment.new_version()
@@ -173,8 +173,8 @@ def test_payment_update_from_receiver_invalid_state_fail(basic_payment, ppctx):
         pp.check_new_update(basic_payment, new_obj)
 
 
-def test_payment_update_from_receiver_invalid_transition_fail(basic_payment, ppctx):
-    bcm, pp = ppctx
+def test_payment_update_from_receiver_invalid_transition_fail(basic_payment, payment_processor_context):
+    bcm, pp = payment_processor_context
     bcm.is_recipient.side_effect = [False]
     basic_payment.data['receiver'].update({'status': Status.ready_for_settlement})
     diff = {'receiver': {'status': "needs_kyc_data"}}
@@ -184,8 +184,8 @@ def test_payment_update_from_receiver_invalid_transition_fail(basic_payment, ppc
         pp.check_new_update(basic_payment, new_obj)
 
 
-def test_payment_update_from_receiver_unilateral_abort_fail(basic_payment, ppctx):
-    bcm, pp = ppctx
+def test_payment_update_from_receiver_unilateral_abort_fail(basic_payment, payment_processor_context):
+    bcm, pp = payment_processor_context
     bcm.is_recipient.side_effect = [False]
     basic_payment.data['receiver'].update({'status': Status.ready_for_settlement})
     diff = {'receiver': {'status': "abort"}}
@@ -208,9 +208,9 @@ def test_payment_update_from_receiver_unilateral_abort_fail(basic_payment, ppctx
 def states(request):
     return request.param
 
-def test_payment_processor_check(states, basic_payment, ppctx):
+def test_payment_processor_check(states, basic_payment, payment_processor_context):
     src_addr, dst_addr, origin_addr, res = states
-    bcm, pp = ppctx
+    bcm, pp = payment_processor_context
     vasp = MagicMock()
     channel = MagicMock()
     channel.other.as_str.side_effect = [ src_addr ] 
@@ -227,8 +227,8 @@ def test_payment_processor_check(states, basic_payment, ppctx):
         with pytest.raises(PaymentLogicError):
             pp.check_command(vasp, channel, executor, command)
 
-def test_payment_process_receiver_new_payment(basic_payment, ppctx):
-    bcm, pp = ppctx
+def test_payment_process_receiver_new_payment(basic_payment, payment_processor_context):
+    bcm, pp = payment_processor_context
     bcm.is_recipient.side_effect = [True, True]
     bcm.check_account_existence.side_effect = [None]
     bcm.next_kyc_level_to_request.side_effect = [Status.needs_kyc_data]
@@ -268,8 +268,8 @@ def test_payment_process_receiver_new_payment(basic_payment, ppctx):
     assert new_payment3.data['receiver'].data['status'] == Status.settled
 
 
-def test_payment_process_interrupt(basic_payment, ppctx):
-    bcm, pp = ppctx
+def test_payment_process_interrupt(basic_payment, payment_processor_context):
+    bcm, pp = payment_processor_context
     bcm.is_recipient.side_effect = [True, True]
     bcm.check_account_existence.side_effect = [None]
     bcm.next_kyc_level_to_request.side_effect = [BusinessAsyncInterupt(1234)]
@@ -280,8 +280,8 @@ def test_payment_process_interrupt(basic_payment, ppctx):
     assert new_payment.data['receiver'].data['status'] == Status.none
 
 
-def test_payment_process_interrupt_resume(basic_payment, ppctx):
-    bcm, pp = ppctx
+def test_payment_process_interrupt_resume(basic_payment, payment_processor_context):
+    bcm, pp = payment_processor_context
     bcm.is_recipient.side_effect = [True, True, True, True]
     bcm.check_account_existence.side_effect = [None, None]
     bcm.next_kyc_level_to_request.side_effect = [Status.ready_for_settlement]
@@ -307,8 +307,8 @@ def test_payment_process_interrupt_resume(basic_payment, ppctx):
     L[0].data['receiver'].data['status'] == Status.settled
 
 
-def test_payment_process_abort(basic_payment, ppctx):
-    bcm, pp = ppctx
+def test_payment_process_abort(basic_payment, payment_processor_context):
+    bcm, pp = payment_processor_context
     bcm.is_recipient.side_effect = [True, True]
     bcm.check_account_existence.side_effect = [None]
     bcm.next_kyc_level_to_request.side_effect = [BusinessForceAbort]
@@ -317,8 +317,8 @@ def test_payment_process_abort(basic_payment, ppctx):
     assert new_payment.data['receiver'].data['status'] == Status.abort
 
 
-def test_payment_process_abort_from_sender(basic_payment, ppctx):
-    bcm, pp = ppctx
+def test_payment_process_abort_from_sender(basic_payment, payment_processor_context):
+    bcm, pp = payment_processor_context
     bcm.is_recipient.side_effect = [True]
     bcm.ready_for_settlement.side_effect = [False]
     basic_payment.data['sender'].data['status'] = Status.abort
@@ -326,8 +326,8 @@ def test_payment_process_abort_from_sender(basic_payment, ppctx):
     assert new_payment.data['receiver'].data['status'] == Status.abort
 
 
-def test_payment_process_get_stable_id(basic_payment, ppctx):
-    bcm, pp = ppctx
+def test_payment_process_get_stable_id(basic_payment, payment_processor_context):
+    bcm, pp = payment_processor_context
     bcm.is_recipient.side_effect = [True]
     bcm.next_kyc_to_provide.side_effect = [ set([ Status.needs_stable_id ]) ]
     bcm.get_stable_id.side_effect = ['stable_id']
@@ -335,8 +335,8 @@ def test_payment_process_get_stable_id(basic_payment, ppctx):
     assert new_payment.data['receiver'].data['stable_id'] == 'stable_id'
 
 
-def test_payment_process_get_extended_kyc(basic_payment, ppctx):
-    bcm, pp = ppctx
+def test_payment_process_get_extended_kyc(basic_payment, payment_processor_context):
+    bcm, pp = payment_processor_context
     bcm.is_recipient.side_effect = [True]
     bcm.next_kyc_to_provide.side_effect = [ set([Status.needs_kyc_data]) ]
     kyc_data = KYCData('{"payment_reference_id": "123", "type": "A"}')
