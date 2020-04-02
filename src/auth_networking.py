@@ -11,8 +11,8 @@ class AuthNetworkClient(NetworkClient):
     def __init__(self, my_addr, other_addr, server_cert, client_cert, client_key):
         super().__init__(my_addr, other_addr)
 
-        self.server_cert = server_cert
-        self.client_cert = client_cert
+        self.server_ca_cert = server_cert
+        self.client_ca_cert = client_cert
         self.client_key = client_key
 
     def send_request(self, url, json_request):
@@ -20,8 +20,8 @@ class AuthNetworkClient(NetworkClient):
             return requests.post(
                 url,
                 json=json_request,
-                verify=self.server_cert,
-                cert=(self.client_cert, self.client_key)
+                verify=self.server_ca_cert,
+                cert=(self.client_ca_cert, self.client_key)
             )
         except requests.exceptions.RequestException:
             # This happens in case of (i) a connection error (e.g. DNS failure,
@@ -63,17 +63,17 @@ class AuthNetworkServer(NetworkServer):
         self.server_key_password = None
 
         # The server's certificate.
-        self.server_cert = server_cert
+        self.server_ca_cert = server_cert
 
         # Certificate of the CA that issued the client's certificate.
-        self.client_cert = client_cert
+        self.client_ca_cert = client_cert
 
     def run(self):
         ssl_context = ssl.create_default_context(
-            purpose=ssl.Purpose.CLIENT_AUTH, cafile=self.client_cert
+            purpose=ssl.Purpose.CLIENT_AUTH, cafile=self.client_ca_cert
         )
         ssl_context.load_cert_chain(
-            certfile=self.server_cert,
+            certfile=self.server_ca_cert,
             keyfile=self.server_key,
             password=self.server_key_password
         )

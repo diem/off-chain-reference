@@ -35,8 +35,6 @@ class BusinessForceAbort(Exception):
 
 
 class BusinessContext:
-    def __init__(self):
-        self.info_context = VASPInfo()
 
     def open_channel_to(self, other_vasp_info):
         ''' Requests authorization to open a channel to another VASP.
@@ -239,13 +237,9 @@ class VASPInfo:
 
     def get_peer_base_url(self, other_addr):
         """ Get the base URL that manages off-chain communications of the other
-            VASP (identified by `other_addr`). Raise IOError no base URL can
-            be loaded.
+            VASP (identified by `other_addr`).
 
             Returns a str: The base url of the other VASP.
-
-            Can Raise:
-                IOError
         """
         raise NotImplementedError()
 
@@ -262,22 +256,22 @@ class VASPInfo:
         """
         raise NotImplementedError()
 
-    def get_TLS_certificate(self):
-        """ Get the on-chain TLS certificate of the VASP to authenticate channels.
+    def get_TLS_certificate_path(self):
+        """ Get the path to the TLS certificate of the VASP to authenticate channels.
 
             Returns a str: path to the file containing the TLS certificatre.
         """
         raise NotImplementedError()
 
-    def get_TLS_key(self):
-        """ Get the on-chain TLS key of the VASP to authenticate channels.
+    def get_TLS_key_path(self):
+        """ Get the path to the on-chain TLS key of the VASP to authenticate channels.
 
             Returns a str: path to the file containing the TLS key.
         """
         raise NotImplementedError()
 
-    def get_peer_TLS_certificate(self, other_addr):
-        """ Get the on-chain TLS certificate of a peer VASP, identified by
+    def get_peer_TLS_certificate_path(self, other_addr):
+        """ Get the path to the TLS certificate of a peer VASP, identified by
             `other_addr`. Raise IOError if no certificates can be loaded.
 
             Returns a str: path to the file containing the TLS certificate.
@@ -287,8 +281,9 @@ class VASPInfo:
         """
         raise NotImplementedError()
 
-    def get_all_peers_TLS_certificate(self):
-        """ Get the on-chain TLS certificate of all authorised peer VASPs.
+    def get_all_peers_TLS_certificate_path(self):
+        """ Get the path to the PEM bundle containing the TLS certificates of
+        all authorised peer VASPs.
 
             Returns a str: path to a single file containing all TLS certificates.
         """

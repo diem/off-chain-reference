@@ -38,17 +38,17 @@ class sample_vasp_info(VASPInfo):
         self.each_peer_tls_cert = each_peer_tls_cert
         self.each_peer_base_url = each_peer_base_url
 
-    def get_TLS_certificate(self):
+    def get_TLS_certificate_path(self):
         return self.tls_cert
 
-    def get_TLS_key(self):
+    def get_TLS_key_path(self):
         return self.tls_key
 
-    def get_peer_TLS_certificate(self, other_addr):
+    def get_peer_TLS_certificate_path(self, other_addr):
         assert other_addr.plain() in self.each_peer_tls_cert
         return self.each_peer_tls_cert[other_addr.plain()]
 
-    def get_all_peers_TLS_certificate(self):
+    def get_all_peers_TLS_certificate_path(self):
         return self.all_peers_tls_cert
 
     def get_peer_base_url(self, other_addr):

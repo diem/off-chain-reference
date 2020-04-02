@@ -88,7 +88,7 @@ class VASPOffChainApi(MethodView):
         if not self.vasp.info_context.is_authorised_VASP(
             client_certificate, other_addr
         ):
-            abort(401)
+            abort(403)
 
         # Process the request and send a response back.
         try:

@@ -90,7 +90,7 @@ def test_process_request(server, flask_client, url, simple_request_json):
 def test_process_request_bad_vasp(server, flask_client, url, simple_request_json):
     server.vasp.info_context.is_authorised_VASP.return_value = False
     response = flask_client.post(url, json=simple_request_json)
-    assert response.status_code == 401
+    assert response.status_code == 403
 
 
 def test_process_request_bad_request(server, flask_client, url, bad_request_json):
