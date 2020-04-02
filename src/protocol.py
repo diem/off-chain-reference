@@ -34,9 +34,9 @@ class OffChainVASP:
         self.info_context = self.business_context.info_context
 
         # The network server
-        self.tls_cert = self.info_context.get_TLS_certificate()
-        self.tls_key = self.info_context.get_TLS_key()
-        peers_cert = self.info_context.get_all_peers_TLS_certificate()
+        self.tls_cert = self.info_context.get_TLS_certificate_path()
+        self.tls_key = self.info_context.get_TLS_key_path()
+        peers_cert = self.info_context.get_all_peers_TLS_certificate_path()
         self.network_server = AuthNetworkServer(
             self, self.tls_key, self.tls_cert, peers_cert
         )
@@ -127,7 +127,7 @@ class VASPPairChannel:
 
         # The network client
         self.peer_base_url = self.vasp.info_context.get_peer_base_url(self.other)
-        peer_cert = self.vasp.info_context.get_peer_TLS_certificate(self.other)
+        peer_cert = self.vasp.info_context.get_peer_TLS_certificate_path(self.other)
         self.network_client = AuthNetworkClient(
             self.myself,
             self.other,
