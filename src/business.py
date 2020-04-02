@@ -250,7 +250,7 @@ class VASPInfo:
         raise NotImplementedError()
 
     def is_authorised_VASP(self, certificate, other_addr):
-        """ Check wether an incoming network request is authorised or not.
+        """ Check whether an incoming network request is authorised or not.
             This function checks that the certificate belongs to the sender
             of the request (ie. the network client); it ensures that a
             VASP is not impersonating one of the other authorised VASPs.
