@@ -282,7 +282,7 @@ class VASPInfo:
 
             Returns a str: path to the file containing the TLS certificate.
 
-            Can Riase:
+            Can Raise:
                 IOError
         """
         raise NotImplementedError()
