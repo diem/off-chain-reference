@@ -91,14 +91,14 @@ class VASPPairChannel:
         self.vasp = vasp
 
         # Check we are not making a channel with ourselves
-        if self.myself.plain() == self.other.plain():
-            raise Exception('Must talk to another VASP:', self.myself.plain(), self.other.plain())
+        if self.myself.as_str() == self.other.as_str():
+            raise Exception('Must talk to another VASP:', self.myself.as_str(), self.other.as_str())
 
         # TODO[issue #7]: persist and recover the command sequences
         # <STARTS to persist>
         storage_factory = self.vasp.get_storage_factory()
-        root = storage_factory.make_value(self.myself.plain(), None)
-        other_vasp = storage_factory.make_value(self.other.plain(), None, root=root)
+        root = storage_factory.make_value(self.myself.as_str(), None)
+        other_vasp = storage_factory.make_value(self.other.as_str(), None, root=root)
 
         with self.get_vasp().get_storage_factory() as tx_no: 
             self.my_requests = storage_factory.make_list('my_requests', CommandRequestObject, root=other_vasp)
