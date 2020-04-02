@@ -93,8 +93,6 @@ class VASPPairChannel:
         # Check we are not making a channel with ourselves
         if self.myself.as_str() == self.other.as_str():
             raise Exception('Must talk to another VASP:', self.myself.as_str(), self.other.as_str())
-
-        # TODO[issue #7]: persist and recover the command sequences
         
         # <STARTS to persist>
         storage_factory = self.vasp.get_storage_factory()
@@ -153,10 +151,6 @@ class VASPPairChannel:
     def get_final_sequence(self):
         """ Returns a list of commands in the common sequence. """
         return self.executor.command_sequence
-
-    def persist(self):
-        """ A hook to block until state of channel is persisted """
-        pass
 
     def send_request(self, request):
         """ A hook to send a request to other VASP"""
@@ -239,8 +233,7 @@ class VASPPairChannel:
 
             self.my_requests += [ request ]
             self.send_request(request)
-            
-        self.persist()
+
 
     def parse_handle_request(self, json_command):
         ''' Handles a request provided as a json_string '''
@@ -317,23 +310,18 @@ class VASPPairChannel:
             except ExecutorException as e:
                 response = make_command_error(request, str(e))
 
+            # Write back to storage
             request.response = response
             request.response.command_seq = seq
-
-            # self.other_next_seq += 1
             self.other_requests += [request]
 
             self.apply_response_to_executor(request)
-
-            self.persist()
             return self.send_response(request.response)
 
         elif request.seq > self.other_next_seq():
             # We have received the other side's request without receiving the
             # previous one
             response = make_protocol_error(request, code='missing')
-            # NOTE: the protocol is still correct without persisiting the cache
-            self.persist()
             return self.send_response(response)
         else:
             # OK: Previous cases are exhaustive
@@ -401,7 +389,6 @@ class VASPPairChannel:
 
                 self.apply_response_to_executor(request)
                 self.process_pending_requests_response()
-                self.persist()
 
             elif response.command_seq < self.next_final_sequence():
                 # Request already in the sequence: happens to the server party.
