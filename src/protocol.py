@@ -95,21 +95,29 @@ class VASPPairChannel:
             raise Exception('Must talk to another VASP:', self.myself.as_str(), self.other.as_str())
 
         # TODO[issue #7]: persist and recover the command sequences
+        
         # <STARTS to persist>
         storage_factory = self.vasp.get_storage_factory()
         root = storage_factory.make_value(self.myself.as_str(), None)
         other_vasp = storage_factory.make_value(self.other.as_str(), None, root=root)
 
-        with self.get_vasp().get_storage_factory() as tx_no: 
+        with storage_factory.atomic_writes() as tx_no: 
+
+            # The list of requests I have initiated
             self.my_requests = storage_factory.make_list('my_requests', CommandRequestObject, root=other_vasp)
+
+            # The list of requests the other side has initiated
             self.other_requests = storage_factory.make_list('other_requests', CommandRequestObject, root=other_vasp)
 
+            # The index of the next request from my sequence that I should retransmit
+            # (ie. for which I have not got a response yet.)
             self.next_retransmit = storage_factory.make_value('next_retransmit', int, root=other_vasp)
             if not self.next_retransmit.exists():
                 self.next_retransmit.set_value(0)
 
             # The final sequence
             self.executor = ProtocolExecutor(self, self.processor)
+
         # <ENDS to persist>
 
         # Ephemeral state that can be forgotten upon a crash
@@ -220,7 +228,7 @@ class VASPPairChannel:
         request = CommandRequestObject(off_chain_command)
 
         # Ensure all storage operations are written atomically.
-        with self.get_vasp().get_storage_factory() as tx_no:
+        with self.get_vasp().get_storage_factory().atomic_writes() as tx_no:
             request.seq = self.my_next_seq()
 
             if self.is_server():
@@ -248,7 +256,7 @@ class VASPPairChannel:
 
 
     def handle_request(self, request):
-        with  self.get_vasp().get_storage_factory() as tx_no:
+        with  self.get_vasp().get_storage_factory().atomic_writes() as tx_no:
             return self._handle_request(request)
 
     def _handle_request(self, request):
@@ -342,7 +350,7 @@ class VASPPairChannel:
             raise # To close the channel
 
     def handle_response(self, response):
-        with self.get_vasp().get_storage_factory() as tx_no:
+        with self.get_vasp().get_storage_factory().atomic_writes() as tx_no:
             self._handle_response(response)
 
     def _handle_response(self, response):
@@ -436,7 +444,7 @@ class VASPPairChannel:
     def would_retransmit(self, do_retransmit=False):
         """ Returns true if there are any pending re-transmits, namely
             requests for which the response has not yet been received. """
-        with self.get_vasp().get_storage_factory() as tx_no:
+        with self.get_vasp().get_storage_factory().atomic_writes() as tx_no:
             answer = False
             next_retransmit = self.next_retransmit.get_value()
             my_request_len  = len(self.my_requests)
