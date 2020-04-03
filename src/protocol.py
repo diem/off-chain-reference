@@ -3,7 +3,7 @@ from protocol_messages import CommandRequestObject, CommandResponseObject, \
     make_success_response, make_protocol_error, make_parsing_error, make_command_error
 from utils import JSONParsingError, JSONFlag
 from libra_address import LibraAddress
-from auth_networking import AuthNetworkClient, AuthNetworkServer
+from auth_networking import AuthNetworkClient
 
 import json
 from collections import namedtuple
@@ -13,7 +13,7 @@ NetMessage = namedtuple('NetMessage', ['src', 'dst', 'type', 'content'])
 class OffChainVASP:
     """Manages the off-chain protocol on behalf of one VASP. """
 
-    def __init__(self, vasp_addr, processor):
+    def __init__(self, vasp_addr, processor, info_context):
         if __debug__:
             assert isinstance(processor, CommandProcessor)
             assert isinstance(vasp_addr, LibraAddress)
@@ -31,15 +31,7 @@ class OffChainVASP:
 
         # The VASPInfo context that contains various network information
         # such as TLS certificates and keys.
-        self.info_context = self.business_context.info_context
-
-        # The network server
-        self.tls_cert = self.info_context.get_TLS_certificate_path()
-        self.tls_key = self.info_context.get_TLS_key_path()
-        peers_cert = self.info_context.get_all_peers_TLS_certificate_path()
-        self.network_server = AuthNetworkServer(
-            self, self.tls_key, self.tls_cert, peers_cert
-        )
+        self.info_context = info_context
 
         # TODO: this should be a persistent store
         self.channel_store = {}
@@ -64,9 +56,6 @@ class OffChainVASP:
         ''' The processor calls this method to notify the VASP that new
             commands are available for processing. '''
         self.processor.process_command_backlog(self)
-
-    def run(self):
-        self.network_server.run()
 
     def close_channel(self, other_vasp_addr):
         my_address = self.get_vasp_address()
@@ -127,13 +116,12 @@ class VASPPairChannel:
 
         # The network client
         self.peer_base_url = self.vasp.info_context.get_peer_base_url(self.other)
-        peer_cert = self.vasp.info_context.get_peer_TLS_certificate_path(self.other)
         self.network_client = AuthNetworkClient(
             self.myself,
             self.other,
-            peer_cert,
-            self.vasp.tls_cert,
-            self.vasp.tls_key
+            self.vasp.info_context.get_peer_TLS_certificate_path(self.other),
+            self.vasp.info_context.get_TLS_certificate_path(),
+            self.vasp.info_context.get_TLS_key_path()
         )
 
     def get_my_address(self):

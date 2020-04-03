@@ -51,7 +51,8 @@ def test_send_request_unknown_receiver(network_client, simple_request_json):
 @pytest.fixture
 def server(testee_addr):
     processor = MagicMock(spec=CommandProcessor)
-    vasp = OffChainVASP(testee_addr, processor)
+    info_context = MagicMock(spec=VASPInfo)
+    vasp = OffChainVASP(testee_addr, processor, info_context)
     server = NetworkServer(vasp)
     return server
 

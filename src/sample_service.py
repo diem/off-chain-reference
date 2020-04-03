@@ -5,6 +5,7 @@ from libra_address import LibraAddress
 from protocol_messages import CommandRequestObject
 from payment_logic import PaymentCommand, PaymentProcessor
 from status_logic import Status
+from auth_networking import AuthNetworkServer
 
 import json
 import OpenSSL.crypto
@@ -30,8 +31,22 @@ business_config = """[
 
 
 class sample_vasp_info(VASPInfo):
-    def __init__(self, tls_cert, tls_key, all_peers_tls_cert, each_peer_tls_cert,
-                 each_peer_base_url):
+    def __init__(self):
+
+        assets_path = '../test_vectors/'
+
+        tls_cert = f'{assets_path}server_cert.pem'
+        tls_key = f'{assets_path}server_key.pem'
+        all_peers_tls_cert = f'{assets_path}client_cert.pem'
+
+        peerA_addr = LibraAddress.encode_to_Libra_address(b'A'*16).plain()
+        each_peer_tls_cert = {
+            peerA_addr: f'{assets_path}client_cert.pem',
+        }
+        each_peer_base_url = {
+            peerA_addr: 'https://peerA.com',
+        }
+
         self.tls_cert = tls_cert
         self.tls_key = tls_key
         self.all_peers_tls_cert = all_peers_tls_cert
@@ -75,32 +90,8 @@ class sample_business(BusinessContext):
     def __init__(self, my_addr):
         self.my_addr = my_addr
         self.accounts_db = json.loads(business_config)
-        self.info_context = self.make_vasp_info()
 
     # Helper functions for the business
-
-    def make_vasp_info(self):
-        assets_path = '../test_vectors/'
-
-        tls_cert = f'{assets_path}server_cert.pem'
-        tls_key = f'{assets_path}server_key.pem'
-        all_peers_tls_cert = f'{assets_path}client_cert.pem'
-
-        peerA_addr = LibraAddress.encode_to_Libra_address(b'A'*16).plain()
-        each_peer_tls_cert = {
-            peerA_addr: f'{assets_path}client_cert.pem',
-        }
-        each_peer_base_url = {
-            peerA_addr: 'https://peerA.com',
-        }
-
-        return sample_vasp_info(
-            tls_cert,
-            tls_key,
-            all_peers_tls_cert,
-            each_peer_tls_cert,
-            each_peer_base_url
-        )
 
     def get_address(self):
         return self.my_addr.encoded_address
@@ -306,10 +297,19 @@ class sample_vasp:
     def __init__(self, my_addr):
         self.my_addr = my_addr
         self.bc = sample_business(self.my_addr)
+        self.info_context = sample_vasp_info()
 
         CommandRequestObject.register_command_type(PaymentCommand)
-        self.pp           = PaymentProcessor(self.bc)
-        self.vasp         = OffChainVASP(self.my_addr, self.pp)
+        self.pp = PaymentProcessor(self.bc)
+        self.vasp = OffChainVASP(self.my_addr, self.pp, self.info_context)
+
+        # The network server
+        self.network_server = AuthNetworkServer(
+            self.vasp,
+            self.info_context.get_TLS_key_path(),
+            self.info_context.get_TLS_certificate_path(),
+            self.info_context.get_all_peers_TLS_certificate_path()
+        )
 
     def collect_messages(self):
         messages = []
@@ -338,3 +338,6 @@ class sample_vasp:
     def process_response(self, other_vasp, request_json):
         channel = self.get_channel(other_vasp)
         channel.parse_handle_response(request_json)
+
+    def run_server(self):
+        self.network_server.run()
