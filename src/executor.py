@@ -116,9 +116,7 @@ class ProtocolExecutor:
         self.command_sequence = storage_factory.make_list('command_sequence', ProtocolCommand, root=other_vasp)
 
         # The highest sequence command confirmed as success of failure.
-        self._last_confirmed = storage_factory.make_value('last_confirmed', int, root=other_vasp)
-        if not self._last_confirmed.exists():
-            self.last_confirmed = 0
+        self._last_confirmed = storage_factory.make_value('last_confirmed', int, root=other_vasp, default=0)
 
         # This is the primary store of shared objects.
         # It maps version numbers -> objects
