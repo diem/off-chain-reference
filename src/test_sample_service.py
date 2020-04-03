@@ -270,4 +270,4 @@ def test_sample_vasp_info_is_authorised():
     my_addr   = LibraAddress.encode_to_Libra_address(b'B'*16)
     other_addr = LibraAddress.encode_to_Libra_address(b'A'*16)
     vc = sample_vasp(my_addr)
-    assert vc.bc.info_context.is_authorised_VASP(cert, other_addr)
+    assert vc.info_context.is_authorised_VASP(cert, other_addr)

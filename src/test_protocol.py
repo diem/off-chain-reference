@@ -210,8 +210,6 @@ def mockVASP():
     vasp = MagicMock(spec=OffChainVASP)
     vasp.info_context = PropertyMock(autospec=True)
     vasp.info_context.get_peer_base_url.return_value = '/'
-    vasp.tls_cert = PropertyMock(autospec=True)
-    vasp.tls_key = PropertyMock(autospec=True)
     return vasp
 
 @pytest.fixture
@@ -579,7 +577,8 @@ def test_VASProot():
     a1 = LibraAddress.encode_to_Libra_address(b'B'*16)
     a2 = LibraAddress.encode_to_Libra_address(b'C'*16)
     proc = MagicMock(spec=CommandProcessor)
-    vasp = OffChainVASP(a0, proc)
+    info_context = MagicMock(spec=VASPInfo)
+    vasp = OffChainVASP(a0, proc, info_context)
 
     # Check our own address is good
     assert vasp.get_vasp_address() == a0
@@ -595,7 +594,8 @@ def test_VASProot_diff_object():
     b1 = LibraAddress.encode_to_Libra_address(b'B'*16)
     b2 = LibraAddress.encode_to_Libra_address(b'B'*16)
     proc = MagicMock(spec=CommandProcessor)
-    vasp = OffChainVASP(a0, proc)
+    info_context = MagicMock(spec=VASPInfo)
+    vasp = OffChainVASP(a0, proc, info_context)
 
     # Check our own address is good
     assert vasp.get_vasp_address() == a0
