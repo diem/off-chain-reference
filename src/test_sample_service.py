@@ -5,7 +5,9 @@ from payment import *
 from libra_address import LibraAddress
 from utils import *
 from protocol_messages import *
+from business import VASPInfo
 
+from unittest.mock import MagicMock
 import pytest
 
 @pytest.fixture
@@ -22,7 +24,7 @@ def kyc_payment_as_receiver():
     receiver = PaymentActor(str(40), '1', Status.none, [])
     action = PaymentAction(5, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
     payment = PaymentObject(sender, receiver, 'ref', 'orig_ref', 'desc', action)
-    
+
     kyc = """{
         "payment_reference_id": "ref",
         "type": "individual",
@@ -36,11 +38,11 @@ def kyc_payment_as_receiver():
         "name": "Alice"
     }
     """
-    
+
     payment.data['sender'].add_kyc_data(KYCData(kyc), 'KYC_SIG', 'CERT')
     payment.data['receiver'].add_kyc_data(KYCData(kycA), 'KYC_SIG', 'CERT')
     payment.data['sender'].change_status(Status.needs_recipient_signature)
-    
+
     return payment
 
 @pytest.fixture
@@ -49,7 +51,7 @@ def kyc_payment_as_sender():
     receiver = PaymentActor(str(100), 'C', Status.none, [])
     action = PaymentAction(5, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
     payment = PaymentObject(sender, receiver, 'ref', 'orig_ref', 'desc', action)
-    
+
     kyc = """{
         "payment_reference_id": "ref",
         "type": "individual",
@@ -63,7 +65,7 @@ def kyc_payment_as_sender():
         "name": "Alice"
     }
     """
-    
+
     payment.data['sender'].add_kyc_data(KYCData(kycA), 'KYC_SIG', 'CERT')
     payment.data['receiver'].add_kyc_data(KYCData(kyc), 'KYC_SIG', 'CERT')
     payment.data['sender'].change_status(Status.needs_recipient_signature)
@@ -78,7 +80,7 @@ def settled_payment_as_receiver():
     receiver = PaymentActor(str(40), '1', Status.none, [])
     action = PaymentAction(5, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
     payment = PaymentObject(sender, receiver, 'ref', 'orig_ref', 'desc', action)
-    
+
     kyc = """{
         "payment_reference_id": "ref",
         "type": "individual",
@@ -92,7 +94,7 @@ def settled_payment_as_receiver():
         "name": "Alice"
     }
     """
-    
+
     payment.data['sender'].add_kyc_data(KYCData(kyc), 'KYC_SIG', 'CERT')
     payment.data['receiver'].add_kyc_data(KYCData(kycA), 'KYC_SIG', 'CERT')
     payment.add_recipient_signature('SIG')
@@ -124,7 +126,7 @@ def test_business_is_related(basic_payment_as_receiver, addr_bc_proc):
 def test_business_is_kyc_provided(kyc_payment_as_receiver, addr_bc_proc):
     a0, bc, proc = addr_bc_proc
     payment = kyc_payment_as_receiver
-    
+
     kyc_level = bc.next_kyc_level_to_request(payment)
     assert kyc_level == Status.none
 
@@ -170,7 +172,7 @@ def test_business_settled(settled_payment_as_receiver,addr_bc_proc):
 @pytest.fixture
 def simple_request_json():
     sender_addr = LibraAddress.encode_to_Libra_address(b'A'*16).encoded_address
-    receiver_addr   = LibraAddress.encode_to_Libra_address(b'B'*16).encoded_address
+    receiver_addr = LibraAddress.encode_to_Libra_address(b'B'*16).encoded_address
     assert type(sender_addr) == str
     assert type(receiver_addr) == str
 
@@ -223,7 +225,7 @@ def test_vasp_simple_wrong_VASP(simple_request_json):
     assert len(responses) == 1
     assert responses[0].type is CommandResponseObject
     assert 'failure' in responses[0].content
-    
+
 
 def test_vasp_response(simple_response_json_error):
     AddrThis   = LibraAddress.encode_to_Libra_address(b'B'*16)
@@ -239,7 +241,7 @@ def test_vasp_simple_interrupt(simple_request_json):
 
     # Patch business context to first return an exception
     vc = sample_vasp(AddrThis)
-    with patch.object(vc.bc, 'ready_for_settlement', side_effect = [ BusinessAsyncInterupt(1234) ]) as mock_thing:        
+    with patch.object(vc.bc, 'ready_for_settlement', side_effect = [ BusinessAsyncInterupt(1234) ]) as mock_thing:
         assert vc.bc.ready_for_settlement == mock_thing
         vc.process_request(AddrOther, simple_request_json)
         responses = vc.collect_messages()
@@ -249,10 +251,23 @@ def test_vasp_simple_interrupt(simple_request_json):
     assert responses[1].type is CommandResponseObject
     assert 'success' in responses[1].content
 
-    with patch.object(vc.bc, 'ready_for_settlement', return_value = True ) as mock_thing:        
+    with patch.object(vc.bc, 'ready_for_settlement', return_value = True ) as mock_thing:
         assert vc.bc.ready_for_settlement == mock_thing
         vc.vasp.processor.notify_callback(1234)
         responses = vc.collect_messages()
-    
+
     assert len(responses) > 0
     assert 'ready_for' in str(responses[0].content)
+
+
+def test_sample_vasp_info_is_authorised():
+    cert_file = '../test_vectors/client_cert.pem'
+    with open(cert_file, 'rt') as f:
+        cert_str = f.read()
+    cert = OpenSSL.crypto.load_certificate(
+        OpenSSL.crypto.FILETYPE_PEM, cert_str
+    )
+    my_addr   = LibraAddress.encode_to_Libra_address(b'B'*16)
+    other_addr = LibraAddress.encode_to_Libra_address(b'A'*16)
+    vc = sample_vasp(my_addr)
+    assert vc.info_context.is_authorised_VASP(cert, other_addr)
