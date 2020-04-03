@@ -44,13 +44,12 @@ class SubAddressResolver:
             raise SubAddressError(f'Account number {account_number} does not exist.')
         return self.storage[key]
 
-
-    def get_stable_id_for_account(self, account_number, period_id, context = ''):
+    def get_stable_id_for_account(self, account_number, period_id, context=''):
         ''' Return a stable identifier for an account number per period. 
             Ensure that stable identifiers are not linkable between periods. 
             
             The period_id is an identifier for the period for which the stable ID
-            should be valid. This could be, for example, a specific day (alighed 
+            should be valid. This could be, for example, a specific day (aligned 
             to UTC). The context can be used to generate different stable IDs for
             different contexts. For example it could be an identifier for the other
             VASP if we expect different VASPs to never compare stable IDs (for 
@@ -65,7 +64,6 @@ class SubAddressResolver:
         if key not in self.storage:
             self.storage[key] = get_unique_string()
         return self.storage[key]
-
 
     def get_new_subaddress_for_account(self, account_number, scope=None):
         ''' Makes a fresh sub-address with a specific scope '''

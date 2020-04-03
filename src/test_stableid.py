@@ -36,7 +36,9 @@ def test_subaddress(base):
     res.register_account_number('ABC', {'hello':'world'})
     sub1 = res.get_new_subaddress_for_account('ABC', [ 'scope1' ])
     sub2 = res.get_new_subaddress_for_account('ABC', [ 'scope2' ])
+    sub3 = res.get_new_subaddress_for_account('ABC', [ 'scope2' ])
     assert sub1 != sub2
+    assert sub2 != sub3
 
     # Resolve a subaddress
     acc0, scope1 = res.resolve_subaddress_to_account(sub1)
