@@ -217,34 +217,41 @@ def mockProcessor():
     proc = MagicMock(spec=CommandProcessor)
     return proc
 
-def test_client_server_role_definition(three_address, mockVASP, mockProcessor):
+@pytest.fixture
+def network_client():
+    network_client = MagicMock()
+    network_client.get_url.return_value = '/'
+    network_client.send_request.return_value = None
+    return network_client
+
+def test_client_server_role_definition(three_address, mockVASP, mockProcessor, network_client):
     a0, a1, a2 = three_address
 
     # Lower address is server (xor bit = 0)
-    channel = VASPPairChannel(a0, a1, mockVASP, mockProcessor)
+    channel = VASPPairChannel(a0, a1, mockVASP, mockProcessor, network_client)
     assert channel.is_server()
     assert not channel.is_client()
 
-    channel = VASPPairChannel(a1, a0, mockVASP, mockProcessor)
+    channel = VASPPairChannel(a1, a0, mockVASP, mockProcessor, network_client)
     assert not channel.is_server()
     assert channel.is_client()
 
     # Lower address is server (xor bit = 1)
-    channel = VASPPairChannel(a0, a2, mockVASP, mockProcessor)
+    channel = VASPPairChannel(a0, a2, mockVASP, mockProcessor, network_client)
     assert not channel.is_server()
     assert channel.is_client()
 
-    channel = VASPPairChannel(a2, a0, mockVASP, mockProcessor)
+    channel = VASPPairChannel(a2, a0, mockVASP, mockProcessor, network_client)
     assert channel.is_server()
     assert not channel.is_client()
 
 
 @pytest.fixture
-def server_client(three_address, mockVASP, mockProcessor):
+def server_client(three_address, mockVASP, mockProcessor, network_client):
     a0, a1, a2 = three_address
 
-    server = VASPPairChannel(a0, a1, mockVASP, mockProcessor)
-    client = VASPPairChannel(a1, a0, mockVASP, mockProcessor)
+    server = VASPPairChannel(a0, a1, mockVASP, mockProcessor, network_client)
+    client = VASPPairChannel(a1, a0, mockVASP, mockProcessor, network_client)
 
     server = monkey_tap(server)
     client = monkey_tap(client)
@@ -572,13 +579,15 @@ def test_json_serlialize():
     req_err = CommandRequestObject.from_json_data_dict(data_err, JSONFlag.STORE)
     assert req0 == req_err
 
-def test_VASProot():
+def test_VASProot(network_client):
     a0 = LibraAddress.encode_to_Libra_address(b'A'*16)
     a1 = LibraAddress.encode_to_Libra_address(b'B'*16)
     a2 = LibraAddress.encode_to_Libra_address(b'C'*16)
     proc = MagicMock(spec=CommandProcessor)
     info_context = MagicMock(spec=VASPInfo)
-    vasp = OffChainVASP(a0, proc, info_context)
+    network_factory = MagicMock()
+    network_factory.make_client.return_value = network_client
+    vasp = OffChainVASP(a0, proc, info_context, network_factory)
 
     # Check our own address is good
     assert vasp.get_vasp_address() == a0
@@ -589,13 +598,15 @@ def test_VASProot():
     assert vasp.get_channel(a1).is_client()
 
 
-def test_VASProot_diff_object():
+def test_VASProot_diff_object(network_client):
     a0 = LibraAddress.encode_to_Libra_address(b'A'*16)
     b1 = LibraAddress.encode_to_Libra_address(b'B'*16)
     b2 = LibraAddress.encode_to_Libra_address(b'B'*16)
     proc = MagicMock(spec=CommandProcessor)
     info_context = MagicMock(spec=VASPInfo)
-    vasp = OffChainVASP(a0, proc, info_context)
+    network_factory = MagicMock()
+    network_factory.make_client.return_value = network_client
+    vasp = OffChainVASP(a0, proc, info_context, network_factory)
 
     # Check our own address is good
     assert vasp.get_vasp_address() == a0

@@ -5,7 +5,7 @@ from libra_address import LibraAddress
 from protocol_messages import CommandRequestObject
 from payment_logic import PaymentCommand, PaymentProcessor
 from status_logic import Status
-from auth_networking import AuthNetworkServer
+from auth_networking import AuthNetworkServer, NetworkFactory
 
 import json
 import OpenSSL.crypto
@@ -298,10 +298,13 @@ class sample_vasp:
         self.my_addr = my_addr
         self.bc = sample_business(self.my_addr)
         self.info_context = sample_vasp_info()
+        self.network_factory = NetworkFactory()
 
         CommandRequestObject.register_command_type(PaymentCommand)
         self.pp = PaymentProcessor(self.bc)
-        self.vasp = OffChainVASP(self.my_addr, self.pp, self.info_context)
+        self.vasp = OffChainVASP(
+            self.my_addr, self.pp, self.info_context, self.network_factory
+        )
 
         # The network server
         self.network_server = AuthNetworkServer(

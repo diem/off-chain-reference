@@ -3,7 +3,6 @@ from protocol_messages import CommandRequestObject, CommandResponseObject, \
     make_success_response, make_protocol_error, make_parsing_error, make_command_error
 from utils import JSONParsingError, JSONFlag
 from libra_address import LibraAddress
-from auth_networking import AuthNetworkClient
 
 import json
 from collections import namedtuple
@@ -13,7 +12,7 @@ NetMessage = namedtuple('NetMessage', ['src', 'dst', 'type', 'content'])
 class OffChainVASP:
     """Manages the off-chain protocol on behalf of one VASP. """
 
-    def __init__(self, vasp_addr, processor, info_context):
+    def __init__(self, vasp_addr, processor, info_context, network_factory):
         if __debug__:
             assert isinstance(processor, CommandProcessor)
             assert isinstance(vasp_addr, LibraAddress)
@@ -33,6 +32,9 @@ class OffChainVASP:
         # such as TLS certificates and keys.
         self.info_context = info_context
 
+        # The network factory creating network clients for the channels.
+        self.network_factory = network_factory
+
         # TODO: this should be a persistent store
         self.channel_store = {}
 
@@ -45,9 +47,14 @@ class OffChainVASP:
         self.business_context.open_channel_to(other_vasp_addr)
         my_address = self.get_vasp_address()
         store_key = (my_address, other_vasp_addr)
+        net_channel = self.network_factory.make_client(
+            my_address, other_vasp_addr, self.info_context
+        )
 
         if store_key not in self.channel_store:
-            channel = VASPPairChannel(my_address, other_vasp_addr, self, self.processor)
+            channel = VASPPairChannel(
+                my_address, other_vasp_addr, self, self.processor, net_channel
+            )
             self.channel_store[store_key] = channel
 
         return self.channel_store[store_key]
@@ -72,7 +79,7 @@ class OffChainVASP:
 class VASPPairChannel:
     """Represents the state of an off-chain bi-directional channel bewteen two VASPs"""
 
-    def __init__(self, myself, other, vasp, processor):
+    def __init__(self, myself, other, vasp, processor, network_client):
         """ Initialize the channel between two VASPs.
 
         * Myself is the VASP initializing the local object (VASPInfo)
@@ -116,13 +123,7 @@ class VASPPairChannel:
 
         # The network client
         self.peer_base_url = self.vasp.info_context.get_peer_base_url(self.other)
-        self.network_client = AuthNetworkClient(
-            self.myself,
-            self.other,
-            self.vasp.info_context.get_peer_TLS_certificate_path(self.other),
-            self.vasp.info_context.get_TLS_certificate_path(),
-            self.vasp.info_context.get_TLS_key_path()
-        )
+        self.network_client = network_client
 
     def get_my_address(self):
         return self.myself
