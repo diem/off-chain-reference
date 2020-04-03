@@ -52,7 +52,8 @@ def test_send_request_unknown_receiver(network_client, simple_request_json):
 def server(testee_addr):
     processor = MagicMock(spec=CommandProcessor)
     info_context = MagicMock(spec=VASPInfo)
-    vasp = OffChainVASP(testee_addr, processor, info_context)
+    network_factory = MagicMock()
+    vasp = OffChainVASP(testee_addr, processor, info_context, network_factory)
     server = NetworkServer(vasp)
     return server
 

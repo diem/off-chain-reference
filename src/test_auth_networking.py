@@ -1,4 +1,4 @@
-from auth_networking import AuthNetworkClient, AuthNetworkServer
+from auth_networking import *
 from protocol import LibraAddress, OffChainVASP
 from executor import CommandProcessor
 from business import VASPInfo
@@ -79,7 +79,8 @@ if __name__ == "__main__":
     processor = MagicMock(spec=CommandProcessor)
     info_context = MagicMock(spec=VASPInfo)
     info_context.get_peer_base_url.return_value = base_url
-    vasp = OffChainVASP(addr, processor, info_context)
+    network_factory = NetworkFactory()
+    vasp = OffChainVASP(addr, processor, info_context, network_factory)
     network_server = AuthNetworkServer(
         vasp, server_key, server_cert, client_cert
     )

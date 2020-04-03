@@ -7,6 +7,18 @@ import requests
 import json
 
 
+class NetworkFactory:
+
+    def make_client(self, my_addr, other_addr, info_context):
+        return AuthNetworkClient(
+            my_addr,
+            other_addr,
+            info_context.get_peer_TLS_certificate_path(other_addr),
+            info_context.get_TLS_certificate_path(),
+            info_context.get_TLS_key_path()
+        )
+
+
 class AuthNetworkClient(NetworkClient):
     def __init__(self, my_addr, other_addr, server_cert, client_cert, client_key):
         super().__init__(my_addr, other_addr)
