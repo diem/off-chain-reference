@@ -51,9 +51,9 @@ class StorableFactory:
         # Check and fix the database, if this is needed
         self.crash_recovery()
 
-    def make_value(self, name, xtype, root = None):
+    def make_value(self, name, xtype, root = None, default=None):
         ''' A new value-like storable'''
-        v = StorableValue(self, name, xtype, root)
+        v = StorableValue(self, name, xtype, root, default)
         v.factory = self
         return v
 
@@ -193,9 +193,8 @@ class StorableDict(Storable):
         # addition and creation.
         meta = StorableValue(db, '__META', str, root=self)
         self.first_key = StorableValue(db, '__FIRST_KEY', str, root=meta)
-        self.length = StorableValue(db, '__LEN', int, root=meta)
-        if not self.length.exists():
-            self.length.set_value(0)
+        self.length = StorableValue(db, '__LEN', int, root=meta, default=0)
+
         
     def base_key(self):
         return self.root / self.name
@@ -305,7 +304,7 @@ class StorableList(Storable):
         self.db = db
         self.xtype = xtype
 
-        self.length = StorableValue(db, '__LEN', int, root=self)
+        self.length = StorableValue(db, '__LEN', int, root=self, default=0)
         if not self.length.exists():
             self.length.set_value(0)
 
@@ -355,7 +354,7 @@ class StorableValue(Storable):
         but a cached variant is stored for quick reads. 
     """
 
-    def __init__(self, db, name, xtype, root=None):
+    def __init__(self, db, name, xtype, root=None, default=None):
         if root is None:
             self.root = PosixPath('/')
         else:
@@ -366,6 +365,7 @@ class StorableValue(Storable):
         self._base_key = self.root / self.name
         self._base_key_str = str(self._base_key)
         self.immut_type = xtype in {int, str, float}
+        self.default = default
 
         self.has_value = False
         if self.exists():
@@ -391,6 +391,10 @@ class StorableValue(Storable):
         # we can cache and return them.
         if self.has_value and self.immut_type:
             return self.value
+        
+        # If there is no stored value return default
+        if not self.exists() and self.default is not None:
+            return self.default
         
         val = json.loads(self.db[self._base_key_str])
         self.value = self.post_proc(val)

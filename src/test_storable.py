@@ -104,6 +104,14 @@ def test_list_dict():
 
 
 def test_value(db):
+    # Test default
+    val0 = StorableValue(db, 'counter_zero', int, default = 0)
+    assert val0.get_value() == 0
+    assert not val0.exists()
+    val0.set_value(10)
+    assert val0.get_value() == 10
+
+
     val = StorableValue(db, 'counter', int)
     assert val.exists() is False
     val.set_value(10)

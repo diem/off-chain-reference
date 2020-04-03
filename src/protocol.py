@@ -109,9 +109,7 @@ class VASPPairChannel:
 
             # The index of the next request from my sequence that I should retransmit
             # (ie. for which I have not got a response yet.)
-            self.next_retransmit = storage_factory.make_value('next_retransmit', int, root=other_vasp)
-            if not self.next_retransmit.exists():
-                self.next_retransmit.set_value(0)
+            self.next_retransmit = storage_factory.make_value('next_retransmit', int, root=other_vasp, default=0)
 
             # The final sequence
             self.executor = ProtocolExecutor(self, self.processor)
