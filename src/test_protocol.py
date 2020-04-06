@@ -10,7 +10,7 @@ from business import BusinessContext, VASPInfo
 import random
 from sample_command import *
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, PropertyMock
 import pytest
 
 def monkey_tap(pair):
@@ -172,6 +172,8 @@ def three_address():
 @pytest.fixture
 def mockVASP():
     vasp = MagicMock(spec=OffChainVASP)
+    vasp.info_context = PropertyMock(autospec=True)
+    vasp.info_context.get_peer_base_url.return_value = '/'
     return vasp
 
 @pytest.fixture
@@ -179,45 +181,50 @@ def mockProcessor():
     proc = MagicMock(spec=CommandProcessor)
     return proc
 
-def test_client_server_role_definition(three_address, mockVASP, mockProcessor):
+@pytest.fixture
+def network_client():
+    network_client = MagicMock()
+    network_client.get_url.return_value = '/'
+    network_client.send_request.return_value = None
+    return network_client
+
+def test_client_server_role_definition(three_address, mockVASP, mockProcessor, network_client):
     a0, a1, a2 = three_address
 
-    store = StorableFactory({})
-    vasp = OffChainVASP(a0, mockProcessor, store)
-    channel = VASPPairChannel(a0, a1, vasp, mockProcessor)
+    mock_store = MagicMock()
+    channel = VASPPairChannel(a0, a1, mockVASP, mock_store, mockProcessor, network_client)
+
     assert channel.is_server()
     assert not channel.is_client()
 
-    channel = VASPPairChannel(a1, a0, mockVASP, mockProcessor)
+    channel = VASPPairChannel(a1, a0, mockVASP, mock_store, mockProcessor, network_client)
     assert not channel.is_server()
     assert channel.is_client()
 
     # Lower address is server (xor bit = 1)
-    channel = VASPPairChannel(a0, a2, mockVASP, mockProcessor)
+    channel = VASPPairChannel(a0, a2, mockVASP, mock_store, mockProcessor, network_client)
     assert not channel.is_server()
     assert channel.is_client()
 
-    channel = VASPPairChannel(a2, a0, mockVASP, mockProcessor)
+    channel = VASPPairChannel(a2, a0, mockVASP, mock_store, mockProcessor, network_client)
     assert channel.is_server()
     assert not channel.is_client()
 
 
 @pytest.fixture
-def server_client(three_address, mockVASP, mockProcessor):
-    a0, a1, a2 = three_address
-
+def server_client(three_address, mockVASP, mockProcessor, network_client):
+    a0, a1, _ = three_address
 
     store_server = StorableFactory({})
-    vasp_server = OffChainVASP(a0, mockProcessor, store_server)
-    server = VASPPairChannel(a0, a1, vasp_server, mockProcessor)
+    server = VASPPairChannel(a0, a1, mockVASP, store_server, mockProcessor, network_client)
     store_client = StorableFactory({})
-    vasp_client = OffChainVASP(a1, mockProcessor, store_client)
-    client = VASPPairChannel(a1, a0, vasp_client, mockProcessor)
+    client = VASPPairChannel(a1, a0, mockVASP, store_client, mockProcessor, network_client)
 
     server = monkey_tap(server)
     client = monkey_tap(client)
 
     return (server, client)
+
 
 def test_protocol_server_client_benign(server_client):
     server, client = server_client
@@ -337,8 +344,8 @@ def test_protocol_server_client_interleaved_benign(server_client):
 
     # The server waits until all own requests are done
     server.handle_request(client_request)
-    no_reply = server.tap()
-    assert no_reply == []
+    server_reply = server.tap()[0]
+    assert server_reply.error.code == 'wait'
 
     client.handle_request(server_request)
     client_reply = client.tap()[0]
@@ -366,8 +373,8 @@ def test_protocol_server_client_interleaved_swapped_request(server_client):
     client.handle_request(server_request)
     client_reply = client.tap()[0]
     server.handle_request(client_request)
-    no_reply = server.tap()
-    assert no_reply == []
+    server_reply = server.tap()[0]
+    assert server_reply.error.code == 'wait'
 
     server.handle_response(client_reply)
     server_reply = server.tap()[0]
@@ -390,8 +397,8 @@ def test_protocol_server_client_interleaved_swapped_reply(server_client):
     server_request = server.tap()[0]
 
     server.handle_request(client_request)
-    server_reply = server.tap()
-    assert server_reply == []
+    server_reply = server.tap()[0]
+    assert server_reply.error.code == 'wait'
 
     client.handle_request(server_request)
     client_reply = client.tap()[0]
@@ -537,13 +544,18 @@ def test_json_serlialize():
     req_err = CommandRequestObject.from_json_data_dict(data_err, JSONFlag.STORE)
     assert req0 == req_err
 
-def test_VASProot():
+def test_VASProot(network_client):
     a0 = LibraAddress.encode_to_Libra_address(b'A'*16)
     a1 = LibraAddress.encode_to_Libra_address(b'B'*16)
     a2 = LibraAddress.encode_to_Libra_address(b'C'*16)
     store = StorableFactory({})
     proc = MagicMock(spec=CommandProcessor)
-    vasp = OffChainVASP(a0, proc, store)
+
+    info_context = MagicMock(spec=VASPInfo)
+    network_factory = MagicMock()
+    network_factory.make_client.return_value = network_client
+    vasp = OffChainVASP(a0, proc, store, info_context, network_factory)
+
 
     # Check our own address is good
     assert vasp.get_vasp_address() == a0
@@ -554,13 +566,16 @@ def test_VASProot():
     assert vasp.get_channel(a1).is_client()
 
 
-def test_VASProot_diff_object():
+def test_VASProot_diff_object(network_client):
     a0 = LibraAddress.encode_to_Libra_address(b'A'*16)
     b1 = LibraAddress.encode_to_Libra_address(b'B'*16)
     b2 = LibraAddress.encode_to_Libra_address(b'B'*16)
     store = StorableFactory({})
     proc = MagicMock(spec=CommandProcessor)
-    vasp = OffChainVASP(a0, proc, store)
+    info_context = MagicMock(spec=VASPInfo)
+    network_factory = MagicMock()
+    network_factory.make_client.return_value = network_client
+    vasp = OffChainVASP(a0, proc, store, info_context, network_factory)
 
     # Check our own address is good
     assert vasp.get_vasp_address() == a0
@@ -595,30 +610,3 @@ def test_sample_command():
     obj2 = JSONSerializable.parse(data, JSONFlag.STORE)
     assert obj2.version == obj.version
     assert obj2.previous_versions == obj.previous_versions
-
-if __name__ == "__main__":
-    a0 = LibraAddress.encode_to_Libra_address(b'A'*16) 
-    a1 = LibraAddress.encode_to_Libra_address(b'B' + b'A'*15)
-    a2 = LibraAddress.encode_to_Libra_address(b'B'*16)
-
-    proc = MagicMock(spec=CommandProcessor)
-    store_server = StorableFactory({})
-    vasp_server = OffChainVASP(a0, proc, store_server)
-    server = VASPPairChannel(a0, a1, vasp_server, proc)
-
-    store_client = StorableFactory({})
-    vasp_client = OffChainVASP(a1, proc, store_client)
-    client = VASPPairChannel(a1, a0, vasp_client, proc)
-
-    server = monkey_tap(server)
-    client = monkey_tap(client)
-
-    NUMBER = 200
-    commands = list(range(NUMBER))
-    commands = [SampleCommand(c) for c in commands]
-    for c in commands:
-        c.always_happy = False
-
-    R = RandomRun(server, client, commands, seed='drop')
-    R.run()
-    R.checks(NUMBER)

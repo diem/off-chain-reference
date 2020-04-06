@@ -113,10 +113,10 @@ def test_payment_create_from_sender(basic_payment, payment_processor_context):
     pp.check_new_payment(basic_payment)
 
 
+
 def test_payment_create_from_sender_fail(basic_payment, payment_processor_context):
     bcm, pp = payment_processor_context
     bcm.is_recipient.side_effect = [True]
-
     basic_payment.data['receiver'].update({'status': Status.ready_for_settlement})
     with pytest.raises(PaymentLogicError):
         pp.check_new_payment(basic_payment)

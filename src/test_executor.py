@@ -4,7 +4,7 @@ from payment import *
 from payment_logic import PaymentCommand
 from business import BusinessContext
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, PropertyMock
 import pytest
 
 
@@ -20,13 +20,22 @@ def basic_payment():
 def test_exec(basic_payment):
     a0 = LibraAddress.encode_to_Libra_address(b'A'*16)
     a1 = LibraAddress.encode_to_Libra_address(b'B'*16)
-    proc = MagicMock(spec=CommandProcessor)
+
     store = StorableFactory({})
-    vasp = OffChainVASP(a0, proc, store)
-    channel = VASPPairChannel(a0, a1, vasp, proc)
-    bcm = MagicMock(spec=BusinessContext)
+
+    # Make mock VASP
+    vasp = MagicMock(spec=OffChainVASP)
+    vasp.info_context = PropertyMock(autospec=True)
+    vasp.info_context.get_peer_base_url.return_value = '/'
+
+    proc = MagicMock(spec=CommandProcessor)
+    net = MagicMock()
     
-    pe = ProtocolExecutor(channel, proc)
+    with store:
+        channel = VASPPairChannel(a0, a1, vasp, store, proc, net)
+        bcm = MagicMock(spec=BusinessContext)
+        pe = ProtocolExecutor(channel, proc)
+
 
     cmd1 = PaymentCommand(basic_payment)
     cmd1.set_origin(channel.get_my_address())
@@ -46,7 +55,7 @@ def test_exec(basic_payment):
     assert cmd2.dependencies == cmd1.creates_versions
     assert cmd3.dependencies == cmd2.creates_versions
 
-    with vasp.get_storage_factory() as tx_no: 
+    with store as tx_no: 
         pe.sequence_next_command(cmd1)
         pe.sequence_next_command(cmd2)
         pe.sequence_next_command(cmd3)
@@ -65,7 +74,7 @@ def test_exec(basic_payment):
     cmd5a = PaymentCommand(pay5a)
     cmd5a.set_origin(channel.get_my_address())
 
-    with vasp.get_storage_factory() as tx_no: 
+    with store as tx_no: 
         pe.sequence_next_command(cmd4a)
         pe.sequence_next_command(cmd5a)
 
@@ -81,7 +90,7 @@ def test_exec(basic_payment):
     cmd5b = PaymentCommand(pay5b)
     cmd5b.set_origin(channel.get_my_address())
 
-    with vasp.get_storage_factory() as tx_no: 
+    with store as tx_no: 
         pe.sequence_next_command(cmd4b)
         pe.sequence_next_command(cmd5b)
 
@@ -96,7 +105,7 @@ def test_exec(basic_payment):
     with pytest.raises(ExecutorException):
         pe.sequence_next_command(cmd_bad, do_not_sequence_errors=True)
 
-    with vasp.get_storage_factory() as tx_no: 
+    with store as tx_no: 
         pe.set_success(0)
         pe.set_success(1)
         pe.set_success(2)
@@ -121,8 +130,14 @@ def test_handlers(basic_payment):
     a1 = LibraAddress.encode_to_Libra_address(b'B'*16)
     proc = MagicMock(spec=CommandProcessor)
     store = StorableFactory({})
-    vasp = OffChainVASP(a0, proc, store)
-    channel = VASPPairChannel(a0, a1, vasp, proc)
+
+    vasp = MagicMock(spec=OffChainVASP)
+    vasp.info_context = PropertyMock(autospec=True)
+    vasp.info_context.get_peer_base_url.return_value = '/'
+
+    proc = MagicMock(spec=CommandProcessor)
+    net = MagicMock()
+    channel = VASPPairChannel(a0, a1, vasp, store, proc, net)
 
     bcm = MagicMock(spec=BusinessContext)
     
@@ -162,7 +177,7 @@ def test_handlers(basic_payment):
     assert cmd2.dependencies == list(cmd1.creates_versions)
     assert cmd3.dependencies == list(cmd1.creates_versions)
 
-    with vasp.get_storage_factory() as tx_no: 
+    with store as tx_no: 
         pe.sequence_next_command(cmd1)
         pe.sequence_next_command(cmd2)
         pe.sequence_next_command(cmd3)

@@ -4,7 +4,10 @@
 __pycache__/
 *.py[cod]
 *$py.class
+<<<<<<< HEAD
 _docs/
+=======
+>>>>>>> develop
 .vscode/
 
 # C extensions
