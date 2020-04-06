@@ -10,12 +10,12 @@ class ProtocolCommand(JSONSerializable):
         self.creates_versions   = []
         self.commit_status = None
         self.origin = None # Takes a LibraAddress
-    
+
     def set_origin(self, origin):
         ''' Sets the Libra address that proposed this command '''
         assert self.origin == None or origin == self.origin
         self.origin = origin
-    
+
     def get_origin(self):
         ''' Gets the Libra address that proposed this command '''
         return self.origin
@@ -70,16 +70,16 @@ class ExecutorException(Exception):
 
 class ProtocolExecutor:
     """ An instance of this class managed the common sequence of commands
-        between two VASPs, and whether they are a success or failure. It 
-        uses a CommandProcessor to determine if the command itself is 
+        between two VASPs, and whether they are a success or failure. It
+        uses a CommandProcessor to determine if the command itself is
         valid by itslef, and also to then 'execute' the command, and
         possibly generate more commands as a result.
 
         A command in the sequence is a success if:
             (0) All the shared objects it depends on are active.
             (1) Both sides consider it a valid (according to the command
-                processor checks.) 
-        
+                processor checks.)
+
         All successful commands see the objects they create become valid,
         and are passed on to the CommandProcessor, to drive the higher
         level protocol forward.
@@ -92,7 +92,7 @@ class ProtocolExecutor:
             successful commands.
 
             The channel provides the context (vasp, channel) to pass on to
-            the executor, as well as the storage context to persist 
+            the executor, as well as the storage context to persist
             the command sequence.
         """
         if __debug__:
@@ -111,7 +111,7 @@ class ProtocolExecutor:
         root = storage_factory.make_value(channel.myself.as_str(), None)
         other_vasp = storage_factory.make_value(channel.other.as_str(), None, root=root)
 
-        # The common sequence of commands 
+        # The common sequence of commands
         self.command_sequence = storage_factory.make_list('command_sequence', ProtocolCommand, root=other_vasp)
 
         # The highest sequence command confirmed as success of failure.
@@ -122,17 +122,17 @@ class ProtocolExecutor:
         self.object_store = storage_factory.make_dict('object_store', SharedObject, root=other_vasp) # TODO: persist this structure
 
         # <ENDS to persist>
-    
+
     @property
     def last_confirmed(self):
         """ The index of the last confirmed (success or fail) command in the sequence """
         return self._last_confirmed.get_value()
-    
+
     @last_confirmed.setter
     def last_confirmed(self, value):
         self._last_confirmed.set_value(value)
 
-    
+
     def set_outcome(self, command, is_success):
         ''' Execute successful commands, and notify of failed commands'''
         vasp, channel, executor = self.get_context()
@@ -160,7 +160,7 @@ class ProtocolExecutor:
             if not res:
                 return False
         return True
-    
+
     def get_context(self):
         """ Returns a (vasp, channel, executor) context. """
         return (self.channel.get_vasp(), self.channel, self)
@@ -215,16 +215,16 @@ class ProtocolExecutor:
         return pos
 
     def set_success(self, seq_no):
-        ''' Sets the command at a specific sequence number to be a success. 
+        ''' Sets the command at a specific sequence number to be a success.
 
-            Turn all objects created to be actually live, and call the 
+            Turn all objects created to be actually live, and call the
             CommandProcessor to drive the protocol forward.
         '''
         assert seq_no == self.last_confirmed
         self.last_confirmed += 1
 
         command = self.command_sequence[seq_no]
-        
+
         # Consumes old objects
         dependencies = command.get_dependencies()
         for version in dependencies:
@@ -240,17 +240,17 @@ class ProtocolExecutor:
             obj.set_potentially_live(True)
             obj.set_actually_live(True)
             self.object_store[version] = obj
-        
+
         # Call the command processor.
         if command.commit_status is None:
             command.commit_status = True
             self.command_sequence[seq_no] = command
             self.set_outcome(command, is_success=True)
-        
+
 
     def set_fail(self, seq_no):
-        ''' Sets the command at a specific sequence number to be a failure. 
-        
+        ''' Sets the command at a specific sequence number to be a failure.
+
             Remove all potentially live objects from the database, to trigger
             failure of subsequent commands that depend on them.
         '''
@@ -266,7 +266,7 @@ class ProtocolExecutor:
                 obj.set_actually_live(False)
                 obj.set_potentially_live(False)
                 del self.object_store[version]
-        
+
         # Call the command processor.
         if command.commit_status is None:
             command.commit_status = False
