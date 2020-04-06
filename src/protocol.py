@@ -12,8 +12,7 @@ NetMessage = namedtuple('NetMessage', ['src', 'dst', 'type', 'content'])
 
 class OffChainVASP:
     """Manages the off-chain protocol on behalf of one VASP. """
-    def __init__(self, vasp_addr, processor, storage_factory):
-
+    def __init__(self, vasp_addr, processor, storage_factory, info_context, network_factory):
         if __debug__:
             assert isinstance(processor, CommandProcessor)
             assert isinstance(vasp_addr, LibraAddress)
@@ -28,6 +27,13 @@ class OffChainVASP:
         # processing of resumed commands.
         self.processor = processor
         self.processor.notify = self.notify_new_commands
+
+        # The VASPInfo context that contains various network information
+        # such as TLS certificates and keys.
+        self.info_context = info_context
+
+        # The network factory creating network clients for the channels.
+        self.network_factory = network_factory
 
         # TODO: this should be a persistent store
         self.channel_store = {}
@@ -44,9 +50,14 @@ class OffChainVASP:
         self.business_context.open_channel_to(other_vasp_addr)
         my_address = self.get_vasp_address()
         store_key = (my_address, other_vasp_addr)
+        net_channel = self.network_factory.make_client(
+            my_address, other_vasp_addr, self.info_context
+        )
 
         if store_key not in self.channel_store:
-            channel = VASPPairChannel(my_address, other_vasp_addr, self, self.processor)
+            channel = VASPPairChannel(
+                my_address, other_vasp_addr, self, self.storage_factory, self.processor, net_channel
+            )
             self.channel_store[store_key] = channel
 
         return self.channel_store[store_key]
@@ -67,11 +78,22 @@ class OffChainVASP:
         ''' Returns a storage factory for this system. '''
         return self.storage_factory
 
+    def close_channel(self, other_vasp_addr):
+        my_address = self.get_vasp_address()
+        store_key = (my_address, other_vasp_addr)
+        if store_key in self.channel_store:
+            # Close the TLS channel.
+            channel = self.channel_store[store_key]
+            channel.network_client.close_connection()
+
+            # Delete the channel from our store.
+            del self.channel_store[store_key]
+
 
 class VASPPairChannel:
     """Represents the state of an off-chain bi-directional channel bewteen two VASPs"""
 
-    def __init__(self, myself, other, vasp, processor):
+    def __init__(self, myself, other, vasp, storage, processor, network_client):
         """ Initialize the channel between two VASPs.
 
         * Myself is the VASP initializing the local object (VASPInfo)
@@ -89,27 +111,27 @@ class VASPPairChannel:
         self.other = other
         self.processor = processor
         self.vasp = vasp
+        self.storage = storage
 
         # Check we are not making a channel with ourselves
         if self.myself.as_str() == self.other.as_str():
             raise Exception('Must talk to another VASP:', self.myself.as_str(), self.other.as_str())
         
         # <STARTS to persist>
-        storage_factory = self.vasp.get_storage_factory()
-        root = storage_factory.make_value(self.myself.as_str(), None)
-        other_vasp = storage_factory.make_value(self.other.as_str(), None, root=root)
+        root = self.storage.make_value(self.myself.as_str(), None)
+        other_vasp = self.storage.make_value(self.other.as_str(), None, root=root)
 
-        with storage_factory.atomic_writes() as tx_no: 
+        with self.storage.atomic_writes() as tx_no: 
 
             # The list of requests I have initiated
-            self.my_requests = storage_factory.make_list('my_requests', CommandRequestObject, root=other_vasp)
+            self.my_requests = self.storage.make_list('my_requests', CommandRequestObject, root=other_vasp)
 
             # The list of requests the other side has initiated
-            self.other_requests = storage_factory.make_list('other_requests', CommandRequestObject, root=other_vasp)
+            self.other_requests = self.storage.make_list('other_requests', CommandRequestObject, root=other_vasp)
 
             # The index of the next request from my sequence that I should retransmit
             # (ie. for which I have not got a response yet.)
-            self.next_retransmit = storage_factory.make_value('next_retransmit', int, root=other_vasp, default=0)
+            self.next_retransmit = self.storage.make_value('next_retransmit', int, root=other_vasp, default=0)
 
             # The final sequence
             self.executor = ProtocolExecutor(self, self.processor)
@@ -123,6 +145,10 @@ class VASPPairChannel:
         self.pending_requests = []
         # Network handler
         self.net_queue = []
+
+        # The network client
+        self.peer_base_url = self.vasp.info_context.get_peer_base_url(self.other)
+        self.network_client = network_client
 
     def my_next_seq(self):
         return len(self.my_requests)
@@ -154,6 +180,7 @@ class VASPPairChannel:
         """ A hook to send a request to other VASP"""
         json_string = request.get_json_data_dict(JSONFlag.NET)
         self.net_queue += [ NetMessage(self.myself, self.other, CommandRequestObject, json_string) ]
+        self.send_network_request(json_string)
 
     def send_response(self, response):
         """ A hook to send a response to other VASP"""
@@ -220,7 +247,7 @@ class VASPPairChannel:
         request = CommandRequestObject(off_chain_command)
 
         # Ensure all storage operations are written atomically.
-        with self.get_vasp().get_storage_factory().atomic_writes() as tx_no:
+        with self.storage.atomic_writes() as tx_no:
             request.seq = self.my_next_seq()
 
             if self.is_server():
@@ -247,7 +274,7 @@ class VASPPairChannel:
 
 
     def handle_request(self, request):
-        with  self.get_vasp().get_storage_factory().atomic_writes() as tx_no:
+        with  self.storage.atomic_writes() as tx_no:
             return self._handle_request(request)
 
     def _handle_request(self, request):
@@ -288,7 +315,12 @@ class VASPPairChannel:
         # requests to sequence any new client requests.
         if self.is_server() and self.num_pending_responses() > 0:
             self.pending_requests += [request]
-            return None
+            # TODO [issue #38]: Ideally, the channel should return None,
+            # and the server network should wait until a response is available
+            # before answering the client.
+            response = make_protocol_error(request, code='wait')
+            return self.send_response(response)
+            #return None
 
         # Sequence newer requests
         if request.seq == self.other_next_seq():
@@ -336,7 +368,7 @@ class VASPPairChannel:
             raise # To close the channel
 
     def handle_response(self, response):
-        with self.get_vasp().get_storage_factory().atomic_writes() as tx_no:
+        with self.storage.atomic_writes() as tx_no:
             self._handle_response(response)
 
     def _handle_response(self, response):
@@ -429,7 +461,8 @@ class VASPPairChannel:
     def would_retransmit(self, do_retransmit=False):
         """ Returns true if there are any pending re-transmits, namely
             requests for which the response has not yet been received. """
-        with self.get_vasp().get_storage_factory().atomic_writes() as tx_no:
+
+        with self.storage.atomic_writes() as tx_no:
             answer = False
             next_retransmit = self.next_retransmit.get_value()
             my_request_len  = len(self.my_requests)
@@ -444,3 +477,9 @@ class VASPPairChannel:
                     break
             self.next_retransmit.set_value(next_retransmit)
             return answer
+
+    def send_network_request(self, request_json):
+        url = self.network_client.get_url(self.peer_base_url)
+        response = self.network_client.send_request(url, request_json)
+        if response != None:
+            self.parse_handle_response(json.dumps(response.json()))

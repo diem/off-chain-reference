@@ -107,8 +107,7 @@ class ProtocolExecutor:
         # <STARTS to persist>
 
         # Configure storage hierarchy
-        vasp = channel.get_vasp()
-        storage_factory = vasp.get_storage_factory()
+        storage_factory = channel.storage
         root = storage_factory.make_value(channel.myself.as_str(), None)
         other_vasp = storage_factory.make_value(channel.other.as_str(), None, root=root)
 
