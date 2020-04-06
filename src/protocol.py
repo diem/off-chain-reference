@@ -64,16 +64,16 @@ class OffChainVASP:
 
     def notify_new_commands(self):
         ''' The processor calls this method to notify the VASP that new
-            commands are available for processing. 
-            
-            Why notify the VASP to then call back the command processor? 
+            commands are available for processing.
+
+            Why notify the VASP to then call back the command processor?
             (Instead of the command processor processing the command backlog
-            directly). Because, the command processor does not keep a 
-            perminant record of the VASP object, so it has to be passed back 
-            to it.    
+            directly). Because, the command processor does not keep a
+            perminant record of the VASP object, so it has to be passed back
+            to it.
         '''
         self.processor.process_command_backlog(self)
-    
+
     def get_storage_factory(self):
         ''' Returns a storage factory for this system. '''
         return self.storage_factory
@@ -116,12 +116,12 @@ class VASPPairChannel:
         # Check we are not making a channel with ourselves
         if self.myself.as_str() == self.other.as_str():
             raise Exception('Must talk to another VASP:', self.myself.as_str(), self.other.as_str())
-        
+
         # <STARTS to persist>
         root = self.storage.make_value(self.myself.as_str(), None)
         other_vasp = self.storage.make_value(self.other.as_str(), None, root=root)
 
-        with self.storage.atomic_writes() as tx_no: 
+        with self.storage.atomic_writes() as tx_no:
 
             # The list of requests I have initiated
             self.my_requests = self.storage.make_list('my_requests', CommandRequestObject, root=other_vasp)
@@ -152,7 +152,7 @@ class VASPPairChannel:
 
     def my_next_seq(self):
         return len(self.my_requests)
-    
+
     def other_next_seq(self):
         return len(self.other_requests)
 
@@ -268,8 +268,8 @@ class VASPPairChannel:
             return self.handle_request(request)
         except JSONParsingError:
             response = make_parsing_error()
-            self.send_response(response)
-            return None
+            return self.send_response(response)
+            #return None
 
 
 
@@ -330,10 +330,10 @@ class VASPPairChannel:
                 # previous commands.
                 response = make_protocol_error(request, code='wait')
                 return self.send_response(response)
-                
+
             seq = self.next_final_sequence()
             try:
-                self.executor.sequence_next_command(request.command, 
+                self.executor.sequence_next_command(request.command,
                                     do_not_sequence_errors = False)
 
                 response = make_success_response(request)
