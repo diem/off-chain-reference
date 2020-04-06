@@ -8,11 +8,11 @@
 class BusinessAsyncInterupt(Exception):
     ''' Indicates that the result cannot be produced immediately,
         and the call must be done again once the result is ready. '''
-    
+
     def __init__(self, callback_ID):
         ''' Set a callback ID to signal which call was interupted '''
         self.callback_ID = callback_ID
-    
+
     def get_callback_ID(self):
         ''' Return the callback ID associated with the interrupted call '''
         return self.callback_ID
@@ -47,7 +47,7 @@ class BusinessContext:
 
     def get_vasp_info_by_libra_address(self, libra_address):
         ''' Returns a VASPInfo instance for the other VASP. This requires
-            reading the latest authoritative information from the chain.    
+            reading the latest authoritative information from the chain.
         '''
         raise NotImplementedError()
 
@@ -65,7 +65,7 @@ class BusinessContext:
         ''' Checks that the actor (sub-account / sub-address) on this VASP exists. This may be either
             the recipient or the sender, since VASPs can initiate payments
             in both directions. If not throw a BusinessValidationFailure.
-            
+
             Can raise:
                 BusinessValidationFailure'''
 
@@ -79,7 +79,7 @@ class BusinessContext:
         ''' Validates the recipient signature is correct. Raise a
             BusinessValidationFailure is the signature is invalid
             or not present. If the signature is valid do nothing.
-            
+
             Can raise:
                 BusinessValidationFailure'''
         raise NotImplementedError()
@@ -129,9 +129,10 @@ class BusinessContext:
         ''' Validates the kyc signature is correct. Raise a
             BusinessValidationFailure is the signature is invalid
             or not present. If the signature is valid do nothing.
-            
+
             Can raise:
-                BusinessValidationFailure'''
+                BusinessValidationFailure
+        '''
         raise NotImplementedError()
 
     def get_extended_kyc(self, payment):
@@ -227,12 +228,70 @@ class VASPInfo:
     """Contains information about VASPs"""
 
     def get_base_url(self):
-        """ Base URL that manages off-chain communications"""
+        """ Get the base URL that manages off-chain communications.
+
+            Returns a str: The base url of the VASP.
+
+        """
         raise NotImplementedError()
 
-    def is_authorised_VASP(self):
-        """ Whether this has the authorised VASP bit set on chain"""
+    def get_peer_base_url(self, other_addr):
+        """ Get the base URL that manages off-chain communications of the other
+            VASP (identified by `other_addr`).
+
+            Returns a str: The base url of the other VASP.
+        """
         raise NotImplementedError()
+
+    def is_authorised_VASP(self, certificate, other_addr):
+        """ Check whether an incoming network request is authorised or not.
+            This function checks that the certificate belongs to the sender
+            of the request (ie. the network client); it ensures that a
+            VASP is not impersonating one of the other authorised VASPs.
+
+            The certificate is a pyOpenSSL X509 object:
+            http://pyopenssl.sourceforge.net/pyOpenSSL.html/openssl-x509.html
+
+            Returns a bool: True or False
+        """
+        raise NotImplementedError()
+
+    def get_TLS_certificate_path(self):
+        """ Get the path to the TLS certificate of the VASP to authenticate channels.
+
+            Returns a str: path to the file containing the TLS certificatre.
+        """
+        raise NotImplementedError()
+
+    def get_TLS_key_path(self):
+        """ Get the path to the on-chain TLS key of the VASP to authenticate channels.
+
+            Returns a str: path to the file containing the TLS key.
+        """
+        raise NotImplementedError()
+
+    def get_peer_TLS_certificate_path(self, other_addr):
+        """ Get the path to the TLS certificate of a peer VASP, identified by
+            `other_addr`. Raise IOError if no certificates can be loaded.
+
+            Returns a str: path to the file containing the TLS certificate.
+
+            Can Raise:
+                IOError
+        """
+        raise NotImplementedError()
+
+    def get_all_peers_TLS_certificate_path(self):
+        """ Get the path to the PEM bundle containing the TLS certificates of
+        all authorised peer VASPs.
+
+            Returns a str: path to a single file containing all TLS certificates.
+        """
+        raise NotImplementedError()
+
+
+    # --- The functions below are currently unused ---
+
 
     def get_libra_address(self):
         """ The settlement Libra address for this channel"""
@@ -241,10 +300,6 @@ class VASPInfo:
     def get_parent_address(self):
         """ The VASP Parent address for this channel. High level logic is common
         to all Libra addresses under a parent to ensure consistency and compliance."""
-        raise NotImplementedError()
-
-    def get_TLS_certificate(self):
-        """ TODO: Get the on-chain TLS certificate to authenticate channels. """
         raise NotImplementedError()
 
     def is_unhosted(self):

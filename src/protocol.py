@@ -12,7 +12,7 @@ NetMessage = namedtuple('NetMessage', ['src', 'dst', 'type', 'content'])
 class OffChainVASP:
     """Manages the off-chain protocol on behalf of one VASP. """
 
-    def __init__(self, vasp_addr, processor):
+    def __init__(self, vasp_addr, processor, info_context, network_factory):
         if __debug__:
             assert isinstance(processor, CommandProcessor)
             assert isinstance(vasp_addr, LibraAddress)
@@ -28,6 +28,13 @@ class OffChainVASP:
         self.processor = processor
         self.processor.notify = self.notify_new_commands
 
+        # The VASPInfo context that contains various network information
+        # such as TLS certificates and keys.
+        self.info_context = info_context
+
+        # The network factory creating network clients for the channels.
+        self.network_factory = network_factory
+
         # TODO: this should be a persistent store
         self.channel_store = {}
 
@@ -40,9 +47,14 @@ class OffChainVASP:
         self.business_context.open_channel_to(other_vasp_addr)
         my_address = self.get_vasp_address()
         store_key = (my_address, other_vasp_addr)
+        net_channel = self.network_factory.make_client(
+            my_address, other_vasp_addr, self.info_context
+        )
 
         if store_key not in self.channel_store:
-            channel = VASPPairChannel(my_address, other_vasp_addr, self, self.processor)
+            channel = VASPPairChannel(
+                my_address, other_vasp_addr, self, self.processor, net_channel
+            )
             self.channel_store[store_key] = channel
 
         return self.channel_store[store_key]
@@ -52,11 +64,22 @@ class OffChainVASP:
             commands are available for processing. '''
         self.processor.process_command_backlog(self)
 
+    def close_channel(self, other_vasp_addr):
+        my_address = self.get_vasp_address()
+        store_key = (my_address, other_vasp_addr)
+        if store_key in self.channel_store:
+            # Close the TLS channel.
+            channel = self.channel_store[store_key]
+            channel.network_client.close_connection()
+
+            # Delete the channel from our store.
+            del self.channel_store[store_key]
+
 
 class VASPPairChannel:
     """Represents the state of an off-chain bi-directional channel bewteen two VASPs"""
 
-    def __init__(self, myself, other, vasp, processor):
+    def __init__(self, myself, other, vasp, processor, network_client):
         """ Initialize the channel between two VASPs.
 
         * Myself is the VASP initializing the local object (VASPInfo)
@@ -98,6 +121,10 @@ class VASPPairChannel:
         # Network handler
         self.net_queue = []
 
+        # The network client
+        self.peer_base_url = self.vasp.info_context.get_peer_base_url(self.other)
+        self.network_client = network_client
+
     def get_my_address(self):
         return self.myself
 
@@ -126,6 +153,7 @@ class VASPPairChannel:
         """ A hook to send a request to other VASP"""
         json_string = request.get_json_data_dict(JSONFlag.NET)
         self.net_queue += [ NetMessage(self.myself, self.other, CommandRequestObject, json_string) ]
+        self.send_network_request(json_string)
 
     def send_response(self, response):
         """ A hook to send a response to other VASP"""
@@ -250,7 +278,12 @@ class VASPPairChannel:
         # requests to sequence any new client requests.
         if self.is_server() and self.num_pending_responses() > 0:
             self.pending_requests += [request]
-            return None
+            # TODO [issue #38]: Ideally, the channel should return None,
+            # and the server network should wait until a response is available
+            # before answering the client.
+            response = make_protocol_error(request, code='wait')
+            return self.send_response(response)
+            #return None
 
         # Sequence newer requests
         if request.seq == self.other_next_seq:
@@ -387,3 +420,9 @@ class VASPPairChannel:
                     self.send_request(request)
                 return True
         return False
+
+    def send_network_request(self, request_json):
+        url = self.network_client.get_url(self.peer_base_url)
+        response = self.network_client.send_request(url, request_json)
+        if response != None:
+            self.parse_handle_response(json.dumps(response.json()))
