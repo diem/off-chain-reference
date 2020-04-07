@@ -1,6 +1,9 @@
 # Tests for the storage framework
 
-from storage import *
+from ..storage import *
+from ..payment import *
+
+
 from pathlib import PosixPath
 
 import pytest
@@ -143,7 +146,6 @@ def test_hierarchy(db):
     assert val.get_value() == 10
     assert val2.get_value() == 20
 
-from payment import *
 
 @pytest.fixture
 def basic_payment():
@@ -171,8 +173,8 @@ def test_value_payment(db, basic_payment):
     assert D[pay2.version] == basic_payment
 
 def test_value_command(db, basic_payment):
-    from payment_logic import PaymentCommand
-    from protocol_messages import make_success_response, CommandRequestObject, make_command_error
+    from ..payment_logic import PaymentCommand
+    from ..protocol_messages import make_success_response, CommandRequestObject, make_command_error
 
     cmd = PaymentCommand(basic_payment)
  
@@ -187,8 +189,8 @@ def test_value_command(db, basic_payment):
 
 
 def test_value_request(db, basic_payment):
-    from payment_logic import PaymentCommand
-    from protocol_messages import make_success_response, CommandRequestObject, make_command_error
+    from ..payment_logic import PaymentCommand
+    from ..protocol_messages import make_success_response, CommandRequestObject, make_command_error
     cmd = CommandRequestObject(PaymentCommand(basic_payment))
     cmd.seq = 10
  

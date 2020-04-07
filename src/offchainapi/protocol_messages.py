@@ -1,4 +1,4 @@
-from utils import JSONSerializable, JSONParsingError, JSONFlag
+from .utils import JSONSerializable, JSONParsingError, JSONFlag
 # from executor import SampleCommand
 
 class OffChainError(JSONSerializable):
