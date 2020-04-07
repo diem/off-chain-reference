@@ -34,7 +34,7 @@ class OffChainVASP:
         # The network factory creating network clients for the channels.
         self.network_factory = network_factory
 
-        # TODO: this should be a persistent store
+        # The dict of channels we already have.
         self.channel_store = {}
 
         # Manage storage
@@ -279,13 +279,7 @@ class VASPPairChannel:
     def _handle_request(self, request):
         """ Handles a request received by this VASP.
 
-            Returns a network record of the response if one can be constructed,
-            or None in case they are scheduled for later processing. If none is
-            returned then this function must be called again once the condition
-
-                self.num_pending_responses() == 0
-
-            becomes true.
+            Returns a network record of the response to the request.
         """
         request.command.set_origin(self.other)
 
