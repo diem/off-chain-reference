@@ -7,11 +7,12 @@ class OffChainError(JSONSerializable):
         self.code = code
 
     def __eq__(self, other):
-        return self.protocol_error == other.protocol_error \
-           and self.code == other.code
+        return isinstance(other, OffChainError) \
+            and self.protocol_error == other.protocol_error \
+            and self.code == other.code
 
     def get_json_data_dict(self, flag):
-        ''' Get a data dictionary compatible with JSON serilization (json.dumps) '''
+        ''' Get a data dictionary compatible with JSON serialization (json.dumps) '''
         data_dict = {
             "protocol_error" : self.protocol_error,
             "code" : self.code
@@ -28,12 +29,9 @@ class OffChainError(JSONSerializable):
         except Exception as e:
             raise JSONParsingError(*e.args)
 
-
+@JSONSerializable.register
 class CommandRequestObject(JSONSerializable):
     """Represents a command of the Off chain protocol"""
-
-    # Maps strings to class types for deserialization
-    type_map = {}
 
     def __init__(self, command):
         self.seq = None          # The sequence in the local queue
@@ -44,14 +42,10 @@ class CommandRequestObject(JSONSerializable):
         # Indicates whether the command was confirmed by the other VASP
         self.response = None
 
-    @classmethod
-    def register_command_type(cls, CommandClass):
-        ''' Register a subclass of Command to allow for json serialization'''
-        cls.type_map[CommandClass.json_type()] = CommandClass
-
     def __eq__(self, other):
         ''' Define equality as field equality '''
-        return self.seq == other.seq \
+        return isinstance(other, CommandRequestObject) \
+           and self.seq == other.seq \
            and self.command_seq == other.command_seq \
            and self.command == other.command \
            and self.command_type == other.command_type \
@@ -80,6 +74,8 @@ class CommandRequestObject(JSONSerializable):
             "command" : self.command.get_json_data_dict(flag),
             "command_type" : self.command_type
             }
+        
+        self.add_object_type(data_dict)
 
         if self.command_seq is not None:
             data_dict["command_seq"] = self.command_seq
@@ -97,8 +93,8 @@ class CommandRequestObject(JSONSerializable):
     def from_json_data_dict(cls, data, flag):
         ''' Construct the object from a serlialized JSON data dictionary (from json.loads). '''
         try:
-            cmd_type = cls.type_map[data["command_type"]]
-            command = cmd_type.from_json_data_dict(data['command'], flag)
+            # Use generic/dynamic parse functionality
+            command = JSONSerializable.parse(data['command'], flag)
             self = CommandRequestObject(command)
             self.seq = int(data["seq"])
             if 'command_seq' in data:
@@ -120,10 +116,11 @@ class CommandResponseObject(JSONSerializable):
         self.error = None
 
     def __eq__(self, other):
-        return self.seq == other.seq \
-           and self.command_seq == other.command_seq \
-           and self.status == other.status \
-           and self.error  == other.error
+        return isinstance(other, CommandResponseObject) \
+            and self.seq == other.seq \
+            and self.command_seq == other.command_seq \
+            and self.status == other.status \
+            and self.error  == other.error
 
 
     def not_protocol_failure(self):
@@ -146,6 +143,7 @@ class CommandResponseObject(JSONSerializable):
         if self.error is not None:
             data_dict["error"] = self.error.get_json_data_dict(flag)
         
+        self.add_object_type(data_dict)
         if __debug__:
             import json
             assert json.dumps(data_dict)
@@ -157,14 +155,13 @@ class CommandResponseObject(JSONSerializable):
         ''' Construct the object from a serlialized JSON data dictionary (from json.loads). '''
         try:
             self = CommandResponseObject()
-            try:
+
+            if 'seq' in data and data['seq'] is not None:
                 self.seq = int(data['seq'])
-            except:
-                self.seq = None
-            try:
+
+            if 'command_seq' in data and data['command_seq'] is not None:
                 self.command_seq = data['command_seq']
-            except:
-                self.command_seq = None
+
             self.status = str(data['status'])
 
             # Only None or int allowed
