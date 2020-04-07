@@ -1,8 +1,8 @@
-from protocol import *
-from executor import *
-from payment import *
-from payment_logic import PaymentCommand
-from business import BusinessContext
+from ..protocol import *
+from ..executor import *
+from ..payment import *
+from ..payment_logic import PaymentCommand
+from ..business import BusinessContext
 
 from unittest.mock import MagicMock, PropertyMock
 import pytest

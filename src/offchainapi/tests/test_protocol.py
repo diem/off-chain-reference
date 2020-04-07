@@ -1,15 +1,13 @@
-import pytest
+from ..libra_address import LibraAddress, LibraAddressError
+from ..protocol import *
+from ..executor import *
+from ..protocol_messages import *
+from ..business import BusinessContext, VASPInfo
+from ..sample_command import *
+
 import types
 from copy import deepcopy
-
-from libra_address import LibraAddress, LibraAddressError
-from protocol import *
-from executor import *
-from protocol_messages import *
-from business import BusinessContext, VASPInfo
 import random
-from sample_command import *
-
 from unittest.mock import MagicMock, PropertyMock
 import pytest
 

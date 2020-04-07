@@ -1,9 +1,9 @@
-from executor import ProtocolExecutor, ExecutorException, CommandProcessor
-from protocol_messages import CommandRequestObject, CommandResponseObject, \
+from .executor import ProtocolExecutor, ExecutorException, CommandProcessor
+from .protocol_messages import CommandRequestObject, CommandResponseObject, \
     make_success_response, make_protocol_error, make_parsing_error, make_command_error
-from utils import JSONParsingError, JSONFlag
-from libra_address import LibraAddress
-from storage import StorableFactory
+from .utils import JSONParsingError, JSONFlag
+from .libra_address import LibraAddress
+from .storage import StorableFactory
 
 import json
 from collections import namedtuple

@@ -1,5 +1,7 @@
+from .utils import get_unique_string,JSONSerializable
+
 from copy import deepcopy
-from utils import get_unique_string,JSONSerializable
+
 
 # Generic interface to a shared object
 
