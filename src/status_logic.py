@@ -110,7 +110,7 @@ def cross_product(L0, L1):
     return lattice
 
 def add_aborts(jointlattice):
-    ''' Adds aborts when once of the joint process aborts '''
+    ''' Adds aborts when one of the joint processes aborts '''
     lattice = set(jointlattice)
     for ((_, _),(e0, e1)) in list(lattice):
         if e0 == Status.abort or e1 == Status.abort:
