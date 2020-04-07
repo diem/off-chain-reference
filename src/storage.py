@@ -81,7 +81,7 @@ class StorableFactory:
         return self.db[key]
 
     def __setitem__(self, key, value):
-        # Ensure all writes are within a  transaction.
+        # Ensure all writes are within a transaction.
         if self.current_transaction is None:
             raise RuntimeError('Writes must happen within a transaction context')
         self.cache[key] = value
@@ -125,7 +125,7 @@ class StorableFactory:
             if item in self.db:
                 del self.db[item]
         
-        # upon completion of write, clean up
+        # Upon completion of write, clean up
         del self.db['__backup_recovery']
         self.cache = {}
         self.del_cache = set()
@@ -316,7 +316,7 @@ class StorableList(Storable):
         if type(key) is not int:
             raise KeyError('Key must be an int.')
         xlen = len(self)
-        if not 0<= key < xlen:
+        if not 0 <= key < xlen:
             raise KeyError('Key does not exist')
 
         db_key = str(self.base_key() / str(key))
