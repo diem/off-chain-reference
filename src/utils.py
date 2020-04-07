@@ -29,6 +29,15 @@ class StructureChecker:
         assert self.fields
         self.data = {}
         self.update_record = []
+    
+    def __getattr__(self, name):
+        ''' Provide a more humaine interface to the data '''
+        if name == "data":
+            raise AttributeError()
+        if name in self.data:
+            return self.data[name]
+        raise AttributeError()
+
 
     def record(self, diff):
         ''' Record all diffs applied to the object '''
@@ -47,8 +56,7 @@ class StructureChecker:
             the type is a subclass of StructureChecker. '''
         parse_map = {
                 field: (field_type, issubclass(field_type, StructureChecker))
-                for field, field_type, _, _ 
-                in cls.fields
+                for field, field_type, _, _ in cls.fields
             }
         return parse_map
 
@@ -57,26 +65,33 @@ class StructureChecker:
         ''' Returns a hierarchy of diffs applied to this object and children'''
         parse = self.parse_map()
         diff = {}
+        for field in self.data:
+            xtype, parse_more = parse[field]
+            if parse_more:
+                diff[field] = self.data[field].get_full_diff_record()
+            else:
+                if xtype in {str, int, list, dict}:
+                    diff[field] = self.data[field]
+                elif issubclass(xtype, Enum):
+                    diff[field] = self.data[field].name
+                else:
+                    diff[field] = str(self.data[field])
+        return diff
+    
+    def has_changed(self):
+        parse = self.parse_map()
         for new_diff in self.update_record:
             for field in new_diff:
-                xtype, parse_more = parse[field]
-                if not parse_more:
-                    # We serialize JSON native types directly
-                    if xtype in {str, int, list, dict}:
-                        diff[field] = new_diff[field]
-                    elif issubclass(xtype, Enum):
-                        diff[field] = new_diff[field].name
-                    else:
-                        diff[field] = str(new_diff[field])
+                return True
 
-        for field in parse:
-            xtype, parse_more = parse[field]
-            if field in self.data and parse_more:
-                inner_diff = self.data[field].get_full_diff_record()
-                if inner_diff != {}:
-                    diff[field] = inner_diff
+        for field in self.data:
+            _, parse_more = parse[field]
+            if parse_more:
+                if self.data[field].has_changed():
+                    return True
+        
+        return False
 
-        return diff
 
     def __eq__(self, other):
         ''' Define equality as equality between data fields only '''
@@ -98,7 +113,8 @@ class StructureChecker:
             self = cls.__new__(cls)
             StructureChecker.__init__(self)
         else:
-            self = deepcopy(base_instance)
+            # TODO: Profile and see if this deep copy is necessary.
+            self = base_instance
         
         parse = cls.parse_map()
         new_diff = {}
@@ -157,8 +173,9 @@ class StructureChecker:
 
                 # Check you can write again
                 if field in self.data and write_mode == WRITE_ONCE:
-                    raise StructureException(
-                        'Wrong update: field %s cannot be changed' % field)
+                    if self.data[field] !=  diff[field]:
+                        raise StructureException(
+                            'Wrong update: field %s cannot be changed' % field)
 
         # Check we are not updating unknown fields
         for key in diff:
@@ -191,14 +208,47 @@ class JSONParsingError(Exception):
     pass
 
 class JSONSerializable:
-    def get_json_data_dict(self, flag):
-        ''' Get a data disctionary compatible with JSON serilization (json.dumps) '''
+
+    # Define a type map for decoding
+    # It maps ObjectType attributes to a JSONSerializable subclass
+    json_type_map = {}
+
+    def get_json_data_dict(self, flag, update_dict = None):
+        ''' Get a data dictionary compatible with JSON serilization (json.dumps) '''
         raise NotImplementedError()
 
     @classmethod
-    def from_json_data_dict(cls, data, flag):
+    def from_json_data_dict(cls, data, flag, self=None):
         ''' Construct the object from a serlialized JSON data dictionary (from json.loads). '''
         raise NotImplementedError()
+    
+    @classmethod
+    def json_type(cls):
+        ''' Overwrite this method to have a nicer json type identifier.'''
+        return str(cls)
+    
+    @classmethod
+    def register(cls, other_cls):
+        cls.json_type_map[other_cls.json_type()] = other_cls
+        return other_cls
+    
+    @classmethod
+    def add_object_type(cls, value_dict):
+        assert 'ObjectType' not in value_dict
+        value_dict['ObjectType'] = cls.json_type()
+        return value_dict
+    
+    @classmethod
+    def parse(cls, data, flag):
+        if 'ObjectType' not in data:
+            print(data)
+            raise JSONParsingError('No object type information')
+
+        if data['ObjectType'] not in cls.json_type_map:
+            raise JSONParsingError('Unknown object type: %s' % data['ObjectType'])
+
+        new_cls = cls.json_type_map[data['ObjectType']]
+        return new_cls.from_json_data_dict(data, flag)
 
 # Utilities
 

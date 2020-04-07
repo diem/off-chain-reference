@@ -6,6 +6,11 @@ from payment import Status, PaymentObject
 from status_logic import status_heights_MUST
 from libra_address import LibraAddress
 
+from storage import StorableFactory
+from utils import JSONSerializable
+
+# Note: ProtocolCommand is JSONSerializable, so no need to extend again.
+@JSONSerializable.register
 class PaymentCommand(ProtocolCommand):
     def __init__(self, payment):
         ''' Creates a new Payment command based on the diff from the given payment.
@@ -20,7 +25,8 @@ class PaymentCommand(ProtocolCommand):
         self.command = payment.get_full_diff_record()
 
     def __eq__(self, other):
-        return self.dependencies == other.dependencies \
+        return ProtocolCommand.__eq__(self, other) \
+            and self.dependencies == other.dependencies \
             and self.creates_versions == other.creates_versions \
             and self.command == other.command
 
@@ -46,6 +52,8 @@ class PaymentCommand(ProtocolCommand):
             if dep not in dependencies:
                 raise PaymentLogicError('Cound not find payment dependency: %s' % dep)
             dep_object = dependencies[dep]
+
+            # Need to get a deepcopy new version
             updated_payment = dep_object.new_version(new_version)
             PaymentObject.from_full_record(self.command, base_instance=updated_payment)
             return updated_payment
@@ -69,7 +77,6 @@ class PaymentCommand(ProtocolCommand):
         return self
 
     # Helper functions for payment commands specifically
-
     def get_previous_version(self):
         ''' Returns the version of the previous payment, or None if this 
             command creates a new payment '''
@@ -122,12 +129,20 @@ def check_status(role, old_status, new_status, other_status):
 # The logic to process a payment from either side.
 class PaymentProcessor(CommandProcessor):
 
-    def __init__(self, business):
+    def __init__(self, business, storage_factory):
         self.business = business
+        self.storage_factory = storage_factory
 
         # TODO: Persit callbacks?
-        self.callbacks = {}
-        self.ready = {}
+        # Either we persit them, or we have to go through all
+        # active payment objects in the executor payment store
+        # and ask for re-processing.
+
+        with storage_factory.atomic_writes() as txid:
+            root = storage_factory.make_value('processor', None)
+            self.callbacks = storage_factory.make_dict('callbacks', PaymentObject, root)
+            self.ready = storage_factory.make_dict('ready', PaymentObject, root)
+
     
     # -------- Implements CommandProcessor interface ---------
     
@@ -142,21 +157,21 @@ class PaymentProcessor(CommandProcessor):
         new_payment = command.get_object(new_version, dependencies)
 
         ## Ensure that the two parties involved are in the VASP channel
-        parties = set([new_payment.data['sender'].data['address'], 
-                            new_payment.data['receiver'].data['address'] ])
+        parties = set([new_payment.sender.address, 
+                            new_payment.receiver.address ])
 
         if len(parties) != 2:
             raise PaymentLogicError('Wrong number of parties to payment: ' + str(parties))
 
-        my_addr = channel.myself.plain()
+        my_addr = channel.myself.as_str()
         if my_addr not in parties:
             raise PaymentLogicError('Payment parties does not include own VASP (%s): %s' % (my_addr, str(parties)))
 
-        other_addr = channel.other.plain()
+        other_addr = channel.other.as_str()
         if other_addr not in parties:
             raise PaymentLogicError('Payment parties does not include other party (%s): %s' % (other_addr, str(parties)))
 
-        origin = command.get_origin().plain()
+        origin = command.get_origin().as_str()
         if origin not in parties:
             raise PaymentLogicError('Command originates from wrong party')
 
@@ -187,13 +202,16 @@ class PaymentProcessor(CommandProcessor):
     def process_command_backlog(self, vasp):
         ''' Sends commands that have been resumed after being interrupted to other
             VASPs.'''
+
+        # TODO: should we only request the backlog for this specific VASP,
+        #       in case this processor is used for multiple ones?
         updated_payments = self.payment_process_ready()
         for payment in updated_payments:
-            parties = [payment.data['sender'].data['address'], 
-                            payment.data['receiver'].data['address'] ]
+            parties = [payment.sender.address, 
+                            payment.receiver.address ]
 
             # Determine the other address
-            my_addr = vasp.get_vasp_address().plain()
+            my_addr = vasp.get_vasp_address().as_str()
             assert my_addr in parties
             parties.remove(my_addr)
             other_addr = LibraAddress(parties[0])
@@ -258,10 +276,10 @@ class PaymentProcessor(CommandProcessor):
         business = self.business
 
         role = ['sender', 'receiver'][business.is_recipient(new_payment)]
-        status = payment.data[role].data['status']
+        status = payment.data[role].status
         other_role = ['sender', 'receiver'][role == 'sender']
-        old_other_status = payment.data[other_role].data['status']
-        other_status = new_payment.data[other_role].data['status']
+        old_other_status = payment.data[other_role].status
+        other_status = new_payment.data[other_role].status
 
         # Ensure nothing on our side was changed by this update
         if payment.data[role] != new_payment.data[role]:
@@ -275,16 +293,23 @@ class PaymentProcessor(CommandProcessor):
     def notify_callback(self, callback_ID):
         ''' Notify the processor that the callback with a specific ID has returned, and is ready to provide an answer. '''
         assert callback_ID in self.callbacks
-        obj = self.callbacks[callback_ID]
-        del self.callbacks[callback_ID]
-        # TODO: should we retrive here the latest version of the object?
-        self.ready[callback_ID] = obj
-        self.notify()
-
+        
+        with self.storage_factory.atomic_writes() as _:
+            obj = self.callbacks[callback_ID]
+            del self.callbacks[callback_ID]
+            # TODO: should we retrive here the latest version of the object?
+            #       Yes we should (opened issue #34)
+            self.ready[callback_ID] = obj
+            self.notify()
+            
     def payment_process_ready(self):
         ''' Processes any objects for which the callbacks have returned '''
         updated_objects = []
-        for (callback_ID, obj) in list(self.ready.items()):
+        # TODO: here some calls to payment process may result in more
+        #       callbacks, should we repeat this undel the ready list len
+        #       is equal to zero. 
+        for callback_ID in list(self.ready.keys()):
+            obj = self.ready[callback_ID]
             new_obj = self.payment_process(obj)
             del self.ready[callback_ID]
             if new_obj.has_changed():
@@ -303,9 +328,9 @@ class PaymentProcessor(CommandProcessor):
         role = ['sender', 'receiver'][is_receiver]
         other_role = ['sender', 'receiver'][not is_receiver]
 
-        status = payment.data[role].data['status']
+        status = payment.data[role].status
         current_status = status
-        other_status = payment.data[other_role].data['status']
+        other_status = payment.data[other_role].status
 
         new_payment = payment.new_version()
 

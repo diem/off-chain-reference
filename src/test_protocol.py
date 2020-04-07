@@ -10,44 +10,8 @@ from business import BusinessContext, VASPInfo
 import random
 from sample_command import *
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, PropertyMock
 import pytest
-
-
-class FakeAddress(LibraAddress):
-    def __init__(self, bit, addr):
-        self.bit = bit
-        self.addr = addr
-        self.encoded_address = str(addr)
-
-    def last_bit(self):
-        return self.bit
-
-    def greater_than_or_equal(self, other):
-        return self.addr >= other.addr
-
-    def equal(self, other):
-        return isinstance(other, FakeAddress) \
-            and self.addr == other.addr
-    
-    def plain(self):
-        return str(self.addr)
-    
-    def __repr__(self):
-        return f'FakeAddr({self.addr},{self.bit})'
-
-class FakeVASPInfo(VASPInfo):
-    def __init__(self, parent_addr, own_address = None):
-        self.parent = parent_addr
-        self.own_address = own_address
-
-    def get_parent_address(self):
-        return self.parent
-    
-    def get_libra_address(self):
-        """ The settlement Libra address for this channel"""
-        return self.own_address
-
 
 def monkey_tap(pair):
     pair.msg = []
@@ -200,14 +164,16 @@ class RandomRun(object):
 
 @pytest.fixture
 def three_address():
-    a0 = FakeAddress(0, 10)
-    a1 = FakeAddress(0, 20)
-    a2 = FakeAddress(1, 30)
+    a0 = LibraAddress.encode_to_Libra_address(b'A'*16) 
+    a1 = LibraAddress.encode_to_Libra_address(b'B' + b'A'*15)
+    a2 = LibraAddress.encode_to_Libra_address(b'B'*16)
     return (a0, a1, a2)
 
 @pytest.fixture
 def mockVASP():
     vasp = MagicMock(spec=OffChainVASP)
+    vasp.info_context = PropertyMock(autospec=True)
+    vasp.info_context.get_peer_base_url.return_value = '/'
     return vasp
 
 @pytest.fixture
@@ -215,39 +181,50 @@ def mockProcessor():
     proc = MagicMock(spec=CommandProcessor)
     return proc
 
-def test_client_server_role_definition(three_address, mockVASP, mockProcessor):
+@pytest.fixture
+def network_client():
+    network_client = MagicMock()
+    network_client.get_url.return_value = '/'
+    network_client.send_request.return_value = None
+    return network_client
+
+def test_client_server_role_definition(three_address, mockVASP, mockProcessor, network_client):
     a0, a1, a2 = three_address
 
-    # Lower address is server (xor bit = 0)
-    channel = VASPPairChannel(a0, a1, mockVASP, mockProcessor)
+    mock_store = MagicMock()
+    channel = VASPPairChannel(a0, a1, mockVASP, mock_store, mockProcessor, network_client)
+
     assert channel.is_server()
     assert not channel.is_client()
 
-    channel = VASPPairChannel(a1, a0, mockVASP, mockProcessor)
+    channel = VASPPairChannel(a1, a0, mockVASP, mock_store, mockProcessor, network_client)
     assert not channel.is_server()
     assert channel.is_client()
 
     # Lower address is server (xor bit = 1)
-    channel = VASPPairChannel(a0, a2, mockVASP, mockProcessor)
+    channel = VASPPairChannel(a0, a2, mockVASP, mock_store, mockProcessor, network_client)
     assert not channel.is_server()
     assert channel.is_client()
 
-    channel = VASPPairChannel(a2, a0, mockVASP, mockProcessor)
+    channel = VASPPairChannel(a2, a0, mockVASP, mock_store, mockProcessor, network_client)
     assert channel.is_server()
     assert not channel.is_client()
 
 
 @pytest.fixture
-def server_client(three_address, mockVASP, mockProcessor):
-    a0, a1, a2 = three_address
+def server_client(three_address, mockVASP, mockProcessor, network_client):
+    a0, a1, _ = three_address
 
-    server = VASPPairChannel(a0, a1, mockVASP, mockProcessor)
-    client = VASPPairChannel(a1, a0, mockVASP, mockProcessor)
+    store_server = StorableFactory({})
+    server = VASPPairChannel(a0, a1, mockVASP, store_server, mockProcessor, network_client)
+    store_client = StorableFactory({})
+    client = VASPPairChannel(a1, a0, mockVASP, store_client, mockProcessor, network_client)
 
     server = monkey_tap(server)
     client = monkey_tap(client)
 
     return (server, client)
+
 
 def test_protocol_server_client_benign(server_client):
     server, client = server_client
@@ -260,16 +237,16 @@ def test_protocol_server_client_benign(server_client):
     assert len(msg_list) == 1
     request = msg_list.pop()
     assert isinstance(request, CommandRequestObject)
-    assert server.my_next_seq == 1
+    assert server.my_next_seq() == 1
 
     # Pass the request to the client
-    assert client.other_next_seq == 0
+    assert client.other_next_seq() == 0
     client.handle_request(request)
     msg_list = client.tap()
     assert len(msg_list) == 1
     reply = msg_list.pop()
     assert isinstance(reply, CommandResponseObject)
-    assert client.other_next_seq == 1
+    assert client.other_next_seq() == 1
     assert reply.status == 'success'
 
     # Pass the reply back to the server
@@ -302,7 +279,7 @@ def test_protocol_server_conflicting_sequence(server_client):
     reply_conflict = client.tap()[0]
 
     # We only sequence one command.
-    assert client.other_next_seq == 1
+    assert client.other_next_seq() == 1
     assert reply.status == 'success'
 
     # The response to the second command is a failure
@@ -328,17 +305,17 @@ def test_protocol_client_server_benign(server_client):
     assert len(msg_list) == 1
     request = msg_list.pop()
     assert isinstance(request, CommandRequestObject)
-    assert client.other_next_seq == 0
-    assert client.my_next_seq == 1
+    assert client.other_next_seq() == 0
+    assert client.my_next_seq() == 1
 
     # Send to server
-    assert server.other_next_seq == 0
+    assert server.other_next_seq() == 0
     server.handle_request(request)
     msg_list = server.tap()
     assert len(msg_list) == 1
     reply = msg_list.pop()
     assert isinstance(reply, CommandResponseObject)
-    assert server.other_next_seq == 1
+    assert server.other_next_seq() == 1
     assert server.next_final_sequence() == 1
     assert server.get_final_sequence()[0].commit_status is not None
     assert reply.status == 'success'
@@ -353,8 +330,8 @@ def test_protocol_client_server_benign(server_client):
     assert client.my_requests[0].response is not None
     assert client.get_final_sequence()[0].item() == 'Hello'
     assert client.next_final_sequence() == 1
-    assert client.my_next_seq == 1
-    assert server.my_next_seq == 0
+    assert client.my_next_seq() == 1
+    assert server.my_next_seq() == 0
 
 
 def test_protocol_server_client_interleaved_benign(server_client):
@@ -367,8 +344,8 @@ def test_protocol_server_client_interleaved_benign(server_client):
 
     # The server waits until all own requests are done
     server.handle_request(client_request)
-    no_reply = server.tap()
-    assert no_reply == []
+    server_reply = server.tap()[0]
+    assert server_reply.error.code == 'wait'
 
     client.handle_request(server_request)
     client_reply = client.tap()[0]
@@ -396,8 +373,8 @@ def test_protocol_server_client_interleaved_swapped_request(server_client):
     client.handle_request(server_request)
     client_reply = client.tap()[0]
     server.handle_request(client_request)
-    no_reply = server.tap()
-    assert no_reply == []
+    server_reply = server.tap()[0]
+    assert server_reply.error.code == 'wait'
 
     server.handle_response(client_reply)
     server_reply = server.tap()[0]
@@ -420,8 +397,8 @@ def test_protocol_server_client_interleaved_swapped_reply(server_client):
     server_request = server.tap()[0]
 
     server.handle_request(client_request)
-    server_reply = server.tap()
-    assert server_reply == []
+    server_reply = server.tap()[0]
+    assert server_reply.error.code == 'wait'
 
     client.handle_request(server_request)
     client_reply = client.tap()[0]
@@ -547,9 +524,6 @@ def test_json_serlialize():
     cmd2 = SampleCommand.from_json_data_dict(data, JSONFlag.NET)
     assert cmd == cmd2
 
-    # First register the SimpleCommand class
-    CommandRequestObject.register_command_type(SampleCommand)
-
     # Test Request, Response
     req0 = CommandRequestObject(cmd)
     req2 = CommandRequestObject(cmd2)
@@ -570,12 +544,18 @@ def test_json_serlialize():
     req_err = CommandRequestObject.from_json_data_dict(data_err, JSONFlag.STORE)
     assert req0 == req_err
 
-def test_VASProot():
+def test_VASProot(network_client):
     a0 = LibraAddress.encode_to_Libra_address(b'A'*16)
     a1 = LibraAddress.encode_to_Libra_address(b'B'*16)
     a2 = LibraAddress.encode_to_Libra_address(b'C'*16)
+    store = StorableFactory({})
     proc = MagicMock(spec=CommandProcessor)
-    vasp = OffChainVASP(a0, proc)
+
+    info_context = MagicMock(spec=VASPInfo)
+    network_factory = MagicMock()
+    network_factory.make_client.return_value = network_client
+    vasp = OffChainVASP(a0, proc, store, info_context, network_factory)
+
 
     # Check our own address is good
     assert vasp.get_vasp_address() == a0
@@ -586,12 +566,16 @@ def test_VASProot():
     assert vasp.get_channel(a1).is_client()
 
 
-def test_VASProot_diff_object():
+def test_VASProot_diff_object(network_client):
     a0 = LibraAddress.encode_to_Libra_address(b'A'*16)
     b1 = LibraAddress.encode_to_Libra_address(b'B'*16)
     b2 = LibraAddress.encode_to_Libra_address(b'B'*16)
+    store = StorableFactory({})
     proc = MagicMock(spec=CommandProcessor)
-    vasp = OffChainVASP(a0, proc)
+    info_context = MagicMock(spec=VASPInfo)
+    network_factory = MagicMock()
+    network_factory.make_client.return_value = network_client
+    vasp = OffChainVASP(a0, proc, store, info_context, network_factory)
 
     # Check our own address is good
     assert vasp.get_vasp_address() == a0
@@ -613,3 +597,16 @@ def test_real_address():
     assert not B.equal(Ap)
     assert A.last_bit() ^ B.last_bit() == 1
     assert A.last_bit() ^ A.last_bit() == 0
+
+
+def test_sample_command():
+    store = {}
+    cmd1 = SampleCommand('hello')
+    store['hello'] = cmd1.get_object('hello', store)
+    cmd2 = SampleCommand('World', deps=[ 'hello' ])
+    obj = cmd2.get_object('World', store)
+
+    data = obj.get_json_data_dict(JSONFlag.STORE)
+    obj2 = JSONSerializable.parse(data, JSONFlag.STORE)
+    assert obj2.version == obj.version
+    assert obj2.previous_versions == obj.previous_versions
