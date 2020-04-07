@@ -13,9 +13,8 @@ NetMessage = namedtuple('NetMessage', ['src', 'dst', 'type', 'content'])
 class OffChainVASP:
     """Manages the off-chain protocol on behalf of one VASP. """
     def __init__(self, vasp_addr, processor, storage_factory, info_context, network_factory):
-        if __debug__:
-            assert isinstance(processor, CommandProcessor)
-            assert isinstance(vasp_addr, LibraAddress)
+        assert isinstance(processor, CommandProcessor)
+        assert isinstance(vasp_addr, LibraAddress)
 
         # The LibraAddress of the VASP
         self.vasp_addr = vasp_addr
