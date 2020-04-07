@@ -5,6 +5,7 @@ from libra_address import LibraAddress
 from protocol_messages import CommandRequestObject
 from payment_logic import PaymentCommand, PaymentProcessor
 from status_logic import Status
+from storage import StorableFactory
 from auth_networking import AuthNetworkServer, NetworkFactory
 
 import json
@@ -39,7 +40,7 @@ class sample_vasp_info(VASPInfo):
         tls_key = f'{assets_path}server_key.pem'
         all_peers_tls_cert = f'{assets_path}client_cert.pem'
 
-        peerA_addr = LibraAddress.encode_to_Libra_address(b'A'*16).plain()
+        peerA_addr = LibraAddress.encode_to_Libra_address(b'A'*16).as_str()
         each_peer_tls_cert = {
             peerA_addr: f'{assets_path}client_cert.pem',
         }
@@ -60,24 +61,24 @@ class sample_vasp_info(VASPInfo):
         return self.tls_key
 
     def get_peer_TLS_certificate_path(self, other_addr):
-        assert other_addr.plain() in self.each_peer_tls_cert
-        return self.each_peer_tls_cert[other_addr.plain()]
+        assert other_addr.as_str() in self.each_peer_tls_cert
+        return self.each_peer_tls_cert[other_addr.as_str()]
 
     def get_all_peers_TLS_certificate_path(self):
         return self.all_peers_tls_cert
 
     def get_peer_base_url(self, other_addr):
-        assert other_addr.plain() in self.each_peer_base_url
-        return self.each_peer_base_url[other_addr.plain()]
+        assert other_addr.as_str() in self.each_peer_base_url
+        return self.each_peer_base_url[other_addr.as_str()]
 
     def is_authorised_VASP(self, certificate, other_addr):
         # The check below should always pass: if we managed to open a channel
         # with another VASP, we should have already loaded its certificate.
-        assert other_addr.plain() in self.each_peer_tls_cert
+        assert other_addr.as_str() in self.each_peer_tls_cert
 
         # Check that the certificate provided with the request matches the
         # certificate we have in store for the given address.
-        cert_file = self.each_peer_tls_cert[other_addr.plain()]
+        cert_file = self.each_peer_tls_cert[other_addr.as_str()]
         with open(cert_file, 'rt') as f:
             cert_str = f.read()
         local_cert = OpenSSL.crypto.load_certificate(
@@ -103,11 +104,11 @@ class sample_business(BusinessContext):
         raise BusinessValidationFailure('Account %s does not exist' % subaddress)
 
     def assert_payment_for_vasp(self, payment):
-        sender = payment.data['sender']
-        receiver = payment.data['receiver']
+        sender = payment.sender
+        receiver = payment.receiver
 
-        if sender.data['address'] == self.get_address() or \
-            receiver.data['address'] == self.get_address():
+        if sender.address == self.get_address() or \
+            receiver.address == self.get_address():
             return
         raise BusinessValidationFailure()
 
@@ -127,20 +128,21 @@ class sample_business(BusinessContext):
         self.assert_payment_for_vasp(payment)
         accounts = {acc['account'] for acc in self.accounts_db}
         if self.is_sender(payment):
-            if payment.data['sender'].data['subaddress'] in accounts:
+            if payment.sender.subaddress in accounts:
                 return
         else:
-            if payment.data['receiver'].data['subaddress'] in accounts:
+            if payment.receiver.subaddress in accounts:
                 return
         raise BusinessForceAbort('Subaccount does not exist.')
 
     def is_sender(self, payment):
         self.assert_payment_for_vasp(payment)
-        return payment.data['sender'].data['address'] == self.get_address()
+        return payment.sender.address == self.get_address()
+    
 
     def validate_recipient_signature(self, payment):
         if 'recipient_signature' in payment.data:
-            if payment.data['recipient_signature'] == 'VALID':
+            if payment.recipient_signature == 'VALID':
                 return
             raise BusinessValidationFailure('Invalid signature: %s' % payment.data.get('recipient_signature', 'Not present'))
 
@@ -159,21 +161,21 @@ class sample_business(BusinessContext):
         my_role = self.get_my_role(payment)
         other_role = self.get_other_role(payment)
 
-        subaddress = payment.data[my_role].data['subaddress']
+        subaddress = payment.data[my_role].subaddress
         account = self.get_account(subaddress)
 
         if account['entity']:
             return { Status.needs_kyc_data }
 
         to_provide = set()
-        if payment.data[other_role].data['status'] == Status.needs_stable_id:
-                to_provide.add(Status.needs_stable_id)
-
-        if payment.data[other_role].data['status'] == Status.needs_kyc_data:
-                to_provide.add(Status.needs_stable_id)
-                to_provide.add(Status.needs_kyc_data)
-
-        if payment.data[other_role].data['status'] == Status.needs_recipient_signature:
+        if payment.data[other_role].status == Status.needs_stable_id:
+                to_provide.add(Status.needs_stable_id) 
+        
+        if payment.data[other_role].status == Status.needs_kyc_data:
+                to_provide.add(Status.needs_stable_id) 
+                to_provide.add(Status.needs_kyc_data) 
+        
+        if payment.data[other_role].status == Status.needs_recipient_signature:
                 if my_role == 'receiver':
                     to_provide.add(Status.needs_recipient_signature)
 
@@ -183,8 +185,7 @@ class sample_business(BusinessContext):
     def next_kyc_level_to_request(self, payment):
         my_role = self.get_my_role(payment)
         other_role = self.get_other_role(payment)
-
-        subaddress = payment.data[my_role].data['subaddress']
+        subaddress = payment.data[my_role].subaddress
         account = self.get_account(subaddress)
 
         if account['entity']:
@@ -197,12 +198,13 @@ class sample_business(BusinessContext):
         if 'recipient_signature' not in payment.data and my_role == 'sender':
             return Status.needs_recipient_signature
 
-        return payment.data[my_role].data['status']
+        return payment.data[my_role].status
+
 
     def validate_kyc_signature(self, payment):
         other_role = ['sender', 'receiver'][self.is_sender(payment)]
         if 'kyc_signature' in payment.data[other_role].data:
-            if not payment.data[other_role].data['kyc_signature'] == 'KYC_SIG':
+            if not payment.data[other_role].kyc_signature == 'KYC_SIG':
                 raise BusinessValidationFailure()
 
     def get_extended_kyc(self, payment):
@@ -213,14 +215,14 @@ class sample_business(BusinessContext):
                    BusinessNotAuthorized.
         '''
         my_role = self.get_my_role(payment)
-        subaddress = payment.data[my_role]['subaddress']
+        subaddress = payment.data[my_role].subaddress
         account = self.get_account(subaddress)
         return (account["kyc_data"], 'KYC_SIG', 'KYC_CERT')
 
 
     def get_stable_id(self, payment):
         my_role = self.get_my_role(payment)
-        subaddress = payment.data[my_role]['subaddress']
+        subaddress = payment.data[my_role].subaddress
         account = self.get_account(subaddress)
         return account["stable_id"]
 
@@ -228,19 +230,19 @@ class sample_business(BusinessContext):
     def ready_for_settlement(self, payment):
         my_role = self.get_my_role(payment)
         other_role = self.get_other_role(payment)
-        subaddress = payment.data[my_role].data['subaddress']
+        subaddress = payment.data[my_role].subaddress
         account = self.get_account(subaddress)
 
-        if my_role == 'sender':
-            if account["balance"] >= payment.data['action'].data['amount']:
+        if my_role == 'sender': 
+            if account["balance"] >= payment.action.amount:
 
                 # Reserve the amount for this payment
-                reference = payment.data['reference_id']
+                reference = payment.reference_id
                 if reference not in account['pending_transactions']:
                     account['pending_transactions'][reference] = {
-                        "amount": payment.data['action'].data['amount']
+                        "amount": payment.action.amount
                     }
-                    account["balance"] -= payment.data['action'].data['amount']
+                    account["balance"] -= payment.action.amount
 
             else:
                 if reference not in account['pending_transactions']:
@@ -271,20 +273,20 @@ class sample_business(BusinessContext):
         return True
 
     def has_settled(self, payment):
-        if payment.data['sender'].data['status'] == Status.settled:
+        if payment.sender.status == Status.settled:
             # In this VASP we consider we are ready to settle when the sender
             # says so (in reality we would check on-chain as well.)
             my_role = self.get_my_role(payment)
+            subaddress = payment.data[my_role].subaddress
 
-            subaddress = payment.data[my_role].data['subaddress']
             account = self.get_account(subaddress)
-            reference = payment.data['reference_id']
+            reference = payment.reference_id
 
             if reference not in account['pending_transactions']:
                 account['pending_transactions'][reference] = { 'settled':False }
 
             if not account['pending_transactions'][reference]['settled']:
-                account["balance"] += payment.data['action'].data['amount']
+                account["balance"] += payment.action.amount
                 account['pending_transactions'][reference]['settled'] = True
 
             return True
@@ -297,13 +299,13 @@ class sample_vasp:
     def __init__(self, my_addr):
         self.my_addr = my_addr
         self.bc = sample_business(self.my_addr)
+        self.store        = StorableFactory({})
         self.info_context = sample_vasp_info()
         self.network_factory = NetworkFactory()
 
-        CommandRequestObject.register_command_type(PaymentCommand)
-        self.pp = PaymentProcessor(self.bc)
+        self.pp = PaymentProcessor(self.bc, self.store)
         self.vasp = OffChainVASP(
-            self.my_addr, self.pp, self.info_context, self.network_factory
+            self.my_addr, self.pp, self.store, self.info_context, self.network_factory
         )
 
         # The network server
@@ -320,7 +322,6 @@ class sample_vasp:
             messages += channel.net_queue
             del channel.net_queue[:]
         return messages
-
 
     def get_channel(self, other_vasp):
         channel = self.vasp.get_channel(other_vasp)

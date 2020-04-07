@@ -1,7 +1,7 @@
 import pytest
 
 from payment import *
-
+from utils import JSONFlag
 
 
 @pytest.fixture
@@ -9,6 +9,37 @@ def basic_actor():
     actor = PaymentActor('AAAA', 'aaaa', Status.none, [])
     return actor
 
+@pytest.fixture
+def basic_payment():
+    sender = PaymentActor('AAAA', 'aaaa', Status.none, [])
+    receiver = PaymentActor('BBBB', 'bbbb', Status.none, [])
+    action = PaymentAction(10, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
+
+    payment = PaymentObject(sender, receiver, 'ref', 'orig_ref', 'desc', action)
+    return payment
+
+def test_json_payment(basic_payment):
+    import json
+    data = json.dumps(basic_payment.get_json_data_dict(flag=JSONFlag.STORE))
+    pay2 = PaymentObject.from_json_data_dict(json.loads(data), flag=JSONFlag.STORE)
+    assert basic_payment == pay2
+
+def test_json_payment_flags(basic_payment):
+    import json
+    basic_payment.actually_live = False
+    basic_payment.potentially_live = True
+    data = json.dumps(basic_payment.get_json_data_dict(flag=JSONFlag.STORE))
+    pay2 = PaymentObject.from_json_data_dict(json.loads(data), flag=JSONFlag.STORE)
+    assert pay2.potentially_live and not pay2.actually_live
+
+    basic_payment.actually_live = True
+    basic_payment.potentially_live = False
+    data = json.dumps(basic_payment.get_json_data_dict(flag=JSONFlag.STORE))
+    pay2 = PaymentObject.from_json_data_dict(json.loads(data), flag=JSONFlag.STORE)
+    assert not pay2.potentially_live and pay2.actually_live
+
+    assert basic_payment.version == pay2.version
+    assert basic_payment.version is not None
 
 def test_kyc_data_missing_payment_reference_fail():
     with pytest.raises(StructureException):
@@ -103,9 +134,12 @@ def test_payment_actor_update_kyc():
     actor = PaymentActor('ABCD', 'XYZ', Status.none, [])
     actor.add_kyc_data(kyc, 'sigXXXX', 'certXXX')
 
+    # We tolerate writing again strictly the same record
+    actor.add_kyc_data(kyc, 'sigXXXX', 'certXXX')
+
     with pytest.raises(StructureException):
         # Cannot change KYC data once set
-        actor.add_kyc_data(kyc, 'sigXXXX', 'certXXX')
+        actor.add_kyc_data(kyc, 'sigYYYY', 'certYYYY')
 
     with pytest.raises(StructureException):
         # Wrong type for kyc data

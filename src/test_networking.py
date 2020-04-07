@@ -5,6 +5,7 @@ from payment_logic import PaymentCommand
 from executor import CommandProcessor
 from protocol_messages import CommandRequestObject
 from business import VASPInfo
+from storage import StorableFactory
 
 from unittest.mock import MagicMock
 import pytest
@@ -29,7 +30,7 @@ def network_client(tester_addr, testee_addr):
 
 def test_get_url(network_client, tester_addr, testee_addr):
     url = network_client.get_url('/')
-    assert url == f'/{tester_addr.plain()}/{testee_addr.plain()}/process/'
+    assert url == f'/{tester_addr.as_str()}/{testee_addr.as_str()}/process/'
 
 
 # the 'httpserver' fixture comes from the pytest-httpserver package
@@ -53,7 +54,8 @@ def server(testee_addr):
     processor = MagicMock(spec=CommandProcessor)
     info_context = MagicMock(spec=VASPInfo)
     network_factory = MagicMock()
-    vasp = OffChainVASP(testee_addr, processor, info_context, network_factory)
+    store = StorableFactory({})
+    vasp = OffChainVASP(testee_addr, processor, store, info_context, network_factory)
     server = NetworkServer(vasp)
     return server
 
@@ -67,7 +69,7 @@ def flask_client(server):
 
 @pytest.fixture
 def url(tester_addr, testee_addr):
-    return f'/{testee_addr.plain()}/{tester_addr.plain()}/process/'
+    return f'/{testee_addr.as_str()}/{tester_addr.as_str()}/process/'
 
 
 @pytest.fixture
@@ -82,7 +84,6 @@ def simple_response_json():
 
 
 def test_process_request(server, flask_client, url, simple_request_json):
-    CommandRequestObject.register_command_type(PaymentCommand)
     server.vasp.info_context.is_authorised_VASP.return_value = True
     response = flask_client.post(url, json=simple_request_json)
     assert response.status_code == 200

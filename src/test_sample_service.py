@@ -1,5 +1,4 @@
 from sample_service import *
-from test_protocol import FakeAddress, FakeVASPInfo
 from payment_logic import PaymentProcessor
 from payment import *
 from libra_address import LibraAddress
@@ -12,16 +11,18 @@ import pytest
 
 @pytest.fixture
 def basic_payment_as_receiver():
+    a0 = LibraAddress.encode_to_Libra_address(b'B'*16)
     sender = PaymentActor(str(100), 'C', Status.none, [])
-    receiver = PaymentActor(str(40), '1', Status.none, [])
+    receiver = PaymentActor(a0.as_str(), '1', Status.none, [])
     action = PaymentAction(5, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
     payment = PaymentObject(sender, receiver, 'ref', 'orig_ref', 'desc', action)
     return payment
 
 @pytest.fixture
 def kyc_payment_as_receiver():
+    a0 = LibraAddress.encode_to_Libra_address(b'B'*16)
     sender = PaymentActor(str(100), 'C', Status.none, [])
-    receiver = PaymentActor(str(40), '1', Status.none, [])
+    receiver = PaymentActor(a0.as_str(), '1', Status.none, [])
     action = PaymentAction(5, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
     payment = PaymentObject(sender, receiver, 'ref', 'orig_ref', 'desc', action)
 
@@ -47,7 +48,8 @@ def kyc_payment_as_receiver():
 
 @pytest.fixture
 def kyc_payment_as_sender():
-    sender = PaymentActor(str(40), '1', Status.none, [])
+    a0 = LibraAddress.encode_to_Libra_address(b'B'*16)
+    sender = PaymentActor(a0.as_str(), '1', Status.none, [])
     receiver = PaymentActor(str(100), 'C', Status.none, [])
     action = PaymentAction(5, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
     payment = PaymentObject(sender, receiver, 'ref', 'orig_ref', 'desc', action)
@@ -76,8 +78,9 @@ def kyc_payment_as_sender():
 
 @pytest.fixture
 def settled_payment_as_receiver():
+    a0 = LibraAddress.encode_to_Libra_address(b'B'*16)
     sender = PaymentActor(str(100), 'C', Status.none, [])
-    receiver = PaymentActor(str(40), '1', Status.none, [])
+    receiver = PaymentActor(a0.as_str(), '1', Status.none, [])
     action = PaymentAction(5, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
     payment = PaymentObject(sender, receiver, 'ref', 'orig_ref', 'desc', action)
 
@@ -103,13 +106,14 @@ def settled_payment_as_receiver():
 
 @pytest.fixture
 def addr_bc_proc():
-    a0 = FakeAddress(0, 40)
+    a0 = LibraAddress.encode_to_Libra_address(b'B'*16)
     bc = sample_business(a0)
-    proc = PaymentProcessor(bc)
+    store = StorableFactory({})
+    proc = PaymentProcessor(bc, store)
     return (a0, bc, proc)
 
 def test_business_simple():
-    a0 = FakeAddress(0, 40)
+    a0 = LibraAddress.encode_to_Libra_address(b'B'*16)
     bc = sample_business(a0)
 
 def test_business_is_related(basic_payment_as_receiver, addr_bc_proc):
@@ -130,7 +134,8 @@ def test_business_is_kyc_provided(kyc_payment_as_receiver, addr_bc_proc):
     kyc_level = bc.next_kyc_level_to_request(payment)
     assert kyc_level == Status.none
 
-    ret_payment = proc.payment_process(payment)
+    with proc.storage_factory as _:
+        ret_payment = proc.payment_process(payment)
     assert ret_payment.has_changed()
 
     ready = bc.ready_for_settlement(ret_payment)
@@ -145,7 +150,8 @@ def test_business_is_kyc_provided_sender(kyc_payment_as_sender, addr_bc_proc):
     kyc_level = bc.next_kyc_level_to_request(payment)
     assert kyc_level == Status.needs_recipient_signature
 
-    ret_payment = proc.payment_process(payment)
+    with proc.storage_factory as _:
+        ret_payment = proc.payment_process(payment)
     assert ret_payment.has_changed()
 
     ready = bc.ready_for_settlement(ret_payment)
