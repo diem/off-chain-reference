@@ -316,7 +316,7 @@ class StorableList(Storable):
         if type(key) is not int:
             raise KeyError('Key must be an int.')
         xlen = len(self)
-        if not 0<= key < xlen:
+        if not 0 <= key < xlen:
             raise KeyError('Key does not exist')
 
         db_key = str(self.base_key() / str(key))
