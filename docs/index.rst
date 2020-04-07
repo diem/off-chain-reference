@@ -6,6 +6,9 @@
 Welcome to offchainapi's documentation!
 =======================================
 
+.. automodule:: offchainapi.business
+    :members:
+
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
