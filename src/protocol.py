@@ -68,7 +68,7 @@ class OffChainVASP:
             Why notify the VASP to then call back the command processor?
             (Instead of the command processor processing the command backlog
             directly). Because, the command processor does not keep a
-            perminant record of the VASP object, so it has to be passed back
+            permanent record of the VASP object, so it has to be passed back
             to it.
         '''
         self.processor.process_command_backlog(self)
