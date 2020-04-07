@@ -125,7 +125,7 @@ class StorableFactory:
             if item in self.db:
                 del self.db[item]
         
-        # upon completion of write, clean up
+        # Upon completion of write, clean up
         del self.db['__backup_recovery']
         self.cache = {}
         self.del_cache = set()
