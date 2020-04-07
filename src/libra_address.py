@@ -17,7 +17,10 @@ class LibraAddress:
         except:
             raise LibraAddressError()
     
-    def plain(self):
+    #def plain(self):
+    #    return self.encoded_address
+    
+    def as_str(self):
         return self.encoded_address
 
     @classmethod

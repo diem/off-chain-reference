@@ -4,6 +4,7 @@ from executor import CommandProcessor
 from business import VASPInfo
 from protocol_messages import CommandRequestObject
 from payment_logic import PaymentCommand
+from storage import StorableFactory
 
 from unittest.mock import MagicMock
 import sys
@@ -32,7 +33,8 @@ test_vector_request = """{
         "seq": 0,
         "command": {
             "dependencies": [],
-            "creates_versions": ["TJZb1EwYY/gloKCIfiASHw=="],
+            "creates_versions": ["uB9tZO8Su2AI9w7nxV1zMA=="],
+            "ObjectType": "<class 'payment_logic.PaymentCommand'>",
             "diff": {
                 "reference_id": "ref_payment_1",
                 "original_payment_reference_id": "orig_ref...",
@@ -57,7 +59,8 @@ test_vector_request = """{
                 }
             }
         },
-        "command_type": "<class 'payment_logic.PaymentCommand'>"
+        "command_type": "<class 'payment_logic.PaymentCommand'>",
+        "ObjectType": "<class 'protocol_messages.CommandRequestObject'>"
     }"""
 
 
@@ -74,13 +77,14 @@ if __name__ == "__main__":
     base_url = 'https://127.0.0.1:5000/'
 
     # Create the networking.
-    CommandRequestObject.register_command_type(PaymentCommand)
     addr = LibraAddress.encode_to_Libra_address(b'B'*16)
     processor = MagicMock(spec=CommandProcessor)
+    #processor.last_confirmed = 0
+    storage_factory = StorableFactory({})
     info_context = MagicMock(spec=VASPInfo)
     info_context.get_peer_base_url.return_value = base_url
     network_factory = NetworkFactory()
-    vasp = OffChainVASP(addr, processor, info_context, network_factory)
+    vasp = OffChainVASP(addr, processor, storage_factory, info_context, network_factory)
     network_server = AuthNetworkServer(
         vasp, server_key, server_cert, client_cert
     )
@@ -97,7 +101,7 @@ if __name__ == "__main__":
 
     elif mode == 'client-process':
         other_addr = LibraAddress.encode_to_Libra_address(b'A'*16)
-        url = f'{base_url}{addr.plain()}/{other_addr.plain()}/process/'
+        url = f'{base_url}{addr.as_str()}/{other_addr.as_str()}/process/'
         network_client = AuthNetworkClient(
             addr, other_addr, server_cert, client_cert, client_key
         )

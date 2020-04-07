@@ -20,7 +20,7 @@ class NetworkClient:
         self.session = requests.Session()
 
     def get_url(self, base_url):
-        url = f'{self.other_addr.plain()}/{self.my_addr.plain()}/process/'
+        url = f'{self.other_addr.as_str()}/{self.my_addr.as_str()}/process/'
         return urljoin(base_url, url)
 
     def send_request(self, url, json_request):
@@ -44,7 +44,7 @@ class NetworkServer:
 
         # Register paths.
         self.app.add_url_rule(
-            f'/{self.vasp.get_vasp_address().plain()}/<other_addr>/process/',
+            f'/{self.vasp.get_vasp_address().as_str()}/<other_addr>/process/',
             view_func=VASPOffChainApi.as_view('vasp_api', self.vasp)
         )
 

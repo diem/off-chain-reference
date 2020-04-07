@@ -1,12 +1,14 @@
 from executor import ProtocolCommand
-from utils import JSONFlag
+from utils import JSONFlag, JSONSerializable
 from shared_object import SharedObject
 
+@JSONSerializable.register
 class SampleObject(SharedObject):
     def __init__(self, item):
         SharedObject.__init__(self)
         self.item = item
 
+@JSONSerializable.register
 class SampleCommand(ProtocolCommand):
     def __init__(self, command, deps=None):
         ProtocolCommand.__init__(self)
@@ -41,9 +43,10 @@ class SampleCommand(ProtocolCommand):
     @classmethod
     def from_json_data_dict(cls, data, flag):
         ''' Construct the object from a serlialized JSON data dictionary (from json.loads). '''
-        self = SampleCommand(data['command'], data['dependencies'])
-        if flag == JSONFlag.STORE:
-            self.commit_status = data["commit_status"]
+        self = super().from_json_data_dict(data, flag)
+        self.command = SampleObject(data['command'])
+        self.dependencies = data['dependencies']
+        assert type(self) == cls
         return self
 
     @classmethod

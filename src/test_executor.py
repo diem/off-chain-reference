@@ -4,7 +4,7 @@ from payment import *
 from payment_logic import PaymentCommand
 from business import BusinessContext
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, PropertyMock
 import pytest
 
 
@@ -18,10 +18,23 @@ def basic_payment():
 
 
 def test_exec(basic_payment):
-    channel = MagicMock(spec=VASPPairChannel)
-    bcm = MagicMock(spec=BusinessContext)
+    a0 = LibraAddress.encode_to_Libra_address(b'A'*16)
+    a1 = LibraAddress.encode_to_Libra_address(b'B'*16)
+
+    store = StorableFactory({})
+
+    # Make mock VASP
+    vasp = MagicMock(spec=OffChainVASP)
+    vasp.info_context = PropertyMock(autospec=True)
+    vasp.info_context.get_peer_base_url.return_value = '/'
+
     proc = MagicMock(spec=CommandProcessor)
-    pe = ProtocolExecutor(channel, proc)
+    net = MagicMock()
+    
+    with store:
+        channel = VASPPairChannel(a0, a1, vasp, store, proc, net)
+        bcm = MagicMock(spec=BusinessContext)
+        pe = ProtocolExecutor(channel, proc)
 
 
     cmd1 = PaymentCommand(basic_payment)
@@ -42,9 +55,10 @@ def test_exec(basic_payment):
     assert cmd2.dependencies == cmd1.creates_versions
     assert cmd3.dependencies == cmd2.creates_versions
 
-    pe.sequence_next_command(cmd1)
-    pe.sequence_next_command(cmd2)
-    pe.sequence_next_command(cmd3)
+    with store as tx_no: 
+        pe.sequence_next_command(cmd1)
+        pe.sequence_next_command(cmd2)
+        pe.sequence_next_command(cmd3)
 
     assert pe.count_potentially_live() == 3
 
@@ -60,9 +74,9 @@ def test_exec(basic_payment):
     cmd5a = PaymentCommand(pay5a)
     cmd5a.set_origin(channel.get_my_address())
 
-
-    pe.sequence_next_command(cmd4a)
-    pe.sequence_next_command(cmd5a)
+    with store as tx_no: 
+        pe.sequence_next_command(cmd4a)
+        pe.sequence_next_command(cmd5a)
 
     # Diverge -- branch B
 
@@ -76,8 +90,9 @@ def test_exec(basic_payment):
     cmd5b = PaymentCommand(pay5b)
     cmd5b.set_origin(channel.get_my_address())
 
-    pe.sequence_next_command(cmd4b)
-    pe.sequence_next_command(cmd5b)
+    with store as tx_no: 
+        pe.sequence_next_command(cmd4b)
+        pe.sequence_next_command(cmd5b)
 
     assert pe.count_potentially_live() == 7
 
@@ -90,28 +105,41 @@ def test_exec(basic_payment):
     with pytest.raises(ExecutorException):
         pe.sequence_next_command(cmd_bad, do_not_sequence_errors=True)
 
-    pe.set_success(0)
-    pe.set_success(1)
-    pe.set_success(2)
-    assert pe.count_potentially_live() == 5
-    assert pe.count_actually_live() == 1
+    with store as tx_no: 
+        pe.set_success(0)
+        pe.set_success(1)
+        pe.set_success(2)
+        assert pe.count_potentially_live() == 5
+        assert pe.count_actually_live() == 1
 
-    pe.set_success(3)
-    pe.set_success(4)
+        pe.set_success(3)
+        pe.set_success(4)
 
-    assert pe.count_potentially_live() == 3
-    assert pe.count_actually_live() == 1
+        assert pe.count_potentially_live() == 3
+        assert pe.count_actually_live() == 1
 
-    pe.set_fail(5)
-    pe.set_fail(6)
+        pe.set_fail(5)
+        pe.set_fail(6)
 
     assert pe.count_potentially_live() == 1
     assert pe.count_actually_live() == 1
 
 def test_handlers(basic_payment):
-    channel = MagicMock(spec=VASPPairChannel)
-    bcm = MagicMock(spec=BusinessContext)
+
+    a0 = LibraAddress.encode_to_Libra_address(b'A'*16)
+    a1 = LibraAddress.encode_to_Libra_address(b'B'*16)
     proc = MagicMock(spec=CommandProcessor)
+    store = StorableFactory({})
+
+    vasp = MagicMock(spec=OffChainVASP)
+    vasp.info_context = PropertyMock(autospec=True)
+    vasp.info_context.get_peer_base_url.return_value = '/'
+
+    proc = MagicMock(spec=CommandProcessor)
+    net = MagicMock()
+    channel = VASPPairChannel(a0, a1, vasp, store, proc, net)
+
+    bcm = MagicMock(spec=BusinessContext)
     
     class Stats(CommandProcessor):
         def __init__(self, bc):
@@ -149,12 +177,13 @@ def test_handlers(basic_payment):
     assert cmd2.dependencies == list(cmd1.creates_versions)
     assert cmd3.dependencies == list(cmd1.creates_versions)
 
-    pe.sequence_next_command(cmd1)
-    pe.sequence_next_command(cmd2)
-    pe.sequence_next_command(cmd3)
-    pe.set_success(0)
-    pe.set_success(1)
-    pe.set_fail(2)
+    with store as tx_no: 
+        pe.sequence_next_command(cmd1)
+        pe.sequence_next_command(cmd2)
+        pe.sequence_next_command(cmd3)
+        pe.set_success(0)
+        pe.set_success(1)
+        pe.set_fail(2)
 
     assert stat.success_no == 2
     assert stat.failure_no == 1
