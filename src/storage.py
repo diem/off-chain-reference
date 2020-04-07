@@ -81,7 +81,7 @@ class StorableFactory:
         return self.db[key]
 
     def __setitem__(self, key, value):
-        # Ensure all writes are within a  transaction.
+        # Ensure all writes are within a transaction.
         if self.current_transaction is None:
             raise RuntimeError('Writes must happen within a transaction context')
         self.cache[key] = value
