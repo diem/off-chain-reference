@@ -276,26 +276,24 @@ def test_payment_process_interrupt(basic_payment, payment_processor_context):
 
     with pp.storage_factory as _:
         new_payment = pp.payment_process(basic_payment)
-    assert not new_payment.has_changed()
-    assert new_payment.data['receiver'].data['status'] == Status.none
+    assert new_payment is None
 
 
 def test_payment_process_interrupt_resume(basic_payment, payment_processor_context):
     bcm, pp = payment_processor_context
-    bcm.is_recipient.side_effect = [True, True, True, True]
-    bcm.check_account_existence.side_effect = [None, None]
-    bcm.next_kyc_level_to_request.side_effect = [Status.ready_for_settlement]
+    bcm.is_recipient.side_effect = [True, True, True, True] * 5
+    bcm.check_account_existence.side_effect = [None, None] * 5
+    bcm.next_kyc_level_to_request.side_effect = [ Status.ready_for_settlement ] * 5
     bcm.next_kyc_to_provide.side_effect = [BusinessAsyncInterupt(1234)]
 
     assert basic_payment.data['receiver'].data['status'] == Status.none
     with pp.storage_factory as _:
         new_payment = pp.payment_process(basic_payment)
-    assert new_payment.has_changed()
-    assert new_payment.data['receiver'].data['status'] == Status.ready_for_settlement
-
-    bcm.next_kyc_to_provide.side_effect = [set()]
-    bcm.ready_for_settlement.side_effect = [True]
-    bcm.has_settled.side_effect = [True]
+    assert new_payment is None
+    
+    bcm.next_kyc_to_provide.side_effect = [set()] * 5
+    bcm.ready_for_settlement.side_effect = [True] * 5
+    bcm.has_settled.side_effect = [True] * 5
 
     pp.notify_callback(1234)
     with pp.storage_factory as _:
