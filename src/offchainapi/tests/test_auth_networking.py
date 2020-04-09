@@ -1,10 +1,10 @@
-from auth_networking import *
-from protocol import LibraAddress, OffChainVASP
-from executor import CommandProcessor
-from business import VASPInfo
-from protocol_messages import CommandRequestObject
-from payment_logic import PaymentCommand
-from storage import StorableFactory
+from ..auth_networking import *
+from ..protocol import LibraAddress, OffChainVASP
+from ..executor import CommandProcessor
+from ..business import VASPInfo
+from ..protocol_messages import CommandRequestObject
+from ..payment_logic import PaymentCommand
+from ..storage import StorableFactory
 
 from unittest.mock import MagicMock
 import sys
@@ -67,7 +67,7 @@ test_vector_request = """{
 if __name__ == "__main__":
 
     # Test keys and certificates.
-    assets_path = '../test_vectors/'
+    assets_path = '../../../test_vectors/'
     server_key = f'{assets_path}server_key.pem'
     server_cert = f'{assets_path}server_cert.pem'
     client_key = f'{assets_path}client_key.pem'

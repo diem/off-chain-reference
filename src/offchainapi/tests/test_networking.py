@@ -1,11 +1,11 @@
-from networking import *
-from protocol import LibraAddress, OffChainVASP
-from test_sample_service import simple_request_json
-from payment_logic import PaymentCommand
-from executor import CommandProcessor
-from protocol_messages import CommandRequestObject
-from business import VASPInfo
-from storage import StorableFactory
+from ..networking import *
+from ..protocol import LibraAddress, OffChainVASP
+from .test_sample_service import simple_request_json
+from ..payment_logic import PaymentCommand
+from ..executor import CommandProcessor
+from ..protocol_messages import CommandRequestObject
+from ..business import VASPInfo
+from ..storage import StorableFactory
 
 from unittest.mock import MagicMock
 import pytest

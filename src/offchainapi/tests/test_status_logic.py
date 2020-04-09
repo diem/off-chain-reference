@@ -1,4 +1,4 @@
-from status_logic import *
+from ..status_logic import *
 
 def test_lattice_finality_barrier_works():
     process = payment_status_process

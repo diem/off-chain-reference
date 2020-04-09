@@ -1,4 +1,4 @@
-from networking import NetworkClient, NetworkServer, VASPOffChainApi
+from .networking import NetworkClient, NetworkServer, VASPOffChainApi
 
 import werkzeug.serving
 import ssl

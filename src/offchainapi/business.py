@@ -35,6 +35,7 @@ class BusinessForceAbort(Exception):
 
 
 class BusinessContext:
+    """ The interface a VASP should define to drive the Off-chain protocol """
 
     def open_channel_to(self, other_vasp_info):
         ''' Requests authorization to open a channel to another VASP.

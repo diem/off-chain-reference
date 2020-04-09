@@ -1,7 +1,7 @@
-from utils import JSONSerializable, JSONFlag
-from command_processor import CommandProcessor
-from libra_address import LibraAddress
-from shared_object import SharedObject
+from .utils import JSONSerializable, JSONFlag
+from .command_processor import CommandProcessor
+from .libra_address import LibraAddress
+from .shared_object import SharedObject
 
 # Interface we need to do commands:
 class ProtocolCommand(JSONSerializable):
@@ -97,7 +97,7 @@ class ProtocolExecutor:
         """
         if __debug__:
             # No need for this import unless we are debugging
-            from protocol import VASPPairChannel
+            from .protocol import VASPPairChannel
             assert isinstance(processor, CommandProcessor)
             assert isinstance(channel, VASPPairChannel)
 

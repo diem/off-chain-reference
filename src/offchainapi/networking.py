@@ -1,6 +1,6 @@
-from libra_address import LibraAddress
-from protocol_messages import CommandResponseObject
-from business import VASPInfo, BusinessNotAuthorized
+from .libra_address import LibraAddress
+from .protocol_messages import CommandResponseObject
+from .business import VASPInfo, BusinessNotAuthorized
 
 from flask import Flask, request, abort
 from flask.views import MethodView
