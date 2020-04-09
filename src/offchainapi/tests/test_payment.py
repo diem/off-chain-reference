@@ -1,7 +1,7 @@
 import pytest
 
-from payment import *
-from utils import JSONFlag
+from ..payment import *
+from ..utils import JSONFlag
 
 
 @pytest.fixture

@@ -1,9 +1,9 @@
-from utils import StructureException, StructureChecker, \
+from .utils import StructureException, StructureChecker, \
     REQUIRED, OPTIONAL, WRITE_ONCE, UPDATABLE, \
     JSONSerializable
-from shared_object import SharedObject
+from .shared_object import SharedObject
+from .status_logic import Status
 
-from status_logic import Status
 import json
 
 

@@ -1,12 +1,12 @@
-from business import BusinessContext, BusinessAsyncInterupt, BusinessForceAbort, \
+from .business import BusinessContext, BusinessAsyncInterupt, BusinessForceAbort, \
 BusinessValidationFailure, VASPInfo
-from protocol import OffChainVASP
-from libra_address import LibraAddress
-from protocol_messages import CommandRequestObject
-from payment_logic import PaymentCommand, PaymentProcessor
-from status_logic import Status
-from storage import StorableFactory
-from auth_networking import AuthNetworkServer, NetworkFactory
+from .protocol import OffChainVASP
+from .libra_address import LibraAddress
+from .protocol_messages import CommandRequestObject
+from .payment_logic import PaymentCommand, PaymentProcessor
+from .status_logic import Status
+from .storage import StorableFactory
+from .auth_networking import AuthNetworkServer, NetworkFactory
 
 import json
 import OpenSSL.crypto
@@ -32,25 +32,25 @@ business_config = """[
 
 
 class sample_vasp_info(VASPInfo):
-    def __init__(self):
+    def __init__(self, assets_path):
 
-        assets_path = '../test_vectors/'
+        # assets_path = '../test_vectors/'
 
-        tls_cert = f'{assets_path}server_cert.pem'
-        tls_key = f'{assets_path}server_key.pem'
-        all_peers_tls_cert = f'{assets_path}client_cert.pem'
+        tls_cert = assets_path / 'server_cert.pem'
+        tls_key = assets_path / 'server_key.pem'
+        all_peers_tls_cert = assets_path / 'client_cert.pem'
 
         peerA_addr = LibraAddress.encode_to_Libra_address(b'A'*16).as_str()
         each_peer_tls_cert = {
-            peerA_addr: f'{assets_path}client_cert.pem',
+            peerA_addr: str(assets_path / 'client_cert.pem'),
         }
         each_peer_base_url = {
             peerA_addr: 'https://peerA.com',
         }
 
-        self.tls_cert = tls_cert
-        self.tls_key = tls_key
-        self.all_peers_tls_cert = all_peers_tls_cert
+        self.tls_cert = str(tls_cert)
+        self.tls_key = str(tls_key)
+        self.all_peers_tls_cert = str(all_peers_tls_cert)
         self.each_peer_tls_cert = each_peer_tls_cert
         self.each_peer_base_url = each_peer_base_url
 
@@ -296,11 +296,11 @@ class sample_business(BusinessContext):
 
 class sample_vasp:
 
-    def __init__(self, my_addr):
+    def __init__(self, my_addr, assets_path):
         self.my_addr = my_addr
         self.bc = sample_business(self.my_addr)
         self.store        = StorableFactory({})
-        self.info_context = sample_vasp_info()
+        self.info_context = sample_vasp_info(assets_path)
         self.network_factory = NetworkFactory()
 
         self.pp = PaymentProcessor(self.bc, self.store)

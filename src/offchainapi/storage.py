@@ -4,7 +4,7 @@ import dbm
 import json
 from pathlib import PosixPath
 
-from utils import JSONFlag, JSONSerializable, get_unique_string
+from .utils import JSONFlag, JSONSerializable, get_unique_string
 
 class Storable:
     """ Base class for objects that can be stored """
