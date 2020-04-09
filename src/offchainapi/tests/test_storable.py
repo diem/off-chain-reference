@@ -110,7 +110,7 @@ def test_value(db):
     # Test default
     val0 = StorableValue(db, 'counter_zero', int, default = 0)
     assert val0.get_value() == 0
-    assert not val0.exists()
+    assert val0.exists()
     val0.set_value(10)
     assert val0.get_value() == 10
 
@@ -267,3 +267,24 @@ def test_recovery():
     sf2 = StorableFactory(cd2)
     assert '__backup_recovery' not in cd2
     assert cd2 == {"1":1, "2":2, '4':4}
+
+def test_dict_trans():
+    d = {}
+    store = StorableFactory(d)
+
+    with store as _:
+        eg = store.make_dict('eg', int, None)
+        
+    with store as _:
+        eg['x'] = 10
+        eg['x'] = 20
+        eg['y'] = 20
+        eg['x'] = 30
+    
+    with store as _:
+        x = eg['x']
+        l = len(eg)
+        eg['z'] = 20
+    
+    assert len(eg) == 3
+    assert set(eg.keys()) == set(['x', 'y', 'z'])

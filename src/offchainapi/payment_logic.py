@@ -190,7 +190,7 @@ class PaymentProcessor(CommandProcessor):
             new_version = command.get_new_version()
             payment = command.get_object(new_version, dependencies)
             new_payment = self.payment_process(payment)
-            if new_payment.has_changed():
+            if new_payment is not None and new_payment.has_changed():
                 new_cmd = PaymentCommand(new_payment)
                 channel.sequence_command_local(new_cmd)
         else:
@@ -207,17 +207,29 @@ class PaymentProcessor(CommandProcessor):
         #       in case this processor is used for multiple ones?
         updated_payments = self.payment_process_ready()
         for payment in updated_payments:
-            parties = [payment.sender.address, 
-                            payment.receiver.address ]
+            parties = [payment.sender.address,
+                       payment.receiver.address]
 
             # Determine the other address
             my_addr = vasp.get_vasp_address().as_str()
             assert my_addr in parties
             parties.remove(my_addr)
+            assert len(parties) == 1
             other_addr = LibraAddress(parties[0])
 
             channel = vasp.get_channel(other_addr)
             new_cmd = PaymentCommand(payment)
+
+            if __debug__:
+                print(list(x for x in channel.executor.object_store.keys()))
+                print(new_cmd.dependencies)
+
+                for dep in new_cmd.dependencies:
+                    assert len(channel.executor.object_store) > 0
+                    assert dep in channel.executor.object_store
+                    obj = channel.executor.object_store[dep]
+                    assert obj.get_actually_live()
+
             channel.sequence_command_local(new_cmd)
 
 
@@ -311,6 +323,7 @@ class PaymentProcessor(CommandProcessor):
         for callback_ID in list(self.ready.keys()):
             obj = self.ready[callback_ID]
             new_obj = self.payment_process(obj)
+            assert new_obj.previous_versions == [ obj.version ]
             del self.ready[callback_ID]
             if new_obj.has_changed():
                 updated_objects += [new_obj]
@@ -321,6 +334,8 @@ class PaymentProcessor(CommandProcessor):
             new payment with potential updates. This function may be
             called multiple times for the same payment to support
             async business operations and recovery.
+
+            If there is no update to the payment simply return None.
         '''
         business = self.business
 
@@ -377,15 +392,8 @@ class PaymentProcessor(CommandProcessor):
 
         except BusinessAsyncInterupt as e:
             # The business layer needs to do a long duration check.
-            # Cannot make quick progress, and must response with current status.
-            check_status(role, status, current_status, other_status)
-            new_payment.data[role].change_status(current_status)
-
-            # TODO: Should we pass the new or old object here?
-            if new_payment.has_changed():
-                self.callbacks[e.get_callback_ID()] = new_payment
-            else:
-                self.callbacks[e.get_callback_ID()] = payment
+            self.callbacks[e.get_callback_ID()] = payment
+            return None
 
         except BusinessForceAbort:
 
@@ -393,8 +401,7 @@ class PaymentProcessor(CommandProcessor):
             # However we will catch a wrong change in the check when we change status.
             current_status = Status.abort
 
-        finally:
-            check_status(role, status, current_status, other_status)
-            new_payment.data[role].change_status(current_status)
+        check_status(role, status, current_status, other_status)
+        new_payment.data[role].change_status(current_status)
 
         return new_payment

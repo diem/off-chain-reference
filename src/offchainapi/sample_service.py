@@ -291,7 +291,7 @@ class sample_business(BusinessContext):
 
             return True
         else:
-            raise BusinessAsyncInterupt(1234)
+            return False
 
 
 class sample_vasp:

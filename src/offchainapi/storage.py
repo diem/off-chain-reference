@@ -89,6 +89,8 @@ class StorableFactory:
             self.del_cache.remove(key)
     
     def __contains__(self, item):
+        if item in self.del_cache:
+            return False
         if item in self.cache:
             return True
         return item in self.db
@@ -163,16 +165,12 @@ class StorableFactory:
         if self.levels == 0:
             self.current_transaction = get_unique_string()
 
-        #print('Enter Tx %s (%s)' % (self.current_transaction, self.levels))
         self.levels += 1
 
     def __exit__(self, type, value, traceback):
-        #print('Exit Tx', self.current_transaction)
         self.levels -= 1
         if self.levels == 0:
             self.current_transaction = None
-            # print('Commit')
-            # TODO: commit state
             self.persist_cache()
 
 class StorableDict(Storable):
@@ -195,6 +193,13 @@ class StorableDict(Storable):
         self.first_key = StorableValue(db, '__FIRST_KEY', str, root=meta)
         self.length = StorableValue(db, '__LEN', int, root=meta, default=0)
 
+    if __debug__:
+        def _check_invariant(self):
+            if self.first_key.exists():
+                first_value_key = self.first_key.get_value()
+                # [prev_LL_key, next_LL_key, db_key, key]
+                first_ll_entry = json.loads(self.db[first_value_key])
+                assert first_ll_entry[0] is None
         
     def base_key(self):
         return self.root / self.name
@@ -203,49 +208,61 @@ class StorableDict(Storable):
         db_key = str(self.base_key() / str(key))
         return self.post_proc(json.loads(self.db[db_key]))
 
-    def __setitem__(self, key, value):
+    def _ll_cons(self, key):
         db_key = str(self.base_key() / str(key))
         db_key_LL = str(self.base_key() / 'LL' / str(key))
+        assert db_key_LL not in self.db
+        
+        if self.first_key.exists():
+            # All new entries to the front
+            first_value_key = self.first_key.get_value()
+            assert first_value_key is not None
+
+            # Format of the LL_entry is:
+            # [prev_LL_key, next_LL_key, db_key, key]
+            ll_entry = [None, first_value_key, str(db_key), key]
+
+            # Modify the record of first value
+            first_ll_entry = json.loads(self.db[first_value_key])
+            first_ll_entry[0] = db_key_LL
+            self.db[first_value_key] = json.dumps(first_ll_entry)
+        else:
+            # This is the first entry, setup the record and first key
+            ll_entry = [None, None, str(db_key), key]
+            
+        self.first_key.set_value(str(db_key_LL))
+        self.db[db_key_LL] = json.dumps(ll_entry)
+    
+        if __debug__:
+            self._check_invariant()
+
+
+    def __setitem__(self, key, value):
+        db_key = str(self.base_key() / str(key))
         data = json.dumps(self.pre_proc(value))
 
         # Ensure nothing fails after that
-
         if db_key not in self.db:
-            assert db_key_LL not in self.db
             xlen = self.length.get_value()
             self.length.set_value(xlen+1)
 
-            # Make the linked list entry
-            if self.first_key.exists():
-                # All new entries to the front
-                first_value_key = self.first_key.get_value()
-
-                # Format of the LL_entry is:
-                # [prev_LL_key, next_LL_key, db_key, key]
-                ll_entry = [None, first_value_key, str(db_key), key]
-
-                # Modify the record of first value
-                first_ll_entry = json.loads(self.db[first_value_key])
-                first_ll_entry[0] = db_key_LL
-                self.db[first_value_key] = json.dumps(first_ll_entry)
-
-            else:
-                # This is the first entry, setup the record and first key
-                ll_entry = [None, None, str(db_key), key]
-            
-            self.first_key.set_value(str(db_key_LL))
-            self.db[db_key_LL] = json.dumps(ll_entry)
+            # Add an entry to the linked list
+            self._ll_cons( key)
 
         self.db[db_key] = data
+
+        if __debug__:
+            self._check_invariant()
     
     def keys(self):
+        if __debug__:
+            self._check_invariant()
+
         if not self.first_key.exists():
             return
         ll_value_key = self.first_key.get_value()
         while True:
             ll_entry = json.loads(self.db[ll_value_key])
-            #if len(ll_entry) < 2:
-            #    print('DEBUG'*3, ll_entry)
             ll_value_key = ll_entry[1]
             yield ll_entry[3]
             if ll_value_key is None:
@@ -260,6 +277,8 @@ class StorableDict(Storable):
         return xlen
 
     def __delitem__(self, key):
+        # TODO: remove
+        # assert False
         db_key = str(self.base_key() / str(key))
         if db_key in self.db:
             xlen = self.length.get_value()
@@ -285,7 +304,7 @@ class StorableDict(Storable):
                 if prev_key is None:
                     self.first_key.set_value(next_key)
             
-            del  self.db[db_key_LL]
+            del self.db[db_key_LL]
             
     
     def __contains__(self, item):
@@ -364,21 +383,19 @@ class StorableValue(Storable):
         self.db = db
         self._base_key = self.root / self.name
         self._base_key_str = str(self._base_key)
-        self.immut_type = xtype in {int, str, float}
-        self.default = default
+        #self.immut_type = xtype in {int, str, float}
+        # self.default = default
 
         self.has_value = False
+
         if self.exists():
             self.value = self.get_value()
-            self.has_value = True
         else:
             self.value = None
+            if default is not None:
+                self.set_value(default)
 
     def set_value(self, value):
-        # Optimization for immutable types: no need to write if same.
-        if self.has_value and self.immut_type and value == self.value:
-            return
-
         json_data = json.dumps(self.pre_proc(value))
         key = self._base_key_str
         self.db[key] = json_data
@@ -387,15 +404,6 @@ class StorableValue(Storable):
         self.value = value
 
     def get_value(self):
-        # Optimization for immutable types: since they cannot change
-        # we can cache and return them.
-        if self.has_value and self.immut_type:
-            return self.value
-        
-        # If there is no stored value return default
-        if not self.exists() and self.default is not None:
-            return self.default
-        
         val = json.loads(self.db[self._base_key_str])
         self.value = self.post_proc(val)
         self.has_value = True
