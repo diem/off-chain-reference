@@ -227,8 +227,8 @@ class PaymentProcessor(CommandProcessor):
                 for dep in new_cmd.dependencies:
                     assert len(channel.executor.object_store) > 0
                     assert dep in channel.executor.object_store
-                    obj = channel.executor.object_store[dep]
-                    assert obj.get_actually_live()
+                    assert dep in channel.executor.object_liveness
+                    assert channel.executor.object_liveness[dep]
 
             channel.sequence_command_local(new_cmd)
 

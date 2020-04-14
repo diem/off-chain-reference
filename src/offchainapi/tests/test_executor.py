@@ -73,7 +73,7 @@ def test_handlers(basic_payment):
     with store as tx_no: 
         pe.sequence_next_command(cmd1)
         v1 = cmd1.creates_versions[0]
-        assert v1 in channel.executor.object_store
+        assert v1 not in channel.executor.object_store
 
         pe.set_success(0)
         assert v1 in object_store
@@ -86,7 +86,7 @@ def test_handlers(basic_payment):
         pe.sequence_next_command(cmd2)
         object_store._check_invariant()
         v2 = cmd2.creates_versions[0]
-        assert v2 in object_store
+        assert v2 not in object_store
         object_store._check_invariant()
 
         pe.set_success(1)
