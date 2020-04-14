@@ -25,7 +25,6 @@ class OffChainVASP:
         # We attach the notify member to this class to trigger
         # processing of resumed commands.
         self.processor = processor
-        self.processor.notify = self.notify_new_commands
 
         # The VASPInfo context that contains various network information
         # such as TLS certificates and keys.
@@ -60,18 +59,6 @@ class OffChainVASP:
             self.channel_store[store_key] = channel
 
         return self.channel_store[store_key]
-
-    def notify_new_commands(self):
-        ''' The processor calls this method to notify the VASP that new
-            commands are available for processing.
-
-            Why notify the VASP to then call back the command processor?
-            (Instead of the command processor processing the command backlog
-            directly). Because, the command processor does not keep a
-            permanent record of the VASP object, so it has to be passed back
-            to it.
-        '''
-        self.processor.process_command_backlog(self)
 
     def get_storage_factory(self):
         ''' Returns a storage factory for this system. '''

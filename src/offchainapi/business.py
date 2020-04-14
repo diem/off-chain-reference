@@ -5,19 +5,6 @@
 
 # A model for VASP business environment
 
-class BusinessAsyncInterupt(Exception):
-    ''' Indicates that the result cannot be produced immediately,
-        and the call must be done again once the result is ready. '''
-
-    def __init__(self, callback_ID):
-        ''' Set a callback ID to signal which call was interupted '''
-        self.callback_ID = callback_ID
-
-    def get_callback_ID(self):
-        ''' Return the callback ID associated with the interrupted call '''
-        return self.callback_ID
-
-
 class BusinessNotAuthorized(Exception):
     ''' Indicates that the VASP requesting some information is
         not authorized to receive it. '''
@@ -186,7 +173,6 @@ class BusinessContext:
             Returns bool: True or False
 
             Can raise:
-                BusinessAsyncInterupt
                 BusinessForceAbort
             '''
         raise NotImplementedError()

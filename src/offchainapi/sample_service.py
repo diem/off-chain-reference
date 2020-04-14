@@ -1,4 +1,4 @@
-from .business import BusinessContext, BusinessAsyncInterupt, BusinessForceAbort, \
+from .business import BusinessContext, BusinessForceAbort, \
 BusinessValidationFailure, VASPInfo
 from .protocol import OffChainVASP
 from .libra_address import LibraAddress
@@ -211,7 +211,6 @@ class sample_business(BusinessContext):
         ''' Gets the extended KYC information for this payment.
 
             Can raise:
-                   BusinessAsyncInterupt
                    BusinessNotAuthorized.
         '''
         my_role = self.get_my_role(payment)
