@@ -4,20 +4,6 @@ from ..payment import *
 from ..utils import JSONFlag
 
 
-@pytest.fixture
-def basic_actor():
-    actor = PaymentActor('AAAA', 'aaaa', Status.none, [])
-    return actor
-
-@pytest.fixture
-def basic_payment():
-    sender = PaymentActor('AAAA', 'aaaa', Status.none, [])
-    receiver = PaymentActor('BBBB', 'bbbb', Status.none, [])
-    action = PaymentAction(10, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
-
-    payment = PaymentObject(sender, receiver, 'ref', 'orig_ref', 'desc', action)
-    return payment
-
 def test_json_payment(basic_payment):
     import json
     data = json.dumps(basic_payment.get_json_data_dict(flag=JSONFlag.STORE))

@@ -11,22 +11,7 @@ import random
 from unittest.mock import MagicMock, PropertyMock
 import pytest
 
-def monkey_tap(pair):
-    pair.msg = []
 
-    def to_tap(self, msg):
-        assert msg is not None
-        self.msg += [ deepcopy(msg) ]
-
-    def tap(self):
-        msg = self.msg
-        self.msg = []
-        return msg
-
-    pair.tap = types.MethodType(tap, pair)
-    pair.send_request = types.MethodType(to_tap, pair)
-    pair.send_response = types.MethodType(to_tap, pair)
-    return pair
 
 def monkey_tap_to_list(pair, requests_sent, replies_sent):
     pair.msg = []
@@ -160,31 +145,6 @@ class RandomRun(object):
         assert set(client_seq) == set(client_exec_seq)
         assert set(server_seq) == set(server_exec_seq)
 
-@pytest.fixture
-def three_address():
-    a0 = LibraAddress.encode_to_Libra_address(b'A'*16) 
-    a1 = LibraAddress.encode_to_Libra_address(b'B' + b'A'*15)
-    a2 = LibraAddress.encode_to_Libra_address(b'B'*16)
-    return (a0, a1, a2)
-
-@pytest.fixture
-def mockVASP():
-    vasp = MagicMock(spec=OffChainVASP)
-    vasp.info_context = PropertyMock(autospec=True)
-    vasp.info_context.get_peer_base_url.return_value = '/'
-    return vasp
-
-@pytest.fixture
-def mockProcessor():
-    proc = MagicMock(spec=CommandProcessor)
-    return proc
-
-@pytest.fixture
-def network_client():
-    network_client = MagicMock()
-    network_client.get_url.return_value = '/'
-    network_client.send_request.return_value = None
-    return network_client
 
 def test_client_server_role_definition(three_address, mockVASP, mockProcessor, network_client):
     a0, a1, a2 = three_address
@@ -207,21 +167,6 @@ def test_client_server_role_definition(three_address, mockVASP, mockProcessor, n
     channel = VASPPairChannel(a2, a0, mockVASP, mock_store, mockProcessor, network_client)
     assert channel.is_server()
     assert not channel.is_client()
-
-
-@pytest.fixture
-def server_client(three_address, mockVASP, mockProcessor, network_client):
-    a0, a1, _ = three_address
-
-    store_server = StorableFactory({})
-    server = VASPPairChannel(a0, a1, mockVASP, store_server, mockProcessor, network_client)
-    store_client = StorableFactory({})
-    client = VASPPairChannel(a1, a0, mockVASP, store_client, mockProcessor, network_client)
-
-    server = monkey_tap(server)
-    client = monkey_tap(client)
-
-    return (server, client)
 
 
 def test_protocol_server_client_benign(server_client):
