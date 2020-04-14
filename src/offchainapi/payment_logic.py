@@ -1,4 +1,4 @@
-from .business import BusinessContext, BusinessAsyncInterupt, \
+from .business import BusinessContext, \
     BusinessNotAuthorized, BusinessValidationFailure, \
     BusinessForceAbort
 from .executor import ProtocolCommand, CommandProcessor
@@ -131,17 +131,6 @@ class PaymentProcessor(CommandProcessor):
 
     def __init__(self, business, storage_factory):
         self.business = business
-        self.storage_factory = storage_factory
-
-        # TODO: Persit callbacks?
-        # Either we persit them, or we have to go through all
-        # active payment objects in the executor payment store
-        # and ask for re-processing.
-
-        with storage_factory.atomic_writes() as txid:
-            root = storage_factory.make_value('processor', None)
-            self.callbacks = storage_factory.make_dict('callbacks', PaymentObject, root)
-            self.ready = storage_factory.make_dict('ready', PaymentObject, root)
 
     
     # -------- Implements CommandProcessor interface ---------
@@ -200,28 +189,6 @@ class PaymentProcessor(CommandProcessor):
             # TODO: Log the error, but do nothing
             if command.origin == channel.myself:
                 pass # log failure of our own command :(
-
-    
-    def process_command_backlog(self, vasp):
-        ''' Sends commands that have been resumed after being interrupted to other
-            VASPs.'''
-
-        # TODO: should we only request the backlog for this specific VASP,
-        #       in case this processor is used for multiple ones?
-        updated_payments = self.payment_process_ready()
-        for payment in updated_payments:
-            parties = [payment.sender.address,
-                       payment.receiver.address]
-
-            # Determine the other address
-            my_addr = vasp.get_vasp_address().as_str()
-            parties.remove(my_addr)
-            other_addr = LibraAddress(parties[0])
-
-            channel = vasp.get_channel(other_addr)
-            new_cmd = PaymentCommand(payment)
-
-            channel.sequence_command_local(new_cmd)
 
 
     # ----------- END of CommandProcessor interface ---------
@@ -381,11 +348,6 @@ class PaymentProcessor(CommandProcessor):
 
             if current_status == Status.ready_for_settlement and business.has_settled(new_payment):
                 current_status = Status.settled
-
-        except BusinessAsyncInterupt as e:
-            # The business layer needs to do a long duration check.
-            self.callbacks[e.get_callback_ID()] = payment
-            return None
 
         except BusinessForceAbort:
 

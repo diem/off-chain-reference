@@ -141,8 +141,7 @@ def test_business_is_kyc_provided(kyc_payment_as_receiver, addr_bc_proc):
     kyc_level = bc.next_kyc_level_to_request(payment)
     assert kyc_level == Status.none
 
-    with proc.storage_factory as _:
-        ret_payment = proc.payment_process(payment)
+    ret_payment = proc.payment_process(payment)
     assert ret_payment.has_changed()
 
     ready = bc.ready_for_settlement(ret_payment)
@@ -157,8 +156,7 @@ def test_business_is_kyc_provided_sender(kyc_payment_as_sender, addr_bc_proc):
     kyc_level = bc.next_kyc_level_to_request(payment)
     assert kyc_level == Status.needs_recipient_signature
 
-    with proc.storage_factory as _:
-        ret_payment = proc.payment_process(payment)
+    ret_payment = proc.payment_process(payment)
     assert ret_payment.has_changed()
 
     ready = bc.ready_for_settlement(ret_payment)
@@ -247,32 +245,6 @@ def test_vasp_response(simple_response_json_error, asset_path):
     vc.process_response(AddrOther, simple_response_json_error)
 
 from unittest.mock import patch
-
-def test_vasp_simple_interrupt(simple_request_json, asset_path):
-    AddrThis   = LibraAddress.encode_to_Libra_address(b'B'*16)
-    AddrOther = LibraAddress.encode_to_Libra_address(b'A'*16)
-
-    # Patch business context to first return an exception
-    vc = sample_vasp(AddrThis, asset_path)
-    with patch.object(vc.bc, 'ready_for_settlement', side_effect = [ BusinessAsyncInterupt(1234) ]) as mock_thing:
-        assert vc.bc.ready_for_settlement == mock_thing
-        vc.process_request(AddrOther, simple_request_json)
-        responses = vc.collect_messages()
-
-    assert len(responses) == 1
-   #  assert responses[0].type is CommandRequestObject
-    assert responses[0].type is CommandResponseObject
-    assert 'success' in responses[0].content
-    assert len(vc.get_channel(AddrOther).executor.object_store) == 1
-
-    with patch.object(vc.bc, 'ready_for_settlement', return_value = True ) as mock_thing:
-        assert vc.bc.ready_for_settlement == mock_thing
-        vc.vasp.processor.notify_callback(1234)
-        responses = vc.collect_messages()
-
-    assert len(responses) > 0
-    assert 'ready_for' in str(responses[0].content)
-
 
 def test_sample_vasp_info_is_authorised(request, asset_path):
     from pathlib import Path

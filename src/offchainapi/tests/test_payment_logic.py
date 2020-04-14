@@ -2,7 +2,6 @@ from ..payment_logic import *
 from ..payment import *
 from ..protocol_messages import *
 from ..protocol import *
-from ..business import BusinessAsyncInterupt
 from ..utils import *
 from ..libra_address import *
 from ..sample_command import *
@@ -266,43 +265,6 @@ def test_payment_process_receiver_new_payment(basic_payment, payment_processor_c
     pp = PaymentProcessor(bcm, store)
     new_payment3 = pp.payment_process(new_payment2)
     assert new_payment3.data['receiver'].data['status'] == Status.settled
-
-
-def test_payment_process_interrupt(basic_payment, payment_processor_context):
-    bcm, pp = payment_processor_context
-    bcm.is_recipient.side_effect = [True, True]
-    bcm.check_account_existence.side_effect = [None]
-    bcm.next_kyc_level_to_request.side_effect = [BusinessAsyncInterupt(1234)]
-
-    with pp.storage_factory as _:
-        new_payment = pp.payment_process(basic_payment)
-    assert new_payment is None
-
-
-def test_payment_process_interrupt_resume(basic_payment, payment_processor_context):
-    bcm, pp = payment_processor_context
-    bcm.is_recipient.side_effect = [True, True, True, True] * 5
-    bcm.check_account_existence.side_effect = [None, None] * 5
-    bcm.next_kyc_level_to_request.side_effect = [ Status.ready_for_settlement ] * 5
-    bcm.next_kyc_to_provide.side_effect = [BusinessAsyncInterupt(1234)]
-
-    assert basic_payment.data['receiver'].data['status'] == Status.none
-    with pp.storage_factory as _:
-        new_payment = pp.payment_process(basic_payment)
-    assert new_payment is None
-    
-    bcm.next_kyc_to_provide.side_effect = [set()] * 5
-    bcm.ready_for_settlement.side_effect = [True] * 5
-    bcm.has_settled.side_effect = [True] * 5
-
-    pp.notify_callback(1234)
-    with pp.storage_factory as _:
-        L = pp.payment_process_ready()
-    assert len(L) == 1
-    assert len(pp.callbacks) == 0
-    assert len(pp.ready) == 0
-    print(bcm.method_calls)
-    L[0].data['receiver'].data['status'] == Status.settled
 
 
 def test_payment_process_abort(basic_payment, payment_processor_context):
