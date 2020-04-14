@@ -150,7 +150,10 @@ class PaymentProcessor(CommandProcessor):
         return self.business
     
     def check_command(self, vasp, channel, executor, command):
-        context = self.business_context()
+        """ Called when receiving a new payment command to validate it. All checks here
+        are blocking subsequent comments, and therefore they must be quick to ensure 
+        performance. As a result we only do local syntactic checks that require no lookup
+        into the VASP potentially remote stores or accounts. """
         dependencies = executor.object_store
 
         new_version = command.get_new_version()
@@ -212,23 +215,11 @@ class PaymentProcessor(CommandProcessor):
 
             # Determine the other address
             my_addr = vasp.get_vasp_address().as_str()
-            assert my_addr in parties
             parties.remove(my_addr)
-            assert len(parties) == 1
             other_addr = LibraAddress(parties[0])
 
             channel = vasp.get_channel(other_addr)
             new_cmd = PaymentCommand(payment)
-
-            if __debug__:
-                print(list(x for x in channel.executor.object_store.keys()))
-                print(new_cmd.dependencies)
-
-                for dep in new_cmd.dependencies:
-                    assert len(channel.executor.object_store) > 0
-                    assert dep in channel.executor.object_store
-                    obj = channel.executor.object_store[dep]
-                    assert obj.get_actually_live()
 
             channel.sequence_command_local(new_cmd)
 
@@ -268,8 +259,8 @@ class PaymentProcessor(CommandProcessor):
 
         role = ['sender', 'receiver'][business.is_recipient(new_payment)]
         other_role = ['sender', 'receiver'][role == 'sender']
-        other_status = new_payment.data[other_role].data['status']
-        if new_payment.data[role].data['status'] != Status.none:
+        other_status = new_payment.data[other_role].status
+        if new_payment.data[role].status != Status.none:
             raise PaymentLogicError('Sender set receiver status or vice-versa.')
 
         if other_role == 'receiver' and other_status == Status.needs_recipient_signature:
@@ -303,7 +294,8 @@ class PaymentProcessor(CommandProcessor):
         self.check_signatures(new_payment)
 
     def notify_callback(self, callback_ID):
-        ''' Notify the processor that the callback with a specific ID has returned, and is ready to provide an answer. '''
+        ''' Notify the processor that the callback with a specific ID has
+            returned, and is ready to provide an answer. '''
         assert callback_ID in self.callbacks
         
         with self.storage_factory.atomic_writes() as _:

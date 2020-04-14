@@ -248,13 +248,13 @@ def test_protocol_server_client_benign(server_client):
     assert reply.status == 'success'
 
     # Pass the reply back to the server
-    assert server.get_final_sequence()[0].commit_status is None
+    assert len(server.executor.command_sequence_status) == 0
     server.handle_response(reply)
     msg_list = server.tap()
     assert len(msg_list) == 0 # No message expected
 
-    assert server.get_final_sequence()[0].commit_status is not None
-    assert client.get_final_sequence()[0].commit_status is not None
+    assert len(server.executor.command_sequence_status) > 0
+    assert len(client.executor.command_sequence_status) > 0
     assert client.get_final_sequence()[0].item() == 'Hello'
 
 
@@ -285,13 +285,13 @@ def test_protocol_server_conflicting_sequence(server_client):
     assert reply_conflict.error.code == 'conflict'
 
     # Pass the reply back to the server
-    assert server.get_final_sequence()[0].commit_status is None
+    assert len(server.executor.command_sequence_status) == 0
     server.handle_response(reply)
     msg_list = server.tap()
     assert len(msg_list) == 0 # No message expected
 
-    assert server.get_final_sequence()[0].commit_status is not None
-    assert client.get_final_sequence()[0].commit_status is not None
+    assert len(server.executor.command_sequence_status) > 0
+    assert len(client.executor.command_sequence_status) > 0
     assert client.get_final_sequence()[0].item() == 'Hello'
 
 def test_protocol_client_server_benign(server_client):
@@ -315,8 +315,7 @@ def test_protocol_client_server_benign(server_client):
     assert isinstance(reply, CommandResponseObject)
     assert server.other_next_seq() == 1
     assert server.next_final_sequence() == 1
-    assert server.get_final_sequence()[0].commit_status is not None
-    assert reply.status == 'success'
+    assert len(server.executor.command_sequence_status) > 0
 
     # Pass response back to client
     assert client.my_requests[0].response is None
@@ -324,7 +323,7 @@ def test_protocol_client_server_benign(server_client):
     msg_list = client.tap()
     assert len(msg_list) == 0 # No message expected
 
-    assert client.get_final_sequence()[0].commit_status is not None
+    assert len(client.executor.command_sequence_status) > 0
     assert client.my_requests[0].response is not None
     assert client.get_final_sequence()[0].item() == 'Hello'
     assert client.next_final_sequence() == 1
@@ -506,7 +505,7 @@ def test_dependencies(server_client):
     client = R.client
     server = R.server
 
-    mapcmd = { c.item():c.commit_status for c in  client.get_final_sequence()}
+    mapcmd = { c.item():client.executor.command_sequence_status[i] for i, c in  enumerate(client.get_final_sequence())}
     # Only one of the items with common dependency commits
     assert sum([mapcmd[1], mapcmd[4]]) == 1
     assert sum([mapcmd[8], mapcmd[9]]) == 1
