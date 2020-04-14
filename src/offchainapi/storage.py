@@ -32,7 +32,6 @@ class Storable:
         if issubclass(self.xtype, JSONSerializable):
             return self.xtype.parse(val, JSONFlag.STORE)
         else:
-            # assert not self.xtype.issubclass(JSONSerializable)
             return self.xtype(val)
 
 class StorableFactory:
@@ -273,7 +272,7 @@ class StorableDict(Storable):
             yield self[k]
 
     def __len__(self):
-        xlen =  self.length.get_value()
+        xlen = self.length.get_value()
         return xlen
 
     def __delitem__(self, key):
@@ -383,8 +382,6 @@ class StorableValue(Storable):
         self.db = db
         self._base_key = self.root / self.name
         self._base_key_str = str(self._base_key)
-        #self.immut_type = xtype in {int, str, float}
-        # self.default = default
 
         self.has_value = False
 
