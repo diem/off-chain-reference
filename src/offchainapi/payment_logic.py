@@ -1,3 +1,6 @@
+import asyncio
+from threading import Thread
+
 from .business import BusinessContext, \
     BusinessNotAuthorized, BusinessValidationFailure, \
     BusinessForceAbort
@@ -132,6 +135,58 @@ class PaymentProcessor(CommandProcessor):
     def __init__(self, business, storage_factory):
         self.business = business
 
+        # Asycnio support
+        self.loop = asyncio.new_event_loop()
+        self.t = None
+
+        # The processor state -- only access through event loop to prevent
+        # mutlithreading bugs.
+        # TODO: how much of this do we want to persist?
+
+        self.command_id = 0
+        self.pending_commands = {}
+        self.futs = []
+
+    # ------ Machinery for supporting async Business context ------
+
+    def start_processor(self):
+        """ Start the asyncio loop to process commands """
+        def main_loop(loop):
+            asyncio.set_event_loop(loop)
+            loop.run_forever()
+            self.t = None
+        self.t = Thread(target=main_loop, args=(self.loop,))
+        self.t.start()
+
+    async def process_command_async(self, vasp, channel, executor, command,
+                                    status_success, error=None):
+        self.command_id += 1
+        self.pending_commands[self.command_id] = (vasp, channel, executor,
+                                                  command, status_success,
+                                                  error)
+        
+        if status_success:
+            dependencies = executor.object_store
+            new_version = command.get_new_version()
+            payment = command.get_object(new_version, dependencies)
+            new_payment = await self.payment_process_async(payment)
+            if new_payment is not None and new_payment.has_changed():
+                new_cmd = PaymentCommand(new_payment)
+                channel.sequence_command_local(new_cmd)
+        else:
+            # TODO: Log the error, but do nothing
+            if command.origin == channel.myself:
+                pass # log failure of our own command :(
+        
+
+    async def stop_loop(self):
+        """ Coroutine to stop the event loop """
+        self.loop.stop()
+
+    def stop_processor(self):
+        """ A syncronous function to stop the event loop """
+        fut = asyncio.run_coroutine_threadsafe(self.stop_loop(), self.loop)
+        # fut.result()
     
     # -------- Implements CommandProcessor interface ---------
     
@@ -177,19 +232,9 @@ class PaymentProcessor(CommandProcessor):
                 self.check_new_update(old_payment, new_payment)
 
     def process_command(self, vasp, channel, executor, command, status_success, error=None):
-        if status_success:
-            dependencies = executor.object_store
-            new_version = command.get_new_version()
-            payment = command.get_object(new_version, dependencies)
-            new_payment = self.payment_process(payment)
-            if new_payment is not None and new_payment.has_changed():
-                new_cmd = PaymentCommand(new_payment)
-                channel.sequence_command_local(new_cmd)
-        else:
-            # TODO: Log the error, but do nothing
-            if command.origin == channel.myself:
-                pass # log failure of our own command :(
-
+        fut = asyncio.run_coroutine_threadsafe(self.process_command_async(vasp, channel, executor, command, status_success, error), self.loop)
+        self.futs += [fut]
+        return fut
 
     # ----------- END of CommandProcessor interface ---------
 
@@ -260,35 +305,11 @@ class PaymentProcessor(CommandProcessor):
 
         self.check_signatures(new_payment)
 
-    def notify_callback(self, callback_ID):
-        ''' Notify the processor that the callback with a specific ID has
-            returned, and is ready to provide an answer. '''
-        assert callback_ID in self.callbacks
-        
-        with self.storage_factory.atomic_writes() as _:
-            obj = self.callbacks[callback_ID]
-            del self.callbacks[callback_ID]
-            # TODO: should we retrive here the latest version of the object?
-            #       Yes we should (opened issue #34)
-            self.ready[callback_ID] = obj
-            self.notify()
-            
-    def payment_process_ready(self):
-        ''' Processes any objects for which the callbacks have returned '''
-        updated_objects = []
-        # TODO: here some calls to payment process may result in more
-        #       callbacks, should we repeat this undel the ready list len
-        #       is equal to zero. 
-        for callback_ID in list(self.ready.keys()):
-            obj = self.ready[callback_ID]
-            new_obj = self.payment_process(obj)
-            assert new_obj.previous_versions == [ obj.version ]
-            del self.ready[callback_ID]
-            if new_obj.has_changed():
-                updated_objects += [new_obj]
-        return updated_objects
-
     def payment_process(self, payment):
+        ''' A syncronous version of payment processing -- largely used for pytests '''
+        return self.loop.run_until_complete(self.payment_process_async(payment))
+
+    async def payment_process_async(self, payment):
         ''' Processes a payment that was just updated, and returns a
             new payment with potential updates. This function may be
             called multiple times for the same payment to support

@@ -220,23 +220,40 @@ def test_vasp_simple(simple_request_json, asset_path):
     AddrThis   = LibraAddress.encode_to_Libra_address(b'B'*16)
     AddrOther = LibraAddress.encode_to_Libra_address(b'A'*16)
     vc = sample_vasp(AddrThis, asset_path)
+    vc.pp.start_processor()
+
     vc.process_request(AddrOther, simple_request_json)
     responses = vc.collect_messages()
-    assert len(responses) == 2
-    assert responses[0].type is CommandRequestObject
-    assert responses[1].type is CommandResponseObject
-    assert 'success' in responses[1].content
+    assert len(responses) == 1
+    assert responses[0].type is CommandResponseObject
+    assert 'success' in responses[0].content
+    assert len(vc.pp.futs) == 1
+
+    # Testing the threading / Async interface works
+    try:
+        for fut in vc.pp.futs:
+            fut.result()
+        requests = vc.collect_messages()
+        assert len(requests) == 1
+        assert requests[0].type is CommandRequestObject
+    finally:
+        vc.pp.stop_processor()
+
 
 def test_vasp_simple_wrong_VASP(simple_request_json, asset_path):
     AddrThis   = LibraAddress.encode_to_Libra_address(b'X'*16)
     AddrOther = LibraAddress.encode_to_Libra_address(b'A'*16)
     vc = sample_vasp(AddrThis, asset_path)
-    vc.process_request(AddrOther, simple_request_json)
-    responses = vc.collect_messages()
-    assert len(responses) == 1
-    assert responses[0].type is CommandResponseObject
-    assert 'failure' in responses[0].content
+    try:
+        vc.pp.start_processor()
 
+        vc.process_request(AddrOther, simple_request_json)
+        responses = vc.collect_messages()
+        assert len(responses) == 1
+        assert responses[0].type is CommandResponseObject
+        assert 'failure' in responses[0].content
+    finally:
+        vc.pp.stop_processor()
 
 def test_vasp_response(simple_response_json_error, asset_path):
     AddrThis   = LibraAddress.encode_to_Libra_address(b'B'*16)
