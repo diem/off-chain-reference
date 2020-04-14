@@ -127,7 +127,7 @@ def test_business_is_related(basic_payment_as_receiver, addr_bc_proc):
     a0, bc, proc = addr_bc_proc
     payment = basic_payment_as_receiver
 
-    kyc_level = bc.next_kyc_level_to_request(payment)
+    kyc_level = proc.loop.run_until_complete(bc.next_kyc_level_to_request(payment))
     assert kyc_level == Status.needs_kyc_data
 
     ret_payment = proc.payment_process(payment)
@@ -138,7 +138,7 @@ def test_business_is_kyc_provided(kyc_payment_as_receiver, addr_bc_proc):
     a0, bc, proc = addr_bc_proc
     payment = kyc_payment_as_receiver
 
-    kyc_level = bc.next_kyc_level_to_request(payment)
+    kyc_level = proc.loop.run_until_complete(bc.next_kyc_level_to_request(payment))
     assert kyc_level == Status.none
 
     ret_payment = proc.payment_process(payment)
@@ -153,7 +153,7 @@ def test_business_is_kyc_provided_sender(kyc_payment_as_sender, addr_bc_proc):
     payment = kyc_payment_as_sender
     assert payment.data['sender'] is not None
     assert bc.is_sender(payment)
-    kyc_level = bc.next_kyc_level_to_request(payment)
+    kyc_level = proc.loop.run_until_complete(bc.next_kyc_level_to_request(payment))
     assert kyc_level == Status.needs_recipient_signature
 
     ret_payment = proc.payment_process(payment)

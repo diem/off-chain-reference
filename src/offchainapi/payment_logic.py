@@ -336,7 +336,7 @@ class PaymentProcessor(CommandProcessor):
                 current_status = Status.abort
 
             if current_status == Status.none:
-                business.check_account_existence(new_payment)
+                await business.check_account_existence(new_payment)
 
             if current_status in {Status.none,
                                   Status.needs_stable_id,
@@ -344,21 +344,21 @@ class PaymentProcessor(CommandProcessor):
                                   Status.needs_recipient_signature}:
 
                 # Request KYC -- this may be async in case of need for user input
-                current_status = business.next_kyc_level_to_request(new_payment)
+                current_status = await business.next_kyc_level_to_request(new_payment)
 
                 # Provide KYC -- this may be async in case of need for user input
-                kyc_to_provide = business.next_kyc_to_provide(new_payment)
+                kyc_to_provide = await business.next_kyc_to_provide(new_payment)
 
                 if Status.needs_stable_id in kyc_to_provide:
-                    stable_id = business.get_stable_id(new_payment)
+                    stable_id = await business.get_stable_id(new_payment)
                     new_payment.data[role].add_stable_id(stable_id)
 
                 if Status.needs_kyc_data in kyc_to_provide:
-                    extended_kyc = business.get_extended_kyc(new_payment)
+                    extended_kyc = await business.get_extended_kyc(new_payment)
                     new_payment.data[role].add_kyc_data(*extended_kyc)
 
                 if Status.needs_recipient_signature in kyc_to_provide:
-                    signature = business.get_recipient_signature(new_payment)
+                    signature = await business.get_recipient_signature(new_payment)
                     new_payment.add_recipient_signature(signature)
 
             # Check if we have all the KYC we need
@@ -367,7 +367,7 @@ class PaymentProcessor(CommandProcessor):
                 if ready:
                     current_status = Status.ready_for_settlement
 
-            if current_status == Status.ready_for_settlement and business.has_settled(new_payment):
+            if current_status == Status.ready_for_settlement and await business.has_settled(new_payment):
                 current_status = Status.settled
 
         except BusinessForceAbort:

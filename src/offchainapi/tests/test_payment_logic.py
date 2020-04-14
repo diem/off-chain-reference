@@ -87,7 +87,7 @@ def test_payment_command_missing_dependency_fail(basic_payment):
 
 @pytest.fixture
 def payment_processor_context():
-    bcm = MagicMock(spec=BusinessContext)
+    bcm = AsyncMock(spec=BusinessContext)
     store = StorableFactory({})
     proc = PaymentProcessor(bcm, store)
     return (bcm, proc)
@@ -239,7 +239,7 @@ def test_payment_process_receiver_new_payment(basic_payment, payment_processor_c
     bcm.check_account_existence.side_effect = [None]
     bcm.next_kyc_level_to_request.side_effect = [Status.needs_kyc_data]
     bcm.next_kyc_to_provide.side_effect = [{Status.none}]
-    bcm.ready_for_settlement.side_effect = [async_return(False)]
+    bcm.ready_for_settlement.side_effect = [ False ]
 
     assert basic_payment.data['receiver'].data['status'] == Status.none
     new_payment = pp.payment_process(basic_payment)
@@ -251,7 +251,7 @@ def test_payment_process_receiver_new_payment(basic_payment, payment_processor_c
     bcm.check_account_existence.side_effect = [None]
     bcm.next_kyc_level_to_request.side_effect = [Status.none]
     bcm.next_kyc_to_provide.side_effect = [{Status.none}]
-    bcm.ready_for_settlement.side_effect = [async_return(True)]
+    bcm.ready_for_settlement.side_effect = [ True ]
     bcm.want_single_payment_settlement.side_effect = [True]
     bcm.has_settled.side_effect = [False]
 
@@ -264,7 +264,7 @@ def test_payment_process_receiver_new_payment(basic_payment, payment_processor_c
     bcm.check_account_existence.side_effect = [None]
     bcm.next_kyc_level_to_request.side_effect = [Status.none]
     bcm.next_kyc_to_provide.side_effect = [{Status.none}]
-    bcm.ready_for_settlement.side_effect = [async_return(True)]
+    bcm.ready_for_settlement.side_effect = [ True ]
     bcm.want_single_payment_settlement.side_effect = [True]
     bcm.has_settled.side_effect = [True]
 
@@ -287,7 +287,7 @@ def test_payment_process_abort(basic_payment, payment_processor_context):
 def test_payment_process_abort_from_sender(basic_payment, payment_processor_context):
     bcm, pp = payment_processor_context
     bcm.is_recipient.side_effect = [True]
-    bcm.ready_for_settlement.side_effect = [async_return(False)]
+    bcm.ready_for_settlement.side_effect = [ False ]
     basic_payment.data['sender'].data['status'] = Status.abort
     new_payment = pp.payment_process(basic_payment)
     assert new_payment.data['receiver'].data['status'] == Status.abort
