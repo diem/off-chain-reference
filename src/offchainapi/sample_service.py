@@ -226,7 +226,7 @@ class sample_business(BusinessContext):
         return account["stable_id"]
 
 
-    def ready_for_settlement(self, payment):
+    async def ready_for_settlement(self, payment):
         my_role = self.get_my_role(payment)
         other_role = self.get_other_role(payment)
         subaddress = payment.data[my_role].subaddress

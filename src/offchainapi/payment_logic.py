@@ -363,7 +363,7 @@ class PaymentProcessor(CommandProcessor):
 
             # Check if we have all the KYC we need
             if current_status not in { Status.ready_for_settlement, Status.settled }:
-                ready = business.ready_for_settlement(new_payment)
+                ready = await business.ready_for_settlement(new_payment)
                 if ready:
                     current_status = Status.ready_for_settlement
 

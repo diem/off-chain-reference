@@ -144,7 +144,7 @@ def test_business_is_kyc_provided(kyc_payment_as_receiver, addr_bc_proc):
     ret_payment = proc.payment_process(payment)
     assert ret_payment.has_changed()
 
-    ready = bc.ready_for_settlement(ret_payment)
+    ready = proc.loop.run_until_complete(bc.ready_for_settlement(ret_payment))
     assert ready
     assert ret_payment.data['receiver'].data['status'] == Status.ready_for_settlement
 
@@ -159,7 +159,7 @@ def test_business_is_kyc_provided_sender(kyc_payment_as_sender, addr_bc_proc):
     ret_payment = proc.payment_process(payment)
     assert ret_payment.has_changed()
 
-    ready = bc.ready_for_settlement(ret_payment)
+    ready = proc.loop.run_until_complete(bc.ready_for_settlement(ret_payment))
     assert ready
     assert ret_payment.data['sender'].data['status'] == Status.ready_for_settlement
     assert bc.get_account('1')['balance'] == 5.0
@@ -172,7 +172,7 @@ def test_business_settled(settled_payment_as_receiver,addr_bc_proc):
     ret_payment = proc.payment_process(payment)
     assert ret_payment.has_changed()
 
-    ready = bc.ready_for_settlement(ret_payment)
+    ready = proc.loop.run_until_complete(bc.ready_for_settlement(ret_payment))
     assert ready
     assert ret_payment.data['receiver'].data['status'] == Status.settled
 
