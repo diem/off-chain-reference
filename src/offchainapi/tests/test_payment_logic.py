@@ -11,15 +11,6 @@ from unittest.mock import MagicMock
 import pytest
 
 
-@pytest.fixture
-def basic_payment():
-    sender = PaymentActor('AAAA', 'aaaa', Status.none, [])
-    receiver = PaymentActor('BBBB', 'bbbb', Status.none, [])
-    action = PaymentAction(10, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
-    payment = PaymentObject(sender, receiver, 'ref', 'orig_ref', 'desc', action)
-    return payment
-
-
 def test_payment_command_serialization_net(basic_payment):
     cmd = PaymentCommand(basic_payment)
     data = cmd.get_json_data_dict(JSONFlag.NET)
@@ -63,7 +54,7 @@ def test_payment_command_multiple_dependencies_fail(basic_payment):
     new_payment.previous_versions += ['v2']
     cmd = PaymentCommand(new_payment)
     with pytest.raises(PaymentLogicError):
-        cmd.get_object(new_payment.get_version(), 
+        cmd.get_object(new_payment.get_version(),
             { basic_payment.get_version():basic_payment })
 
 
@@ -84,18 +75,13 @@ def test_payment_command_missing_dependency_fail(basic_payment):
 
 # ----- check_new_payment -----
 
-@pytest.fixture
-def payment_processor_context():
-    bcm = MagicMock(spec=BusinessContext)
-    store = StorableFactory({})
-    proc = PaymentProcessor(bcm, store)
-    return (bcm, proc)
+
 
 def test_payment_create_from_recipient(basic_payment, payment_processor_context):
     bcm, pp = payment_processor_context
     bcm.is_recipient.side_effect = [True] * 4
     pp.check_new_payment(basic_payment)
-    
+
 
 def test_payment_create_from_sender_sig_fail(basic_payment, payment_processor_context):
     bcm, pp = payment_processor_context
@@ -196,25 +182,15 @@ def test_payment_update_from_receiver_unilateral_abort_fail(basic_payment, payme
 
 
 # ----- payment_process -----
-@pytest.fixture(params=[
-    ('AAAA', 'BBBB', 'AAAA', True),
-    ('BBBB', 'AAAA', 'AAAA', True),
-    ('CCCC', 'AAAA', 'AAAA', False),
-    ('BBBB', 'CCCC', 'AAAA', False),
-    ('DDDD', 'CCCC', 'AAAA', False),
-    ('AAAA', 'BBBB', 'BBBB', True),
-    ('BBBB', 'AAAA', 'DDDD', False),
-])
-def states(request):
-    return request.param
+
 
 def test_payment_processor_check(states, basic_payment, payment_processor_context):
     src_addr, dst_addr, origin_addr, res = states
     bcm, pp = payment_processor_context
     vasp = MagicMock()
     channel = MagicMock()
-    channel.other.as_str.side_effect = [ src_addr ] 
-    channel.myself.as_str.side_effect = [ dst_addr ] 
+    channel.other.as_str.side_effect = [ src_addr ]
+    channel.myself.as_str.side_effect = [ dst_addr ]
     executor = MagicMock()
     command = PaymentCommand(basic_payment)
     origin = MagicMock(spec=LibraAddress)

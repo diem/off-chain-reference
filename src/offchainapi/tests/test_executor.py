@@ -8,15 +8,6 @@ from unittest.mock import MagicMock, PropertyMock
 import pytest
 
 
-@pytest.fixture
-def basic_payment():
-    sender = PaymentActor('AAAA', 'aaaa', Status.none, [])
-    receiver = PaymentActor('BBBB', 'bbbb', Status.none, [])
-    action = PaymentAction(10, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
-    payment = PaymentObject(sender, receiver, 'ref', 'orig_ref', 'desc', action)
-    return payment
-
-
 def test_exec(basic_payment):
     a0 = LibraAddress.encode_to_Libra_address(b'A'*16)
     a1 = LibraAddress.encode_to_Libra_address(b'B'*16)
@@ -30,12 +21,11 @@ def test_exec(basic_payment):
 
     proc = MagicMock(spec=CommandProcessor)
     net = MagicMock()
-    
+
     with store:
         channel = VASPPairChannel(a0, a1, vasp, store, proc, net)
         bcm = MagicMock(spec=BusinessContext)
         pe = ProtocolExecutor(channel, proc)
-
 
     cmd1 = PaymentCommand(basic_payment)
     cmd1.set_origin(channel.get_my_address())
@@ -55,7 +45,7 @@ def test_exec(basic_payment):
     assert cmd2.dependencies == cmd1.creates_versions
     assert cmd3.dependencies == cmd2.creates_versions
 
-    with store as tx_no: 
+    with store as tx_no:
         pe.sequence_next_command(cmd1)
         pe.sequence_next_command(cmd2)
         pe.sequence_next_command(cmd3)
@@ -74,7 +64,7 @@ def test_exec(basic_payment):
     cmd5a = PaymentCommand(pay5a)
     cmd5a.set_origin(channel.get_my_address())
 
-    with store as tx_no: 
+    with store as tx_no:
         pe.sequence_next_command(cmd4a)
         pe.sequence_next_command(cmd5a)
 
@@ -90,7 +80,7 @@ def test_exec(basic_payment):
     cmd5b = PaymentCommand(pay5b)
     cmd5b.set_origin(channel.get_my_address())
 
-    with store as tx_no: 
+    with store as tx_no:
         pe.sequence_next_command(cmd4b)
         pe.sequence_next_command(cmd5b)
 
@@ -105,7 +95,7 @@ def test_exec(basic_payment):
     with pytest.raises(ExecutorException):
         pe.sequence_next_command(cmd_bad, do_not_sequence_errors=True)
 
-    with store as tx_no: 
+    with store as tx_no:
         pe.set_success(0)
         pe.set_success(1)
         pe.set_success(2)
@@ -124,6 +114,7 @@ def test_exec(basic_payment):
     assert pe.count_potentially_live() == 1
     assert pe.count_actually_live() == 1
 
+
 def test_handlers(basic_payment):
 
     a0 = LibraAddress.encode_to_Libra_address(b'A'*16)
@@ -140,13 +131,13 @@ def test_handlers(basic_payment):
     channel = VASPPairChannel(a0, a1, vasp, store, proc, net)
 
     bcm = MagicMock(spec=BusinessContext)
-    
+
     class Stats(CommandProcessor):
         def __init__(self, bc):
             self.success_no = 0
             self.failure_no = 0
             self.bc = bc
-        
+
         def business_context(self):
             return self.bc
 
@@ -167,7 +158,6 @@ def test_handlers(basic_payment):
     cmd2 = PaymentCommand(pay2)
     cmd2.set_origin(channel.get_my_address())
 
-
     pay3 = basic_payment.new_version()
     pay3.data['sender'].change_status(Status.needs_stable_id)
     cmd3 = PaymentCommand(pay3)
@@ -177,7 +167,7 @@ def test_handlers(basic_payment):
     assert cmd2.dependencies == list(cmd1.creates_versions)
     assert cmd3.dependencies == list(cmd1.creates_versions)
 
-    with store as tx_no: 
+    with store as tx_no:
         pe.sequence_next_command(cmd1)
         pe.sequence_next_command(cmd2)
         pe.sequence_next_command(cmd3)

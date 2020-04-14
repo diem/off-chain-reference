@@ -8,21 +8,16 @@ from pathlib import PosixPath
 
 import pytest
 
-@pytest.fixture
-def db(tmp_path):
-    db_path = tmp_path / 'db.dat'
-    xdb = dbm.open(str(db_path), 'c')
-    return xdb
 
 def test_dict(db):
     D = StorableDict(db, 'mary', int)
     D['x'] = 10
-    assert D['x'] == 10 
+    assert D['x'] == 10
     assert len(D) == 1
     D['hello'] = 2
     assert len(D) == 2
     del D['x']
-    assert D['hello'] == 2 
+    assert D['hello'] == 2
     assert len(D) == 1
     assert 'hello' in D
     assert 'x' not in D
@@ -60,12 +55,12 @@ def test_dict_index():
     db = {}
     D = StorableDict(db, 'mary', int)
     D['x'] = 10
-    assert D['x'] == 10 
+    assert D['x'] == 10
     assert len(D) == 1
     D['hello'] = 2
     assert len(D) == 2
     del D['x']
-    assert D['hello'] == 2 
+    assert D['hello'] == 2
     assert len(D) == 1
     assert 'hello' in D
     assert 'x' not in D
@@ -147,15 +142,6 @@ def test_hierarchy(db):
     assert val2.get_value() == 20
 
 
-@pytest.fixture
-def basic_payment():
-    sender = PaymentActor('AAAA', 'aaaa', Status.none, [])
-    receiver = PaymentActor('BBBB', 'bbbb', Status.none, [])
-    action = PaymentAction(10, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
-
-    payment = PaymentObject(sender, receiver, 'ref', 'orig_ref', 'desc', action)
-    return payment
-
 def test_value_payment(db, basic_payment):
     val = StorableValue(db, 'payment', basic_payment.__class__)
     assert val.exists() is False
@@ -177,7 +163,7 @@ def test_value_command(db, basic_payment):
     from ..protocol_messages import make_success_response, CommandRequestObject, make_command_error
 
     cmd = PaymentCommand(basic_payment)
- 
+
     val = StorableValue(db, 'command', PaymentCommand)
     val.set_value(cmd)
     assert val.get_value() == cmd
@@ -193,7 +179,7 @@ def test_value_request(db, basic_payment):
     from ..protocol_messages import make_success_response, CommandRequestObject, make_command_error
     cmd = CommandRequestObject(PaymentCommand(basic_payment))
     cmd.seq = 10
- 
+
     val = StorableValue(db, 'command', CommandRequestObject)
     val.set_value(cmd)
     assert val.get_value() == cmd
@@ -218,7 +204,7 @@ def test_recovery():
 
     # Define an underlying storage that crashes
     class CrashDict(dict):
-        
+
         def __init__(self, *args, **kwargs):
             dict.__init__(self, *args, **kwargs)
             self.crash = None
@@ -230,7 +216,7 @@ def test_recovery():
                     self.crash = None
                     raise CrashNow()
             dict.__setitem__(self, key, value)
-    
+
     # Test the crashing dict itself.
     cd = CrashDict()
     cd.crash = 2
@@ -249,7 +235,7 @@ def test_recovery():
         sf["2"] = 2
         assert "2" in sf.cache
         sf["4"] = 4
-    
+
     assert sf.cache == {}
     assert cd2 == {"1":1, "2":2, '4':4}
     sf.__enter__()
