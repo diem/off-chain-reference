@@ -145,7 +145,7 @@ class BusinessContext:
 
 # ----- Settlement -----
 
-    def ready_for_settlement(self, payment):
+    async def ready_for_settlement(self, payment):
         ''' Indicates whether a payment is ready for settlement as far as this
             VASP is concerned. Once it returns True it must never return False.
 

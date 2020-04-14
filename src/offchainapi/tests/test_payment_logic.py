@@ -7,7 +7,9 @@ from ..libra_address import *
 from ..sample_command import *
 
 from unittest.mock import MagicMock
+from mock import AsyncMock
 import pytest
+import asyncio
 
 
 @pytest.fixture
@@ -226,13 +228,18 @@ def test_payment_processor_check(states, basic_payment, payment_processor_contex
         with pytest.raises(PaymentLogicError):
             pp.check_command(vasp, channel, executor, command)
 
+def async_return(result):
+    f = asyncio.Future()
+    f.set_result(result)
+    return f
+
 def test_payment_process_receiver_new_payment(basic_payment, payment_processor_context):
     bcm, pp = payment_processor_context
     bcm.is_recipient.side_effect = [True, True]
     bcm.check_account_existence.side_effect = [None]
     bcm.next_kyc_level_to_request.side_effect = [Status.needs_kyc_data]
     bcm.next_kyc_to_provide.side_effect = [{Status.none}]
-    bcm.ready_for_settlement.side_effect = [False]
+    bcm.ready_for_settlement.side_effect = [async_return(False)]
 
     assert basic_payment.data['receiver'].data['status'] == Status.none
     new_payment = pp.payment_process(basic_payment)
@@ -244,7 +251,7 @@ def test_payment_process_receiver_new_payment(basic_payment, payment_processor_c
     bcm.check_account_existence.side_effect = [None]
     bcm.next_kyc_level_to_request.side_effect = [Status.none]
     bcm.next_kyc_to_provide.side_effect = [{Status.none}]
-    bcm.ready_for_settlement.side_effect = [True]
+    bcm.ready_for_settlement.side_effect = [async_return(True)]
     bcm.want_single_payment_settlement.side_effect = [True]
     bcm.has_settled.side_effect = [False]
 
@@ -257,7 +264,7 @@ def test_payment_process_receiver_new_payment(basic_payment, payment_processor_c
     bcm.check_account_existence.side_effect = [None]
     bcm.next_kyc_level_to_request.side_effect = [Status.none]
     bcm.next_kyc_to_provide.side_effect = [{Status.none}]
-    bcm.ready_for_settlement.side_effect = [True]
+    bcm.ready_for_settlement.side_effect = [async_return(True)]
     bcm.want_single_payment_settlement.side_effect = [True]
     bcm.has_settled.side_effect = [True]
 
@@ -280,7 +287,7 @@ def test_payment_process_abort(basic_payment, payment_processor_context):
 def test_payment_process_abort_from_sender(basic_payment, payment_processor_context):
     bcm, pp = payment_processor_context
     bcm.is_recipient.side_effect = [True]
-    bcm.ready_for_settlement.side_effect = [False]
+    bcm.ready_for_settlement.side_effect = [async_return(False)]
     basic_payment.data['sender'].data['status'] = Status.abort
     new_payment = pp.payment_process(basic_payment)
     assert new_payment.data['receiver'].data['status'] == Status.abort
@@ -291,6 +298,8 @@ def test_payment_process_get_stable_id(basic_payment, payment_processor_context)
     bcm.is_recipient.side_effect = [True]
     bcm.next_kyc_to_provide.side_effect = [ set([ Status.needs_stable_id ]) ]
     bcm.get_stable_id.side_effect = ['stable_id']
+    bcm.ready_for_settlement.side_effect = [async_return(False)]
+    bcm.next_kyc_level_to_request.side_effect = [Status.none]
     new_payment = pp.payment_process(basic_payment)
     assert new_payment.data['receiver'].data['stable_id'] == 'stable_id'
 
@@ -303,7 +312,7 @@ def test_payment_process_get_extended_kyc(basic_payment, payment_processor_conte
     bcm.get_extended_kyc.side_effect = [
         (kyc_data, 'sig', 'cert')
     ]
-    bcm.ready_for_settlement.side_effect = [Status.ready_for_settlement]
+    bcm.ready_for_settlement.side_effect = [async_return(True)]
     new_payment = pp.payment_process(basic_payment)
     assert new_payment.data['receiver'].data['kyc_data'] == kyc_data
     assert new_payment.data['receiver'].data['kyc_signature'] == 'sig'
