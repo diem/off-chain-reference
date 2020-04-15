@@ -135,14 +135,14 @@ class PaymentProcessor(CommandProcessor):
     def __init__(self, business, storage_factory):
         self.business = business
 
-        # Asycnio support
+        # Asyncio support
         self.loop = asyncio.new_event_loop()
         self.t = None
 
         # The processor state -- only access through event loop to prevent
         # mutlithreading bugs.
-        # TODO: how much of this do we want to persist?
 
+        # TODO: how much of this do we want to persist?
         self.command_id = 0
         self.pending_commands = {}
         self.futs = []
