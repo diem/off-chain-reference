@@ -453,8 +453,7 @@ class VASPPairChannel:
         with self.storage.atomic_writes() as tx_no:
             answer = False
             next_retransmit = self.next_retransmit.get_value()
-            my_request_len  = len(self.my_requests)
-            while next_retransmit < my_request_len:
+            while next_retransmit < len(self.my_requests):
                 request = self.my_requests[next_retransmit]
                 if request.has_response():
                     next_retransmit += 1
