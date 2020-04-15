@@ -113,7 +113,7 @@ class ProtocolExecutor:
 
         # The common sequence of commands & and their status for those committed
         self.command_sequence = storage_factory.make_list('command_sequence', ProtocolCommand, root=other_vasp)
-        self.command_sequence_status = storage_factory.make_list('command_sequence_status', bool, root=other_vasp)
+        self.command_status_sequence = storage_factory.make_list('command_status_sequence', bool, root=other_vasp)
 
         # This is the primary store of shared objects.
         # It maps version numbers -> objects
@@ -127,7 +127,7 @@ class ProtocolExecutor:
     def last_confirmed(self):
         """ The index of the last confirmed (success or fail) 
             command in the sequence """
-        return len(self.command_sequence_status)
+        return len(self.command_status_sequence)
 
     def set_outcome(self, command, is_success):
         ''' Execute successful commands, and notify of failed commands'''
@@ -199,7 +199,7 @@ class ProtocolExecutor:
             self.object_store[version] = obj
 
         # Call the command processor.
-        self.command_sequence_status += [True]
+        self.command_status_sequence += [True]
         self.set_outcome(command, is_success=True)
 
     def set_fail(self, seq_no):
@@ -209,7 +209,7 @@ class ProtocolExecutor:
             failure of subsequent commands that depend on them.
         '''
         assert seq_no == self.last_confirmed
-        self.command_sequence_status += [False]
+        self.command_status_sequence += [False]
 
         # Call the command processor.
         command = self.command_sequence[seq_no]
