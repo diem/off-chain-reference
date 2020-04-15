@@ -1,43 +1,26 @@
-from ..protocol import *
 from ..executor import *
-from ..payment import *
-from ..payment_logic import PaymentCommand
+from ..payment_logic import PaymentCommand, Status
 from ..business import BusinessContext
 
-from unittest.mock import MagicMock, PropertyMock
+from unittest.mock import MagicMock
 import pytest
 
 
-def test_exec(basic_payment):
-    a0 = LibraAddress.encode_to_Libra_address(b'A'*16)
-    a1 = LibraAddress.encode_to_Libra_address(b'B'*16)
+def test_exec(payment, executor):
+    _, channel, _ = executor.get_context()
+    store = channel.storage
 
-    store = StorableFactory({})
-
-    # Make mock VASP
-    vasp = MagicMock(spec=OffChainVASP)
-    vasp.info_context = PropertyMock(autospec=True)
-    vasp.info_context.get_peer_base_url.return_value = '/'
-
-    proc = MagicMock(spec=CommandProcessor)
-    net = MagicMock()
-
-    with store:
-        channel = VASPPairChannel(a0, a1, vasp, store, proc, net)
-        bcm = MagicMock(spec=BusinessContext)
-        pe = ProtocolExecutor(channel, proc)
-
-    cmd1 = PaymentCommand(basic_payment)
+    cmd1 = PaymentCommand(payment)
     cmd1.set_origin(channel.get_my_address())
     assert cmd1.get_origin() == channel.get_my_address()
 
-    pay2 = basic_payment.new_version()
-    pay2.data['sender'].change_status(Status.needs_stable_id)
+    pay2 = payment.new_version()
+    pay2.sender.change_status(Status.needs_stable_id)
     cmd2 = PaymentCommand(pay2)
     cmd2.set_origin(channel.get_my_address())
 
     pay3 = pay2.new_version()
-    pay3.data['sender'].change_status(Status.needs_stable_id)
+    pay3.sender.change_status(Status.needs_stable_id)
     cmd3 = PaymentCommand(pay3)
     cmd3.set_origin(channel.get_my_address())
 
@@ -46,90 +29,78 @@ def test_exec(basic_payment):
     assert cmd3.dependencies == cmd2.creates_versions
 
     with store as tx_no:
-        pe.sequence_next_command(cmd1)
-        pe.sequence_next_command(cmd2)
-        pe.sequence_next_command(cmd3)
+        executor.sequence_next_command(cmd1)
+        executor.sequence_next_command(cmd2)
+        executor.sequence_next_command(cmd3)
 
-    assert pe.count_potentially_live() == 3
+    assert executor.count_potentially_live() == 3
 
     # Diverge -- branch A
 
     pay4a = pay3.new_version()
-    pay4a.data['sender'].change_status(Status.ready_for_settlement)
+    pay4a.sender.change_status(Status.ready_for_settlement)
     cmd4a = PaymentCommand(pay4a)
     cmd4a.set_origin(channel.get_my_address())
 
     pay5a = pay4a.new_version()
-    pay5a.data['sender'].change_status(Status.settled)
+    pay5a.sender.change_status(Status.settled)
     cmd5a = PaymentCommand(pay5a)
     cmd5a.set_origin(channel.get_my_address())
 
     with store as tx_no:
-        pe.sequence_next_command(cmd4a)
-        pe.sequence_next_command(cmd5a)
+        executor.sequence_next_command(cmd4a)
+        executor.sequence_next_command(cmd5a)
 
     # Diverge -- branch B
 
     pay4b = pay3.new_version()
-    pay4b.data['sender'].change_status(Status.needs_kyc_data)
+    pay4b.sender.change_status(Status.needs_kyc_data)
     cmd4b = PaymentCommand(pay4b)
     cmd4b.set_origin(channel.get_my_address())
 
     pay5b = pay4b.new_version()
-    pay5b.data['sender'].change_status(Status.abort)
+    pay5b.sender.change_status(Status.abort)
     cmd5b = PaymentCommand(pay5b)
     cmd5b.set_origin(channel.get_my_address())
 
     with store as tx_no:
-        pe.sequence_next_command(cmd4b)
-        pe.sequence_next_command(cmd5b)
+        executor.sequence_next_command(cmd4b)
+        executor.sequence_next_command(cmd5b)
 
-    assert pe.count_potentially_live() == 7
+    assert executor.count_potentially_live() == 7
 
     # Try to sequence a really bad command
     pay_bad = pay4b.new_version()
-    pay_bad.data['sender'].change_status(Status.abort)
+    pay_bad.sender.change_status(Status.abort)
     cmd_bad = PaymentCommand(pay_bad)
     cmd_bad.command['action'] = {'amount':  1000000}
     cmd_bad.set_origin(channel.get_my_address())
     with pytest.raises(ExecutorException):
-        pe.sequence_next_command(cmd_bad, do_not_sequence_errors=True)
+        executor.sequence_next_command(cmd_bad, do_not_sequence_errors=True)
 
     with store as tx_no:
-        pe.set_success(0)
-        pe.set_success(1)
-        pe.set_success(2)
-        assert pe.count_potentially_live() == 5
-        assert pe.count_actually_live() == 1
+        executor.set_success(0)
+        executor.set_success(1)
+        executor.set_success(2)
+        assert executor.count_potentially_live() == 5
+        assert executor.count_actually_live() == 1
 
-        pe.set_success(3)
-        pe.set_success(4)
+        executor.set_success(3)
+        executor.set_success(4)
 
-        assert pe.count_potentially_live() == 3
-        assert pe.count_actually_live() == 1
+        assert executor.count_potentially_live() == 3
+        assert executor.count_actually_live() == 1
 
-        pe.set_fail(5)
-        pe.set_fail(6)
+        executor.set_fail(5)
+        executor.set_fail(6)
 
-    assert pe.count_potentially_live() == 1
-    assert pe.count_actually_live() == 1
+    assert executor.count_potentially_live() == 1
+    assert executor.count_actually_live() == 1
 
 
-def test_handlers(basic_payment):
-
-    a0 = LibraAddress.encode_to_Libra_address(b'A'*16)
-    a1 = LibraAddress.encode_to_Libra_address(b'B'*16)
-    proc = MagicMock(spec=CommandProcessor)
-    store = StorableFactory({})
-
-    vasp = MagicMock(spec=OffChainVASP)
-    vasp.info_context = PropertyMock(autospec=True)
-    vasp.info_context.get_peer_base_url.return_value = '/'
-
-    proc = MagicMock(spec=CommandProcessor)
-    net = MagicMock()
-    channel = VASPPairChannel(a0, a1, vasp, store, proc, net)
-
+def test_handlers(payment, executor):
+    _, channel, _ = executor.get_context()
+    store = channel.storage
     bcm = MagicMock(spec=BusinessContext)
 
     class Stats(CommandProcessor):
@@ -150,16 +121,16 @@ def test_handlers(basic_payment):
     stat = Stats(bcm)
     pe = ProtocolExecutor(channel, stat)
 
-    cmd1 = PaymentCommand(basic_payment)
+    cmd1 = PaymentCommand(payment)
     cmd1.set_origin(channel.get_my_address())
 
-    pay2 = basic_payment.new_version()
-    pay2.data['sender'].change_status(Status.needs_stable_id)
+    pay2 = payment.new_version()
+    pay2.sender.change_status(Status.needs_stable_id)
     cmd2 = PaymentCommand(pay2)
     cmd2.set_origin(channel.get_my_address())
 
-    pay3 = basic_payment.new_version()
-    pay3.data['sender'].change_status(Status.needs_stable_id)
+    pay3 = payment.new_version()
+    pay3.sender.change_status(Status.needs_stable_id)
     cmd3 = PaymentCommand(pay3)
     cmd3.set_origin(channel.get_my_address())
 

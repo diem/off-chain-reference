@@ -1,10 +1,8 @@
 # Tests for the storage framework
-
 from ..storage import *
-from ..payment import *
-
-
-from pathlib import PosixPath
+from ..payment_logic import PaymentCommand
+from ..protocol_messages import make_success_response, CommandRequestObject, \
+    make_command_error
 
 import pytest
 
@@ -21,6 +19,7 @@ def test_dict(db):
     assert len(D) == 1
     assert 'hello' in D
     assert 'x' not in D
+
 
 def test_dict_dict():
     db = {}
@@ -66,14 +65,12 @@ def test_dict_index():
     assert 'x' not in D
 
 
-
-
 def test_list(db):
     lst = StorableList(db, 'jacklist', int)
-    lst += [ 1 ]
+    lst += [1]
     assert len(lst) == 1
     assert lst[0] == 1
-    lst += [ 2 ]
+    lst += [2]
     assert len(lst) == 2
     lst[0] = 10
     assert lst[0] == 10
@@ -87,10 +84,10 @@ def test_list(db):
 def test_list_dict():
     db = {}
     lst = StorableList(db, 'jacklist', int)
-    lst += [ 1 ]
+    lst += [1]
     assert len(lst) == 1
     assert lst[0] == 1
-    lst += [ 2 ]
+    lst += [2]
     assert len(lst) == 2
     lst[0] = 10
     assert lst[0] == 10
@@ -103,12 +100,11 @@ def test_list_dict():
 
 def test_value(db):
     # Test default
-    val0 = StorableValue(db, 'counter_zero', int, default = 0)
+    val0 = StorableValue(db, 'counter_zero', int, default=0)
     assert val0.get_value() == 0
     assert not val0.exists()
     val0.set_value(10)
     assert val0.get_value() == 10
-
 
     val = StorableValue(db, 'counter', int)
     assert val.exists() is False
@@ -118,6 +114,7 @@ def test_value(db):
     val2 = StorableValue(db, 'counter', int)
     assert val2.exists() is True
     assert val2.get_value() == 10
+
 
 def test_value_dict():
     db = {}
@@ -142,42 +139,39 @@ def test_hierarchy(db):
     assert val2.get_value() == 20
 
 
-def test_value_payment(db, basic_payment):
-    val = StorableValue(db, 'payment', basic_payment.__class__)
+def test_value_payment(db, payment):
+    val = StorableValue(db, 'payment', payment.__class__)
     assert val.exists() is False
-    val.set_value(basic_payment)
+    val.set_value(payment)
     assert val.exists() is True
     pay2 = val.get_value()
-    assert basic_payment == pay2
+    assert payment == pay2
 
-    lst = StorableList(db, 'jacklist', basic_payment.__class__)
-    lst += [ basic_payment ]
+    lst = StorableList(db, 'jacklist', payment.__class__)
+    lst += [payment]
     assert lst[0] == pay2
 
-    D = StorableDict(db, 'mary', basic_payment.__class__)
+    D = StorableDict(db, 'mary', payment.__class__)
     D[pay2.version] = pay2
-    assert D[pay2.version] == basic_payment
+    assert D[pay2.version] == payment
 
-def test_value_command(db, basic_payment):
-    from ..payment_logic import PaymentCommand
-    from ..protocol_messages import make_success_response, CommandRequestObject, make_command_error
 
-    cmd = PaymentCommand(basic_payment)
+def test_value_command(db, payment):
+
+    cmd = PaymentCommand(payment)
 
     val = StorableValue(db, 'command', PaymentCommand)
     val.set_value(cmd)
     assert val.get_value() == cmd
 
-    cmd.creates_versions = [ 'xxxxxxxx' ]
+    cmd.creates_versions = ['xxxxxxxx']
     assert val.get_value() != cmd
     val.set_value(cmd)
     assert val.get_value() == cmd
 
 
-def test_value_request(db, basic_payment):
-    from ..payment_logic import PaymentCommand
-    from ..protocol_messages import make_success_response, CommandRequestObject, make_command_error
-    cmd = CommandRequestObject(PaymentCommand(basic_payment))
+def test_value_request(db, payment):
+    cmd = CommandRequestObject(PaymentCommand(payment))
     cmd.seq = 10
 
     val = StorableValue(db, 'command', CommandRequestObject)
@@ -196,6 +190,7 @@ def test_value_request(db, basic_payment):
     assert val.get_value() != cmd
     val.set_value(cmd)
     assert val.get_value() == cmd
+
 
 def test_recovery():
 
@@ -237,7 +232,7 @@ def test_recovery():
         sf["4"] = 4
 
     assert sf.cache == {}
-    assert cd2 == {"1":1, "2":2, '4':4}
+    assert cd2 == {"1": 1, "2": 2, '4': 4}
     sf.__enter__()
     sf["1"] = 10
     assert "1" in sf.cache
@@ -252,4 +247,4 @@ def test_recovery():
 
     sf2 = StorableFactory(cd2)
     assert '__backup_recovery' not in cd2
-    assert cd2 == {"1":1, "2":2, '4':4}
+    assert cd2 == {"1": 1, "2": 2, '4': 4}
