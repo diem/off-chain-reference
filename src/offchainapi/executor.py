@@ -164,7 +164,7 @@ class ProtocolExecutor:
         #       unexpected exceptions (Issue #33)
         except Exception as e:
             all_good = False
-            type_str = str(type(e)) + ": " + str(e)
+            type_str = f'{str(type(e))}: {str(e)}'
             raise ExecutorException(type_str)
 
         finally:
