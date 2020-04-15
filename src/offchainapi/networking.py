@@ -48,8 +48,8 @@ class NetworkServer:
             view_func=VASPOffChainApi.as_view('vasp_api', self.vasp)
         )
 
-    def run(self):
-        self.app.run()
+    def run(self, host='0.0.0.0', port=80):
+        self.app.run(host=host, port=port)
 
 
 class VASPOffChainApi(MethodView):
