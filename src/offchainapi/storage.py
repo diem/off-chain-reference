@@ -3,8 +3,12 @@
 import dbm
 import json
 from pathlib import PosixPath
+from threading import RLock
 
 from .utils import JSONFlag, JSONSerializable, get_unique_string
+
+def key_join(strs):
+    return '||'.join(strs)
 
 class Storable:
     """ Base class for objects that can be stored """
@@ -38,6 +42,7 @@ class StorableFactory:
     ''' This class maintains an overview of the full storage subsystem.'''
 
     def __init__(self, db):
+        self.rlock = RLock()
         self.db = db
         self.current_transaction = None
         self.levels = 0
@@ -161,16 +166,20 @@ class StorableFactory:
         return self
 
     def __enter__(self):
+        self.rlock.acquire()
         if self.levels == 0:
             self.current_transaction = get_unique_string()
 
         self.levels += 1
 
     def __exit__(self, type, value, traceback):
-        self.levels -= 1
-        if self.levels == 0:
-            self.current_transaction = None
-            self.persist_cache()
+        try:
+            self.levels -= 1
+            if self.levels == 0:
+                self.current_transaction = None
+                self.persist_cache()
+        finally:
+            self.rlock.release()
 
 class StorableDict(Storable):
 
@@ -179,7 +188,7 @@ class StorableDict(Storable):
             by key directly, and a separate doubly linked list structure is
             stored to enable traversal of keys and values. """
         if root is None:
-            self.root = PosixPath('/')
+            self.root = [ '' ]
         else:
             self.root = root.base_key()
         self.name = name
@@ -190,6 +199,7 @@ class StorableDict(Storable):
         # addition and creation.
         meta = StorableValue(db, '__META', str, root=self)
         self.first_key = StorableValue(db, '__FIRST_KEY', str, root=meta)
+        self.first_key.debug = True
         self.length = StorableValue(db, '__LEN', int, root=meta, default=0)
 
     if __debug__:
@@ -201,15 +211,14 @@ class StorableDict(Storable):
                 assert first_ll_entry[0] is None
         
     def base_key(self):
-        return self.root / self.name
+        return self.root + [self.name]
 
     def __getitem__(self, key):
-        db_key = str(self.base_key() / str(key))
+        db_key, db_key_LL = self.derive_keys(key)
         return self.post_proc(json.loads(self.db[db_key]))
 
     def _ll_cons(self, key):
-        db_key = str(self.base_key() / str(key))
-        db_key_LL = str(self.base_key() / 'LL' / str(key))
+        db_key, db_key_LL = self.derive_keys(key)
         assert db_key_LL not in self.db
         
         if self.first_key.exists():
@@ -228,8 +237,8 @@ class StorableDict(Storable):
         else:
             # This is the first entry, setup the record and first key
             ll_entry = [None, None, str(db_key), key]
-            
-        self.first_key.set_value(str(db_key_LL))
+        
+        self.first_key.set_value(db_key_LL)
         self.db[db_key_LL] = json.dumps(ll_entry)
     
         if __debug__:
@@ -237,7 +246,7 @@ class StorableDict(Storable):
 
 
     def __setitem__(self, key, value):
-        db_key = str(self.base_key() / str(key))
+        db_key, _ = self.derive_keys(key)  
         data = json.dumps(self.pre_proc(value))
 
         # Ensure nothing fails after that
@@ -246,7 +255,7 @@ class StorableDict(Storable):
             self.length.set_value(xlen+1)
 
             # Add an entry to the linked list
-            self._ll_cons( key)
+            self._ll_cons(key)
 
         self.db[db_key] = data
 
@@ -278,14 +287,14 @@ class StorableDict(Storable):
     def __delitem__(self, key):
         # TODO: remove
         # assert False
-        db_key = str(self.base_key() / str(key))
+        db_key, db_key_LL = self.derive_keys(key)
         if db_key in self.db:
             xlen = self.length.get_value()
             self.length.set_value(xlen-1)
             del self.db[db_key]
 
             # Now fix the LL structure
-            db_key_LL = str(self.base_key() / 'LL' / str(key))
+            # db_key_LL = str(self.base_key() / 'LL' / str(key))
             ll_entry = json.loads(self.db[db_key_LL])
             prev_key, next_key, _, _ = tuple(ll_entry)
 
@@ -301,13 +310,18 @@ class StorableDict(Storable):
                 next_entry[0] = prev_key
                 self.db[next_key] = json.dumps(next_entry)
                 if prev_key is None:
+                    _, next_db_key_LL = self.derive_keys(next_key)
                     self.first_key.set_value(next_key)
             
             del self.db[db_key_LL]
             
-    
+    def derive_keys(self, item):
+        key = key_join(self.base_key() + [str(item)])
+        key_LL = key_join(self.base_key() + ['LL', str(item)])
+        return key, key_LL
+
     def __contains__(self, item):
-        db_key = str(self.base_key() / str(item))
+        db_key = key_join(self.base_key() + [str(item)])
         return db_key in self.db
 
 
@@ -315,7 +329,7 @@ class StorableList(Storable):
     
     def __init__(self, db, name, xtype, root=None):
         if root is None:
-            self.root = PosixPath('/')
+            self.root = ['']
         else:
             self.root = root.base_key()
         self.name = name
@@ -328,7 +342,7 @@ class StorableList(Storable):
 
 
     def base_key(self):
-        return self.root / self.name
+        return self.root + [self.name]
     
     def __getitem__(self, key):
         if type(key) is not int:
@@ -337,7 +351,7 @@ class StorableList(Storable):
         if not 0 <= key < xlen:
             raise KeyError('Key does not exist')
 
-        db_key = str(self.base_key() / str(key))
+        db_key = key_join(self.base_key() + [str(key)])
         return self.post_proc(json.loads(self.db[db_key]))
 
     def __setitem__(self, key, value):
@@ -346,7 +360,7 @@ class StorableList(Storable):
         xlen = len(self)
         if not 0<= key < xlen:
             raise KeyError('Key does not exist')
-        db_key = str(self.base_key() / str(key))
+        db_key = key_join(self.base_key() + [str(key)])
         self.db[db_key] = json.dumps(self.pre_proc(value))
 
     def __len__(self):
@@ -374,14 +388,15 @@ class StorableValue(Storable):
 
     def __init__(self, db, name, xtype, root=None, default=None):
         if root is None:
-            self.root = PosixPath('/')
+            self.root = ['']
         else:
             self.root = root.base_key()
+
         self.name = name
         self.xtype = xtype
         self.db = db
-        self._base_key = self.root / self.name
-        self._base_key_str = str(self._base_key)
+        self._base_key = self.root + [self.name]
+        self._base_key_str = key_join(self._base_key)
 
         self.has_value = False
 
@@ -391,17 +406,19 @@ class StorableValue(Storable):
             self.value = None
             if default is not None:
                 self.set_value(default)
-
+        
+        
     def set_value(self, value):
         json_data = json.dumps(self.pre_proc(value))
         key = self._base_key_str
         self.db[key] = json_data
-
         self.has_value = True
         self.value = value
 
     def get_value(self):
-        val = json.loads(self.db[self._base_key_str])
+        key = self._base_key_str
+        encoded_value = self.db[key]
+        val = json.loads(encoded_value)
         self.value = self.post_proc(val)
         self.has_value = True
         return self.value
