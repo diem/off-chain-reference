@@ -261,9 +261,7 @@ class VASPPairChannel:
             except JSONParsingError:
                 response = make_parsing_error()
                 return self.send_response(response)
-                #return None
-
-
+                
 
     def handle_request(self, request):
         with  self.storage.atomic_writes() as tx_no:

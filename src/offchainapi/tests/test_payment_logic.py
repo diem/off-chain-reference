@@ -68,14 +68,6 @@ def test_payment_command_multiple_dependencies_fail(basic_payment):
             { basic_payment.get_version():basic_payment })
 
 
-def test_payment_command_create_fail(basic_payment):
-    cmd = PaymentCommand(basic_payment)
-    # Error: two new versions
-    cmd.creates_versions += [ basic_payment.get_version() ]
-    with pytest.raises(PaymentLogicError):
-        cmd.get_object(basic_payment.get_version(), {})
-
-
 def test_payment_command_missing_dependency_fail(basic_payment):
     new_payment = basic_payment.new_version('v1')
     cmd = PaymentCommand(new_payment)

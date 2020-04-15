@@ -77,24 +77,30 @@ class PaymentCommand(ProtocolCommand):
         # Thus super() is magic, but do not worry we get the right type:
         assert isinstance(self, PaymentCommand)
         self.command = data['diff']
+
+        if len(self.dependencies) > 1:
+            raise PaymentLogicError("A payment can only depend on a single previous payment")
+
+        if len(self.creates_versions) != 1:
+            raise PaymentLogicError("A payment always creates a new payment")
+
         return self
 
     # Helper functions for payment commands specifically
     def get_previous_version(self):
         ''' Returns the version of the previous payment, or None if this 
             command creates a new payment '''
-        dep_len = len(self.dependencies)
-        if dep_len > 1:
-            raise PaymentLogicError("A payment can only depend on a single previous payment")
-        if dep_len == 0:
+        # This is  ensured from the constructors
+        assert len(self.dependencies) in [0, 1]
+        if len(self.dependencies) == 0:
             return None
-        else:
-            return self.dependencies[0]
+        return self.dependencies[0]
 
     def get_new_version(self):
         ''' Returns the version number of the payment created or updated '''
-        if len(self.creates_versions) != 1:
-            raise PaymentLogicError("A payment always creates a new payment")
+        
+        # Ensured from the constructors
+        assert len(self.creates_versions) == 1
         return self.creates_versions[0]
 
 class PaymentLogicError(Exception):
