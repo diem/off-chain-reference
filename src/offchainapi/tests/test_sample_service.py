@@ -8,6 +8,7 @@ from ..business import VASPInfo
 
 from unittest.mock import MagicMock
 import pytest
+import asyncio
 
 @pytest.fixture
 def asset_path(request):
@@ -117,6 +118,7 @@ def addr_bc_proc():
     bc = sample_business(a0)
     store = StorableFactory({})
     proc = PaymentProcessor(bc, store)
+    proc.loop = asyncio.get_event_loop()
     return (a0, bc, proc)
 
 def test_business_simple():

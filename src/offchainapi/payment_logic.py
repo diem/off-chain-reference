@@ -98,7 +98,7 @@ class PaymentCommand(ProtocolCommand):
 
     def get_new_version(self):
         ''' Returns the version number of the payment created or updated '''
-        
+
         # Ensured from the constructors
         assert len(self.creates_versions) == 1
         return self.creates_versions[0]
@@ -142,7 +142,8 @@ class PaymentProcessor(CommandProcessor):
         self.business = business
 
         # Asyncio support
-        self.loop = asyncio.new_event_loop()
+        self.loop = None
+        # print('Creating event loop', self.loop)
         self.t = None
 
         # The processor state -- only access through event loop to prevent
@@ -159,8 +160,12 @@ class PaymentProcessor(CommandProcessor):
         """ Start the asyncio loop to process commands """
         def main_loop(loop):
             asyncio.set_event_loop(loop)
+            print('Entring event loop', loop)
             loop.run_forever()
             self.t = None
+            self.loop = None
+        
+        self.loop = asyncio.new_event_loop()
         self.t = Thread(target=main_loop, args=(self.loop,))
         self.t.start()
 
@@ -313,7 +318,10 @@ class PaymentProcessor(CommandProcessor):
 
     def payment_process(self, payment):
         ''' A syncronous version of payment processing -- largely used for pytests '''
-        return self.loop.run_until_complete(self.payment_process_async(payment))
+        loop = self.loop
+        if self.loop is None:
+            loop = asyncio.get_event_loop()
+        return loop.run_until_complete(self.payment_process_async(payment))
 
     async def payment_process_async(self, payment):
         ''' Processes a payment that was just updated, and returns a
