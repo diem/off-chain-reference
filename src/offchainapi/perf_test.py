@@ -52,8 +52,9 @@ class SimpleNetworkFactory:
 
 
 class PerfVasp:
-    def __init__(self, my_addr):
+    def __init__(self, my_addr, port):
         self.my_addr = my_addr
+        self.port = port
         self.bc = MagicMock()
         self.store        = StorableFactory({})
         self.info_context = SimpleVASPInfo()
@@ -64,15 +65,24 @@ class PerfVasp:
             self.my_addr, self.pp, self.store, self.info_context, self.network_factory
         )
 
-def start_thread_main(addr):
-    node = PerfVasp(addr)
+        self.server = NetworkServer(self.vasp)
+    
+    def start(self):
+        # Start the processor
+        self.pp.start_processor()
+        # Start the server
+        self.server.run(port=self.port)
+
+def start_thread_main(addr, port):
+    node = PerfVasp(addr, port)
+    node.start()
 
 def main_perf():
     
-    tA = Thread(target=start_thread_main, args=(PeerA_addr,))
+    tA = Thread(target=start_thread_main, args=(PeerA_addr, 8090, ))
     tA.start()
     print('Start Node A')
 
-    tB = Thread(target=start_thread_main, args=(PeerB_addr,))
+    tB = Thread(target=start_thread_main, args=(PeerB_addr, 8091, ))
     tB.start()
     print('Start Node B')
