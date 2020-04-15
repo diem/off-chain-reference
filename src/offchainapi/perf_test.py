@@ -10,6 +10,7 @@ from .networking import NetworkServer, NetworkClient
 
 import json
 from unittest.mock import MagicMock
+from threading import Thread
 
 # A stand alone performance test.
 
@@ -63,6 +64,15 @@ class PerfVasp:
             self.my_addr, self.pp, self.store, self.info_context, self.network_factory
         )
 
+def start_thread_main(addr):
+    node = PerfVasp(addr)
+
 def main_perf():
-    node_A = PerfVasp(PeerA_addr)
-    node_B = PerfVasp(PeerB_addr)
+    
+    tA = Thread(target=start_thread_main, args=(PeerA_addr,))
+    tA.start()
+    print('Start Node A')
+
+    tB = Thread(target=start_thread_main, args=(PeerB_addr,))
+    tB.start()
+    print('Start Node B')
