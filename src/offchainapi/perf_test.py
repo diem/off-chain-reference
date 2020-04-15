@@ -1,3 +1,5 @@
+import logging
+
 from .business import BusinessContext, BusinessForceAbort, \
 BusinessValidationFailure, VASPInfo
 from .protocol import OffChainVASP
@@ -7,10 +9,14 @@ from .payment_logic import PaymentCommand, PaymentProcessor
 from .status_logic import Status
 from .storage import StorableFactory
 from .networking import NetworkServer, NetworkClient
+from .payment import PaymentAction, PaymentActor, PaymentObject
 
 import json
 from unittest.mock import MagicMock
 from threading import Thread
+import time
+
+
 
 # A stand alone performance test.
 
@@ -73,16 +79,57 @@ class PerfVasp:
         # Start the server
         self.server.run(port=self.port)
 
+global_dir = {}
+
 def start_thread_main(addr, port):
     node = PerfVasp(addr, port)
+    global_dir[addr.as_str()] = node
     node.start()
 
 def main_perf():
+    logging.basicConfig(level=logging.DEBUG)
     
-    tA = Thread(target=start_thread_main, args=(PeerA_addr, 8090, ))
+    tA = Thread(target=start_thread_main, args=(PeerA_addr, 8091, ))
     tA.start()
     print('Start Node A')
 
-    tB = Thread(target=start_thread_main, args=(PeerB_addr, 8091, ))
+    tB = Thread(target=start_thread_main, args=(PeerB_addr, 8092, ))
     tB.start()
     print('Start Node B')
+
+    time.sleep(1.0) # sec
+    print('Inject commands')
+    time.sleep(1.0)
+    while len(global_dir) != 2:
+        time.sleep(0.1)
+    print(global_dir)
+
+    # Get the channel from A -> B
+    nodeA = global_dir[PeerA_addr.as_str()]
+    channelAB = nodeA.vasp.get_channel(PeerB_addr)
+    nodeB = global_dir[PeerB_addr.as_str()]
+    channelBA = nodeB.vasp.get_channel(PeerA_addr)
+
+    # Define a payment command
+    commands = []
+    for cid in range(100):
+        sender = PaymentActor(PeerA_addr.as_str(), 'aaaa', Status.none, [])
+        receiver = PaymentActor(PeerB_addr.as_str(), 'bbbb', Status.none, [])
+        action = PaymentAction(10, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
+        payment = PaymentObject(sender, receiver, f'ref {cid}', 'orig_ref', 'desc', action)
+        cmd = PaymentCommand(payment)
+        commands += [ cmd ]
+
+    for cmd in commands:
+        channelAB.sequence_command_local(cmd)
+
+    def channel_summary(name, channel):
+        localQlen = len(channel.my_requests)
+        remoteQlen = len(channel.other_requests)
+        commonQlen = len(channel.get_final_sequence())
+        logging.debug(f'{name} : L:{localQlen}  R:{remoteQlen}  C:{commonQlen}')
+
+    while True:
+        time.sleep(0.1)
+        channel_summary('AB', channelAB)
+        channel_summary('BA', channelBA)

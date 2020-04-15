@@ -8,12 +8,15 @@ from .storage import StorableFactory
 import json
 from collections import namedtuple
 from threading import RLock
+import logging
 
 NetMessage = namedtuple('NetMessage', ['src', 'dst', 'type', 'content'])
 
 class OffChainVASP:
     """Manages the off-chain protocol on behalf of one VASP. """
     def __init__(self, vasp_addr, processor, storage_factory, info_context, network_factory):
+        logging.debug(f'Creating VASP {vasp_addr.as_str()}')
+        
         assert isinstance(processor, CommandProcessor)
         assert isinstance(vasp_addr, LibraAddress)
 
@@ -140,6 +143,8 @@ class VASPPairChannel:
         self.peer_base_url = self.vasp.info_context.get_peer_base_url(self.other)
         self.network_client = network_client
 
+        logging.debug(f'Creating VASP channel {myself.as_str()}  -> {other.as_str()}')
+
     def my_next_seq(self):
         return len(self.my_requests)
 
@@ -171,12 +176,14 @@ class VASPPairChannel:
         json_string = request.get_json_data_dict(JSONFlag.NET)
         self.net_queue += [ NetMessage(self.myself, self.other, CommandRequestObject, json_string) ]
         self.send_network_request(json_string)
+        logging.debug(f'Request SENT {self.myself.as_str()}  -> {self.other.as_str()}')
 
     def send_response(self, response):
         """ A hook to send a response to other VASP"""
         json_string = json.dumps(response.get_json_data_dict(JSONFlag.NET))
         net_message = NetMessage(self.myself, self.other, CommandResponseObject,json_string)
         self.net_queue += [ net_message ]
+        logging.debug(f'Response SENT {self.myself.as_str()}  -> {self.other.as_str()}')
         return net_message
 
     def is_client(self):
@@ -253,6 +260,7 @@ class VASPPairChannel:
 
     def parse_handle_request(self, json_command):
         ''' Handles a request provided as a json_string '''
+        logging.debug(f'Request Received {self.other.as_str()}  -> {self.myself.as_str()}')
         with self.rlock:
             try:
                 req_dict = json.loads(json_command)
@@ -343,6 +351,7 @@ class VASPPairChannel:
 
     def parse_handle_response(self, json_response):
         ''' Handles a response provided as a json string. '''
+        logging.debug(f'Response Received {self.other.as_str()}  -> {self.myself.as_str()}')
         with self.rlock:
             try:
                 resp_dict = json.loads(json_response)
@@ -467,4 +476,5 @@ class VASPPairChannel:
         url = self.network_client.get_url(self.peer_base_url)
         response = self.network_client.send_request(url, request_json)
         if response != None:
-            self.parse_handle_response(json.dumps(response.json()))
+            print(response.content)
+            self.parse_handle_response(response.content)
