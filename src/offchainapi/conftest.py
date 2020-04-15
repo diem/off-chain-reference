@@ -4,41 +4,82 @@ from .business import BusinessContext
 from .storage import StorableFactory
 from .payment_logic import PaymentProcessor, PaymentCommand
 from .protocol import OffChainVASP, VASPPairChannel
-from .executor import CommandProcessor
+from .executor import ProtocolExecutor
+from .command_processor import CommandProcessor
 from .libra_address import LibraAddress
 from .sample_service import sample_business
-from .protocol_messages import CommandRequestObject, CommandResponseObject, OffChainError
+from .protocol_messages import CommandRequestObject, CommandResponseObject, \
+    OffChainError
 from .utils import JSONFlag
 
+
 import types
-from copy import deepcopy
 import json
 import dbm
+from copy import deepcopy
 from unittest.mock import MagicMock, PropertyMock
 import pytest
 
 
 @pytest.fixture
-def basic_actor():
-    actor = PaymentActor('AAAA', 'aaaa', Status.none, [])
-    return actor
+def three_addresses():
+    a0 = LibraAddress.encode_to_Libra_address(b'A'*16)
+    a1 = LibraAddress.encode_to_Libra_address(b'B' + b'A'*15)
+    a2 = LibraAddress.encode_to_Libra_address(b'B'*16)
+    return (a0, a1, a2)
 
 
 @pytest.fixture
-def basic_payment():
-    sender = PaymentActor('AAAA', 'aaaa', Status.none, [])
-    receiver = PaymentActor('BBBB', 'bbbb', Status.none, [])
-    action = PaymentAction(10, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
-    payment = PaymentObject(sender, receiver, 'ref', 'orig_ref', 'desc', action)
-    return payment
+def sender_actor():
+    return PaymentActor('AAAA', 'aaaa', Status.none, [])
 
 
 @pytest.fixture
-def payment_processor_context():
+def receiver_actor():
+    return PaymentActor('BBBB', 'bbbb', Status.none, [])
+
+
+@pytest.fixture
+def payment_action():
+    return PaymentAction(10, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
+
+
+@pytest.fixture
+def payment(sender_actor, receiver_actor, payment_action):
+    return PaymentObject(
+        sender_actor, receiver_actor, 'ref', 'orig_ref', 'desc', payment_action
+    )
+
+
+@pytest.fixture
+def kyc_data():
+    return KYCData("""{
+        "payment_reference_id" : "PAYMENT_XYZ",
+        "type" : "individual",
+        "other_field" : "other data"
+    }""")
+
+
+@pytest.fixture
+def store():
+    return StorableFactory({})
+
+@pytest.fixture
+def processor(store):
     bcm = MagicMock(spec=BusinessContext)
-    store = StorableFactory({})
-    proc = PaymentProcessor(bcm, store)
-    return (bcm, proc)
+    return PaymentProcessor(bcm, store)
+
+
+@pytest.fixture
+def executor(three_addresses, store):
+    a0, _, a1 = three_addresses
+    channel = MagicMock(spec=VASPPairChannel)
+    channel.get_my_address.return_value = a0
+    channel.get_other_address.return_value = a1
+    with store:
+        channel.storage = store
+        command_processor = MagicMock(spec=CommandProcessor)
+        return ProtocolExecutor(channel, command_processor)
 
 
 @pytest.fixture(params=[
@@ -52,6 +93,63 @@ def payment_processor_context():
 ])
 def states(request):
     return request.param
+
+
+@pytest.fixture
+def vasp():
+    vasp = MagicMock(spec=OffChainVASP)
+    vasp.info_context = PropertyMock(autospec=True)
+    vasp.info_context.get_peer_base_url.return_value = '/'
+    return vasp
+
+
+@pytest.fixture
+def network_client():
+    network_client = MagicMock()
+    network_client.get_url.return_value = '/'
+    network_client.send_request.return_value = None
+    return network_client
+
+
+@pytest.fixture
+def server_client(three_addresses, vasp, network_client, store):
+    def monkey_tap(pair):
+        pair.msg = []
+
+        def to_tap(self, msg):
+            assert msg is not None
+            self.msg += [deepcopy(msg)]
+
+        def tap(self):
+            msg = self.msg
+            self.msg = []
+            return msg
+
+        pair.tap = types.MethodType(tap, pair)
+        pair.send_request = types.MethodType(to_tap, pair)
+        pair.send_response = types.MethodType(to_tap, pair)
+        return pair
+
+    a0, a1, _ = three_addresses
+    command_processor = MagicMock(spec=CommandProcessor)
+    store_server = deepcopy(store)
+    server = VASPPairChannel(
+        a0, a1, vasp, store_server, command_processor, network_client
+    )
+    store_client = deepcopy(store)
+    client = VASPPairChannel(
+        a1, a0, vasp, store_client, command_processor, network_client
+    )
+
+    server = monkey_tap(server)
+    client = monkey_tap(client)
+    return (server, client)
+
+
+
+
+# --- below are only needed for networking and sample_vasp ---
+
 
 
 @pytest.fixture(params=[
@@ -74,27 +172,6 @@ def simple_response_json_error(request):
     return json_obj
 
 
-@pytest.fixture
-def three_address():
-    a0 = LibraAddress.encode_to_Libra_address(b'A'*16)
-    a1 = LibraAddress.encode_to_Libra_address(b'B' + b'A'*15)
-    a2 = LibraAddress.encode_to_Libra_address(b'B'*16)
-    return (a0, a1, a2)
-
-
-@pytest.fixture
-def mockVASP():
-    vasp = MagicMock(spec=OffChainVASP)
-    vasp.info_context = PropertyMock(autospec=True)
-    vasp.info_context.get_peer_base_url.return_value = '/'
-    return vasp
-
-
-@pytest.fixture
-def mockProcessor():
-    proc = MagicMock(spec=CommandProcessor)
-    return proc
-
 
 @pytest.fixture
 def simple_request_json():
@@ -115,45 +192,6 @@ def simple_request_json():
     return request_json
 
 
-@pytest.fixture
-def network_client():
-    network_client = MagicMock()
-    network_client.get_url.return_value = '/'
-    network_client.send_request.return_value = None
-    return network_client
-
-
-def monkey_tap(pair):
-    pair.msg = []
-
-    def to_tap(self, msg):
-        assert msg is not None
-        self.msg += [deepcopy(msg)]
-
-    def tap(self):
-        msg = self.msg
-        self.msg = []
-        return msg
-
-    pair.tap = types.MethodType(tap, pair)
-    pair.send_request = types.MethodType(to_tap, pair)
-    pair.send_response = types.MethodType(to_tap, pair)
-    return pair
-
-
-@pytest.fixture
-def server_client(three_address, mockVASP, mockProcessor, network_client):
-    a0, a1, _ = three_address
-
-    store_server = StorableFactory({})
-    server = VASPPairChannel(a0, a1, mockVASP, store_server, mockProcessor, network_client)
-    store_client = StorableFactory({})
-    client = VASPPairChannel(a1, a0, mockVASP, store_client, mockProcessor, network_client)
-
-    server = monkey_tap(server)
-    client = monkey_tap(client)
-
-    return (server, client)
 
 
 @pytest.fixture
@@ -269,6 +307,7 @@ def addr_bc_proc():
     store = StorableFactory({})
     proc = PaymentProcessor(bc, store)
     return (a0, bc, proc)
+
 
 @pytest.fixture
 def db(tmp_path):
