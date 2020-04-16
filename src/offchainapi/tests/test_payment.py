@@ -1,5 +1,6 @@
-from ..payment import *
-from ..utils import JSONFlag
+from ..payment import PaymentActor, PaymentAction, PaymentObject, KYCData
+from ..utils import StructureException, JSONFlag
+from ..payment_logic import Status
 
 import json
 import pytest
@@ -113,20 +114,25 @@ def test_payment_actor_update_kyc(sender_actor, kyc_data):
     # We tolerate writing again strictly the same record
     sender_actor.add_kyc_data(kyc_data, 'sigXXXX', 'certXXX')
 
+
+def test_payment_actor_change_kyc(sender_actor, kyc_data):
+    sender_actor.add_kyc_data(kyc_data, 'sigXXXX', 'certXXX')
     with pytest.raises(StructureException):
-        # Cannot change KYC data once set
         sender_actor.add_kyc_data(kyc_data, 'sigYYYY', 'certYYYY')
 
+
+def test_payment_actor_wronte_kyc_type(sender_actor, kyc_data):
     with pytest.raises(StructureException):
-        # Wrong type for kyc data
         sender_actor.add_kyc_data(0, 'sigXXXX', 'certXXX')
 
+
+def test_payment_actor_wrong_kyc_sig_type(sender_actor, kyc_data):
     with pytest.raises(StructureException):
-        # Wrong type for sig data
         sender_actor.add_kyc_data(kyc_data, 0, 'certXXX')
 
+
+def test_payment_actor_wrong_kyc_cert_type(sender_actor, kyc_data):
     with pytest.raises(StructureException):
-        # Wrong type for cert data
         sender_actor.add_kyc_data(kyc_data, 'sigXXXX', 0)
 
 

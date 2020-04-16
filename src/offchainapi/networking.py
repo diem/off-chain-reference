@@ -6,7 +6,7 @@ from flask import Flask, request, abort
 from flask.views import MethodView
 import requests
 from urllib.parse import urljoin
-import json
+from json import dumps
 import sys
 
 
@@ -25,7 +25,7 @@ class NetworkClient:
 
     def send_request(self, url, json_request):
         try:
-            return self.session.post(url, json=json_request)
+            return self.session.post(url, json=dumps(json_request))
         except requests.exceptions.RequestException:
             # This happens in case of (i) a connection error (e.g. DNS failure,
             # refused connection, etc), (ii) timeout, or (iii) if the maximum
