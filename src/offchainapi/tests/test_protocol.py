@@ -150,39 +150,40 @@ class RandomRun(object):
         assert set(server_seq) == set(server_exec_seq)
 
 
-def test_client_server_role_definition(three_addresses, vasp, network_client):
+def test_client_server_role_definition(three_addresses, vasp):
     a0, a1, a2 = three_addresses
     command_processor = MagicMock(spec=CommandProcessor)
-    mock_store = MagicMock()
+    store = MagicMock()
+    network_client = MagicMock()
 
     channel = VASPPairChannel(
-        a0, a1, vasp, mock_store, command_processor, network_client
+        a0, a1, vasp, store, command_processor, network_client
     )
     assert channel.is_server()
     assert not channel.is_client()
 
     channel = VASPPairChannel(
-        a1, a0, vasp, mock_store, command_processor, network_client
+        a1, a0, vasp, store, command_processor, network_client
     )
     assert not channel.is_server()
     assert channel.is_client()
 
     # Lower address is server (xor bit = 1)
     channel = VASPPairChannel(
-        a0, a2, vasp, mock_store, command_processor, network_client
+        a0, a2, vasp, store, command_processor, network_client
     )
     assert not channel.is_server()
     assert channel.is_client()
 
     channel = VASPPairChannel(
-        a2, a0, vasp, mock_store, command_processor, network_client
+        a2, a0, vasp, store, command_processor, network_client
     )
     assert channel.is_server()
     assert not channel.is_client()
 
 
-def test_protocol_server_client_benign(server_client):
-    server, client = server_client
+def test_protocol_server_client_benign(two_channels):
+    server, client = two_channels
 
     # Create a server request for a command
     server.sequence_command_local(SampleCommand('Hello'))
@@ -215,8 +216,8 @@ def test_protocol_server_client_benign(server_client):
     assert client.get_final_sequence()[0].item() == 'Hello'
 
 
-def test_protocol_server_conflicting_sequence(server_client):
-    server, client = server_client
+def test_protocol_server_conflicting_sequence(two_channels):
+    server, client = two_channels
 
     # Create a server request for a command
     server.sequence_command_local(SampleCommand('Hello'))
@@ -252,8 +253,8 @@ def test_protocol_server_conflicting_sequence(server_client):
     assert client.get_final_sequence()[0].item() == 'Hello'
 
 
-def test_protocol_client_server_benign(server_client):
-    server, client = server_client
+def test_protocol_client_server_benign(two_channels):
+    server, client = two_channels
 
     # Create a server request for a command
     client.sequence_command_local(SampleCommand('Hello'))
@@ -290,8 +291,8 @@ def test_protocol_client_server_benign(server_client):
     assert server.my_next_seq() == 0
 
 
-def test_protocol_server_client_interleaved_benign(server_client):
-    server, client = server_client
+def test_protocol_server_client_interleaved_benign(two_channels):
+    server, client = two_channels
 
     client.sequence_command_local(SampleCommand('Hello'))
     client_request = client.tap()[0]
@@ -319,8 +320,8 @@ def test_protocol_server_client_interleaved_benign(server_client):
     assert [c.item() for c in server.get_final_sequence()] == ['World', 'Hello']
 
 
-def test_protocol_server_client_interleaved_swapped_request(server_client):
-    server, client = server_client
+def test_protocol_server_client_interleaved_swapped_request(two_channels):
+    server, client = two_channels
 
     client.sequence_command_local(SampleCommand('Hello'))
     client_request = client.tap()[0]
@@ -346,8 +347,8 @@ def test_protocol_server_client_interleaved_swapped_request(server_client):
     assert [c.item() for c in server.get_final_sequence()] == ['World', 'Hello']
 
 
-def test_protocol_server_client_interleaved_swapped_reply(server_client):
-    server, client = server_client
+def test_protocol_server_client_interleaved_swapped_reply(two_channels):
+    server, client = two_channels
 
     client.sequence_command_local(SampleCommand('Hello'))
     client_request = client.tap()[0]
@@ -374,8 +375,8 @@ def test_protocol_server_client_interleaved_swapped_reply(server_client):
     assert [c.item() for c in server.get_final_sequence()] == ['World', 'Hello']
 
 
-def test_random_interleave_no_drop(server_client):
-    server, client = server_client
+def test_random_interleave_no_drop(two_channels):
+    server, client = two_channels
 
     NUMBER = 20
     commands = list(range(NUMBER))
@@ -398,8 +399,8 @@ def test_random_interleave_no_drop(server_client):
           (server.xx_requests_stats, server.xx_replies_stats))
 
 
-def test_random_interleave_and_drop(server_client):
-    server, client = server_client
+def test_random_interleave_and_drop(two_channels):
+    server, client = two_channels
 
     NUMBER = 20
     commands = list(range(NUMBER))
@@ -420,8 +421,8 @@ def test_random_interleave_and_drop(server_client):
           (server.xx_requests_stats, server.xx_replies_stats))
 
 
-def test_random_interleave_and_drop_and_invalid(server_client):
-    server, client = server_client
+def test_random_interleave_and_drop_and_invalid(two_channels):
+    server, client = two_channels
 
     NUMBER = 20
     commands = list(range(NUMBER))
@@ -451,8 +452,8 @@ def test_random_interleave_and_drop_and_invalid(server_client):
     assert set(server_store_keys) == set(client_store_keys)
 
 
-def test_dependencies(server_client):
-    server, client = server_client
+def test_dependencies(two_channels):
+    server, client = two_channels
 
     # Commands with dependencies
     cmd = [(0, []),
@@ -514,14 +515,8 @@ def test_json_serlialize():
     assert req0 == req_err
 
 
-def test_VASProot(three_addresses, network_client):
+def test_VASProot(three_addresses, vasp):
     a0, a1, a2 = three_addresses
-    store = StorableFactory({})
-    proc = MagicMock(spec=CommandProcessor)
-    info_context = MagicMock(spec=VASPInfo)
-    network_factory = MagicMock()
-    network_factory.make_client.return_value = network_client
-    vasp = OffChainVASP(a0, proc, store, info_context, network_factory)
 
     # Check our own address is good
     assert vasp.get_vasp_address() == a0
@@ -532,16 +527,10 @@ def test_VASProot(three_addresses, network_client):
     assert vasp.get_channel(a2).is_client()
 
 
-def test_VASProot_diff_object(network_client):
+def test_VASProot_diff_object(vasp):
     a0 = LibraAddress.encode_to_Libra_address(b'A'*16)
     b1 = LibraAddress.encode_to_Libra_address(b'B'*16)
     b2 = LibraAddress.encode_to_Libra_address(b'B'*16)
-    store = StorableFactory({})
-    proc = MagicMock(spec=CommandProcessor)
-    info_context = MagicMock(spec=VASPInfo)
-    network_factory = MagicMock()
-    network_factory.make_client.return_value = network_client
-    vasp = OffChainVASP(a0, proc, store, info_context, network_factory)
 
     # Check our own address is good
     assert vasp.get_vasp_address() == a0
