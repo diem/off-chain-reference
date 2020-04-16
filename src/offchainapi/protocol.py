@@ -158,6 +158,9 @@ class VASPPairChannel:
     def get_my_address(self):
         return self.myself
 
+    def get_other_address(self):
+        return self.other
+
     def get_vasp(self):
         ''' Get the OffChainVASP to which this channel is attached. '''
         return self.vasp
