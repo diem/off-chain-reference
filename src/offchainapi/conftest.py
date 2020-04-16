@@ -1,6 +1,6 @@
 from .payment import PaymentActor, PaymentAction, PaymentObject, KYCData
 from .payment_logic import Status
-from .business import BusinessContext
+from .business import BusinessContext, VASPInfo
 from .storage import StorableFactory
 from .payment_logic import PaymentProcessor, PaymentCommand
 from .protocol import OffChainVASP, VASPPairChannel
@@ -64,6 +64,7 @@ def kyc_data():
 def store():
     return StorableFactory({})
 
+
 @pytest.fixture
 def processor(store):
     bcm = MagicMock(spec=BusinessContext)
@@ -96,23 +97,18 @@ def states(request):
 
 
 @pytest.fixture
-def vasp():
-    vasp = MagicMock(spec=OffChainVASP)
-    vasp.info_context = PropertyMock(autospec=True)
-    vasp.info_context.get_peer_base_url.return_value = '/'
-    return vasp
+def vasp(three_addresses, store):
+    a0, _, _ = three_addresses
+    command_processor = MagicMock(spec=CommandProcessor)
+    info_context = MagicMock(spec=VASPInfo)
+    network_factory = MagicMock()
+    return OffChainVASP(
+        a0, command_processor, store, info_context, network_factory
+    )
 
 
 @pytest.fixture
-def network_client():
-    network_client = MagicMock()
-    network_client.get_url.return_value = '/'
-    network_client.send_request.return_value = None
-    return network_client
-
-
-@pytest.fixture
-def server_client(three_addresses, vasp, network_client, store):
+def two_channels(three_addresses, vasp, store):
     def monkey_tap(pair):
         pair.msg = []
 
@@ -132,24 +128,19 @@ def server_client(three_addresses, vasp, network_client, store):
 
     a0, a1, _ = three_addresses
     command_processor = MagicMock(spec=CommandProcessor)
-    store_server = deepcopy(store)
+    network_client = MagicMock()
     server = VASPPairChannel(
-        a0, a1, vasp, store_server, command_processor, network_client
+        a0, a1, vasp, store, command_processor, network_client
     )
-    store_client = deepcopy(store)
     client = VASPPairChannel(
-        a1, a0, vasp, store_client, command_processor, network_client
+        a1, a0, vasp, store, command_processor, network_client
     )
 
-    server = monkey_tap(server)
-    client = monkey_tap(client)
+    server, client = monkey_tap(server), monkey_tap(client)
     return (server, client)
 
 
-
-
 # --- below are only needed for networking and sample_vasp ---
-
 
 
 @pytest.fixture(params=[
@@ -172,7 +163,6 @@ def simple_response_json_error(request):
     return json_obj
 
 
-
 @pytest.fixture
 def simple_request_json():
     sender_addr = LibraAddress.encode_to_Libra_address(b'A'*16).encoded_address
@@ -190,8 +180,6 @@ def simple_request_json():
     request.seq = 0
     request_json = json.dumps(request.get_json_data_dict(JSONFlag.NET))
     return request_json
-
-
 
 
 @pytest.fixture
