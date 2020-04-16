@@ -77,19 +77,6 @@ def executor(three_addresses, store):
         return ProtocolExecutor(channel, command_processor)
 
 
-@pytest.fixture(params=[
-    ('AAAA', 'BBBB', 'AAAA', True),
-    ('BBBB', 'AAAA', 'AAAA', True),
-    ('CCCC', 'AAAA', 'AAAA', False),
-    ('BBBB', 'CCCC', 'AAAA', False),
-    ('DDDD', 'CCCC', 'AAAA', False),
-    ('AAAA', 'BBBB', 'BBBB', True),
-    ('BBBB', 'AAAA', 'DDDD', False),
-])
-def states(request):
-    return request.param
-
-
 @pytest.fixture
 def vasp(three_addresses, store):
     a0, _, _ = three_addresses

@@ -173,27 +173,37 @@ def test_payment_update_from_receiver_unilateral_abort_fail(payment, processor):
         processor.check_new_update(payment, new_obj)
 
 
-def test_payment_processor_check(states, payment, processor, executor):
-    src_addr, dst_addr, origin_addr, res = states
+def test_payment_processor_check(payment, processor, executor):
+    states = [
+        ('AAAA', 'BBBB', 'AAAA', True),
+        ('BBBB', 'AAAA', 'AAAA', True),
+        ('CCCC', 'AAAA', 'AAAA', False),
+        ('BBBB', 'CCCC', 'AAAA', False),
+        ('DDDD', 'CCCC', 'AAAA', False),
+        ('AAAA', 'BBBB', 'BBBB', True),
+        ('BBBB', 'AAAA', 'DDDD', False),
+    ]
+    for state in states:
+        src_addr, dst_addr, origin_addr, res = state
 
-    a0 = MagicMock(spec=LibraAddress)
-    a0.as_str.return_value = src_addr
-    a1 = MagicMock(spec=LibraAddress)
-    a1.as_str.return_value = dst_addr
-    origin = MagicMock(spec=LibraAddress)
-    origin.as_str.return_value = origin_addr
+        a0 = MagicMock(spec=LibraAddress)
+        a0.as_str.return_value = src_addr
+        a1 = MagicMock(spec=LibraAddress)
+        a1.as_str.return_value = dst_addr
+        origin = MagicMock(spec=LibraAddress)
+        origin.as_str.return_value = origin_addr
 
-    vasp, channel, _ = executor.get_context()
-    channel.get_my_address.return_value = a0
-    channel.get_other_address.return_value = a1
+        vasp, channel, _ = executor.get_context()
+        channel.get_my_address.return_value = a0
+        channel.get_other_address.return_value = a1
 
-    command = PaymentCommand(payment)
-    command.set_origin(origin)
-    if res:
-        processor.check_command(vasp, channel, executor, command)
-    else:
-        with pytest.raises(PaymentLogicError):
+        command = PaymentCommand(payment)
+        command.set_origin(origin)
+        if res:
             processor.check_command(vasp, channel, executor, command)
+        else:
+            with pytest.raises(PaymentLogicError):
+                processor.check_command(vasp, channel, executor, command)
 
 
 def test_payment_process_receiver_new_payment(payment, processor):
