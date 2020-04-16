@@ -1,17 +1,11 @@
 from .payment import PaymentActor, PaymentAction, PaymentObject, KYCData
-from .payment_logic import Status
 from .business import BusinessContext, VASPInfo
 from .storage import StorableFactory
-from .payment_logic import PaymentProcessor, PaymentCommand
+from .payment_logic import Status, PaymentProcessor
 from .protocol import OffChainVASP, VASPPairChannel
 from .executor import ProtocolExecutor
 from .command_processor import CommandProcessor
 from .libra_address import LibraAddress
-from .sample_service import sample_business
-from .protocol_messages import CommandRequestObject, CommandResponseObject, \
-    OffChainError
-from .utils import JSONFlag
-
 
 import types
 import json
@@ -41,7 +35,7 @@ def receiver_actor():
 
 @pytest.fixture
 def payment_action():
-    return PaymentAction(10, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
+    return PaymentAction(5, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
 
 
 @pytest.fixture
@@ -138,163 +132,6 @@ def two_channels(three_addresses, vasp, store):
 
     server, client = monkey_tap(server), monkey_tap(client)
     return (server, client)
-
-
-# --- below are only needed for networking and sample_vasp ---
-
-
-@pytest.fixture(params=[
-    (None, None, 'failure', True, 'parsing'),
-    (0, 0, 'success', None, None),
-    (0, 0, 'success', None, None),
-    (10, 10, 'success', None, None),
-])
-def simple_response_json_error(request):
-    seq, cmd_seq, status, protoerr, errcode = request.param
-    sender_addr = LibraAddress.encode_to_Libra_address(b'A'*16).encoded_address
-    receiver_addr = LibraAddress.encode_to_Libra_address(b'B'*16).encoded_address
-    resp = CommandResponseObject()
-    resp.status = status
-    resp.seq = seq
-    resp.command_seq = cmd_seq
-    if status == 'failure':
-        resp.error = OffChainError(protoerr, errcode)
-    json_obj = json.dumps(resp.get_json_data_dict(JSONFlag.NET))
-    return json_obj
-
-
-@pytest.fixture
-def simple_request_json():
-    sender_addr = LibraAddress.encode_to_Libra_address(b'A'*16).encoded_address
-    receiver_addr = LibraAddress.encode_to_Libra_address(b'B'*16).encoded_address
-    assert type(sender_addr) == str
-    assert type(receiver_addr) == str
-
-    sender = PaymentActor(sender_addr, 'C', Status.none, [])
-    receiver = PaymentActor(receiver_addr, '1', Status.none, [])
-    action = PaymentAction(5, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
-    payment = PaymentObject(sender, receiver, 'ref_payment_1',
-                            'orig_ref...', 'description ...', action)
-    command = PaymentCommand(payment)
-    request = CommandRequestObject(command)
-    request.seq = 0
-    request_json = json.dumps(request.get_json_data_dict(JSONFlag.NET))
-    return request_json
-
-
-@pytest.fixture
-def asset_path(request):
-    from pathlib import Path
-    asset_path = Path(request.fspath).resolve()
-    asset_path = asset_path.parents[3] / 'test_vectors'
-    return asset_path
-
-
-@pytest.fixture
-def basic_payment_as_receiver():
-    a0 = LibraAddress.encode_to_Libra_address(b'B'*16)
-    sender = PaymentActor(str(100), 'C', Status.none, [])
-    receiver = PaymentActor(a0.as_str(), '1', Status.none, [])
-    action = PaymentAction(5, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
-    payment = PaymentObject(sender, receiver, 'ref', 'orig_ref', 'desc', action)
-    return payment
-
-
-@pytest.fixture
-def kyc_payment_as_receiver():
-    a0 = LibraAddress.encode_to_Libra_address(b'B'*16)
-    sender = PaymentActor(str(100), 'C', Status.none, [])
-    receiver = PaymentActor(a0.as_str(), '1', Status.none, [])
-    action = PaymentAction(5, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
-    payment = PaymentObject(sender, receiver, 'ref', 'orig_ref', 'desc', action)
-
-    kyc = """{
-        "payment_reference_id": "ref",
-        "type": "individual",
-        "name": "Charlie"
-    }
-    """
-
-    kycA = """{
-        "payment_reference_id": "ref",
-        "type": "individual",
-        "name": "Alice"
-    }
-    """
-
-    payment.data['sender'].add_kyc_data(KYCData(kyc), 'KYC_SIG', 'CERT')
-    payment.data['receiver'].add_kyc_data(KYCData(kycA), 'KYC_SIG', 'CERT')
-    payment.data['sender'].change_status(Status.needs_recipient_signature)
-
-    return payment
-
-
-@pytest.fixture
-def kyc_payment_as_sender():
-    a0 = LibraAddress.encode_to_Libra_address(b'B'*16)
-    sender = PaymentActor(a0.as_str(), '1', Status.none, [])
-    receiver = PaymentActor(str(100), 'C', Status.none, [])
-    action = PaymentAction(5, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
-    payment = PaymentObject(sender, receiver, 'ref', 'orig_ref', 'desc', action)
-
-    kyc = """{
-        "payment_reference_id": "ref",
-        "type": "individual",
-        "name": "Charlie"
-    }
-    """
-
-    kycA = """{
-        "payment_reference_id": "ref",
-        "type": "individual",
-        "name": "Alice"
-    }
-    """
-
-    payment.data['sender'].add_kyc_data(KYCData(kycA), 'KYC_SIG', 'CERT')
-    payment.data['receiver'].add_kyc_data(KYCData(kyc), 'KYC_SIG', 'CERT')
-    payment.data['sender'].change_status(Status.needs_recipient_signature)
-    payment.add_recipient_signature('SIG')
-    assert payment.data['sender'] is not None
-    return payment
-
-
-@pytest.fixture
-def settled_payment_as_receiver():
-    a0 = LibraAddress.encode_to_Libra_address(b'B'*16)
-    sender = PaymentActor(str(100), 'C', Status.none, [])
-    receiver = PaymentActor(a0.as_str(), '1', Status.none, [])
-    action = PaymentAction(5, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
-    payment = PaymentObject(sender, receiver, 'ref', 'orig_ref', 'desc', action)
-
-    kyc = """{
-        "payment_reference_id": "ref",
-        "type": "individual",
-        "name": "Charlie"
-    }
-    """
-
-    kycA = """{
-        "payment_reference_id": "ref",
-        "type": "individual",
-        "name": "Alice"
-    }
-    """
-
-    payment.data['sender'].add_kyc_data(KYCData(kyc), 'KYC_SIG', 'CERT')
-    payment.data['receiver'].add_kyc_data(KYCData(kycA), 'KYC_SIG', 'CERT')
-    payment.add_recipient_signature('SIG')
-    payment.data['sender'].change_status(Status.settled)
-    return payment
-
-
-@pytest.fixture
-def addr_bc_proc():
-    a0 = LibraAddress.encode_to_Libra_address(b'B'*16)
-    bc = sample_business(a0)
-    store = StorableFactory({})
-    proc = PaymentProcessor(bc, store)
-    return (a0, bc, proc)
 
 
 @pytest.fixture
