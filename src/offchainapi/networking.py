@@ -110,7 +110,9 @@ class VASPOffChainApi(MethodView):
             logging.debug(f'Type Error {e}')
             import traceback
             traceback.print_exc()
-
             abort(400)
+
+        
+
         assert response != None
         return response.content
