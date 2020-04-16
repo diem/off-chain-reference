@@ -1,8 +1,6 @@
 from ..protocol import *
 from ..executor import ExecutorException
-from ..libra_address import LibraAddress, LibraAddressError
 from ..protocol_messages import CommandRequestObject, CommandResponseObject
-from ..business import BusinessContext, VASPInfo
 from ..sample_command import SampleCommand
 from ..utils import JSONSerializable
 
@@ -527,10 +525,9 @@ def test_VASProot(three_addresses, vasp):
     assert vasp.get_channel(a2).is_client()
 
 
-def test_VASProot_diff_object(vasp):
-    a0 = LibraAddress.encode_to_Libra_address(b'A'*16)
-    b1 = LibraAddress.encode_to_Libra_address(b'B'*16)
-    b2 = LibraAddress.encode_to_Libra_address(b'B'*16)
+def test_VASProot_diff_object(vasp, three_addresses):
+    a0, _, b1 = three_addresses
+    b2 = deepcopy(b1)
 
     # Check our own address is good
     assert vasp.get_vasp_address() == a0
@@ -538,11 +535,10 @@ def test_VASProot_diff_object(vasp):
     assert vasp.get_channel(b1) is vasp.get_channel(b2)
 
 
-def test_real_address():
+def test_real_address(three_addresses):
     from os import urandom
-    A = LibraAddress.encode_to_Libra_address(b'A'*16)
-    Ap = LibraAddress.encode_to_Libra_address(b'A'*16)
-    B = LibraAddress.encode_to_Libra_address(b'B'*16)
+    A, _, B = three_addresses
+    Ap = deepcopy(A)
     assert B.greater_than_or_equal(A)
     assert not A.greater_than_or_equal(B)
     assert A.greater_than_or_equal(A)
