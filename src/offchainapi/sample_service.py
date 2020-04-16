@@ -138,7 +138,7 @@ class sample_business(BusinessContext):
     def is_sender(self, payment):
         self.assert_payment_for_vasp(payment)
         return payment.sender.address == self.get_address()
-    
+
 
     def validate_recipient_signature(self, payment):
         if 'recipient_signature' in payment.data:
@@ -169,12 +169,12 @@ class sample_business(BusinessContext):
 
         to_provide = set()
         if payment.data[other_role].status == Status.needs_stable_id:
-                to_provide.add(Status.needs_stable_id) 
-        
+                to_provide.add(Status.needs_stable_id)
+
         if payment.data[other_role].status == Status.needs_kyc_data:
-                to_provide.add(Status.needs_stable_id) 
-                to_provide.add(Status.needs_kyc_data) 
-        
+                to_provide.add(Status.needs_stable_id)
+                to_provide.add(Status.needs_kyc_data)
+
         if payment.data[other_role].status == Status.needs_recipient_signature:
                 if my_role == 'receiver':
                     to_provide.add(Status.needs_recipient_signature)
@@ -233,11 +233,11 @@ class sample_business(BusinessContext):
         subaddress = payment.data[my_role].subaddress
         account = self.get_account(subaddress)
 
-        if my_role == 'sender': 
+        if my_role == 'sender':
+            reference = payment.reference_id
             if account["balance"] >= payment.action.amount:
 
                 # Reserve the amount for this payment
-                reference = payment.reference_id
                 if reference not in account['pending_transactions']:
                     account['pending_transactions'][reference] = {
                         "amount": payment.action.amount
