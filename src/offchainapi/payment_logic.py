@@ -14,9 +14,9 @@ from .utils import JSONSerializable
 class PaymentCommand(ProtocolCommand):
     def __init__(self, payment):
         ''' Creates a new Payment command based on the diff from the given payment.
-        
-            It depedends on the payment object that the payment diff extends 
-            (in case it updates a previous payment). It creates the object 
+
+            It depedends on the payment object that the payment diff extends
+            (in case it updates a previous payment). It creates the object
             with the version number of the payment provided.
         '''
         ProtocolCommand.__init__(self)
@@ -78,7 +78,7 @@ class PaymentCommand(ProtocolCommand):
 
     # Helper functions for payment commands specifically
     def get_previous_version(self):
-        ''' Returns the version of the previous payment, or None if this 
+        ''' Returns the version of the previous payment, or None if this
             command creates a new payment '''
         dep_len = len(self.dependencies)
         if dep_len > 1:
@@ -143,12 +143,12 @@ class PaymentProcessor(CommandProcessor):
             self.callbacks = storage_factory.make_dict('callbacks', PaymentObject, root)
             self.ready = storage_factory.make_dict('ready', PaymentObject, root)
 
-    
+
     # -------- Implements CommandProcessor interface ---------
-    
+
     def business_context(self):
         return self.business
-    
+
     def check_command(self, vasp, channel, executor, command):
         context = self.business_context()
         dependencies = executor.object_store
@@ -157,17 +157,17 @@ class PaymentProcessor(CommandProcessor):
         new_payment = command.get_object(new_version, dependencies)
 
         ## Ensure that the two parties involved are in the VASP channel
-        parties = set([new_payment.sender.address, 
+        parties = set([new_payment.sender.address,
                             new_payment.receiver.address ])
 
         if len(parties) != 2:
             raise PaymentLogicError('Wrong number of parties to payment: ' + str(parties))
 
-        my_addr = channel.myself.as_str()
+        my_addr = channel.get_my_address().as_str()
         if my_addr not in parties:
             raise PaymentLogicError('Payment parties does not include own VASP (%s): %s' % (my_addr, str(parties)))
 
-        other_addr = channel.other.as_str()
+        other_addr = channel.get_other_address().as_str()
         if other_addr not in parties:
             raise PaymentLogicError('Payment parties does not include other party (%s): %s' % (other_addr, str(parties)))
 
@@ -198,7 +198,7 @@ class PaymentProcessor(CommandProcessor):
             if command.origin == channel.myself:
                 pass # log failure of our own command :(
 
-    
+
     def process_command_backlog(self, vasp):
         ''' Sends commands that have been resumed after being interrupted to other
             VASPs.'''
@@ -207,7 +207,7 @@ class PaymentProcessor(CommandProcessor):
         #       in case this processor is used for multiple ones?
         updated_payments = self.payment_process_ready()
         for payment in updated_payments:
-            parties = [payment.sender.address, 
+            parties = [payment.sender.address,
                             payment.receiver.address ]
 
             # Determine the other address
@@ -293,7 +293,7 @@ class PaymentProcessor(CommandProcessor):
     def notify_callback(self, callback_ID):
         ''' Notify the processor that the callback with a specific ID has returned, and is ready to provide an answer. '''
         assert callback_ID in self.callbacks
-        
+
         with self.storage_factory.atomic_writes() as _:
             obj = self.callbacks[callback_ID]
             del self.callbacks[callback_ID]
@@ -301,13 +301,13 @@ class PaymentProcessor(CommandProcessor):
             #       Yes we should (opened issue #34)
             self.ready[callback_ID] = obj
             self.notify()
-            
+
     def payment_process_ready(self):
         ''' Processes any objects for which the callbacks have returned '''
         updated_objects = []
         # TODO: here some calls to payment process may result in more
         #       callbacks, should we repeat this undel the ready list len
-        #       is equal to zero. 
+        #       is equal to zero.
         for callback_ID in list(self.ready.keys()):
             obj = self.ready[callback_ID]
             new_obj = self.payment_process(obj)
