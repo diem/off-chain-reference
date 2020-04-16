@@ -181,7 +181,7 @@ class VASPPairChannel:
     def send_response(self, response):
         """ A hook to send a response to other VASP"""
         json_string = json.dumps(response.get_json_data_dict(JSONFlag.NET))
-        net_message = NetMessage(self.myself, self.other, CommandResponseObject,json_string)
+        net_message = NetMessage(self.myself, self.other, CommandResponseObject, json_string)
         self.net_queue += [ net_message ]
         logging.debug(f'Response SENT {self.myself.as_str()}  -> {self.other.as_str()}')
         return net_message
@@ -260,6 +260,7 @@ class VASPPairChannel:
 
     def parse_handle_request(self, json_command):
         ''' Handles a request provided as a json_string '''
+        assert type(json_command) == str
         logging.debug(f'Request Received {self.other.as_str()}  -> {self.myself.as_str()}')
         with self.rlock:
             try:
@@ -351,6 +352,7 @@ class VASPPairChannel:
 
     def parse_handle_response(self, json_response):
         ''' Handles a response provided as a json string. '''
+        assert type(json_response) == str
         logging.debug(f'Response Received {self.other.as_str()}  -> {self.myself.as_str()}')
         with self.rlock:
             try:
