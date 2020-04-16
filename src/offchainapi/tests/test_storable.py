@@ -1,5 +1,5 @@
 # Tests for the storage framework
-from ..storage import *
+from ..storage import StorableDict, StorableList, StorableValue, StorableFactory
 from ..payment_logic import PaymentCommand
 from ..protocol_messages import make_success_response, CommandRequestObject, \
     make_command_error

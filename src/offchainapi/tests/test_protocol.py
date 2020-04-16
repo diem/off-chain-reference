@@ -1,8 +1,9 @@
-from ..protocol import *
+from ..protocol import VASPPairChannel, make_protocol_error
 from ..executor import ExecutorException
 from ..protocol_messages import CommandRequestObject, CommandResponseObject
 from ..sample_command import SampleCommand
-from ..utils import JSONSerializable
+from ..command_processor import CommandProcessor
+from ..utils import JSONSerializable, JSONFlag
 
 import types
 from copy import deepcopy

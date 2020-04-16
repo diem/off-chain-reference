@@ -1,7 +1,9 @@
-from ..payment_logic import *
+from ..payment_logic import Status, PaymentCommand, PaymentLogicError
 from ..protocol_messages import CommandRequestObject, make_success_response
-from ..business import BusinessAsyncInterupt
+from ..business import BusinessAsyncInterupt, BusinessForceAbort, \
+    BusinessValidationFailure
 from ..utils import JSONFlag, JSONSerializable
+from ..payment import PaymentObject
 from ..libra_address import LibraAddress
 from ..sample_command import SampleCommand
 
@@ -224,44 +226,6 @@ def test_payment_process_receiver_new_payment(payment, processor):
     bcm.has_settled.side_effect = [True]
     new_payment3 = processor.payment_process(new_payment2)
     assert new_payment3.receiver.status == Status.settled
-
-
-def test_payment_process_interrupt(payment, processor):
-    bcm = processor.business_context()
-    bcm.is_recipient.side_effect = [True, True]
-    bcm.check_account_existence.side_effect = [None]
-    bcm.next_kyc_level_to_request.side_effect = [BusinessAsyncInterupt(1234)]
-    with processor.storage_factory as _:
-        new_payment = processor.payment_process(payment)
-    assert not new_payment.has_changed()
-    assert new_payment.receiver.status == Status.none
-
-
-def test_payment_process_interrupt_resume(payment, processor):
-    bcm = processor.business_context()
-    bcm.is_recipient.side_effect = [True, True, True, True]
-    bcm.check_account_existence.side_effect = [None, None]
-    bcm.next_kyc_level_to_request.side_effect = [Status.ready_for_settlement]
-    bcm.next_kyc_to_provide.side_effect = [BusinessAsyncInterupt(1234)]
-
-    assert payment.receiver.status == Status.none
-    with processor.storage_factory as _:
-        new_payment = processor.payment_process(payment)
-    assert new_payment.has_changed()
-    assert new_payment.receiver.status == Status.ready_for_settlement
-
-    bcm.next_kyc_to_provide.side_effect = [set()]
-    bcm.ready_for_settlement.side_effect = [True]
-    bcm.has_settled.side_effect = [True]
-
-    processor.notify_callback(1234)
-    with processor.storage_factory as _:
-        L = processor.payment_process_ready()
-    assert len(L) == 1
-    assert len(processor.callbacks) == 0
-    assert len(processor.ready) == 0
-    print(bcm.method_calls)
-    L[0].receiver.status == Status.settled
 
 
 def test_payment_process_abort(payment, processor):

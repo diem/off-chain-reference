@@ -137,5 +137,5 @@ def two_channels(three_addresses, vasp, store):
 @pytest.fixture
 def db(tmp_path):
     db_path = tmp_path / 'db.dat'
-    xdb = dbm.open(str(db_path), 'c')
-    return xdb
+    with dbm.open(str(db_path), 'c') as xdb:
+        yield xdb
