@@ -112,6 +112,5 @@ class VASPOffChainApi(MethodView):
             traceback.print_exc()
             abort(400)
 
-    
         assert response != None
         return response.content
