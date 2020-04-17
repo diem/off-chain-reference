@@ -1,141 +1,145 @@
-from ..sample_service import *
-from ..payment_logic import PaymentProcessor
-from ..payment import *
+from ..sample_service import sample_business, sample_vasp
+from ..payment_logic import Status, PaymentProcessor, PaymentCommand
+from ..payment import PaymentActor, PaymentObject
 from ..libra_address import LibraAddress
-from ..utils import *
-from ..protocol_messages import *
-from ..business import VASPInfo
+from ..utils import JSONFlag
+from ..protocol_messages import CommandRequestObject, CommandResponseObject, \
+    OffChainError
 
-from unittest.mock import MagicMock
+from pathlib import Path
+import OpenSSL.crypto
+import json
+from unittest.mock import MagicMock, patch
 import pytest
+
+
+@pytest.fixture
+def business_and_processor(three_addresses, store):
+    _, _, a0 = three_addresses
+    bc = sample_business(a0)
+    proc = PaymentProcessor(bc, store)
+    return (bc, proc)
+
+
+@pytest.fixture
+def payment_as_receiver(three_addresses, sender_actor, payment_action):
+    _, _, a0 = three_addresses
+    receiver = PaymentActor(a0.as_str(), '1', Status.none, [])
+    return PaymentObject(
+        sender_actor, receiver, 'ref', 'orig_ref', 'desc', payment_action
+    )
+
+
+@pytest.fixture
+def kyc_payment_as_receiver(payment_as_receiver, kyc_data):
+    payment = payment_as_receiver
+    payment.sender.add_kyc_data(kyc_data, 'KYC_SIG', 'CERT')
+    payment.receiver.add_kyc_data(kyc_data, 'KYC_SIG', 'CERT')
+    payment.sender.change_status(Status.needs_recipient_signature)
+    return payment
+
+
+@pytest.fixture
+def settled_payment_as_receiver(kyc_payment_as_receiver):
+    payment = kyc_payment_as_receiver
+    payment.add_recipient_signature('SIG')
+    payment.sender.change_status(Status.settled)
+    return payment
+
+
+@pytest.fixture
+def payment_as_sender(three_addresses, receiver_actor, payment_action):
+    _, _, a0 = three_addresses
+    sender = PaymentActor(a0.as_str(), '1', Status.none, [])
+    return PaymentObject(
+        sender, receiver_actor, 'ref', 'orig_ref', 'desc', payment_action
+    )
+
+
+@pytest.fixture
+def kyc_payment_as_sender(payment_as_sender, kyc_data):
+    payment = payment_as_sender
+    payment.sender.add_kyc_data(kyc_data, 'KYC_SIG', 'CERT')
+    payment.receiver.add_kyc_data(kyc_data, 'KYC_SIG', 'CERT')
+    payment.sender.change_status(Status.needs_recipient_signature)
+    payment.add_recipient_signature('SIG')
+    assert payment.sender is not None
+    return payment
+
+
+@pytest.fixture
+def my_addr(three_addresses):
+    _, _, a0 = three_addresses
+    return a0
+
+
+@pytest.fixture
+def other_addr(three_addresses):
+    a0, _, _ = three_addresses
+    return a0
+
 
 @pytest.fixture
 def asset_path(request):
-    from pathlib import Path
     asset_path = Path(request.fspath).resolve()
     asset_path = asset_path.parents[3] / 'test_vectors'
     return asset_path
 
-@pytest.fixture
-def basic_payment_as_receiver():
-    a0 = LibraAddress.encode_to_Libra_address(b'B'*16)
-    sender = PaymentActor(str(100), 'C', Status.none, [])
-    receiver = PaymentActor(a0.as_str(), '1', Status.none, [])
-    action = PaymentAction(5, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
-    payment = PaymentObject(sender, receiver, 'ref', 'orig_ref', 'desc', action)
-    return payment
 
 @pytest.fixture
-def kyc_payment_as_receiver():
-    a0 = LibraAddress.encode_to_Libra_address(b'B'*16)
-    sender = PaymentActor(str(100), 'C', Status.none, [])
-    receiver = PaymentActor(a0.as_str(), '1', Status.none, [])
-    action = PaymentAction(5, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
-    payment = PaymentObject(sender, receiver, 'ref', 'orig_ref', 'desc', action)
+def vasp(my_addr, asset_path):
+    return sample_vasp(my_addr, asset_path)
 
-    kyc = """{
-        "payment_reference_id": "ref",
-        "type": "individual",
-        "name": "Charlie"
-    }
-    """
 
-    kycA = """{
-        "payment_reference_id": "ref",
-        "type": "individual",
-        "name": "Alice"
-    }
-    """
-
-    payment.data['sender'].add_kyc_data(KYCData(kyc), 'KYC_SIG', 'CERT')
-    payment.data['receiver'].add_kyc_data(KYCData(kycA), 'KYC_SIG', 'CERT')
-    payment.data['sender'].change_status(Status.needs_recipient_signature)
-
-    return payment
-
-@pytest.fixture
-def kyc_payment_as_sender():
-    a0 = LibraAddress.encode_to_Libra_address(b'B'*16)
-    sender = PaymentActor(a0.as_str(), '1', Status.none, [])
-    receiver = PaymentActor(str(100), 'C', Status.none, [])
-    action = PaymentAction(5, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
-    payment = PaymentObject(sender, receiver, 'ref', 'orig_ref', 'desc', action)
-
-    kyc = """{
-        "payment_reference_id": "ref",
-        "type": "individual",
-        "name": "Charlie"
-    }
-    """
-
-    kycA = """{
-        "payment_reference_id": "ref",
-        "type": "individual",
-        "name": "Alice"
-    }
-    """
-
-    payment.data['sender'].add_kyc_data(KYCData(kycA), 'KYC_SIG', 'CERT')
-    payment.data['receiver'].add_kyc_data(KYCData(kyc), 'KYC_SIG', 'CERT')
-    payment.data['sender'].change_status(Status.needs_recipient_signature)
-    payment.add_recipient_signature('SIG')
-    assert payment.data['sender'] is not None
-    return payment
+@pytest.fixture(params=[
+    (None, None, 'failure', True, 'parsing'),
+    (0, 0, 'success', None, None),
+    (0, 0, 'success', None, None),
+    (10, 10, 'success', None, None),
+])
+def simple_response_json_error(request):
+    seq, cmd_seq, status, protoerr, errcode = request.param
+    resp = CommandResponseObject()
+    resp.status = status
+    resp.seq = seq
+    resp.command_seq = cmd_seq
+    if status == 'failure':
+        resp.error = OffChainError(protoerr, errcode)
+    json_obj = json.dumps(resp.get_json_data_dict(JSONFlag.NET))
+    return json_obj
 
 
 @pytest.fixture
-def settled_payment_as_receiver():
-    a0 = LibraAddress.encode_to_Libra_address(b'B'*16)
-    sender = PaymentActor(str(100), 'C', Status.none, [])
-    receiver = PaymentActor(a0.as_str(), '1', Status.none, [])
-    action = PaymentAction(5, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
-    payment = PaymentObject(sender, receiver, 'ref', 'orig_ref', 'desc', action)
+def simple_request_json(payment_action, my_addr, other_addr):
+    sender = PaymentActor(other_addr.as_str(), 'C', Status.none, [])
+    receiver = PaymentActor(my_addr.as_str(), '1', Status.none, [])
+    payment = PaymentObject(
+        sender, receiver, 'ref', 'orig_ref', 'desc', payment_action
+    )
+    command = PaymentCommand(payment)
+    request = CommandRequestObject(command)
+    request.seq = 0
+    return json.dumps(request.get_json_data_dict(JSONFlag.NET))
 
-    kyc = """{
-        "payment_reference_id": "ref",
-        "type": "individual",
-        "name": "Charlie"
-    }
-    """
 
-    kycA = """{
-        "payment_reference_id": "ref",
-        "type": "individual",
-        "name": "Alice"
-    }
-    """
+def test_business_simple(my_addr):
+    bc = sample_business(my_addr)
 
-    payment.data['sender'].add_kyc_data(KYCData(kyc), 'KYC_SIG', 'CERT')
-    payment.data['receiver'].add_kyc_data(KYCData(kycA), 'KYC_SIG', 'CERT')
-    payment.add_recipient_signature('SIG')
-    payment.data['sender'].change_status(Status.settled)
-    return payment
 
-@pytest.fixture
-def addr_bc_proc():
-    a0 = LibraAddress.encode_to_Libra_address(b'B'*16)
-    bc = sample_business(a0)
-    store = StorableFactory({})
-    proc = PaymentProcessor(bc, store)
-    return (a0, bc, proc)
-
-def test_business_simple():
-    a0 = LibraAddress.encode_to_Libra_address(b'B'*16)
-    bc = sample_business(a0)
-
-def test_business_is_related(basic_payment_as_receiver, addr_bc_proc):
-    a0, bc, proc = addr_bc_proc
-    payment = basic_payment_as_receiver
+def test_business_is_related(business_and_processor, payment_as_receiver):
+    bc, proc = business_and_processor
+    payment = payment_as_receiver
 
     kyc_level = proc.loop.run_until_complete(bc.next_kyc_level_to_request(payment))
     assert kyc_level == Status.needs_kyc_data
 
     ret_payment = proc.payment_process(payment)
     assert ret_payment.has_changed()
-    assert ret_payment.data['receiver'].data['status'] == Status.needs_kyc_data
+    assert ret_payment.receiver.status == Status.needs_kyc_data
 
-def test_business_is_kyc_provided(kyc_payment_as_receiver, addr_bc_proc):
-    a0, bc, proc = addr_bc_proc
+
+def test_business_is_kyc_provided(business_and_processor, kyc_payment_as_receiver):
+    bc, proc = business_and_processor
     payment = kyc_payment_as_receiver
 
     kyc_level = proc.loop.run_until_complete(bc.next_kyc_level_to_request(payment))
@@ -146,12 +150,11 @@ def test_business_is_kyc_provided(kyc_payment_as_receiver, addr_bc_proc):
 
     ready = proc.loop.run_until_complete(bc.ready_for_settlement(ret_payment))
     assert ready
-    assert ret_payment.data['receiver'].data['status'] == Status.ready_for_settlement
+    assert ret_payment.receiver.status == Status.ready_for_settlement
 
-def test_business_is_kyc_provided_sender(kyc_payment_as_sender, addr_bc_proc):
-    a0, bc, proc = addr_bc_proc
+def test_business_is_kyc_provided_sender(business_and_processor, kyc_payment_as_sender):
+    bc, proc = business_and_processor
     payment = kyc_payment_as_sender
-    assert payment.data['sender'] is not None
     assert bc.is_sender(payment)
     kyc_level = proc.loop.run_until_complete(bc.next_kyc_level_to_request(payment))
     assert kyc_level == Status.needs_recipient_signature
@@ -165,8 +168,8 @@ def test_business_is_kyc_provided_sender(kyc_payment_as_sender, addr_bc_proc):
     assert bc.get_account('1')['balance'] == 5.0
 
 
-def test_business_settled(settled_payment_as_receiver,addr_bc_proc):
-    a0, bc, proc = addr_bc_proc
+def test_business_settled(business_and_processor, settled_payment_as_receiver):
+    bc, proc = business_and_processor
     payment = settled_payment_as_receiver
 
     ret_payment = proc.payment_process(payment)
@@ -174,28 +177,11 @@ def test_business_settled(settled_payment_as_receiver,addr_bc_proc):
 
     ready = proc.loop.run_until_complete(bc.ready_for_settlement(ret_payment))
     assert ready
-    assert ret_payment.data['receiver'].data['status'] == Status.settled
+    assert ret_payment.data['receiver'].status == Status.settled
 
     assert bc.get_account('1')['pending_transactions']['ref']['settled']
     assert bc.get_account('1')['balance'] == 15.0
 
-
-@pytest.fixture
-def simple_request_json():
-    sender_addr = LibraAddress.encode_to_Libra_address(b'A'*16).encoded_address
-    receiver_addr = LibraAddress.encode_to_Libra_address(b'B'*16).encoded_address
-    assert type(sender_addr) == str
-    assert type(receiver_addr) == str
-
-    sender = PaymentActor(sender_addr, 'C', Status.none, [])
-    receiver = PaymentActor(receiver_addr, '1', Status.none, [])
-    action = PaymentAction(5, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
-    payment = PaymentObject(sender, receiver, 'ref_payment_1', 'orig_ref...', 'description ...', action)
-    command = PaymentCommand(payment)
-    request = CommandRequestObject(command)
-    request.seq = 0
-    request_json = json.dumps(request.get_json_data_dict(JSONFlag.NET))
-    return request_json
 
 @pytest.fixture(params=[
     (None, None, 'failure', True, 'parsing'),
@@ -216,55 +202,43 @@ def simple_response_json_error(request):
     json_obj = json.dumps(resp.get_json_data_dict(JSONFlag.NET))
     return json_obj
 
-def test_vasp_simple(simple_request_json, asset_path):
-    AddrThis   = LibraAddress.encode_to_Libra_address(b'B'*16)
-    AddrOther = LibraAddress.encode_to_Libra_address(b'A'*16)
-    vc = sample_vasp(AddrThis, asset_path)
-    vc.pp.start_processor()
-
-    vc.process_request(AddrOther, simple_request_json)
-    responses = vc.collect_messages()
-    assert len(responses) == 1
-    assert responses[0].type is CommandResponseObject
-    assert 'success' in responses[0].content
-    assert len(vc.pp.futs) == 1
-
-    # Testing the threading / Async interface works
+def test_vasp_simple(simple_request_json, vasp, other_addr):
+    vasp.process_request(other_addr, simple_request_json)
     try:
-        for fut in vc.pp.futs:
+        requests = vasp.collect_messages()
+        assert len(requests) == 1
+        assert requests[0].type is CommandResponseObject
+
+        vasp.pp.start_processor()
+        for fut in vasp.pp.futs:
             fut.result()
-        requests = vc.collect_messages()
+        requests = vasp.collect_messages()
         assert len(requests) == 1
         assert requests[0].type is CommandRequestObject
     finally:
-        vc.pp.stop_processor()
+        vasp.pp.stop_processor()
 
 
-def test_vasp_simple_wrong_VASP(simple_request_json, asset_path):
-    AddrThis   = LibraAddress.encode_to_Libra_address(b'X'*16)
-    AddrOther = LibraAddress.encode_to_Libra_address(b'A'*16)
-    vc = sample_vasp(AddrThis, asset_path)
+def test_vasp_simple_wrong_VASP(simple_request_json, asset_path, other_addr):
+    my_addr = LibraAddress.encode_to_Libra_address(b'X'*16)
+    vasp = sample_vasp(my_addr, asset_path)
+
     try:
-        vc.pp.start_processor()
-
-        vc.process_request(AddrOther, simple_request_json)
-        responses = vc.collect_messages()
+        vasp.pp.start_processor()
+        vasp.process_request(other_addr, simple_request_json)
+        responses = vasp.collect_messages()
         assert len(responses) == 1
         assert responses[0].type is CommandResponseObject
         assert 'failure' in responses[0].content
     finally:
-        vc.pp.stop_processor()
+        vasp.pp.stop_processor()
 
-def test_vasp_response(simple_response_json_error, asset_path):
-    AddrThis   = LibraAddress.encode_to_Libra_address(b'B'*16)
-    AddrOther = LibraAddress.encode_to_Libra_address(b'A'*16)
-    vc = sample_vasp(AddrThis, asset_path)
-    vc.process_response(AddrOther, simple_response_json_error)
 
-from unittest.mock import patch
+
+def test_vasp_response(simple_response_json_error, vasp, other_addr):
+    vasp.process_response(other_addr, simple_response_json_error)
 
 def test_sample_vasp_info_is_authorised(request, asset_path):
-    from pathlib import Path
     cert_file = Path(request.fspath).resolve()
     cert_file = cert_file.parents[3] / 'test_vectors' / 'client_cert.pem'
     cert_file = cert_file.resolve()
