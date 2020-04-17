@@ -17,9 +17,9 @@ from .utils import JSONSerializable
 class PaymentCommand(ProtocolCommand):
     def __init__(self, payment):
         ''' Creates a new Payment command based on the diff from the given payment.
-        
-            It depedends on the payment object that the payment diff extends 
-            (in case it updates a previous payment). It creates the object 
+
+            It depedends on the payment object that the payment diff extends
+            (in case it updates a previous payment). It creates the object
             with the version number of the payment provided.
         '''
         ProtocolCommand.__init__(self)
@@ -81,7 +81,7 @@ class PaymentCommand(ProtocolCommand):
 
     # Helper functions for payment commands specifically
     def get_previous_version(self):
-        ''' Returns the version of the previous payment, or None if this 
+        ''' Returns the version of the previous payment, or None if this
             command creates a new payment '''
         dep_len = len(self.dependencies)
         if dep_len > 1:
@@ -188,11 +188,12 @@ class PaymentProcessor(CommandProcessor):
         fut = asyncio.run_coroutine_threadsafe(self.stop_loop(), self.loop)
         # fut.result()
     
+
     # -------- Implements CommandProcessor interface ---------
-    
+
     def business_context(self):
         return self.business
-    
+
     def check_command(self, vasp, channel, executor, command):
         """ Called when receiving a new payment command to validate it. All checks here
         are blocking subsequent comments, and therefore they must be quick to ensure 
@@ -204,17 +205,17 @@ class PaymentProcessor(CommandProcessor):
         new_payment = command.get_object(new_version, dependencies)
 
         ## Ensure that the two parties involved are in the VASP channel
-        parties = set([new_payment.sender.address, 
+        parties = set([new_payment.sender.address,
                             new_payment.receiver.address ])
 
         if len(parties) != 2:
             raise PaymentLogicError('Wrong number of parties to payment: ' + str(parties))
 
-        my_addr = channel.myself.as_str()
+        my_addr = channel.get_my_address().as_str()
         if my_addr not in parties:
             raise PaymentLogicError('Payment parties does not include own VASP (%s): %s' % (my_addr, str(parties)))
 
-        other_addr = channel.other.as_str()
+        other_addr = channel.get_other_address().as_str()
         if other_addr not in parties:
             raise PaymentLogicError('Payment parties does not include other party (%s): %s' % (other_addr, str(parties)))
 
@@ -304,6 +305,7 @@ class PaymentProcessor(CommandProcessor):
         check_status(other_role, old_other_status, other_status, status)
 
         self.check_signatures(new_payment)
+
 
     def payment_process(self, payment):
         ''' A syncronous version of payment processing -- largely used for pytests '''
