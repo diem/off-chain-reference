@@ -6,7 +6,7 @@ from flask import Flask, request, abort
 from flask.views import MethodView
 import requests
 from urllib.parse import urljoin
-import json
+from json import dumps, loads
 import sys
 import logging
 
@@ -102,7 +102,7 @@ class VASPOffChainApi(MethodView):
 
         # Process the request and send a response back.
         try:
-            response = channel.parse_handle_request(json.dumps(request_json))
+            response = channel.parse_handle_request(dumps(request_json))
         except TypeError as e:
             # This exception is triggered when the channel cannot load the
             # json request; eg. when the clients sends a json dict instead of

@@ -1,36 +1,18 @@
-from ..protocol import *
-from ..executor import *
-from ..payment import *
-from ..payment_logic import PaymentCommand
+from ..executor import ProtocolExecutor, ExecutorException
+from ..command_processor import CommandProcessor
+from ..payment_logic import PaymentCommand, Status
 from ..business import BusinessContext
 
-from unittest.mock import MagicMock, PropertyMock
+from unittest.mock import MagicMock
 import pytest
 
 
-@pytest.fixture
-def basic_payment():
-    sender = PaymentActor('AAAA', 'aaaa', Status.none, [])
-    receiver = PaymentActor('BBBB', 'bbbb', Status.none, [])
-    action = PaymentAction(10, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
-    payment = PaymentObject(sender, receiver, 'ref', 'orig_ref', 'desc', action)
-    return payment
+def test_handlers(payment, executor):
+    _, channel, _ = executor.get_context()
+    store = channel.storage
+    bcm = MagicMock(spec=BusinessContext)
 
-def test_handlers(basic_payment):
-
-    a0 = LibraAddress.encode_to_Libra_address(b'A'*16)
-    a1 = LibraAddress.encode_to_Libra_address(b'B'*16)
-    proc = MagicMock(spec=CommandProcessor)
-    store = StorableFactory({})
-
-    vasp = MagicMock(spec=OffChainVASP)
-    vasp.info_context = PropertyMock(autospec=True)
-    vasp.info_context.get_peer_base_url.return_value = '/'
-
-    proc = MagicMock(spec=CommandProcessor)
-    net = MagicMock()
-    channel = VASPPairChannel(a0, a1, vasp, store, proc, net)
-    object_store = channel.executor.object_store
+    object_store = executor.object_store
 
     bcm = MagicMock(spec=BusinessContext)
     
@@ -52,16 +34,16 @@ def test_handlers(basic_payment):
     stat = Stats(bcm)
     pe = ProtocolExecutor(channel, stat)
 
-    cmd1 = PaymentCommand(basic_payment)
+    cmd1 = PaymentCommand(payment)
     cmd1.set_origin(channel.get_my_address())
 
-    pay2 = basic_payment.new_version()
+    pay2 = payment.new_version()
     pay2.data['sender'].change_status(Status.needs_stable_id)
     cmd2 = PaymentCommand(pay2)
     cmd2.set_origin(channel.get_my_address())
 
 
-    pay3 = basic_payment.new_version()
+    pay3 = payment.new_version()
     pay3.data['sender'].change_status(Status.needs_stable_id)
     cmd3 = PaymentCommand(pay3)
     cmd3.set_origin(channel.get_my_address())
@@ -73,7 +55,7 @@ def test_handlers(basic_payment):
     with store as tx_no: 
         pe.sequence_next_command(cmd1)
         v1 = cmd1.creates_versions[0]
-        assert v1 not in channel.executor.object_store
+        assert v1 not in object_store
 
         pe.set_success(0)
         assert v1 in object_store

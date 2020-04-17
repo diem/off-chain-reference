@@ -108,8 +108,8 @@ class ProtocolExecutor:
 
         # Configure storage hierarchy
         storage_factory = channel.storage
-        root = storage_factory.make_value(channel.myself.as_str(), None)
-        other_vasp = storage_factory.make_value(channel.other.as_str(), None, root=root)
+        root = storage_factory.make_value(channel.get_my_address().as_str(), None)
+        other_vasp = storage_factory.make_value(channel.get_other_address().as_str(), None, root=root)
 
         # The common sequence of commands & and their status for those committed
         self.command_sequence = storage_factory.make_list('command_sequence', ProtocolCommand, root=other_vasp)
