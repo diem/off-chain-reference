@@ -2,7 +2,6 @@ from ..sample_service import sample_business, sample_vasp
 from ..payment_logic import Status, PaymentProcessor, PaymentCommand
 from ..payment import PaymentActor, PaymentObject
 from ..libra_address import LibraAddress
-from ..business import BusinessAsyncInterupt
 from ..utils import JSONFlag
 from ..protocol_messages import CommandRequestObject, CommandResponseObject, \
     OffChainError
@@ -131,7 +130,7 @@ def test_business_is_related(business_and_processor, payment_as_receiver):
     bc, proc = business_and_processor
     payment = payment_as_receiver
 
-    kyc_level = bc.next_kyc_level_to_request(payment)
+    kyc_level = proc.loop.run_until_complete(bc.next_kyc_level_to_request(payment))
     assert kyc_level == Status.needs_kyc_data
 
     ret_payment = proc.payment_process(payment)
@@ -143,30 +142,29 @@ def test_business_is_kyc_provided(business_and_processor, kyc_payment_as_receive
     bc, proc = business_and_processor
     payment = kyc_payment_as_receiver
 
-    kyc_level = bc.next_kyc_level_to_request(payment)
+    kyc_level = proc.loop.run_until_complete(bc.next_kyc_level_to_request(payment))
     assert kyc_level == Status.none
 
-    with proc.storage_factory as _:
-        ret_payment = proc.payment_process(payment)
+    ret_payment = proc.payment_process(payment)
     assert ret_payment.has_changed()
 
-    assert bc.ready_for_settlement(ret_payment)
+    ready = proc.loop.run_until_complete(bc.ready_for_settlement(ret_payment))
+    assert ready
     assert ret_payment.receiver.status == Status.ready_for_settlement
-
 
 def test_business_is_kyc_provided_sender(business_and_processor, kyc_payment_as_sender):
     bc, proc = business_and_processor
     payment = kyc_payment_as_sender
     assert bc.is_sender(payment)
-    kyc_level = bc.next_kyc_level_to_request(payment)
+    kyc_level = proc.loop.run_until_complete(bc.next_kyc_level_to_request(payment))
     assert kyc_level == Status.needs_recipient_signature
 
-    with proc.storage_factory as _:
-        ret_payment = proc.payment_process(payment)
+    ret_payment = proc.payment_process(payment)
     assert ret_payment.has_changed()
 
-    assert bc.ready_for_settlement(ret_payment)
-    assert ret_payment.sender.status == Status.ready_for_settlement
+    ready = proc.loop.run_until_complete(bc.ready_for_settlement(ret_payment))
+    assert ready
+    assert ret_payment.data['sender'].data['status'] == Status.ready_for_settlement
     assert bc.get_account('1')['balance'] == 5.0
 
 
@@ -177,62 +175,70 @@ def test_business_settled(business_and_processor, settled_payment_as_receiver):
     ret_payment = proc.payment_process(payment)
     assert ret_payment.has_changed()
 
-    assert bc.ready_for_settlement(ret_payment)
-    assert ret_payment.receiver.status == Status.settled
+    ready = proc.loop.run_until_complete(bc.ready_for_settlement(ret_payment))
+    assert ready
+    assert ret_payment.data['receiver'].status == Status.settled
 
     assert bc.get_account('1')['pending_transactions']['ref']['settled']
     assert bc.get_account('1')['balance'] == 15.0
 
 
+@pytest.fixture(params=[
+    (None, None, 'failure', True, 'parsing'),
+    (0, 0, 'success', None, None),
+    (0, 0, 'success', None, None),
+    (10, 10, 'success', None, None),
+    ])
+def simple_response_json_error(request):
+    seq, cmd_seq, status, protoerr, errcode =  request.param
+    sender_addr = LibraAddress.encode_to_Libra_address(b'A'*16).encoded_address
+    receiver_addr   = LibraAddress.encode_to_Libra_address(b'B'*16).encoded_address
+    resp = CommandResponseObject()
+    resp.status = status
+    resp.seq = seq
+    resp.command_seq = cmd_seq
+    if status == 'failure':
+        resp.error = OffChainError(protoerr, errcode)
+    json_obj = json.dumps(resp.get_json_data_dict(JSONFlag.NET))
+    return json_obj
+
 def test_vasp_simple(simple_request_json, vasp, other_addr):
     vasp.process_request(other_addr, simple_request_json)
-    responses = vasp.collect_messages()
-    assert len(responses) == 2
-    assert responses[0].type is CommandRequestObject
-    assert responses[1].type is CommandResponseObject
-    assert 'success' in responses[1].content
+    try:
+        requests = vasp.collect_messages()
+        assert len(requests) == 1
+        assert requests[0].type is CommandResponseObject
+
+        vasp.pp.start_processor()
+        for fut in vasp.pp.futs:
+            fut.result()
+        requests = vasp.collect_messages()
+        assert len(requests) == 1
+        assert requests[0].type is CommandRequestObject
+    finally:
+        vasp.pp.stop_processor()
 
 
 def test_vasp_simple_wrong_VASP(simple_request_json, asset_path, other_addr):
     my_addr = LibraAddress.encode_to_Libra_address(b'X'*16)
     vasp = sample_vasp(my_addr, asset_path)
-    vasp.process_request(other_addr, simple_request_json)
-    responses = vasp.collect_messages()
-    assert len(responses) == 1
-    assert responses[0].type is CommandResponseObject
-    assert 'failure' in responses[0].content
+
+    try:
+        vasp.pp.start_processor()
+        vasp.process_request(other_addr, simple_request_json)
+        responses = vasp.collect_messages()
+        assert len(responses) == 1
+        assert responses[0].type is CommandResponseObject
+        assert 'failure' in responses[0].content
+    finally:
+        vasp.pp.stop_processor()
+
 
 
 def test_vasp_response(simple_response_json_error, vasp, other_addr):
     vasp.process_response(other_addr, simple_response_json_error)
 
-
-def test_vasp_simple_interrupt(simple_request_json, vasp, other_addr):
-    # Patch business context to first return an exception
-    with patch.object(
-        vasp.bc, 'ready_for_settlement', side_effect=[BusinessAsyncInterupt(1234)]
-    ) as mock_thing:
-        assert vasp.bc.ready_for_settlement == mock_thing
-        vasp.process_request(other_addr, simple_request_json)
-        responses = vasp.collect_messages()
-
-    assert len(responses) == 2
-    assert responses[0].type is CommandRequestObject
-    assert responses[1].type is CommandResponseObject
-    assert 'success' in responses[1].content
-
-    with patch.object(
-        vasp.bc, 'ready_for_settlement', return_value=True
-    ) as mock_thing:
-        assert vasp.bc.ready_for_settlement == mock_thing
-        vasp.vasp.processor.notify_callback(1234)
-        responses = vasp.collect_messages()
-
-    assert len(responses) > 0
-    assert 'ready_for' in str(responses[0].content)
-
-
-def test_sample_vasp_info_is_authorised(request, vasp, other_addr):
+def test_sample_vasp_info_is_authorised(request, asset_path):
     cert_file = Path(request.fspath).resolve()
     cert_file = cert_file.parents[3] / 'test_vectors' / 'client_cert.pem'
     cert_file = cert_file.resolve()
@@ -241,4 +247,7 @@ def test_sample_vasp_info_is_authorised(request, vasp, other_addr):
     cert = OpenSSL.crypto.load_certificate(
         OpenSSL.crypto.FILETYPE_PEM, cert_str
     )
-    assert vasp.info_context.is_authorised_VASP(cert, other_addr)
+    my_addr   = LibraAddress.encode_to_Libra_address(b'B'*16)
+    other_addr = LibraAddress.encode_to_Libra_address(b'A'*16)
+    vc = sample_vasp(my_addr, asset_path)
+    assert vc.info_context.is_authorised_VASP(cert, other_addr)

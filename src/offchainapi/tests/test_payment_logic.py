@@ -1,6 +1,6 @@
 from ..payment_logic import Status, PaymentCommand, PaymentLogicError
 from ..protocol_messages import CommandRequestObject, make_success_response
-from ..business import BusinessAsyncInterupt, BusinessForceAbort, \
+from ..business import BusinessForceAbort, \
     BusinessValidationFailure
 from ..utils import JSONFlag, JSONSerializable
 from ..payment import PaymentObject
@@ -8,7 +8,9 @@ from ..libra_address import LibraAddress
 from ..sample_command import SampleCommand
 
 from unittest.mock import MagicMock
+from mock import AsyncMock
 import pytest
+import asyncio
 
 
 def test_payment_command_serialization_net(payment):
@@ -72,6 +74,13 @@ def test_payment_command_missing_dependency_fail(payment):
     with pytest.raises(PaymentLogicError):
         cmd.get_object(new_payment.get_version(), {})
 
+
+@pytest.fixture
+def payment_processor_context():
+    bcm = AsyncMock(spec=BusinessContext)
+    store = StorableFactory({})
+    proc = PaymentProcessor(bcm, store)
+    return proc
 
 def test_payment_create_from_recipient(payment, processor):
     bcm = processor.business_context()
@@ -221,7 +230,7 @@ def test_payment_process_receiver_new_payment(payment, processor):
     bcm.check_account_existence.side_effect = [None]
     bcm.next_kyc_level_to_request.side_effect = [Status.none]
     bcm.next_kyc_to_provide.side_effect = [{Status.none}]
-    bcm.ready_for_settlement.side_effect = [True]
+    bcm.ready_for_settlement.side_effect = [ True ]
     bcm.want_single_payment_settlement.side_effect = [True]
     bcm.has_settled.side_effect = [False]
     new_payment2 = processor.payment_process(new_payment)
@@ -231,7 +240,7 @@ def test_payment_process_receiver_new_payment(payment, processor):
     bcm.check_account_existence.side_effect = [None]
     bcm.next_kyc_level_to_request.side_effect = [Status.none]
     bcm.next_kyc_to_provide.side_effect = [{Status.none}]
-    bcm.ready_for_settlement.side_effect = [True]
+    bcm.ready_for_settlement.side_effect = [ True ]
     bcm.want_single_payment_settlement.side_effect = [True]
     bcm.has_settled.side_effect = [True]
     new_payment3 = processor.payment_process(new_payment2)

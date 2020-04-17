@@ -1,4 +1,7 @@
-from .business import BusinessContext, BusinessAsyncInterupt, \
+import asyncio
+from threading import Thread
+
+from .business import BusinessContext, \
     BusinessNotAuthorized, BusinessValidationFailure, \
     BusinessForceAbort
 from .executor import ProtocolCommand, CommandProcessor
@@ -131,18 +134,60 @@ class PaymentProcessor(CommandProcessor):
 
     def __init__(self, business, storage_factory):
         self.business = business
-        self.storage_factory = storage_factory
 
-        # TODO: Persit callbacks?
-        # Either we persit them, or we have to go through all
-        # active payment objects in the executor payment store
-        # and ask for re-processing.
+        # Asyncio support
+        self.loop = asyncio.new_event_loop()
+        self.t = None
 
-        with storage_factory.atomic_writes() as txid:
-            root = storage_factory.make_value('processor', None)
-            self.callbacks = storage_factory.make_dict('callbacks', PaymentObject, root)
-            self.ready = storage_factory.make_dict('ready', PaymentObject, root)
+        # The processor state -- only access through event loop to prevent
+        # mutlithreading bugs.
 
+        # TODO: how much of this do we want to persist?
+        self.command_id = 0
+        self.pending_commands = {}
+        self.futs = []
+
+    # ------ Machinery for supporting async Business context ------
+
+    def start_processor(self):
+        """ Start the asyncio loop to process commands """
+        def main_loop(loop):
+            asyncio.set_event_loop(loop)
+            loop.run_forever()
+            self.t = None
+        self.t = Thread(target=main_loop, args=(self.loop,))
+        self.t.start()
+
+    async def process_command_async(self, vasp, channel, executor, command,
+                                    status_success, error=None):
+        self.command_id += 1
+        self.pending_commands[self.command_id] = (vasp, channel, executor,
+                                                  command, status_success,
+                                                  error)
+        
+        if status_success:
+            dependencies = executor.object_store
+            new_version = command.get_new_version()
+            payment = command.get_object(new_version, dependencies)
+            new_payment = await self.payment_process_async(payment)
+            if new_payment is not None and new_payment.has_changed():
+                new_cmd = PaymentCommand(new_payment)
+                channel.sequence_command_local(new_cmd)
+        else:
+            # TODO: Log the error, but do nothing
+            if command.origin == channel.myself:
+                pass # log failure of our own command :(
+        
+
+    async def stop_loop(self):
+        """ Coroutine to stop the event loop """
+        self.loop.stop()
+
+    def stop_processor(self):
+        """ A syncronous function to stop the event loop """
+        fut = asyncio.run_coroutine_threadsafe(self.stop_loop(), self.loop)
+        # fut.result()
+    
 
     # -------- Implements CommandProcessor interface ---------
 
@@ -150,7 +195,10 @@ class PaymentProcessor(CommandProcessor):
         return self.business
 
     def check_command(self, vasp, channel, executor, command):
-        context = self.business_context()
+        """ Called when receiving a new payment command to validate it. All checks here
+        are blocking subsequent comments, and therefore they must be quick to ensure 
+        performance. As a result we only do local syntactic checks that require no lookup
+        into the VASP potentially remote stores or accounts. """
         dependencies = executor.object_store
 
         new_version = command.get_new_version()
@@ -185,41 +233,9 @@ class PaymentProcessor(CommandProcessor):
                 self.check_new_update(old_payment, new_payment)
 
     def process_command(self, vasp, channel, executor, command, status_success, error=None):
-        if status_success:
-            dependencies = executor.object_store
-            new_version = command.get_new_version()
-            payment = command.get_object(new_version, dependencies)
-            new_payment = self.payment_process(payment)
-            if new_payment.has_changed():
-                new_cmd = PaymentCommand(new_payment)
-                channel.sequence_command_local(new_cmd)
-        else:
-            # TODO: Log the error, but do nothing
-            if command.origin == channel.myself:
-                pass # log failure of our own command :(
-
-
-    def process_command_backlog(self, vasp):
-        ''' Sends commands that have been resumed after being interrupted to other
-            VASPs.'''
-
-        # TODO: should we only request the backlog for this specific VASP,
-        #       in case this processor is used for multiple ones?
-        updated_payments = self.payment_process_ready()
-        for payment in updated_payments:
-            parties = [payment.sender.address,
-                            payment.receiver.address ]
-
-            # Determine the other address
-            my_addr = vasp.get_vasp_address().as_str()
-            assert my_addr in parties
-            parties.remove(my_addr)
-            other_addr = LibraAddress(parties[0])
-
-            channel = vasp.get_channel(other_addr)
-            new_cmd = PaymentCommand(payment)
-            channel.sequence_command_local(new_cmd)
-
+        fut = asyncio.run_coroutine_threadsafe(self.process_command_async(vasp, channel, executor, command, status_success, error), self.loop)
+        self.futs += [fut]
+        return fut
 
     # ----------- END of CommandProcessor interface ---------
 
@@ -256,8 +272,8 @@ class PaymentProcessor(CommandProcessor):
 
         role = ['sender', 'receiver'][business.is_recipient(new_payment)]
         other_role = ['sender', 'receiver'][role == 'sender']
-        other_status = new_payment.data[other_role].data['status']
-        if new_payment.data[role].data['status'] != Status.none:
+        other_status = new_payment.data[other_role].status
+        if new_payment.data[role].status != Status.none:
             raise PaymentLogicError('Sender set receiver status or vice-versa.')
 
         if other_role == 'receiver' and other_status == Status.needs_recipient_signature:
@@ -290,37 +306,18 @@ class PaymentProcessor(CommandProcessor):
 
         self.check_signatures(new_payment)
 
-    def notify_callback(self, callback_ID):
-        ''' Notify the processor that the callback with a specific ID has returned, and is ready to provide an answer. '''
-        assert callback_ID in self.callbacks
-
-        with self.storage_factory.atomic_writes() as _:
-            obj = self.callbacks[callback_ID]
-            del self.callbacks[callback_ID]
-            # TODO: should we retrive here the latest version of the object?
-            #       Yes we should (opened issue #34)
-            self.ready[callback_ID] = obj
-            self.notify()
-
-    def payment_process_ready(self):
-        ''' Processes any objects for which the callbacks have returned '''
-        updated_objects = []
-        # TODO: here some calls to payment process may result in more
-        #       callbacks, should we repeat this undel the ready list len
-        #       is equal to zero.
-        for callback_ID in list(self.ready.keys()):
-            obj = self.ready[callback_ID]
-            new_obj = self.payment_process(obj)
-            del self.ready[callback_ID]
-            if new_obj.has_changed():
-                updated_objects += [new_obj]
-        return updated_objects
 
     def payment_process(self, payment):
+        ''' A syncronous version of payment processing -- largely used for pytests '''
+        return self.loop.run_until_complete(self.payment_process_async(payment))
+
+    async def payment_process_async(self, payment):
         ''' Processes a payment that was just updated, and returns a
             new payment with potential updates. This function may be
             called multiple times for the same payment to support
             async business operations and recovery.
+
+            If there is no update to the payment simply return None.
         '''
         business = self.business
 
@@ -341,7 +338,7 @@ class PaymentProcessor(CommandProcessor):
                 current_status = Status.abort
 
             if current_status == Status.none:
-                business.check_account_existence(new_payment)
+                await business.check_account_existence(new_payment)
 
             if current_status in {Status.none,
                                   Status.needs_stable_id,
@@ -349,43 +346,31 @@ class PaymentProcessor(CommandProcessor):
                                   Status.needs_recipient_signature}:
 
                 # Request KYC -- this may be async in case of need for user input
-                current_status = business.next_kyc_level_to_request(new_payment)
+                current_status = await business.next_kyc_level_to_request(new_payment)
 
                 # Provide KYC -- this may be async in case of need for user input
-                kyc_to_provide = business.next_kyc_to_provide(new_payment)
+                kyc_to_provide = await business.next_kyc_to_provide(new_payment)
 
                 if Status.needs_stable_id in kyc_to_provide:
-                    stable_id = business.get_stable_id(new_payment)
+                    stable_id = await business.get_stable_id(new_payment)
                     new_payment.data[role].add_stable_id(stable_id)
 
                 if Status.needs_kyc_data in kyc_to_provide:
-                    extended_kyc = business.get_extended_kyc(new_payment)
+                    extended_kyc = await business.get_extended_kyc(new_payment)
                     new_payment.data[role].add_kyc_data(*extended_kyc)
 
                 if Status.needs_recipient_signature in kyc_to_provide:
-                    signature = business.get_recipient_signature(new_payment)
+                    signature = await business.get_recipient_signature(new_payment)
                     new_payment.add_recipient_signature(signature)
 
             # Check if we have all the KYC we need
             if current_status not in { Status.ready_for_settlement, Status.settled }:
-                ready = business.ready_for_settlement(new_payment)
+                ready = await business.ready_for_settlement(new_payment)
                 if ready:
                     current_status = Status.ready_for_settlement
 
-            if current_status == Status.ready_for_settlement and business.has_settled(new_payment):
+            if current_status == Status.ready_for_settlement and await business.has_settled(new_payment):
                 current_status = Status.settled
-
-        except BusinessAsyncInterupt as e:
-            # The business layer needs to do a long duration check.
-            # Cannot make quick progress, and must response with current status.
-            check_status(role, status, current_status, other_status)
-            new_payment.data[role].change_status(current_status)
-
-            # TODO: Should we pass the new or old object here?
-            if new_payment.has_changed():
-                self.callbacks[e.get_callback_ID()] = new_payment
-            else:
-                self.callbacks[e.get_callback_ID()] = payment
 
         except BusinessForceAbort:
 
@@ -393,8 +378,7 @@ class PaymentProcessor(CommandProcessor):
             # However we will catch a wrong change in the check when we change status.
             current_status = Status.abort
 
-        finally:
-            check_status(role, status, current_status, other_status)
-            new_payment.data[role].change_status(current_status)
+        check_status(role, status, current_status, other_status)
+        new_payment.data[role].change_status(current_status)
 
         return new_payment

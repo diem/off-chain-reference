@@ -12,6 +12,7 @@ import json
 import dbm
 from copy import deepcopy
 from unittest.mock import MagicMock, PropertyMock
+from mock import AsyncMock
 import pytest
 
 
@@ -61,7 +62,7 @@ def store():
 
 @pytest.fixture
 def processor(store):
-    bcm = MagicMock(spec=BusinessContext)
+    bcm = AsyncMock(spec=BusinessContext)
     return PaymentProcessor(bcm, store)
 
 
