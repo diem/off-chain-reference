@@ -17,13 +17,11 @@ def test_json_payment_flags(payment):
     payment.potentially_live = True
     data = json.dumps(payment.get_json_data_dict(flag=JSONFlag.STORE))
     pay2 = PaymentObject.from_json_data_dict(json.loads(data), flag=JSONFlag.STORE)
-    assert pay2.potentially_live and not pay2.actually_live
 
     payment.actually_live = True
     payment.potentially_live = False
     data = json.dumps(payment.get_json_data_dict(flag=JSONFlag.STORE))
     pay2 = PaymentObject.from_json_data_dict(json.loads(data), flag=JSONFlag.STORE)
-    assert not pay2.potentially_live and pay2.actually_live
 
     assert payment.version == pay2.version
     assert payment.version is not None

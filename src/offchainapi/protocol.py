@@ -7,6 +7,7 @@ from .storage import StorableFactory
 
 import json
 from collections import namedtuple
+from threading import RLock
 
 NetMessage = namedtuple('NetMessage', ['src', 'dst', 'type', 'content'])
 
@@ -25,7 +26,6 @@ class OffChainVASP:
         # We attach the notify member to this class to trigger
         # processing of resumed commands.
         self.processor = processor
-        self.processor.notify = self.notify_new_commands
 
         # The VASPInfo context that contains various network information
         # such as TLS certificates and keys.
@@ -60,18 +60,6 @@ class OffChainVASP:
             self.channel_store[store_key] = channel
 
         return self.channel_store[store_key]
-
-    def notify_new_commands(self):
-        ''' The processor calls this method to notify the VASP that new
-            commands are available for processing.
-
-            Why notify the VASP to then call back the command processor?
-            (Instead of the command processor processing the command backlog
-            directly). Because, the command processor does not keep a
-            permanent record of the VASP object, so it has to be passed back
-            to it.
-        '''
-        self.processor.process_command_backlog(self)
 
     def get_storage_factory(self):
         ''' Returns a storage factory for this system. '''
@@ -115,6 +103,9 @@ class VASPPairChannel:
         # Check we are not making a channel with ourselves
         if self.myself.as_str() == self.other.as_str():
             raise Exception('Must talk to another VASP:', self.myself.as_str(), self.other.as_str())
+
+        # A reentrant lock to manage access.
+        self.rlock = RLock()
 
         # <STARTS to persist>
         root = self.storage.make_value(self.myself.as_str(), None)
@@ -249,29 +240,31 @@ class VASPPairChannel:
         request = CommandRequestObject(off_chain_command)
 
         # Ensure all storage operations are written atomically.
-        with self.storage.atomic_writes() as tx_no:
-            request.seq = self.my_next_seq()
+        with self.rlock:
+            with self.storage.atomic_writes() as tx_no:
+                request.seq = self.my_next_seq()
 
-            if self.is_server():
-                request.command_seq = self.next_final_sequence()
-                # Raises and exits on error -- does not sequence
-                self.executor.sequence_next_command(off_chain_command,
-                    do_not_sequence_errors = True)
+                if self.is_server():
+                    request.command_seq = self.next_final_sequence()
+                    # Raises and exits on error -- does not sequence
+                    self.executor.sequence_next_command(off_chain_command,
+                        do_not_sequence_errors = True)
 
-            self.my_requests += [ request ]
-            self.send_request(request)
+                self.my_requests += [ request ]
+                self.send_request(request)
 
 
     def parse_handle_request(self, json_command):
         ''' Handles a request provided as a json_string '''
-        try:
-            req_dict = json.loads(json_command)
-            request = CommandRequestObject.from_json_data_dict(req_dict, JSONFlag.NET)
-            return self.handle_request(request)
-        except JSONParsingError:
-            response = make_parsing_error()
-            return self.send_response(response)
-            #return None
+        with self.rlock:
+            try:
+                req_dict = json.loads(json_command)
+                request = CommandRequestObject.from_json_data_dict(req_dict, JSONFlag.NET)
+                return self.handle_request(request)
+            except JSONParsingError:
+                response = make_parsing_error()
+                return self.send_response(response)
+                #return None
 
 
 
@@ -355,13 +348,14 @@ class VASPPairChannel:
 
     def parse_handle_response(self, json_response):
         ''' Handles a response provided as a json string. '''
-        try:
-            resp_dict = json.loads(json_response)
-            response = CommandResponseObject.from_json_data_dict(resp_dict, JSONFlag.NET)
-            self.handle_response(response)
-        except JSONParsingError:
-            # Log, but cannot reply: TODO
-            raise # To close the channel
+        with self.rlock:
+            try:
+                resp_dict = json.loads(json_response)
+                response = CommandResponseObject.from_json_data_dict(resp_dict, JSONFlag.NET)
+                self.handle_response(response)
+            except JSONParsingError:
+                # Log, but cannot reply: TODO
+                raise # To close the channel
 
     def handle_response(self, response):
         with self.storage.atomic_writes() as tx_no:
@@ -452,7 +446,8 @@ class VASPPairChannel:
 
     def retransmit(self):
         """ Re-sends the earlierst request that has not yet got a response, if any """
-        self.would_retransmit(do_retransmit=True)
+        with self.rlock:
+            self.would_retransmit(do_retransmit=True)
 
     def would_retransmit(self, do_retransmit=False):
         """ Returns true if there are any pending re-transmits, namely
@@ -461,8 +456,7 @@ class VASPPairChannel:
         with self.storage.atomic_writes() as tx_no:
             answer = False
             next_retransmit = self.next_retransmit.get_value()
-            my_request_len  = len(self.my_requests)
-            while next_retransmit < my_request_len:
+            while next_retransmit < len(self.my_requests):
                 request = self.my_requests[next_retransmit]
                 if request.has_response():
                     next_retransmit += 1

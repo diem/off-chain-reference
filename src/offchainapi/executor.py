@@ -3,17 +3,17 @@ from .command_processor import CommandProcessor
 from .libra_address import LibraAddress
 from .shared_object import SharedObject
 
+
 # Interface we need to do commands:
 class ProtocolCommand(JSONSerializable):
     def __init__(self):
         self.dependencies = []
-        self.creates_versions   = []
-        self.commit_status = None
-        self.origin = None # Takes a LibraAddress
+        self.creates_versions = []
+        self.origin = None  # Takes a LibraAddress
 
     def set_origin(self, origin):
         ''' Sets the Libra address that proposed this command '''
-        assert self.origin == None or origin == self.origin
+        assert self.origin is None or origin == self.origin
         self.origin = origin
 
     def get_origin(self):
@@ -21,7 +21,8 @@ class ProtocolCommand(JSONSerializable):
         return self.origin
 
     def get_dependencies(self):
-        ''' Get the list of dependencies. This is a list of version numbers. '''
+        ''' Get the list of dependencies.
+            This is a list of version numbers. '''
         return set(self.dependencies)
 
     def new_object_versions(self):
@@ -30,22 +31,21 @@ class ProtocolCommand(JSONSerializable):
 
     def get_object(self, version_number, dependencies):
         ''' Returns the actual shared object with this version number. '''
-        raise NotImplementedError('You need to subclass and override this method')
+        raise NotImplementedError(
+                'You need to subclass and override this method')
 
     def get_json_data_dict(self, flag):
-        ''' Get a data dictionary compatible with JSON serilization (json.dumps) '''
+        ''' Get a data dictionary compatible with
+            JSON serilization (json.dumps) '''
         data_dict = {
-            "dependencies" : self.dependencies,
-            "creates_versions"    : self.creates_versions,
+            "dependencies":     self.dependencies,
+            "creates_versions": self.creates_versions,
         }
 
         if flag == JSONFlag.STORE:
-            data_dict.update({
-                "commit_status" : self.commit_status,
-            })
             if self.origin is not None:
                 data_dict.update({
-                    "origin" : self.origin.as_str()
+                    "origin": self.origin.as_str()
                 })
 
         self.add_object_type(data_dict)
@@ -53,13 +53,13 @@ class ProtocolCommand(JSONSerializable):
 
     @classmethod
     def from_json_data_dict(cls, data, flag):
-        ''' Construct the object from a serlialized JSON data dictionary (from json.loads). '''
+        ''' Construct the object from a serlialized
+            JSON data dictionary (from json.loads). '''
         self = cls.__new__(cls)
         ProtocolCommand.__init__(self)
         self.dependencies = list(data['dependencies'])
         self.creates_versions = list(data['creates_versions'])
         if flag == JSONFlag.STORE:
-            self.commit_status = data["commit_status"]
             if "origin" in data:
                 self.origin = LibraAddress(data["origin"])
         return self
@@ -67,6 +67,7 @@ class ProtocolCommand(JSONSerializable):
 
 class ExecutorException(Exception):
     pass
+
 
 class ProtocolExecutor:
     """ An instance of this class managed the common sequence of commands
@@ -85,7 +86,6 @@ class ProtocolExecutor:
         level protocol forward.
     """
 
-
     def __init__(self, channel, processor):
         """ Initialize the ProtocolExecutor with a Command Processor
             that checks the commands, and then executes the protocol for
@@ -102,7 +102,7 @@ class ProtocolExecutor:
             assert isinstance(channel, VASPPairChannel)
 
         self.processor = processor
-        self.channel   = channel
+        self.channel = channel
 
         # <STARTS to persist>
 
@@ -111,27 +111,23 @@ class ProtocolExecutor:
         root = storage_factory.make_value(channel.get_my_address().as_str(), None)
         other_vasp = storage_factory.make_value(channel.get_other_address().as_str(), None, root=root)
 
-        # The common sequence of commands
+        # The common sequence of commands & and their status for those committed
         self.command_sequence = storage_factory.make_list('command_sequence', ProtocolCommand, root=other_vasp)
-
-        # The highest sequence command confirmed as success of failure.
-        self._last_confirmed = storage_factory.make_value('last_confirmed', int, root=other_vasp, default=0)
+        self.command_status_sequence = storage_factory.make_list('command_status_sequence', bool, root=other_vasp)
 
         # This is the primary store of shared objects.
         # It maps version numbers -> objects
-        self.object_store = storage_factory.make_dict('object_store', SharedObject, root=other_vasp) # TODO: persist this structure
-
+        self.object_store = storage_factory.make_dict('object_store', SharedObject, root=other_vasp)
+        # Maps of version numbers -> bool, where True = live, and False = not live.
+        self.object_liveness = storage_factory.make_dict('object_liveness', bool, root=other_vasp)
+        
         # <ENDS to persist>
 
     @property
     def last_confirmed(self):
-        """ The index of the last confirmed (success or fail) command in the sequence """
-        return self._last_confirmed.get_value()
-
-    @last_confirmed.setter
-    def last_confirmed(self, value):
-        self._last_confirmed.set_value(value)
-
+        """ The index of the last confirmed (success or fail) 
+            command in the sequence """
+        return len(self.command_status_sequence)
 
     def set_outcome(self, command, is_success):
         ''' Execute successful commands, and notify of failed commands'''
@@ -142,66 +138,33 @@ class ProtocolExecutor:
         ''' Returns the next sequence number in the common sequence.'''
         return len(self.command_sequence)
 
-    # Helper functions for testing.
-    if __debug__:
-        def count_potentially_live(self):
-            return sum(1 for obj in self.object_store.values() if obj.get_potentially_live())
-
-        def count_actually_live(self):
-            return sum(1 for obj in self.object_store.values() if obj.get_actually_live())
-
-    def all_true(self, versions, predicate):
-        ''' Helper function for testing status of objects in bulk '''
-        for version in versions:
-            if version not in self.object_store:
-                return False
-            obj = self.object_store[version]
-            res = predicate(obj)
-            if not res:
-                return False
-        return True
-
     def get_context(self):
         """ Returns a (vasp, channel, executor) context. """
         return (self.channel.get_vasp(), self.channel, self)
 
-    def sequence_next_command(self, command, do_not_sequence_errors = False):
-        ''' Sequence the next command in the shared sequence. '''
+    def sequence_next_command(self, command, do_not_sequence_errors=False):
+        ''' Sequence the next command in the shared sequence.'''
         dependencies = command.get_dependencies()
         all_good = False
         pos = None
 
-        own = (command.origin == self.channel.get_my_address())
-
         try:
-            # For our own commands we do speculative execution
-            # For the other commands we do actual execution
-            predicate_own = lambda obj: obj.get_potentially_live()
-            predicate_other = lambda obj: obj.get_actually_live()
-            predicate = [predicate_other, predicate_own][own]
-
-            all_good = self.all_true(dependencies, predicate)
+            # Check all dependencies are live
+            all_good = all(version in self.object_liveness \
+                           and self.object_liveness[version] \
+                           for version in dependencies)
             if not all_good:
                 raise ExecutorException('Required objects do not exist')
 
+            # Check the command is well formed
             vasp, channel, executor = self.get_context()
             self.processor.check_command(vasp, channel, executor, command)
 
-            # Since the processor has not thrown an error, we assume the
-            # command is valid and tag the objects as potentially live.
-            # (We still need a successful response from the other side to
-            # ensure they are actually live.)
-            new_versions = command.new_object_versions()
-            for version in new_versions:
-                obj = command.get_object(version, self.object_store)
-                obj.set_potentially_live(True)
-                self.object_store[version] = obj
-
-        # TODO: have a less catch-all exception here to detect expected vs. unexpected exceptions
-        #       (Issue #33)
+        # TODO: have a less catch-all exception here to detect expected vs.
+        #       unexpected exceptions (Issue #33)
         except Exception as e:
             all_good = False
-            type_str = str(type(e)) +": "+str(e)
+            type_str = f'{str(type(e))}: {str(e)}'
             raise ExecutorException(type_str)
 
         finally:
@@ -210,7 +173,7 @@ class ProtocolExecutor:
             # high level protocol failure (for audit).
             if all_good or not do_not_sequence_errors:
                 pos = len(self.command_sequence)
-                self.command_sequence += [ command ]
+                self.command_sequence += [command]
 
         return pos
 
@@ -221,32 +184,23 @@ class ProtocolExecutor:
             CommandProcessor to drive the protocol forward.
         '''
         assert seq_no == self.last_confirmed
-        self.last_confirmed += 1
-
         command = self.command_sequence[seq_no]
 
         # Consumes old objects
         dependencies = command.get_dependencies()
         for version in dependencies:
-            obj = self.object_store[version]
-            obj.set_actually_live(False)
-            obj.set_potentially_live(False)
-            self.object_store[version] = obj
+            self.object_liveness[version] = False
 
         # Creates new objects
         new_versions = command.new_object_versions()
         for version in new_versions:
-            obj = self.object_store[version]
-            obj.set_potentially_live(True)
-            obj.set_actually_live(True)
+            obj = command.get_object(version, self.object_store)
+            self.object_liveness[version] = True
             self.object_store[version] = obj
 
         # Call the command processor.
-        if command.commit_status is None:
-            command.commit_status = True
-            self.command_sequence[seq_no] = command
-            self.set_outcome(command, is_success=True)
-
+        self.command_status_sequence += [True]
+        self.set_outcome(command, is_success=True)
 
     def set_fail(self, seq_no):
         ''' Sets the command at a specific sequence number to be a failure.
@@ -255,20 +209,8 @@ class ProtocolExecutor:
             failure of subsequent commands that depend on them.
         '''
         assert seq_no == self.last_confirmed
-        self.last_confirmed += 1
-
-        command = self.command_sequence[seq_no]
-
-        new_versions = command.new_object_versions()
-        for version in new_versions:
-            if version in self.object_store:
-                obj = self.object_store[version]
-                obj.set_actually_live(False)
-                obj.set_potentially_live(False)
-                del self.object_store[version]
+        self.command_status_sequence += [False]
 
         # Call the command processor.
-        if command.commit_status is None:
-            command.commit_status = False
-            self.command_sequence[seq_no] = command
-            self.set_outcome(command, is_success=False)
+        command = self.command_sequence[seq_no]
+        self.set_outcome(command, is_success=False)
