@@ -481,5 +481,4 @@ class VASPPairChannel:
         url = self.network_client.get_url(self.peer_base_url)
         response = self.network_client.send_request(url, request_json)
         if response != None:
-            print(response.content)
-            self.parse_handle_response(response.content)
+            self.parse_handle_response(response.content.decode("utf-8") )
