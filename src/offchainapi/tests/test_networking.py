@@ -5,6 +5,7 @@ from ..protocol_messages import CommandRequestObject
 from ..utils import JSONFlag
 from ..payment_logic import Status
 
+from flask import request
 from json import dumps, loads
 from unittest.mock import MagicMock
 import pytest
@@ -97,7 +98,7 @@ def bad_request_json():
 
 def test_process_request(server, flask_client, url, request_json):
     server.vasp.info_context.is_authorised_VASP.return_value = True
-    response = flask_client.post(url, json=dumps(request_json))
+    response = flask_client.post(url, json=request_json)
     assert response.status_code == 200
     assert loads(response.data)['status'] == 'success'
 
@@ -110,5 +111,7 @@ def test_process_request_bad_vasp(server, flask_client, url, request_json):
 
 def test_process_request_bad_request(server, flask_client, url, bad_request_json):
     server.vasp.info_context.is_authorised_VASP.return_value = True
-    response = flask_client.post(url, json=bad_request_json)
+    response = flask_client.post(
+        url, json=bad_request_json, headers={'status': 'encoded'}
+    )
     assert response.status_code == 400
