@@ -178,8 +178,8 @@ class VASPPairChannel:
         """ A hook to send a request to other VASP"""
         json_string = request.get_json_data_dict(JSONFlag.NET)
         self.net_queue += [ NetMessage(self.myself, self.other, CommandRequestObject, json_string) ]
-        self.send_network_request(json_string)
         logging.debug(f'Request SENT {self.myself.as_str()}  -> {self.other.as_str()}')
+        self.send_network_request(json_string)
 
     def send_response(self, response):
         """ A hook to send a response to other VASP"""
@@ -217,6 +217,7 @@ class VASPPairChannel:
     def has_pending_responses(self):
         return self.would_retransmit()
 
+
     def process_pending_requests_response(self):
         """ The server re-schedules and executes pending requests, and cached
             responses. """
@@ -230,6 +231,7 @@ class VASPPairChannel:
         if self.next_final_sequence() in self.response_cache:
             response = self.response_cache[self.next_final_sequence()]
             self.handle_response(response)
+
 
     def apply_response_to_executor(self, request):
         """Signals to the executor the success or failure of a command."""
@@ -258,7 +260,10 @@ class VASPPairChannel:
                         do_not_sequence_errors = True)
 
                 self.my_requests += [ request ]
-                self.send_request(request)
+        
+        # Send the requests outside the locks to allow
+        # for an asyncronous implementation.
+        self.send_request(request)
 
 
     def parse_handle_request(self, json_command):
@@ -269,10 +274,14 @@ class VASPPairChannel:
             try:
                 req_dict = json.loads(json_command)
                 request = CommandRequestObject.from_json_data_dict(req_dict, JSONFlag.NET)
-                return self.handle_request(request)
+                # return self.handle_request(request)
+                response = self.handle_request(request)
             except JSONParsingError:
                 response = make_parsing_error()
-                return self.send_response(response)
+                #return self.send_response(response)
+        
+        full_response = self.send_response(response)
+        return full_response
                 
 
     def handle_request(self, request):
@@ -292,7 +301,7 @@ class VASPPairChannel:
             if previous_request.is_same_command(request):
                 # Re-send the response
                 response = previous_request.response
-                return self.send_response(response)
+                return response 
 
             else:
                 # There is a conflict, and it will have to be resolved
@@ -300,12 +309,12 @@ class VASPPairChannel:
                 #        two participants we cannot tolerate errors.
                 response = make_protocol_error(request, code='conflict')
                 response.previous_command = previous_request.command
-                return self.send_response(response)
+                return response  
 
         # Clients are not to suggest sequence numbers.
         if self.is_server() and request.command_seq is not None:
             response = make_protocol_error(request, code='malformed')
-            return self.send_response(response)
+            return response 
 
         # As a server we first wait for the status of all server
         # requests to sequence any new client requests.
@@ -315,8 +324,7 @@ class VASPPairChannel:
             # and the server network should wait until a response is available
             # before answering the client.
             response = make_protocol_error(request, code='wait')
-            return self.send_response(response)
-            #return None
+            return response
 
         # Sequence newer requests
         if request.seq == self.other_next_seq():
@@ -325,7 +333,7 @@ class VASPPairChannel:
                 # We must wait, since we cannot give an answer before sequencing
                 # previous commands.
                 response = make_protocol_error(request, code='wait')
-                return self.send_response(response)
+                return response  
 
             seq = self.next_final_sequence()
             try:
@@ -342,13 +350,13 @@ class VASPPairChannel:
             self.other_requests += [request]
 
             self.apply_response_to_executor(request)
-            return self.send_response(request.response)
+            return request.response
 
         elif request.seq > self.other_next_seq():
             # We have received the other side's request without receiving the
             # previous one
             response = make_protocol_error(request, code='missing')
-            return self.send_response(response)
+            return response
         else:
             # OK: Previous cases are exhaustive
             assert False
@@ -462,20 +470,28 @@ class VASPPairChannel:
         """ Returns true if there are any pending re-transmits, namely
             requests for which the response has not yet been received. """
 
-        with self.storage.atomic_writes() as tx_no:
-            answer = False
-            next_retransmit = self.next_retransmit.get_value()
-            while next_retransmit < len(self.my_requests):
-                request = self.my_requests[next_retransmit]
-                if request.has_response():
-                    next_retransmit += 1
-                else:
-                    answer = True
-                    if do_retransmit:
-                        self.send_request(request)
-                    break
-            self.next_retransmit.set_value(next_retransmit)
-            return answer
+        request_to_send = None
+
+        with self.rlock:
+            with self.storage.atomic_writes() as tx_no:
+                answer = False
+                next_retransmit = self.next_retransmit.get_value()
+                while next_retransmit < len(self.my_requests):
+                    request = self.my_requests[next_retransmit]
+                    if request.has_response():
+                        next_retransmit += 1
+                    else:
+                        answer = True
+                        if do_retransmit:
+                            request_to_send = request
+                        break
+                self.next_retransmit.set_value(next_retransmit)
+
+        # Send request outside the lock to allow for asynchronous
+        # sending methods.
+        if request_to_send is not None:
+            self.send_request(request)
+        return answer
 
     def send_network_request(self, request_json):
         url = self.network_client.get_url(self.peer_base_url)

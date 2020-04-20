@@ -3,6 +3,8 @@ from .protocol_messages import CommandResponseObject
 from .business import VASPInfo, BusinessNotAuthorized
 
 from flask import Flask, request, abort
+from werkzeug.serving import WSGIRequestHandler
+
 from flask.views import MethodView
 import requests
 from urllib.parse import urljoin
@@ -56,6 +58,8 @@ class NetworkServer:
         )
 
     def run(self, host='0.0.0.0', port=80):
+        # Ensures that the connection is kept alive
+        WSGIRequestHandler.protocol_version = "HTTP/1.1"
         self.app.run(host=host, port=port)
 
 
