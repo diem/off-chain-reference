@@ -192,11 +192,13 @@ class PaymentProcessor(CommandProcessor):
 
     async def stop_loop(self):
         """ Coroutine to stop the event loop """
-        self.loop.stop()
+        if self.loop is not None:
+            self.loop.stop()
 
     def stop_processor(self):
         """ A syncronous function to stop the event loop """
-        fut = asyncio.run_coroutine_threadsafe(self.stop_loop(), self.loop)
+        if self.loop is not None:
+            fut = asyncio.run_coroutine_threadsafe(self.stop_loop(), self.loop)
         # fut.result()
     
 
