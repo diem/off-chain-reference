@@ -105,7 +105,7 @@ def simple_response_json_error(request):
     resp.command_seq = cmd_seq
     if status == 'failure':
         resp.error = OffChainError(protoerr, errcode)
-    json_obj = json.dumps(resp.get_json_data_dict(JSONFlag.NET))
+    json_obj = resp.get_json_data_dict(JSONFlag.NET)
     return json_obj
 
 
@@ -119,7 +119,7 @@ def simple_request_json(payment_action, my_addr, other_addr):
     command = PaymentCommand(payment)
     request = CommandRequestObject(command)
     request.seq = 0
-    return json.dumps(request.get_json_data_dict(JSONFlag.NET))
+    return request.get_json_data_dict(JSONFlag.NET)
 
 
 def test_business_simple(my_addr):
