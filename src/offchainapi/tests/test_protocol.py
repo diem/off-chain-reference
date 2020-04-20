@@ -96,11 +96,11 @@ class RandomRun(object):
             # Make progress by delivering a random queue
             if Case[0] and len(to_server_requests) > 0:
                 client_request = to_server_requests.pop(0)
-                server.handle_request(client_request)
+                server.send_response(server.handle_request(client_request))
 
             if Case[1] and len(to_client_requests) > 0:
                 server_request = to_client_requests.pop(0)
-                client.handle_request(server_request)
+                client.send_response(client.handle_request(server_request))
 
             if Case[2] and len(to_client_response) > 0:
                 rep = to_client_response.pop(0)
@@ -196,10 +196,7 @@ def test_protocol_server_client_benign(two_channels):
 
     # Pass the request to the client
     assert client.other_next_seq() == 0
-    client.handle_request(request)
-    msg_list = client.tap()
-    assert len(msg_list) == 1
-    reply = msg_list.pop()
+    reply = client.handle_request(request)
     assert isinstance(reply, CommandResponseObject)
     assert client.other_next_seq() == 1
     assert reply.status == 'success'
@@ -228,10 +225,8 @@ def test_protocol_server_conflicting_sequence(two_channels):
     request_conflict.command = SampleCommand("Conflict")
 
     # Pass the request to the client
-    client.handle_request(request)
-    reply = client.tap()[0]
-    client.handle_request(request_conflict)
-    reply_conflict = client.tap()[0]
+    reply = client.handle_request(request)
+    reply_conflict = client.handle_request(request_conflict)
 
     # We only sequence one command.
     assert client.other_next_seq() == 1
@@ -266,10 +261,10 @@ def test_protocol_client_server_benign(two_channels):
 
     # Send to server
     assert server.other_next_seq() == 0
-    server.handle_request(request)
-    msg_list = server.tap()
-    assert len(msg_list) == 1
-    reply = msg_list.pop()
+    reply = server.handle_request(request)
+    #msg_list = server.tap()
+    #assert len(msg_list) == 1
+    #reply = msg_list.pop()
     assert isinstance(reply, CommandResponseObject)
     assert server.other_next_seq() == 1
     assert server.next_final_sequence() == 1
@@ -298,15 +293,13 @@ def test_protocol_server_client_interleaved_benign(two_channels):
     server_request = server.tap()[0]
 
     # The server waits until all own requests are done
-    server.handle_request(client_request)
-    server_reply = server.tap()[0]
+    server_reply = server.handle_request(client_request)
+    # server_reply = server.tap()[0]
     assert server_reply.error.code == 'wait'
 
-    client.handle_request(server_request)
-    client_reply = client.tap()[0]
-
+    client_reply = client.handle_request(server_request)
     server.handle_response(client_reply)
-    server_reply = server.tap()[0]
+    server_reply = server.handle_request(client_request)
 
     client.handle_response(server_reply)
 
@@ -326,14 +319,12 @@ def test_protocol_server_client_interleaved_swapped_request(two_channels):
     server.sequence_command_local(SampleCommand('World'))
     server_request = server.tap()[0]
 
-    client.handle_request(server_request)
-    client_reply = client.tap()[0]
-    server.handle_request(client_request)
-    server_reply = server.tap()[0]
+    client_reply = client.handle_request(server_request)
+    server_reply = server.handle_request(client_request)
     assert server_reply.error.code == 'wait'
 
     server.handle_response(client_reply)
-    server_reply = server.tap()[0]
+    server_reply = server.handle_request(client_request)
 
     client.handle_response(server_reply)
 
@@ -353,15 +344,15 @@ def test_protocol_server_client_interleaved_swapped_reply(two_channels):
     server.sequence_command_local(SampleCommand('World'))
     server_request = server.tap()[0]
 
-    server.handle_request(client_request)
-    server_reply = server.tap()[0]
+    server_reply = server.handle_request(client_request)
+    # server_reply = server.tap()[0]
     assert server_reply.error.code == 'wait'
 
-    client.handle_request(server_request)
-    client_reply = client.tap()[0]
+    client_reply = client.handle_request(server_request)
+    # client_reply = client.tap()[0]
 
     server.handle_response(client_reply)
-    server_reply = server.tap()[0]
+    server_reply = server.handle_request(client_request)
 
     client.handle_response(server_reply)
 

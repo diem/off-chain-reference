@@ -22,8 +22,6 @@ from unittest.mock import MagicMock
 from threading import Thread
 import time
 
-
-
 # A stand alone performance test.
 
 PeerA_addr = LibraAddress.encode_to_Libra_address(b'A'*16)
@@ -157,6 +155,13 @@ def main_perf():
     est_tx_per_sec = 1.0 / per_command_time
 
     print('Exit loop')
+
+    success_number = 0
+    for i in range(len(channelAB.executor.command_status_sequence)):
+        if channelAB.executor.command_status_sequence[i]:
+            success_number += 1
+
+    print(f'Success #: {success_number}/100')
     print(f'Command time: {1000*per_command_time: 4.2f} ms Estimate throughput: {est_tx_per_sec: 4.2f} Tx/sec')
 
     import sys
