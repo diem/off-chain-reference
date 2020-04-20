@@ -1,3 +1,9 @@
+# Sample benchmark to profile performance and observe bottlenecks.
+#
+# Run as:
+# $ python -m cProfile -s tottime src/scripts/run_perf.py > report.txt
+#
+
 import logging
 
 from .business import BusinessContext, BusinessForceAbort, \
@@ -89,11 +95,11 @@ def start_thread_main(addr, port):
 def main_perf():
     logging.basicConfig(level=logging.DEBUG)
     
-    tA = Thread(target=start_thread_main, args=(PeerA_addr, 8091, ))
+    tA = Thread(target=start_thread_main, args=(PeerA_addr, 8091, ), daemon=True)
     tA.start()
     print('Start Node A')
 
-    tB = Thread(target=start_thread_main, args=(PeerB_addr, 8092, ))
+    tB = Thread(target=start_thread_main, args=(PeerB_addr, 8092, ), daemon=True)
     tB.start()
     print('Start Node B')
 
@@ -120,6 +126,9 @@ def main_perf():
         cmd = PaymentCommand(payment)
         commands += [ cmd ]
 
+
+    start_timer = time.time()
+
     for cmd in commands:
         channelAB.sequence_command_local(cmd)
 
@@ -130,11 +139,10 @@ def main_perf():
         logging.debug(f'{name} : L:{localQlen}  R:{remoteQlen}  C:{commonQlen}')
 
         if commonQlen < 100:
-            return True
+            return False
 
-        print('Exit')
         channel.processor.stop_processor()
-        return False
+        return True
         
     exit_loop = False
     while not exit_loop:
@@ -142,3 +150,14 @@ def main_perf():
         time.sleep(0.1)
         exit_loop &= channel_summary('AB', channelAB)
         exit_loop &= channel_summary('BA', channelBA)
+    
+    end_timer = time.time()
+    
+    per_command_time = (end_timer - start_timer) / 100
+    est_tx_per_sec = 1.0 / per_command_time
+
+    print('Exit loop')
+    print(f'Command time: {1000*per_command_time: 4.2f} ms Estimate throughput: {est_tx_per_sec: 4.2f} Tx/sec')
+
+    import sys
+    sys.exit()
