@@ -129,7 +129,16 @@ def main_perf():
         commonQlen = len(channel.get_final_sequence())
         logging.debug(f'{name} : L:{localQlen}  R:{remoteQlen}  C:{commonQlen}')
 
-    while True:
+        if commonQlen < 100:
+            return True
+
+        print('Exit')
+        channel.processor.stop_processor()
+        return False
+        
+    exit_loop = False
+    while not exit_loop:
+        exit_loop = True
         time.sleep(0.1)
-        channel_summary('AB', channelAB)
-        channel_summary('BA', channelBA)
+        exit_loop &= channel_summary('AB', channelAB)
+        exit_loop &= channel_summary('BA', channelBA)
