@@ -64,7 +64,7 @@ def make_net_app(vasp):
     app = web.Application()
     net_handler = Aionet(vasp)
     app.add_routes([web.post('/', net_handler.handle_request)])
-    app.add_routes([web.post('/{recvvasp}/{sendvasp}/process', net_handler.handle_request)])
+    app.add_routes([web.post('/{recvvasp}/{sendvasp}/process', net_handler.handle_offchain_request)])
     return app, net_handler
 
 def sync_new_command(net_handler, loop, ):

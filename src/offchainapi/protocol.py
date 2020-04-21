@@ -174,9 +174,10 @@ class VASPPairChannel:
     def send_request(self, request):
         """ A hook to send a request to other VASP"""
         json_string = request.get_json_data_dict(JSONFlag.NET)
-        self.net_queue += [ NetMessage(self.myself, self.other, CommandRequestObject, json_string) ]
+        net_message = NetMessage(self.myself, self.other, CommandRequestObject, json_string)
+        self.net_queue += [ net_message ]
         logging.debug(f'Request SENT {self.myself.as_str()}  -> {self.other.as_str()}')
-        #self.network_client.send_request(json_string)
+        return net_message
 
     def send_response(self, response):
         """ A hook to send a response to other VASP"""
@@ -260,7 +261,7 @@ class VASPPairChannel:
 
         # Send the requests outside the locks to allow
         # for an asyncronous implementation.
-        self.send_request(request)
+        return self.send_request(request)
 
 
     def parse_handle_request(self, json_command):
