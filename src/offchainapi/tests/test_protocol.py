@@ -153,30 +153,21 @@ def test_client_server_role_definition(three_addresses, vasp):
     a0, a1, a2 = three_addresses
     command_processor = MagicMock(spec=CommandProcessor)
     store = MagicMock()
-    network_client = MagicMock()
 
-    channel = VASPPairChannel(
-        a0, a1, vasp, store, command_processor, network_client
-    )
+    channel = VASPPairChannel(a0, a1, vasp, store, command_processor)
     assert channel.is_server()
     assert not channel.is_client()
 
-    channel = VASPPairChannel(
-        a1, a0, vasp, store, command_processor, network_client
-    )
+    channel = VASPPairChannel(a1, a0, vasp, store, command_processor)
     assert not channel.is_server()
     assert channel.is_client()
 
     # Lower address is server (xor bit = 1)
-    channel = VASPPairChannel(
-        a0, a2, vasp, store, command_processor, network_client
-    )
+    channel = VASPPairChannel(a0, a2, vasp, store, command_processor)
     assert not channel.is_server()
     assert channel.is_client()
 
-    channel = VASPPairChannel(
-        a2, a0, vasp, store, command_processor, network_client
-    )
+    channel = VASPPairChannel(a2, a0, vasp, store, command_processor)
     assert channel.is_server()
     assert not channel.is_client()
 

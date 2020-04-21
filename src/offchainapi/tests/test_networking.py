@@ -4,9 +4,11 @@ from ..payment_logic import PaymentCommand
 from ..protocol_messages import CommandRequestObject
 from ..utils import JSONFlag
 from ..payment_logic import Status
+from ..protocol import VASPPairChannel
 
 from json import dumps, loads
 from unittest.mock import MagicMock
+import mock
 import pytest
 
 
@@ -41,7 +43,11 @@ def request_json(three_addresses, payment_action):
 
 @pytest.fixture
 def network_client(tester_addr, testee_addr):
-    return NetworkClient(testee_addr, tester_addr)
+    channel = MagicMock(spec=VASPPairChannel)
+    channel.get_my_address.return_value = testee_addr
+    channel.get_other_address.return_value = tester_addr
+    channel.peer_base_url = '/'
+    return NetworkClient(channel)
 
 
 @pytest.fixture
@@ -51,21 +57,20 @@ def response_json():
 
 def test_get_url(network_client, tester_addr, testee_addr):
     url = network_client.get_url('/')
-    assert url == f'/{tester_addr.as_str()}/{testee_addr.as_str()}/process/'
+    assert url == f'/{testee_addr.as_str()}/{tester_addr.as_str()}/process/'
 
 
 # the 'httpserver' fixture comes from the pytest-httpserver package
 def test_send_request(network_client, httpserver, request_json, response_json):
     url = '/process'
     httpserver.expect_request(url).respond_with_json(dumps(response_json))
-    response = network_client.send_request(httpserver.url_for(url), request_json)
-    assert response.status_code == 200
+    ret = network_client.send_request(httpserver.url_for(url), request_json)
+    assert ret
 
 
 def test_send_request_unknown_receiver(network_client, request_json):
-    url = 'http://bad_url'
-    response = network_client.send_request(url, request_json)
-    assert response is None
+    ret = network_client.send_request(url, request_json)
+    assert not ret
 
 
 # --- Test server ---

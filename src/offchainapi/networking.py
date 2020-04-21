@@ -14,28 +14,40 @@ import logging
 
 
 class NetworkClient:
-    def __init__(self, my_addr, other_addr):
-        self.my_addr = my_addr
-        self.other_addr = other_addr
+    def __init__(self, channel):
+        self.channel = channel
 
         # We send all requests through a session to re-use the TLS connection.
         # Keep-alive is automatic within a session.
         self.session = requests.Session()
 
     def get_url(self, base_url):
-        url = f'{self.other_addr.as_str()}/{self.my_addr.as_str()}/process/'
+        my_addr = self.channel.get_my_address()
+        my_other = self.channel.get_other_address()
+        url = f'{my_addr.as_str()}/{my_other.as_str()}/process/'
         return urljoin(base_url, url)
 
     def send_request(self, url, json_request):
         logging.debug(f'Connect to {url}')
         try:
-            return self.session.post(url, json=json_request)
+            response = self.session.post(url, json=json_request)
         except requests.exceptions.RequestException as e:
             logging.warning(f'RequestException: {e}')
             # This happens in case of (i) a connection error (e.g. DNS failure,
             # refused connection, etc), (ii) timeout, or (iii) if the maximum
             # number of redirections is reached.
-            return None
+            response = None
+
+        if response == None:
+            return False
+
+        try:
+            self.channel.parse_handle_response(response.content.decode('utf-8'))
+        except UnicodeError as e:
+            logging.warning(f'UnicodeError: {e}')
+            return False
+
+        return True
 
     def close_connection(self):
         self.session.config['keep_alive'] = False

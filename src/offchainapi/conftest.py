@@ -110,12 +110,11 @@ def two_channels(three_addresses, vasp, store):
 
     a0, a1, _ = three_addresses
     command_processor = MagicMock(spec=CommandProcessor)
-    network_client = MagicMock()
     server = VASPPairChannel(
-        a0, a1, vasp, store, command_processor, network_client
+        a0, a1, vasp, store, command_processor
     )
     client = VASPPairChannel(
-        a1, a0, vasp, store, command_processor, network_client
+        a1, a0, vasp, store, command_processor
     )
 
     server, client = monkey_tap(server), monkey_tap(client)
