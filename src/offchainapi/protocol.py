@@ -16,7 +16,7 @@ class OffChainVASP:
     """Manages the off-chain protocol on behalf of one VASP. """
     def __init__(self, vasp_addr, processor, storage_factory, info_context, network_factory):
         logging.debug(f'Creating VASP {vasp_addr.as_str()}')
-        
+
         assert isinstance(processor, CommandProcessor)
         assert isinstance(vasp_addr, LibraAddress)
 
@@ -52,13 +52,14 @@ class OffChainVASP:
         self.business_context.open_channel_to(other_vasp_addr)
         my_address = self.get_vasp_address()
         store_key = (my_address, other_vasp_addr)
-        net_channel = self.network_factory.make_client(
-            my_address, other_vasp_addr, self.info_context
-        )
 
         if store_key not in self.channel_store:
             channel = VASPPairChannel(
-                my_address, other_vasp_addr, self, self.storage_factory, self.processor, net_channel
+                my_address,
+                other_vasp_addr,
+                self,
+                self.storage_factory,
+                self.processor
             )
             self.channel_store[store_key] = channel
 
@@ -83,7 +84,7 @@ class OffChainVASP:
 class VASPPairChannel:
     """Represents the state of an off-chain bi-directional channel bewteen two VASPs"""
 
-    def __init__(self, myself, other, vasp, storage, processor, network_client):
+    def __init__(self, myself, other, vasp, storage, processor):
         """ Initialize the channel between two VASPs.
 
         * Myself is the VASP initializing the local object (VASPInfo)
@@ -139,11 +140,10 @@ class VASPPairChannel:
         # Network handler
         self.net_queue = []
 
-        # The network client
+        # The peer base url
         self.peer_base_url = self.vasp.info_context.get_peer_base_url(self.other)
-        self.network_client = network_client
 
-        logging.debug(f'Creating VASP channel {myself.as_str()}  -> {other.as_str()}')
+        logging.debug(f'Creating VASP channel {myself.as_str()} -> {other.as_str()}')
 
     def my_next_seq(self):
         return len(self.my_requests)
@@ -179,7 +179,7 @@ class VASPPairChannel:
         json_string = request.get_json_data_dict(JSONFlag.NET)
         self.net_queue += [ NetMessage(self.myself, self.other, CommandRequestObject, json_string) ]
         logging.debug(f'Request SENT {self.myself.as_str()}  -> {self.other.as_str()}')
-        self.send_network_request(json_string)
+        #self.network_client.send_request(json_string)
 
     def send_response(self, response):
         """ A hook to send a response to other VASP"""
@@ -260,7 +260,7 @@ class VASPPairChannel:
                         do_not_sequence_errors = True)
 
                 self.my_requests += [ request ]
-        
+
         # Send the requests outside the locks to allow
         # for an asyncronous implementation.
         self.send_request(request)
@@ -279,10 +279,10 @@ class VASPPairChannel:
             except JSONParsingError:
                 response = make_parsing_error()
                 #return self.send_response(response)
-        
+
         full_response = self.send_response(response)
         return full_response
-                
+
 
     def handle_request(self, request):
         with  self.storage.atomic_writes() as tx_no:
@@ -301,7 +301,7 @@ class VASPPairChannel:
             if previous_request.is_same_command(request):
                 # Re-send the response
                 response = previous_request.response
-                return response 
+                return response
 
             else:
                 # There is a conflict, and it will have to be resolved
@@ -309,12 +309,12 @@ class VASPPairChannel:
                 #        two participants we cannot tolerate errors.
                 response = make_protocol_error(request, code='conflict')
                 response.previous_command = previous_request.command
-                return response  
+                return response
 
         # Clients are not to suggest sequence numbers.
         if self.is_server() and request.command_seq is not None:
             response = make_protocol_error(request, code='malformed')
-            return response 
+            return response
 
         # As a server we first wait for the status of all server
         # requests to sequence any new client requests.
@@ -333,7 +333,7 @@ class VASPPairChannel:
                 # We must wait, since we cannot give an answer before sequencing
                 # previous commands.
                 response = make_protocol_error(request, code='wait')
-                return response  
+                return response
 
             seq = self.next_final_sequence()
             try:
@@ -492,9 +492,3 @@ class VASPPairChannel:
         if request_to_send is not None:
             self.send_request(request)
         return answer
-
-    def send_network_request(self, request_json):
-        url = self.network_client.get_url(self.peer_base_url)
-        response = self.network_client.send_request(url, request_json)
-        if response != None:
-            self.parse_handle_response(response.content.decode("utf-8") )
