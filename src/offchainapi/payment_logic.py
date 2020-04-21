@@ -324,7 +324,7 @@ class PaymentProcessor(CommandProcessor):
         ''' A syncronous version of payment processing -- largely used for pytests '''
         loop = self.loop
         if self.loop is None:
-            loop = asyncio.get_event_loop()
+            loop = asyncio.new_event_loop()
         return loop.run_until_complete(self.payment_process_async(payment))
 
     async def payment_process_async(self, payment):

@@ -19,7 +19,7 @@ def business_and_processor(three_addresses, store):
     _, _, a0 = three_addresses
     bc = sample_business(a0)
     proc = PaymentProcessor(bc, store)
-    proc.loop = asyncio.get_event_loop()
+    proc.loop = asyncio.new_event_loop()
     return (bc, proc)
 
 
