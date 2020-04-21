@@ -1,71 +1,124 @@
+from .business import BusinessNotAuthorized
+from .libra_address import LibraAddress
+
 import aiohttp
-import asyncio
 from aiohttp import web
+import asyncio
+import logging
+from urllib.parse import urljoin
+import json
+
+def make_net_app(vasp):
+    return Aionet(vasp)
+
 
 class Aionet:
-
     def __init__(self, vasp):
         self.vasp = vasp
+
+        # TODO: This should be a dict holding one session per other vasp.
         self.session = None
 
-        # TODO: must eventually call
-        # await self.session.close()
+        self.app = web.Application()
 
+        # Register routes.
+        route = self.get_url('/', '{other_addr}')
+        logging.debug(f'Register route {route}')
+        self.app.add_routes([web.post(route, self.handle_request)])
+        if __debug__:
+            self.app.add_routes([web.post('/', self.handle_request_debug)])
+
+    def close_connection(self):
+        # TODO: must eventually call: await self.session.close()
+        pass
+
+    def get_url(self, base_url, other_addr_str):
+        other = other_addr_str # Trick to re-use this function to register routes.
+        url = f'{self.vasp.get_vasp_address().as_str()}/{other}/process/'
+        return urljoin(base_url, url)
+
+    async def handle_request_debug(self, request):
+        return web.Response(text='Hello, world')
 
     async def handle_request(self, request):
-        return web.Response(text="Hello, world")
-    
-    async def handle_offchain_request(self, request):
-        myself_name = request.match_info['recvvasp']
-        other_name = request.match_info['sendvasp']
-        channel = self.vasp.get_channel(other_name)
+        other_addr = LibraAddress(request.match_info['other_addr'])
+        logging.debug(f'Data Received from {other_addr.as_str()}')
 
-        # Perform the request, send back the reponse
-        # TODO: here we may place the reqyest in a queue and have it
+        # Try to get a channel with the other VASP.
+        try:
+            channel = self.vasp.get_channel(other_addr)
+        except BusinessNotAuthorized as e:
+            # Raised if the other VASP is not an authorised business.
+            logging.debug(f'Not Authorized {e}')
+            raise web.HTTPUnauthorized
+
+        # Verify that the other VASP is authorised to submit the request;
+        # ie. that 'other_addr' matches the certificate.
+        client_certificate = None  # TODO: Get certificate from ...
+        if not self.vasp.info_context.is_authorised_VASP(
+            client_certificate, other_addr
+        ):
+            logging.debug(f'Not Authorized')
+            raise web.HTTPForbidden
+
+        # Perform the request, send back the reponse.
+        # TODO: here we may place the request in a queue and have it
         #       handled by a central task per channel to ensure we
-        #       handle requests, and send responses strictly in 
-        #       sequence.
-        body = await request.text()
-        response = channel.parse_handle_request(body)
+        #       handle requests, and send responses strictly in sequence.
+        try:
+            request_json = await request.json()
+            # TODO: It is a bit silly that we have to call dumps here...
+            response = channel.parse_handle_request(json.dumps(request_json))
+        except json.decoder.JSONDecodeError as e:
+            # Raised if the request does not contain valid JSON.
+            logging.debug(f'Type Error {e}')
+            import traceback
+            traceback.print_exc()
+            raise web.HTTPBadRequest
 
         # Send back the response
-        return web.Response(text=response)
-    
-    async def send_request(self, other_vasp, off_chain_request):
-        # Init the client
+        return web.json_response(response.content)
+
+    async def send_request(self, other_addr, json_request):
+        logging.debug(f'Connect to {other_addr.as_str()}')
+
+        # Initialize the client.
         if self.session is None:
             self.session = aiohttp.ClientSession()
 
-        my_name = self.vasp.my_name
-        channel = self.vasp.get_channel(other_vasp)
+        # Try to get a channel with the other VASP.
+        try:
+            channel = self.vasp.get_channel(other_addr)
+        except BusinessNotAuthorized as e:
+            # Raised if the other VASP is not an authorised business.
+            logging.debug(f'Not Authorized {e}')
+            return False
 
-        addr = 'http://otherhost' + f'/{other_vasp}/{my_name}/process'
-        async with self.session.post(addr, data=off_chain_request) as resp:
-            channel.parse_handle_response(resp.text())
-        
-        # TODO: here we can return whether it worked or not.
-        return
-    
-    async def new_command(self, other_vasp, command):
-        channel = self.vasp.get_channel(other_vasp)
+        base_url = self.vasp.info_context.get_peer_base_url(other_addr)
+        url = self.get_url(base_url, other_addr)
+        # TODO: Handle errors with session.post
+        async with self.session.post(url, data=json_request) as response:
+            # TODO: Handle errors with parse_handle_response.
+            ret = channel.parse_handle_response(response.json())
+
+        return ret
+
+    async def send_command(self, other_addr, command):
+        try:
+            channel = self.vasp.get_channel(other_addr)
+        except BusinessNotAuthorized as e:
+            # Raised if the other VASP is not an authorised business.
+            logging.debug(f'Not Authorized {e}')
+            return False
+
         request = channel.sequence_command_local(command)
-
-        result = await self.send_request(other_vasp, request)
+        result = await self.send_request(other_addr, request)
         return result
-    
-    def sync_new_command(self, other_vasp, command, loop):
-        fut = asyncio.run_coroutine_threadsafe(self.new_command(other_vasp, command), loop)
-        # Returns a future that can be used to trigger 
-        # a callback when a result is available.
-        return fut
 
-
-def make_net_app(vasp):
-    app = web.Application()
-    net_handler = Aionet(vasp)
-    app.add_routes([web.post('/', net_handler.handle_request)])
-    app.add_routes([web.post('/{recvvasp}/{sendvasp}/process', net_handler.handle_offchain_request)])
-    return app, net_handler
-
-def sync_new_command(net_handler, loop, ):
-    fut = asyncio.run_coroutine_threadsafe(net_handler.new_command(), loop)
+    def sync_new_command(self, other_addr, command, loop):
+        ''' Returns a future that can be used to trigger a callback when
+        a result is available.
+        '''
+        return asyncio.run_coroutine_threadsafe(
+            self.send_command(other_addr, command), loop
+        )
