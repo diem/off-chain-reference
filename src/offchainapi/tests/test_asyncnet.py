@@ -82,8 +82,7 @@ async def test_handle_request_business_not_authorised(vasp, url, json_request,
     assert response.status == 401
 
 
-async def test_handle_request_vasp_not_authorised(vasp, url, json_request,
-                                                  aiohttp_client):
+async def test_handle_request_forbidden(vasp, url, json_request, aiohttp_client):
     vasp.info_context.is_authorised_VASP.return_value = False
     net_handler = make_net_app(vasp)
     client = await aiohttp_client(net_handler.app)
@@ -94,3 +93,6 @@ async def test_handle_request_vasp_not_authorised(vasp, url, json_request,
 async def test_handle_request_bad_payload(client, url):
     response = await client.post(url)
     assert response.status == 400
+
+async def test_send_request():
+    pass
