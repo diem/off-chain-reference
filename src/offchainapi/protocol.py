@@ -254,11 +254,11 @@ class VASPPairChannel:
                 self.send_request(request)
 
 
-    def parse_handle_request(self, json_command):
+    def parse_handle_request(self, json_command, encoded=False):
         ''' Handles a request provided as a json_string '''
         with self.rlock:
             try:
-                req_dict = json.loads(json_command)
+                req_dict = json.loads(json_command) if encoded else json_command
                 request = CommandRequestObject.from_json_data_dict(req_dict, JSONFlag.NET)
                 return self.handle_request(request)
             except JSONParsingError:
