@@ -300,11 +300,10 @@ class sample_vasp:
         self.bc = sample_business(self.my_addr)
         self.store        = StorableFactory({})
         self.info_context = sample_vasp_info(assets_path)
-        self.network_factory = NetworkFactory()
 
         self.pp = PaymentProcessor(self.bc, self.store)
         self.vasp = OffChainVASP(
-            self.my_addr, self.pp, self.store, self.info_context, self.network_factory
+            self.my_addr, self.pp, self.store, self.info_context
         )
 
         # The network server

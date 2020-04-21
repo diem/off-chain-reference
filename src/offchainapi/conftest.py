@@ -83,10 +83,7 @@ def vasp(three_addresses, store):
     a0, _, _ = three_addresses
     command_processor = MagicMock(spec=CommandProcessor)
     info_context = MagicMock(spec=VASPInfo)
-    network_factory = MagicMock()
-    return OffChainVASP(
-        a0, command_processor, store, info_context, network_factory
-    )
+    return OffChainVASP(a0, command_processor, store, info_context)
 
 
 @pytest.fixture
