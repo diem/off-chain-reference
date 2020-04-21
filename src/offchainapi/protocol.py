@@ -266,6 +266,9 @@ class VASPPairChannel:
 
     def parse_handle_request(self, json_command):
         ''' Handles a request provided as a json_string '''
+        # TODO: The assert below is not ideal as it will go away when running
+        # python -O, and is important since it needs to sanitize inputs from
+        # the other VASP.
         assert type(json_command) == str
         logging.debug(f'Request Received {self.other.as_str()}  -> {self.myself.as_str()}')
         with self.rlock:
@@ -277,13 +280,12 @@ class VASPPairChannel:
             except JSONParsingError:
                 response = make_parsing_error()
                 #return self.send_response(response)
-
         full_response = self.send_response(response)
         return full_response
 
 
     def handle_request(self, request):
-        with  self.storage.atomic_writes() as tx_no:
+        with self.storage.atomic_writes() as tx_no:
             return self._handle_request(request)
 
     def _handle_request(self, request):
@@ -326,7 +328,6 @@ class VASPPairChannel:
 
         # Sequence newer requests
         if request.seq == self.other_next_seq():
-
             if self.is_client() and request.command_seq > self.next_final_sequence():
                 # We must wait, since we cannot give an answer before sequencing
                 # previous commands.
@@ -337,7 +338,6 @@ class VASPPairChannel:
             try:
                 self.executor.sequence_next_command(request.command,
                                     do_not_sequence_errors = False)
-
                 response = make_success_response(request)
             except ExecutorException as e:
                 response = make_command_error(request, str(e))
@@ -346,7 +346,6 @@ class VASPPairChannel:
             request.response = response
             request.response.command_seq = seq
             self.other_requests += [request]
-
             self.apply_response_to_executor(request)
             return request.response
 

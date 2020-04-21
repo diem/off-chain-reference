@@ -22,7 +22,7 @@ class NetworkClient:
         self.session = requests.Session()
 
     def get_url(self, base_url):
-        my_addr = self.channel.get_my_address()
+        my_addr = self.channel.get_vasp_address()
         my_other = self.channel.get_other_address()
         url = f'{my_addr.as_str()}/{my_other.as_str()}/process/'
         return urljoin(base_url, url)
