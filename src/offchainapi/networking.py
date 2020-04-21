@@ -32,21 +32,19 @@ class NetworkClient:
         try:
             response = self.session.post(url, json=json_request)
         except requests.exceptions.RequestException as e:
-            logging.warning(f'RequestException: {e}')
             # This happens in case of (i) a connection error (e.g. DNS failure,
             # refused connection, etc), (ii) timeout, or (iii) if the maximum
             # number of redirections is reached.
-            response = None
-
-        if response == None:
+            logging.warning(f'RequestException: {e}')
             return False
 
         try:
-            self.channel.parse_handle_response(response.content.decode('utf-8'))
+            decoded_response = response.content.decode('utf-8')
         except UnicodeError as e:
             logging.warning(f'UnicodeError: {e}')
             return False
 
+        self.channel.parse_handle_response(decoded_response)
         return True
 
     def close_connection(self):
