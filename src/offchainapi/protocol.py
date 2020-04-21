@@ -14,7 +14,7 @@ NetMessage = namedtuple('NetMessage', ['src', 'dst', 'type', 'content'])
 
 class OffChainVASP:
     """Manages the off-chain protocol on behalf of one VASP. """
-    def __init__(self, vasp_addr, processor, storage_factory, info_context, network_factory):
+    def __init__(self, vasp_addr, processor, storage_factory, info_context):
         logging.debug(f'Creating VASP {vasp_addr.as_str()}')
 
         assert isinstance(processor, CommandProcessor)
@@ -33,9 +33,6 @@ class OffChainVASP:
         # The VASPInfo context that contains various network information
         # such as TLS certificates and keys.
         self.info_context = info_context
-
-        # The network factory creating network clients for the channels.
-        self.network_factory = network_factory
 
         # The dict of channels we already have.
         self.channel_store = {}
