@@ -22,6 +22,8 @@ import json
 from unittest.mock import MagicMock
 from threading import Thread
 import time
+import asyncio
+from aiohttp import web
 
 # A stand alone performance test.
 
@@ -75,7 +77,8 @@ class PerfVasp:
             self.my_addr, self.pp, self.store, self.info_context
         )
 
-        if async_vasp:
+        self.async_vasp = async_vasp
+        if self.async_vasp:
             self.server = Aionet(self.vasp)
         else:
             self.server = NetworkServer(self.vasp)
@@ -84,7 +87,16 @@ class PerfVasp:
         # Start the processor
         self.pp.start_processor()
         # Start the server
-        self.server.run(port=self.port)
+        if self.async_vasp:
+            runner = self.server.get_runner()
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(runner.setup())
+            site = web.TCPSite(runner, 'localhost', self.port)
+            loop.run_until_complete(site.start())
+            loop.run_forever()
+        else:
+            self.server.run(port=self.port)
 
 
 global_dir = {}

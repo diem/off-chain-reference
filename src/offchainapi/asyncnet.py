@@ -134,3 +134,6 @@ class Aionet:
 
     def run(self, **kwargs):
         web.run_app(self.app, **kwargs)
+
+    def get_runner(self):
+        return web.AppRunner(self.app)
