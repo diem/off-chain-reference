@@ -23,8 +23,7 @@ class Aionet:
         self.app = web.Application()
 
         # Register routes.
-        base_url = self.vasp.info_context.get_base_url()
-        route = self.get_url(base_url, '{other_addr}')
+        route = self.get_url('/', '{other_addr}')
         logging.debug(f'Register route {route}')
         self.app.add_routes([web.post(route, self.handle_request)])
         if __debug__:
@@ -133,5 +132,5 @@ class Aionet:
             self.send_command(other_addr, command), loop
         )
 
-    def run_server(self, *args):
-        web.run_app(self.app, *args)
+    def run(self, **kwargs):
+        web.run_app(self.app, **kwargs)

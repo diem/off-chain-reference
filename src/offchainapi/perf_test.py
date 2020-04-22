@@ -16,6 +16,7 @@ from .status_logic import Status
 from .storage import StorableFactory
 from .networking import NetworkServer, NetworkClient
 from .payment import PaymentAction, PaymentActor, PaymentObject
+from .asyncnet import Aionet
 
 import json
 from unittest.mock import MagicMock
@@ -33,8 +34,8 @@ peer_address = {
 
 class SimpleVASPInfo(VASPInfo):
 
-    def __init__(self):
-        return
+    def __init__(self, vasp):
+        self.vasp = vasp
 
     def get_TLS_certificate_path(self):
         raise NotImplementedError()
@@ -62,26 +63,29 @@ class SimpleNetworkFactory:
 
 
 class PerfVasp:
-    def __init__(self, my_addr, port):
+    def __init__(self, my_addr, port, async_vasp=True):
         self.my_addr = my_addr
         self.port = port
         self.bc = MagicMock()
         self.store        = StorableFactory({})
-        self.info_context = SimpleVASPInfo()
-        self.network_factory = SimpleNetworkFactory()
+        self.info_context = SimpleVASPInfo(self)
 
         self.pp = PaymentProcessor(self.bc, self.store)
         self.vasp = OffChainVASP(
-            self.my_addr, self.pp, self.store, self.info_context, self.network_factory
+            self.my_addr, self.pp, self.store, self.info_context
         )
 
-        self.server = NetworkServer(self.vasp)
-    
+        if async_vasp:
+            self.server = Aionet(self.vasp)
+        else:
+            self.server = NetworkServer(self.vasp)
+
     def start(self):
         # Start the processor
         self.pp.start_processor()
         # Start the server
         self.server.run(port=self.port)
+
 
 global_dir = {}
 
@@ -92,12 +96,12 @@ def start_thread_main(addr, port):
 
 def main_perf():
     logging.basicConfig(level=logging.DEBUG)
-    
-    tA = Thread(target=start_thread_main, args=(PeerA_addr, 8091, ), daemon=True)
+
+    tA = Thread(target=start_thread_main, args=(PeerA_addr, 8091,), daemon=True)
     tA.start()
     print('Start Node A')
 
-    tB = Thread(target=start_thread_main, args=(PeerB_addr, 8092, ), daemon=True)
+    tB = Thread(target=start_thread_main, args=(PeerB_addr, 8092,), daemon=True)
     tB.start()
     print('Start Node B')
 
@@ -120,7 +124,9 @@ def main_perf():
         sender = PaymentActor(PeerA_addr.as_str(), 'aaaa', Status.none, [])
         receiver = PaymentActor(PeerB_addr.as_str(), 'bbbb', Status.none, [])
         action = PaymentAction(10, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
-        payment = PaymentObject(sender, receiver, f'ref {cid}', 'orig_ref', 'desc', action)
+        payment = PaymentObject(
+            sender, receiver, f'ref {cid}', 'orig_ref', 'desc', action
+        )
         cmd = PaymentCommand(payment)
         commands += [ cmd ]
 
@@ -141,16 +147,16 @@ def main_perf():
 
         channel.processor.stop_processor()
         return True
-        
+
     exit_loop = False
     while not exit_loop:
         exit_loop = True
         time.sleep(0.1)
         exit_loop &= channel_summary('AB', channelAB)
         exit_loop &= channel_summary('BA', channelBA)
-    
+
     end_timer = time.time()
-    
+
     per_command_time = (end_timer - start_timer) / 100
     est_tx_per_sec = 1.0 / per_command_time
 
@@ -162,7 +168,8 @@ def main_perf():
             success_number += 1
 
     print(f'Success #: {success_number}/100')
-    print(f'Command time: {1000*per_command_time: 4.2f} ms Estimate throughput: {est_tx_per_sec: 4.2f} Tx/sec')
+    print(f'Command time: {1000*per_command_time: 4.2f} ms \
+          Estimate throughput: {est_tx_per_sec: 4.2f} Tx/sec')
 
     import sys
     sys.exit()
