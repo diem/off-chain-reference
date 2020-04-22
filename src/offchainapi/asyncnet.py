@@ -43,8 +43,9 @@ class Aionet:
         url = f'{server}/{client}/process/'
         return urljoin(base_url, url)
 
-    async def handle_request_debug(self, request):
-        return web.Response(text='Hello, world')
+    if __debug__:
+        async def handle_request_debug(self, request):
+            return web.Response(text='Hello, world')
 
     async def handle_request(self, request):
         # TODO: Could there be errors when creating LibraAddress?
