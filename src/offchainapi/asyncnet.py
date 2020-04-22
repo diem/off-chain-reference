@@ -103,8 +103,6 @@ class Aionet:
             return False
 
         base_url = self.vasp.info_context.get_peer_base_url(other_addr)
-        port = self.vasp.info_context.get_peer_port(other_addr)
-        base_url = f'{base_url}:{port}'
         url = self.get_url(base_url, other_addr.as_str(), other_is_server=True)
         # TODO: Handle errors with session.post
         async with self.session.post(url, json=json_request) as response:
@@ -134,3 +132,6 @@ class Aionet:
         return asyncio.run_coroutine_threadsafe(
             self.send_command(other_addr, command), loop
         )
+
+    def run_server(self, *args):
+        web.run_app(self.app, *args)

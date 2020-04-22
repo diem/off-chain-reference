@@ -121,9 +121,9 @@ async def test_handle_request_bad_payload(client, url):
 
 
 async def test_send_request(net_handler, tester_addr, server, json_request):
-    base_url = f'http://{server.host}'
+    base_url = f'http://{server.host}:{server.port}'
     net_handler.vasp.info_context.get_peer_base_url.return_value = base_url
-    net_handler.vasp.info_context.get_peer_port.return_value = server.port
+    #net_handler.vasp.info_context.get_peer_port.return_value = server.port
     ret = await net_handler.send_request(tester_addr, json_request)
     # This returns False since the vasp did not emit the command; so it does
     # not expect a response.
@@ -131,8 +131,8 @@ async def test_send_request(net_handler, tester_addr, server, json_request):
 
 
 async def test_send_command(net_handler, tester_addr, server, command):
-    base_url = f'http://{server.host}'
+    base_url = f'http://{server.host}:{server.port}'
     net_handler.vasp.info_context.get_peer_base_url.return_value = base_url
-    net_handler.vasp.info_context.get_peer_port.return_value = server.port
+    #net_handler.vasp.info_context.get_peer_port.return_value = server.port
     ret = await net_handler.send_command(tester_addr, command)
     assert ret
