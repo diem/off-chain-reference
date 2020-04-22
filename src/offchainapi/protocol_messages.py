@@ -74,7 +74,7 @@ class CommandRequestObject(JSONSerializable):
             "command" : self.command.get_json_data_dict(flag),
             "command_type" : self.command_type
             }
-        
+
         self.add_object_type(data_dict)
 
         if self.command_seq is not None:
@@ -142,7 +142,7 @@ class CommandResponseObject(JSONSerializable):
 
         if self.error is not None:
             data_dict["error"] = self.error.get_json_data_dict(flag)
-        
+
         self.add_object_type(data_dict)
         if __debug__:
             import json
@@ -177,7 +177,7 @@ class CommandResponseObject(JSONSerializable):
 
             if self.status == 'failure':
                 self.error = OffChainError.from_json_data_dict(data['error'], flag)
-                
+
             return self
         except Exception as e:
             raise JSONParsingError(*e.args)

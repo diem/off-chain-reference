@@ -1,7 +1,7 @@
 .DS_Store
 
 # Editors
-*.code-worksspace
+*.code-worksspace*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

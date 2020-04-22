@@ -6,9 +6,11 @@ from .libra_address import LibraAddress
 from .storage import StorableFactory
 
 import json
-from collections import namedtuple
+from collections import namedtuple, defaultdict
 from threading import RLock
 import logging
+import asyncio
+import time
 
 NetMessage = namedtuple('NetMessage', ['src', 'dst', 'type', 'content'])
 
@@ -133,6 +135,7 @@ class VASPPairChannel:
 
         # Response cache
         self.response_cache = {}
+        self.waiting = defaultdict(list)
         self.pending_requests = []
         # Network handler
         self.net_queue = []
@@ -179,10 +182,12 @@ class VASPPairChannel:
         logging.debug(f'Request SENT {self.myself.as_str()}  -> {self.other.as_str()}')
         return net_message
 
-    def send_response(self, response):
+    def send_response(self, response, encoded=True):
         """ A hook to send a response to other VASP"""
-        json_string = json.dumps(response.get_json_data_dict(JSONFlag.NET))
-        net_message = NetMessage(self.myself, self.other, CommandResponseObject, json_string)
+        struct = response.get_json_data_dict(JSONFlag.NET)
+        if encoded:
+            struct = json.dumps(struct)
+        net_message = NetMessage(self.myself, self.other, CommandResponseObject, struct)
         self.net_queue += [ net_message ]
         logging.debug(f'Response SENT {self.myself.as_str()}  -> {self.other.as_str()}')
         return net_message
@@ -219,11 +224,10 @@ class VASPPairChannel:
     def process_pending_requests_response(self):
         """ The server re-schedules and executes pending requests, and cached
             responses. """
-        if self.num_pending_responses() == 0:
-            requests = self.pending_requests
-            self.pending_requests = []
-            for req in requests:
-                self.handle_request(req)
+
+        # Process any requests that might be waiting, due to out
+        # of order delivery.
+        self.process_waiting_requests()
 
         ## No need to make loop -- it will call again upon success
         if self.next_final_sequence() in self.response_cache:
@@ -264,24 +268,73 @@ class VASPPairChannel:
         return self.send_request(request)
 
 
-    def parse_handle_request(self, json_command):
+    def parse_handle_request(self, json_command, encoded=False):
         ''' Handles a request provided as a json_string '''
         # TODO: The assert below is not ideal as it will go away when running
         # python -O, and is important since it needs to sanitize inputs from
         # the other VASP.
-        assert type(json_command) == str
+        # assert type(json_command) == str
         logging.debug(f'Request Received {self.other.as_str()}  -> {self.myself.as_str()}')
         with self.rlock:
             try:
-                req_dict = json.loads(json_command)
+                req_dict = json.loads(json_command) if encoded else json_command
                 request = CommandRequestObject.from_json_data_dict(req_dict, JSONFlag.NET)
-                # return self.handle_request(request)
                 response = self.handle_request(request)
             except JSONParsingError:
                 response = make_parsing_error()
-                #return self.send_response(response)
-        full_response = self.send_response(response)
+        full_response = self.send_response(response, encoded=False)
         return full_response
+
+    def process_waiting_requests(self):
+        ''' Executes any requets that are now capable of executing, and were
+            not before due to being received out of order. '''
+        while self.other_next_seq() in self.waiting:
+            next_seq = self.other_next_seq()
+            list_of_requets = self.waiting[next_seq]
+            for req_record in list_of_requets:
+                (json_command, encoded, fut, old_time) = req_record
+
+                # Call, and this will update the future and unblocks
+                # any processes waiting on it.
+                self.parse_handle_request_to_future(json_command, encoded, fut)
+
+            del self.waiting[next_seq]
+
+
+    def parse_handle_request_to_future(self, json_command, encoded=False, fut=None):
+        ''' Handles a request provided as a json_string and returns
+            a future for when the command will be processed.'''
+        # TODO: The assert below is not ideal as it will go away when running
+        # python -O, and is important since it needs to sanitize inputs from
+        # the other VASP.
+        # assert type(json_command) == str
+        if fut is None:
+            fut = asyncio.Future()
+
+        logging.debug(f'Request Received {self.other.as_str()}  -> {self.myself.as_str()}')
+        with self.rlock:
+            try:
+                # Parse the request whoever necessary
+                req_dict = json.loads(json_command) if encoded else json_command
+                request = CommandRequestObject.from_json_data_dict(req_dict, JSONFlag.NET)
+
+                # Here test if it is the next one in order
+                if request.seq <= self.other_next_seq() and not (self.is_server() and self.num_pending_responses() > 0):
+                    response = self.handle_request(request)
+                else:
+                    self.waiting[request.seq] += [(json_command, encoded, fut, time.time())]
+                    return fut
+
+            except JSONParsingError:
+                response = make_parsing_error()
+                full_response = self.send_response(response, encoded=False)
+            except Exception as e:
+                fut.set_exception(e)
+                return fut
+
+        full_response = self.send_response(response, encoded=False)
+        fut.set_result(full_response)
+        return fut
 
 
     def handle_request(self, request):
@@ -358,18 +411,21 @@ class VASPPairChannel:
             # OK: Previous cases are exhaustive
             assert False
 
-    def parse_handle_response(self, json_response):
+    def parse_handle_response(self, json_response, encoded=False):
         ''' Handles a response provided as a json string. '''
-        assert type(json_response) == str
+        # assert type(json_response) == str
         logging.debug(f'Response Received {self.other.as_str()}  -> {self.myself.as_str()}')
         with self.rlock:
             try:
-                resp_dict = json.loads(json_response)
+                resp_dict = json.loads(json_response) if encoded else json_response
                 response = CommandResponseObject.from_json_data_dict(resp_dict, JSONFlag.NET)
-                return self.handle_response(response)
-            except JSONParsingError:
+                result = self.handle_response(response)
+                return result
+            except JSONParsingError as e:
                 # Log, but cannot reply: TODO
                 # Close the channel?
+                import traceback
+                traceback.print_exc()
                 return False
 
     def handle_response(self, response):

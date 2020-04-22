@@ -15,6 +15,8 @@ from .payment import PaymentAction, PaymentActor, PaymentObject
 from .asyncnet import Aionet
 
 import logging
+logging.basicConfig(level=logging.ERROR)
+
 import json
 from unittest.mock import MagicMock
 from threading import Thread
@@ -69,26 +71,27 @@ class PerfVasp:
         )
         self.net_handler = Aionet(self.vasp)
 
-    def start(self):
+    def start(self, loop):
         # Start the processor
         self.pp.start_processor()
 
         # Start the server
         runner = self.net_handler.get_runner()
-        loop = asyncio.new_event_loop()
+        #
         asyncio.set_event_loop(loop)
         loop.run_until_complete(runner.setup())
+
         site = web.TCPSite(runner, 'localhost', self.port)
         loop.run_until_complete(site.start())
-        loop.run_forever()
 
+        loop.run_forever()
 
 global_dir = {}
 
-def start_thread_main(addr, port):
+def start_thread_main(addr, port, loop):
     node = PerfVasp(addr, port)
     global_dir[addr.as_str()] = node
-    node.start()
+    node.start(loop)
 
 async def execute(nodeA, nodeB, cmd):
     ret = await nodeA.net_handler.send_command(nodeB.my_addr, cmd)
@@ -97,11 +100,13 @@ async def execute(nodeA, nodeB, cmd):
 async def main_perf():
     logging.basicConfig(level=logging.DEBUG)
 
-    tA = Thread(target=start_thread_main, args=(PeerA_addr, 8091,), daemon=True)
+    loopA = asyncio.new_event_loop()
+    tA = Thread(target=start_thread_main, args=(PeerA_addr, 8091,loopA), daemon=True)
     tA.start()
     print('Start Node A')
 
-    tB = Thread(target=start_thread_main, args=(PeerB_addr, 8092,), daemon=True)
+    loopB = asyncio.new_event_loop()
+    tB = Thread(target=start_thread_main, args=(PeerB_addr, 8092,loopB), daemon=True)
     tB.start()
     print('Start Node B')
 
@@ -131,12 +136,22 @@ async def main_perf():
         commands += [ cmd ]
 
     s = time.perf_counter()
-    res = await asyncio.gather(*(execute(nodeA, nodeB, cmd) for cmd in commands))
-    success_number = sum([1 for r in res if r])
-    elapsed = time.perf_counter() - s
+
+    futs = []
+    for cmd in commands:
+        ret = nodeA.net_handler.sync_new_command(nodeB.my_addr, cmd, loopA)
+        futs += [ ret ]
+
+    # res = await asyncio.gather(*(execute(nodeA, nodeB, cmd) for cmd in commands))
+    res = []
+    for fut in futs:
+        res += [fut.result()]
+
+    success_number = sum([1 for r in futs if r.result()])
+    elapsed = (time.perf_counter() - s)
     print(f'Commands executed in {elapsed:0.2f} seconds.')
     print(f'Success #: {success_number}/{len(commands)}')
-    print(f'Estimate throughput #: {1.0/elapsed} Tx/s')
+    print(f'Estimate throughput #: {len(commands)/elapsed} Tx/s')
 
     import sys
     sys.exit()
