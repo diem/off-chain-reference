@@ -102,7 +102,7 @@ class PerfVasp:
 global_dir = {}
 
 def start_thread_main(addr, port):
-    node = PerfVasp(addr, port)
+    node = PerfVasp(addr, port, async_vasp=False)
     global_dir[addr.as_str()] = node
     node.start()
 
