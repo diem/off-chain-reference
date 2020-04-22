@@ -214,14 +214,6 @@ class VASPInfo:
         """
         raise NotImplementedError()
 
-    def get_peer_port(self, other_addr):
-        """ Get the TCP port that manages off-chain communications of the other
-            VASP (identified by `other_addr`).
-
-            Returns a str: The TCP port of the other VASP.
-        """
-        raise NotImplementedError()
-
     def is_authorised_VASP(self, certificate, other_addr):
         """ Check whether an incoming network request is authorised or not.
             This function checks that the certificate belongs to the sender
