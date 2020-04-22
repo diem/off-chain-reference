@@ -463,9 +463,9 @@ class VASPPairChannel:
     def retransmit(self):
         """ Re-sends the earlierst request that has not yet got a response, if any """
         with self.rlock:
-            self.would_retransmit()
+            self.would_retransmit(do_retransmit=True)
 
-    def would_retransmit(self):
+    def would_retransmit(self, do_retransmit=False):
         """ Returns true if there are any pending re-transmits, namely
             requests for which the response has not yet been received. """
 
@@ -479,7 +479,8 @@ class VASPPairChannel:
                     if request.has_response():
                         next_retransmit += 1
                     else:
-                        request_to_send = request
+                        if do_retransmit:
+                            request_to_send = request
                         break
                 self.next_retransmit.set_value(next_retransmit)
 
