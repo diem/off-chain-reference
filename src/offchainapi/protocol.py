@@ -413,7 +413,6 @@ class VASPPairChannel:
 
     def parse_handle_response(self, json_response, encoded=False):
         ''' Handles a response provided as a json string. '''
-        # assert type(json_response) == str
         logging.debug(f'Response Received {self.other.as_str()}  -> {self.myself.as_str()}')
         with self.rlock:
             try:
@@ -530,14 +529,12 @@ class VASPPairChannel:
 
         with self.rlock:
             with self.storage.atomic_writes() as tx_no:
-                answer = False
                 next_retransmit = self.next_retransmit.get_value()
                 while next_retransmit < len(self.my_requests):
                     request = self.my_requests[next_retransmit]
                     if request.has_response():
                         next_retransmit += 1
                     else:
-                        answer = True
                         if do_retransmit:
                             request_to_send = request
                         break
@@ -545,6 +542,4 @@ class VASPPairChannel:
 
         # Send request outside the lock to allow for asynchronous
         # sending methods.
-        if request_to_send is not None:
-            self.send_request(request)
-        return answer
+        return self.send_request(request) if request_to_send != None else None
