@@ -366,31 +366,31 @@ class VASPPairChannel:
             try:
                 resp_dict = json.loads(json_response)
                 response = CommandResponseObject.from_json_data_dict(resp_dict, JSONFlag.NET)
-                self.handle_response(response)
+                return self.handle_response(response)
             except JSONParsingError:
                 # Log, but cannot reply: TODO
-                raise # To close the channel
+                # Close the channel?
+                return False
 
     def handle_response(self, response):
         with self.storage.atomic_writes() as tx_no:
-            self._handle_response(response)
+            return self._handle_response(response)
 
     def _handle_response(self, response):
         """ Handles a response to a request by this VASP """
         assert isinstance(response, CommandResponseObject)
-
         request_seq = response.seq
         if type(request_seq) is not int:
             # This denotes a serious error, where the response could not
             # even be parsed. TODO: log the request/reply for debugging.
             assert response.status == 'failure'
-            return
+            return False
 
         # Check this is the next expected response
         if not request_seq < len(self.my_requests):
             # Caught a bug on the other side
             # TODO: Log warning the other side might be buggy
-            return
+            return False
 
         if response.not_protocol_failure():
 
@@ -402,7 +402,7 @@ class VASPPairChannel:
             # Idenpotent: We have already processed the response
             if self.my_requests[request_seq].has_response():
                 # TODO: Check the reponse is the same and log warning otherwise.
-                return
+                return True
 
             request = self.my_requests[request_seq]
             if response.command_seq == self.next_final_sequence():
@@ -423,6 +423,7 @@ class VASPPairChannel:
 
                 self.apply_response_to_executor(request)
                 self.process_pending_requests_response()
+                return True
 
             elif response.command_seq < self.next_final_sequence():
                 # Request already in the sequence: happens to the server party.
@@ -434,25 +435,27 @@ class VASPPairChannel:
 
                 self.apply_response_to_executor(request)
                 self.process_pending_requests_response()
+                return True
 
             elif response.command_seq > self.next_final_sequence():
                 # This is too high -- wait for more data?
                 # Store the response for later use.
                 self.response_cache[response.command_seq] = response
+                return True
             else:
                 # Previous conditions are exhaustive
                 assert False
         else:
             # Handle protocol failures.
             if response.error.code == 'missing':
-                pass  # Will Retransmit
+                return False  # Will Retransmit
             elif response.error.code == 'wait':
-                pass  # Will Retransmit
+                return False  # Will Retransmit
             elif response.error.code == 'malformed':
                 # TODO: log a warning
-                pass # Implementation bug was caught.
+                return False  # Implementation bug was caught.
             elif response.error.code == 'conflict':
-                pass
+                return False
             else:
                 # Manage other errors
                 # Implementation bug was caught.

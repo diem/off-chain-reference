@@ -8,6 +8,7 @@ import logging
 from urllib.parse import urljoin
 import json
 
+
 def make_net_app(vasp):
     return Aionet(vasp)
 
@@ -22,7 +23,8 @@ class Aionet:
         self.app = web.Application()
 
         # Register routes.
-        route = self.get_url('/', '{other_addr}')
+        base_url = self.vasp.info_context.get_base_url()
+        route = self.get_url(base_url, '{other_addr}')
         logging.debug(f'Register route {route}')
         self.app.add_routes([web.post(route, self.handle_request)])
         if __debug__:
@@ -32,15 +34,21 @@ class Aionet:
         # TODO: must eventually call: await self.session.close()
         pass
 
-    def get_url(self, base_url, other_addr_str):
-        other = other_addr_str # Trick to re-use this function to register routes.
-        url = f'{self.vasp.get_vasp_address().as_str()}/{other}/process/'
+    def get_url(self, base_url, other_addr_str, other_is_server=False):
+        if other_is_server:
+            server = other_addr_str
+            client = self.vasp.get_vasp_address().as_str()
+        else:
+            server = self.vasp.get_vasp_address().as_str()
+            client = other_addr_str
+        url = f'{server}/{client}/process/'
         return urljoin(base_url, url)
 
     async def handle_request_debug(self, request):
         return web.Response(text='Hello, world')
 
     async def handle_request(self, request):
+        # TODO: Could there be errors when creating LibraAddress?
         other_addr = LibraAddress(request.match_info['other_addr'])
         logging.debug(f'Data Received from {other_addr.as_str()}')
 
@@ -67,7 +75,7 @@ class Aionet:
         #       handle requests, and send responses strictly in sequence.
         try:
             request_json = await request.json()
-            # TODO: It is a bit silly that we have to call dumps here...
+            # TODO: It is a bit silly to call dumps here...
             response = channel.parse_handle_request(json.dumps(request_json))
         except json.decoder.JSONDecodeError as e:
             # Raised if the request does not contain valid JSON.
@@ -95,13 +103,18 @@ class Aionet:
             return False
 
         base_url = self.vasp.info_context.get_peer_base_url(other_addr)
-        url = self.get_url(base_url, other_addr)
+        port = self.vasp.info_context.get_peer_port(other_addr)
+        base_url = f'{base_url}:{port}'
+        url = self.get_url(base_url, other_addr.as_str(), other_is_server=True)
         # TODO: Handle errors with session.post
-        async with self.session.post(url, data=json_request) as response:
-            # TODO: Handle errors with parse_handle_response.
-            ret = channel.parse_handle_response(response.json())
-
-        return ret
+        async with self.session.post(url, json=json_request) as response:
+            try:
+                json_response = await response.json()
+                # TODO: It is a bit silly to call dumps here...
+                return channel.parse_handle_response(json.dumps(json_response))
+            except json.decoder.JSONDecodeError as e:
+                logging.debug(f'Type Error {e}')
+                return False
 
     async def send_command(self, other_addr, command):
         try:
@@ -112,8 +125,7 @@ class Aionet:
             return False
 
         request = channel.sequence_command_local(command)
-        result = await self.send_request(other_addr, request)
-        return result
+        return await self.send_request(other_addr, request.content)
 
     def sync_new_command(self, other_addr, command, loop):
         ''' Returns a future that can be used to trigger a callback when
