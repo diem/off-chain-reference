@@ -75,8 +75,7 @@ class Aionet:
         #       handle requests, and send responses strictly in sequence.
         try:
             request_json = await request.json()
-            # TODO: It is a bit silly to call dumps here...
-            response = channel.parse_handle_request(json.dumps(request_json))
+            response = channel.parse_handle_request(request_json)
         except json.decoder.JSONDecodeError as e:
             # Raised if the request does not contain valid JSON.
             logging.debug(f'Type Error {e}')
@@ -108,8 +107,7 @@ class Aionet:
         async with self.session.post(url, json=json_request) as response:
             try:
                 json_response = await response.json()
-                # TODO: It is a bit silly to call dumps here...
-                return channel.parse_handle_response(json.dumps(json_response))
+                return channel.parse_handle_response(json_response)
             except json.decoder.JSONDecodeError as e:
                 logging.debug(f'Type Error {e}')
                 return False

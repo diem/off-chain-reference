@@ -264,17 +264,17 @@ class VASPPairChannel:
         return self.send_request(request)
 
 
-    def parse_handle_request(self, json_command):
+    def parse_handle_request(self, json_command, encoded=False):
         ''' Handles a request provided as a json_string '''
-        # TODO: The assert below is not ideal as it will go away when running
-        # python -O, and is important since it needs to sanitize inputs from
-        # the other VASP.
-        assert type(json_command) == str
-        logging.debug(f'Request Received {self.other.as_str()}  -> {self.myself.as_str()}')
+        logging.debug(
+            f'Request Received {self.other.as_str()}  -> {self.myself.as_str()}'
+        )
         with self.rlock:
             try:
-                req_dict = json.loads(json_command)
-                request = CommandRequestObject.from_json_data_dict(req_dict, JSONFlag.NET)
+                req_dict = json.loads(json_command) if encoded else json_command
+                request = CommandRequestObject.from_json_data_dict(
+                    req_dict, JSONFlag.NET
+                )
                 # return self.handle_request(request)
                 response = self.handle_request(request)
             except JSONParsingError:
@@ -358,13 +358,12 @@ class VASPPairChannel:
             # OK: Previous cases are exhaustive
             assert False
 
-    def parse_handle_response(self, json_response):
+    def parse_handle_response(self, json_response, encoded=False):
         ''' Handles a response provided as a json string. '''
-        assert type(json_response) == str
         logging.debug(f'Response Received {self.other.as_str()}  -> {self.myself.as_str()}')
         with self.rlock:
             try:
-                resp_dict = json.loads(json_response)
+                resp_dict = json.loads(json_response) if encoded else json_response
                 response = CommandResponseObject.from_json_data_dict(resp_dict, JSONFlag.NET)
                 return self.handle_response(response)
             except JSONParsingError:
