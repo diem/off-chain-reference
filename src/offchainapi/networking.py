@@ -116,7 +116,12 @@ class VASPOffChainApi(MethodView):
 
         # Process the request and send a response back.
         try:
-            response = channel.parse_handle_request(dumps(request_json))
+            if request.headers.get('status') == 'encoded':
+                response = channel.parse_handle_request(
+                    request_json, encoded=True
+                )
+            else:
+                response = channel.parse_handle_request(request_json)
         except TypeError as e:
             # This exception is triggered when the channel cannot load the
             # json request; eg. when the clients sends a json dict instead of

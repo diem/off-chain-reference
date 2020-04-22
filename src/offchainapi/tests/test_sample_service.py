@@ -107,7 +107,7 @@ def simple_response_json_error(request):
     resp.command_seq = cmd_seq
     if status == 'failure':
         resp.error = OffChainError(protoerr, errcode)
-    json_obj = json.dumps(resp.get_json_data_dict(JSONFlag.NET))
+    json_obj = resp.get_json_data_dict(JSONFlag.NET)
     return json_obj
 
 
@@ -121,7 +121,7 @@ def simple_request_json(payment_action, my_addr, other_addr):
     command = PaymentCommand(payment)
     request = CommandRequestObject(command)
     request.seq = 0
-    return json.dumps(request.get_json_data_dict(JSONFlag.NET))
+    return request.get_json_data_dict(JSONFlag.NET)
 
 
 def test_business_simple(my_addr):
@@ -212,7 +212,7 @@ def test_vasp_simple(simple_request_json, vasp, other_addr):
         requests = vasp.collect_messages()
         assert len(requests) == 1
         assert requests[0].type is CommandResponseObject
-        
+
         for fut in vasp.pp.futs:
             fut.result()
         requests = vasp.collect_messages()
@@ -232,7 +232,7 @@ def test_vasp_simple_wrong_VASP(simple_request_json, asset_path, other_addr):
         responses = vasp.collect_messages()
         assert len(responses) == 1
         assert responses[0].type is CommandResponseObject
-        assert 'failure' in responses[0].content
+        assert 'failure' == responses[0].content['status']
     finally:
         vasp.pp.stop_processor()
 

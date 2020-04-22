@@ -94,7 +94,7 @@ async def test_handle_request(url, client, json_request):
     response = await client.post(url, json=json_request)
     assert response.status == 200
     content = await response.json()
-    assert loads(content)['status'] == 'success'
+    assert content['status'] == 'success'
 
 
 async def test_handle_request_business_not_authorised(vasp, url, json_request,

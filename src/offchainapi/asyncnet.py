@@ -75,7 +75,7 @@ class Aionet:
         try:
             request_json = await request.json()
             # TODO: It is a bit silly to call dumps here...
-            response = channel.parse_handle_request(json.dumps(request_json))
+            response = await channel.parse_handle_request_to_future(request_json, encoded=False)
         except json.decoder.JSONDecodeError as e:
             # Raised if the request does not contain valid JSON.
             logging.debug(f'Type Error {e}')
@@ -84,6 +84,7 @@ class Aionet:
             raise web.HTTPBadRequest
 
         # Send back the response
+        channel.process_waiting_requests()
         return web.json_response(response.content)
 
     async def send_request(self, other_addr, json_request):
@@ -107,8 +108,14 @@ class Aionet:
         async with self.session.post(url, json=json_request) as response:
             try:
                 json_response = await response.json()
-                # TODO: It is a bit silly to call dumps here...
-                return channel.parse_handle_response(json.dumps(json_response))
+
+                logging.debug(json_response)
+
+                # TODO: here, what if we receive responses out of order?
+                #       I think we should make a future-based parse_handle_response
+                #       that returns when there is a genuine success.
+                res =  channel.parse_handle_response(json_response, encoded=False)
+                return res
             except json.decoder.JSONDecodeError as e:
                 logging.debug(f'Type Error {e}')
                 return False
