@@ -4,6 +4,7 @@ import boto3
 from fabric import task, Connection, ThreadingGroup as Group
 from paramiko import RSAKey
 import os
+from json import dumps
 
 ec2 = boto3.client('ec2')
 region = os.environ.get("AWS_EC2_REGION")
@@ -130,16 +131,30 @@ def update(ctx):
 
     COMMANDS:	fab update
     '''
-    run_script = 'affchainapi-aws-run.sh'
-
+    port = 80
     set_hosts(ctx)
-    g = Group(*ctx.hosts, user=ctx.user, connect_kwargs=ctx.connect_kwargs)
-    g.run('(cd off-chain-api/ && git pull)')
 
+    # Update code.
+    #g = Group(*ctx.hosts, user=ctx.user, connect_kwargs=ctx.connect_kwargs)
+    #g.run('(cd off-chain-api/ && git pull)')
+
+    # Generate config files.
+    files = []
+    for i, host in enumerate(ctx.hosts):
+        configs = {
+            "addr": chr(65+i)*16,
+            "base_url": f'http://{host}',
+            "port": port
+        }
+        files += [f'{host}.json']
+        with open(files[-1], 'w') as f:
+            f.write(dumps(configs))
+
+    # Upload files.
     for host in ctx.hosts:
         c = Connection(host, user=ctx.user, connect_kwargs=ctx.connect_kwargs)
-        c.put(run_script, '.')
-        c.run(f'chmod +x {run_script}')
+        for f in files:
+            c.put(f, '.')
 
 
 @task
@@ -153,8 +168,9 @@ def run(ctx):
     # NOTE: Calling tmux in threaded groups does not work (bug in Fabric?).
     set_hosts(ctx)
     for host in ctx.hosts:
-        c = Connection(host, user=ctx.user, connect_kwargs=ctx.connect_kwargs)
-        c.run(f'tmux new -d -s "offchainapi" ./{run_script}')
+        pass
+        #c = Connection(host, user=ctx.user, connect_kwargs=ctx.connect_kwargs)
+        #c.run(f'tmux new -d -s "offchainapi" ./{run_script}')
 
 
 @task
