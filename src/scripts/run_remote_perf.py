@@ -11,7 +11,7 @@ num_of_commands = int(sys.argv[3]) if len(sys.argv) > 3 else 0
 
 # Run performance testing.
 asyncio.run(
-    local_benchmark.main_perf(
+    remote_benchmark.main_perf(
         my_configs_path, other_configs_path, num_of_commands
     )
 )
