@@ -137,17 +137,14 @@ async def main_perf():
 
     s = time.perf_counter()
 
-    futs = []
-    for cmd in commands:
-        ret = nodeA.net_handler.sync_new_command(nodeB.my_addr, cmd, loopA)
-        futs += [ ret ]
+    async def send100(nodeA, commands):
+        res = await asyncio.gather( *[nodeA.net_handler.send_command(nodeB.my_addr, cmd) for cmd in commands] )
+        return res
 
-    # res = await asyncio.gather(*(execute(nodeA, nodeB, cmd) for cmd in commands))
-    res = []
-    for fut in futs:
-        res += [fut.result()]
+    res = asyncio.run_coroutine_threadsafe(send100(nodeA, commands), loopA)
+    res = res.result()
 
-    success_number = sum([1 for r in futs if r.result()])
+    success_number = sum([1 for r in res if r])
     elapsed = (time.perf_counter() - s)
     print(f'Commands executed in {elapsed:0.2f} seconds.')
     print(f'Success #: {success_number}/{len(commands)}')
