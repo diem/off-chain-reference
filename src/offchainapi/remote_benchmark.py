@@ -104,8 +104,9 @@ async def main_perf(my_configs_path, other_configs_path, num_of_commands=0):
 
     my_configs = load_configs(my_configs_path)
     other_configs = load_configs(other_configs_path)
-
     my_addr = my_configs['addr']
+    other_addr = other_configs['addr']
+
     logging.basicConfig(level=logging.INFO)
     '''
     logging.basicConfig(
@@ -133,7 +134,6 @@ async def main_perf(my_configs_path, other_configs_path, num_of_commands=0):
             time.sleep(1)
 
     # Get the channel to the other vasp.
-    other_addr = other_configs['addr']
     channel = node.vasp.get_channel(other_addr)
 
     # Make a payment commands.
