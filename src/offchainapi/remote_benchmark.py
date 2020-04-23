@@ -38,7 +38,9 @@ class SimpleVASPInfo(VASPInfo):
         raise NotImplementedError()
 
     def get_peer_base_url(self, other_addr):
-        return f'{self.other_configs['base_url']}:{self.other_configs['port']}'
+        base_url = self.other_configs['base_url']
+        port = self.other_configs['port']
+        return f'{base_url}:{port}'
 
     def is_authorised_VASP(self, certificate, other_addr):
         return True
