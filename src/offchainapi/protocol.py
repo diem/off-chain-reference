@@ -135,8 +135,13 @@ class VASPPairChannel:
 
         # Response cache
         self.response_cache = {}
-        self.waiting = defaultdict(list)
-        self.pending_requests = []
+
+        #  Request cache to reorder
+        self.waiting_requests = defaultdict(list)
+        self.request_window = 1000
+        self.waiting_response = defaultdict(list)
+        self.response_window = 1000
+
         # Network handler
         self.net_queue = []
 
@@ -178,7 +183,8 @@ class VASPPairChannel:
         """ A hook to send a request to other VASP"""
         json_string = request.get_json_data_dict(JSONFlag.NET)
         net_message = NetMessage(self.myself, self.other, CommandRequestObject, json_string)
-        self.net_queue += [ net_message ]
+        if __debug__:
+            self.net_queue += [ net_message ]
         logging.debug(f'Request SENT {self.myself.as_str()}  -> {self.other.as_str()}')
         return net_message
 
@@ -188,7 +194,8 @@ class VASPPairChannel:
         if encoded:
             struct = json.dumps(struct)
         net_message = NetMessage(self.myself, self.other, CommandResponseObject, struct)
-        self.net_queue += [ net_message ]
+        if __debug__:
+            self.net_queue += [ net_message ]
         logging.debug(f'Response SENT {self.myself.as_str()}  -> {self.other.as_str()}')
         return net_message
 
@@ -227,7 +234,7 @@ class VASPPairChannel:
 
         # Process any requests that might be waiting, due to out
         # of order delivery.
-        self.process_waiting_requests()
+        self.process_waiting_messages()
 
         ## No need to make loop -- it will call again upon success
         if self.next_final_sequence() in self.response_cache:
@@ -270,68 +277,68 @@ class VASPPairChannel:
 
     def parse_handle_request(self, json_command, encoded=False):
         ''' Handles a request provided as a json_string '''
-        # TODO: The assert below is not ideal as it will go away when running
-        # python -O, and is important since it needs to sanitize inputs from
-        # the other VASP.
-        # assert type(json_command) == str
-        logging.debug(f'Request Received {self.other.as_str()}  -> {self.myself.as_str()}')
-        with self.rlock:
-            try:
-                req_dict = json.loads(json_command) if encoded else json_command
-                request = CommandRequestObject.from_json_data_dict(req_dict, JSONFlag.NET)
-                response = self.handle_request(request)
-            except JSONParsingError:
-                response = make_parsing_error()
-        full_response = self.send_response(response, encoded=False)
-        return full_response
+        loop = asyncio.new_event_loop()
+        fut = self.parse_handle_request_to_future(json_command, encoded, nowait=True, loop=loop)
+        return fut.result()
 
-    def process_waiting_requests(self):
+
+    def process_waiting_messages(self):
         ''' Executes any requets that are now capable of executing, and were
             not before due to being received out of order. '''
-        while self.other_next_seq() in self.waiting:
+
+        while self.next_final_sequence() in self.waiting_response:
+            next_cmd_seq = self.executor.last_confirmed
+            list_of_responses = self.waiting_response[next_cmd_seq]
+            for resp_record in list_of_responses:
+                (json_command, encoded, fut) = resp_record
+                self.parse_handle_response_to_future(json_command, encoded, fut)
+            del self.waiting_response[next_cmd_seq]
+
+        while self.other_next_seq() in self.waiting_requests:
             next_seq = self.other_next_seq()
-            list_of_requets = self.waiting[next_seq]
-            for req_record in list_of_requets:
+            list_of_requests = self.waiting[next_seq]
+            for req_record in list_of_requests:
                 (json_command, encoded, fut, old_time) = req_record
 
                 # Call, and this will update the future and unblocks
                 # any processes waiting on it.
                 self.parse_handle_request_to_future(json_command, encoded, fut)
 
-            del self.waiting[next_seq]
+            del self.waiting_requests[next_seq]
 
 
-    def parse_handle_request_to_future(self, json_command, encoded=False, fut=None):
+    def parse_handle_request_to_future(self, json_command, encoded=False, fut=None, nowait=False, loop=None):
         ''' Handles a request provided as a json_string and returns
-            a future for when the command will be processed.'''
-        # TODO: The assert below is not ideal as it will go away when running
-        # python -O, and is important since it needs to sanitize inputs from
-        # the other VASP.
-        # assert type(json_command) == str
+            a future that triggers when the command is processed.'''
+
         if fut is None:
-            fut = asyncio.Future()
+            fut = asyncio.Future(loop=loop)
 
         logging.debug(f'Request Received {self.other.as_str()}  -> {self.myself.as_str()}')
-        with self.rlock:
-            try:
-                # Parse the request whoever necessary
-                req_dict = json.loads(json_command) if encoded else json_command
-                request = CommandRequestObject.from_json_data_dict(req_dict, JSONFlag.NET)
+        try:
+            # Parse the request whoever necessary
+            req_dict = json.loads(json_command) if encoded else json_command
+            request = CommandRequestObject.from_json_data_dict(req_dict, JSONFlag.NET)
 
-                # Here test if it is the next one in order
-                if request.seq <= self.other_next_seq() and not (self.is_server() and self.num_pending_responses() > 0):
+            # Here test if it is the next one in order
+            # (1) It is not in the next window
+            # (3) The server is not waiting for replies
+            if not (self.other_next_seq() < request.seq  < request.seq + self.request_window) and \
+                    not (self.is_server() and self.num_pending_responses() > 0) or \
+                    nowait:
+                with self.rlock:
                     response = self.handle_request(request)
-                else:
-                    self.waiting[request.seq] += [(json_command, encoded, fut, time.time())]
-                    return fut
-
-            except JSONParsingError:
-                response = make_parsing_error()
-                full_response = self.send_response(response, encoded=False)
-            except Exception as e:
-                fut.set_exception(e)
+            else:
+                self.waiting_requests[request.seq] += [(json_command, encoded, fut, time.time())]
                 return fut
+        except JSONParsingError:
+            response = make_parsing_error()
+            full_response = self.send_response(response, encoded=False)
+        except Exception as e:
+            fut.set_exception(e)
+            return fut
 
+        # Prepare the response.
         full_response = self.send_response(response, encoded=False)
         fut.set_result(full_response)
         return fut
@@ -372,7 +379,6 @@ class VASPPairChannel:
         # As a server we first wait for the status of all server
         # requests to sequence any new client requests.
         if self.is_server() and self.num_pending_responses() > 0:
-            self.pending_requests += [request]
             # TODO [issue #38]: Ideally, the channel should return None,
             # and the server network should wait until a response is available
             # before answering the client.
@@ -413,19 +419,43 @@ class VASPPairChannel:
 
     def parse_handle_response(self, json_response, encoded=False):
         ''' Handles a response provided as a json string. '''
+        loop = asyncio.new_event_loop()
+        fut = self.parse_handle_response_to_future(json_response, encoded, nowait=True, loop=loop)
+        return fut.result()
+
+    def parse_handle_response_to_future(self, json_response, encoded=False, fut=None, nowait=False, loop=None):
+        ''' Handles a response provided as a json string. Returns a future
+            that fires when the response is processed.'''
         logging.debug(f'Response Received {self.other.as_str()}  -> {self.myself.as_str()}')
-        with self.rlock:
-            try:
-                resp_dict = json.loads(json_response) if encoded else json_response
-                response = CommandResponseObject.from_json_data_dict(resp_dict, JSONFlag.NET)
-                result = self.handle_response(response)
-                return result
-            except JSONParsingError as e:
-                # Log, but cannot reply: TODO
-                # Close the channel?
-                import traceback
-                traceback.print_exc()
-                return False
+
+        if fut is None:
+            fut = asyncio.Future(loop=loop)
+
+        try:
+            resp_dict = json.loads(json_response) if encoded else json_response
+            response = CommandResponseObject.from_json_data_dict(resp_dict, JSONFlag.NET)
+
+            # Check if this has to wait
+            next_response_seq = self.next_final_sequence()
+            command_seq = response.command_seq
+            if command_seq is None \
+                or not (next_response_seq < command_seq < next_response_seq + self.response_window) \
+                or nowait:
+                with self.rlock:
+                    result = self.handle_response(response)
+                fut.set_result(result)
+
+            else:
+                self.waiting_response[command_seq] += [(json_response, encoded, fut)]
+
+        except JSONParsingError as e:
+            # Log, but cannot reply: TODO
+            # Close the channel?
+            import traceback
+            traceback.print_exc()
+            fut.set_exception(e)
+
+        return fut
 
     def handle_response(self, response):
         with self.storage.atomic_writes() as tx_no:
