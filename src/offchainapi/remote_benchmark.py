@@ -125,8 +125,12 @@ async def main_perf(my_configs_path, other_configs_path, num_of_commands=0):
 
     # Stop here if there are no commands to send.
     if num_of_commands == 0:
-        logging.info('No commands to send: exiting now.')
-        sys.exit()
+        logging.info(
+            ('No commands to send:
+            f'waiting for commands from VASP {other_addr.as_str()}.')
+        )
+        while True:
+            time.sleep(1)
 
     # Get the channel to the other vasp.
     other_addr = other_configs['addr']
