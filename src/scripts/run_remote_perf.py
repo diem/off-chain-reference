@@ -1,8 +1,8 @@
-from offchainapi import remote_benchmark
 import asyncio
 import sys
 sys.path += ['src/.']
 
+from offchainapi import remote_benchmark
 
 assert len(sys.argv) > 2
 my_configs_path = sys.argv[1]
