@@ -204,8 +204,8 @@ def simple_response_json_error(request):
     json_obj = json.dumps(resp.get_json_data_dict(JSONFlag.NET))
     return json_obj
 
-def test_vasp_simple(simple_request_json, vasp, other_addr):
-    vasp.pp.start_processor()
+def test_vasp_simple(simple_request_json, vasp, other_addr, loop):
+    vasp.pp.loop = loop
 
     try:
         vasp.process_request(other_addr, simple_request_json)
@@ -213,28 +213,35 @@ def test_vasp_simple(simple_request_json, vasp, other_addr):
         assert len(requests) == 1
         assert requests[0].type is CommandResponseObject
 
+        assert len(vasp.pp.futs) == 1
         for fut in vasp.pp.futs:
-            fut.result()
+            vasp.pp.loop.run_until_complete(fut)
+            # fut.result()
+
+
         requests = vasp.collect_messages()
         assert len(requests) == 1
         assert requests[0].type is CommandRequestObject
     finally:
-        vasp.pp.stop_processor()
+        # vasp.pp.stop_processor()
+        pass
 
 
-def test_vasp_simple_wrong_VASP(simple_request_json, asset_path, other_addr):
+def test_vasp_simple_wrong_VASP(simple_request_json, asset_path, other_addr, loop):
     my_addr = LibraAddress.encode_to_Libra_address(b'X'*16)
     vasp = sample_vasp(my_addr, asset_path)
+    vasp.pp.loop = loop
 
     try:
-        vasp.pp.start_processor()
+        # vasp.pp.start_processor()
         vasp.process_request(other_addr, simple_request_json)
         responses = vasp.collect_messages()
         assert len(responses) == 1
         assert responses[0].type is CommandResponseObject
         assert 'failure' == responses[0].content['status']
     finally:
-        vasp.pp.stop_processor()
+        # vasp.pp.stop_processor()
+        pass
 
 
 

@@ -14,6 +14,8 @@ from .storage import StorableFactory
 from .payment import PaymentAction, PaymentActor, PaymentObject
 from .asyncnet import Aionet
 
+from .core import Vasp
+
 import logging
 logging.basicConfig(level=logging.ERROR)
 
@@ -57,41 +59,12 @@ class SimpleVASPInfo(VASPInfo):
     def is_authorised_VASP(self, certificate, other_addr):
         return True
 
-
-class PerfVasp:
-    def __init__(self, my_addr, port):
-        self.my_addr = my_addr
-        self.port = port
-        self.bc = MagicMock()
-        self.store = StorableFactory({})
-        self.info_context = SimpleVASPInfo()
-        self.pp = PaymentProcessor(self.bc, self.store)
-        self.vasp = OffChainVASP(
-            self.my_addr, self.pp, self.store, self.info_context
-        )
-        self.net_handler = Aionet(self.vasp)
-
-    def start(self, loop):
-        # Start the processor
-        self.pp.start_processor()
-
-        # Start the server
-        runner = self.net_handler.get_runner()
-        #
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(runner.setup())
-
-        site = web.TCPSite(runner, 'localhost', self.port)
-        loop.run_until_complete(site.start())
-
-        loop.run_forever()
-
 global_dir = {}
 
-def start_thread_main(addr, port, loop):
-    node = PerfVasp(addr, port)
-    global_dir[addr.as_str()] = node
-    node.start(loop)
+def start_thread_main(vasp, loop):
+    vasp.start_services(loop)
+    global_dir[vasp.vasp.get_vasp_address().as_str()] = vasp
+    loop.run_forever()
 
 async def execute(nodeA, nodeB, cmd):
     ret = await nodeA.net_handler.send_command(nodeB.my_addr, cmd)
@@ -100,13 +73,28 @@ async def execute(nodeA, nodeB, cmd):
 async def main_perf():
     logging.basicConfig(level=logging.DEBUG)
 
+    VASPa = Vasp(PeerA_addr,
+                 host = 'localhost',
+                 port = 8091,
+                 business_context = MagicMock(),
+                 info_context = SimpleVASPInfo(),
+                 database ={})
+
     loopA = asyncio.new_event_loop()
-    tA = Thread(target=start_thread_main, args=(PeerA_addr, 8091,loopA), daemon=True)
+    tA = Thread(target=start_thread_main, args=(VASPa, loopA), daemon=True)
     tA.start()
     print('Start Node A')
 
+    VASPb = Vasp(PeerB_addr,
+                host = 'localhost',
+                port = 8092,
+                business_context = MagicMock(),
+                info_context = SimpleVASPInfo(),
+                database ={})
+
     loopB = asyncio.new_event_loop()
-    tB = Thread(target=start_thread_main, args=(PeerB_addr, 8092,loopB), daemon=True)
+
+    tB = Thread(target=start_thread_main, args=(VASPb, loopB), daemon=True)
     tB.start()
     print('Start Node B')
 
@@ -138,7 +126,7 @@ async def main_perf():
     s = time.perf_counter()
 
     async def send100(nodeA, commands):
-        res = await asyncio.gather( *[nodeA.net_handler.send_command(nodeB.my_addr, cmd) for cmd in commands] )
+        res = await asyncio.gather( *[nodeA.new_command_async(nodeB.my_addr, cmd) for cmd in commands] )
         return res
 
     res = asyncio.run_coroutine_threadsafe(send100(nodeA, commands), loopA)
