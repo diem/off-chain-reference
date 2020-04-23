@@ -106,8 +106,6 @@ async def main_perf(my_configs_path, other_configs_path, num_of_commands=0):
     other_configs = load_configs(other_configs_path)
 
     my_addr = my_configs['addr']
-    node = PerfVasp(my_configs, other_configs)
-
     logging.basicConfig(level=logging.INFO)
     '''
     logging.basicConfig(
@@ -116,6 +114,9 @@ async def main_perf(my_configs_path, other_configs_path, num_of_commands=0):
         datefmt='%m/%d/%Y %I:%M:%S %p'
     )
     '''
+
+    node = PerfVasp(my_configs, other_configs)
+    logging.info(f'Created VASP {my_addr.as_str()}.')
 
     # Start server.
     loop = asyncio.new_event_loop()
