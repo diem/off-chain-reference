@@ -11,7 +11,7 @@ sudo apt -y autoremove
 git config --global credential.helper store
 
 # Get the repo (the testbed brancha).
-git clone -b testbed https://github.com/calibra/off-chain-api.git
+git clone -b aws https://github.com/calibra/off-chain-api.git
 
 # Install Python and all dependencies.
 sudo apt install -y software-properties-common
