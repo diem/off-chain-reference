@@ -135,8 +135,8 @@ def update(ctx):
     set_hosts(ctx)
 
     # Update code.
-    #g = Group(*ctx.hosts, user=ctx.user, connect_kwargs=ctx.connect_kwargs)
-    #g.run('(cd off-chain-api/ && git pull)')
+    g = Group(*ctx.hosts, user=ctx.user, connect_kwargs=ctx.connect_kwargs)
+    g.run('(cd off-chain-api/ && git pull)')
 
     # Generate config files.
     files = []
@@ -153,6 +153,7 @@ def update(ctx):
     # Upload files.
     for host in ctx.hosts:
         c = Connection(host, user=ctx.user, connect_kwargs=ctx.connect_kwargs)
+        c.run('rm *.json')
         for f in files:
             c.put(f, '.')
 

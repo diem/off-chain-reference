@@ -18,5 +18,6 @@ sudo apt install -y software-properties-common
 sudo add-apt-repository ppa:deadsnakes/ppa
 sudo apt update
 sudo apt install -y python3.7
+sudo apt install -y python3-pip
 python3.7 -m pip install pip
-pip install -r requirements.txt
+(cd off-chain-api && pip install -r requirements.txt)
