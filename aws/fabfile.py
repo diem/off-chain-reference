@@ -164,14 +164,19 @@ def run(ctx):
 
     COMMANDS:	fab run
     '''
-    run_script = 'affchainapi-aws-run.sh'
+    num_of_commands = 100
 
-    # NOTE: Calling tmux in threaded groups does not work (bug in Fabric?).
     set_hosts(ctx)
-    for host in ctx.hosts:
-        pass
-        #c = Connection(host, user=ctx.user, connect_kwargs=ctx.connect_kwargs)
-        #c.run(f'tmux new -d -s "offchainapi" ./{run_script}')
+    for i, host in enumerate(ctx.hosts):
+        command = 'cd off-chain-api && pwd && '
+        command += 'python3.7 src/scripts/run_remote_perf.py '
+        command += f'{host}.json '
+        command += f'{num_of_commands}' if i == 0 else '0'
+        print(command)
+
+        # NOTE: Calling tmux in threaded groups does not work (bug in Fabric?).
+        c = Connection(host, user=ctx.user, connect_kwargs=ctx.connect_kwargs)
+        c.run(f'tmux new -d -s "offchainapi" {command}')
 
 
 @task
