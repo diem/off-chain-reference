@@ -118,6 +118,7 @@ async def main_perf(my_configs_path, other_configs_path, num_of_commands=0):
     loop = asyncio.new_event_loop()
     Thread(target=node.start, args=(loop,), daemon=True).start()
     logging.info(f'VASP {my_addr.as_str()} is running.')
+    print('here')
 
     # Stop here if there are no commands to send.
     if num_of_commands == 0:
