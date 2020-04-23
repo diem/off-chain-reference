@@ -107,7 +107,7 @@ async def main_perf(my_configs_path, other_configs_path, num_of_commands=0):
     my_addr = my_configs['addr']
     other_addr = other_configs['addr']
 
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.DEBUG)
     '''
     logging.basicConfig(
         level=logging.INFO,

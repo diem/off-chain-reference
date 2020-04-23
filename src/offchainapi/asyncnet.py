@@ -117,7 +117,7 @@ class Aionet:
                 # TODO: here, what if we receive responses out of order?
                 #       I think we should make a future-based parse_handle_response
                 #       that returns when there is a genuine success.
-                res =  channel.parse_handle_response(json_response, encoded=False)
+                res = channel.parse_handle_response(json_response, encoded=False)
                 return res
             except json.decoder.JSONDecodeError as e:
                 logging.debug(f'Type Error {e}')

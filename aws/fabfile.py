@@ -131,8 +131,9 @@ def update(ctx):
 
     COMMANDS:	fab update
     '''
-    UPLOAD_FILES = False
+    UPLOAD_FILES = True
 
+    run_script = 'offchainapi-aws-run.sh'
     port = 8090
     set_hosts(ctx)
 
@@ -158,6 +159,8 @@ def update(ctx):
     # Upload files.
     for host in ctx.hosts:
         c = Connection(host, user=ctx.user, connect_kwargs=ctx.connect_kwargs)
+        c.put(run_script, '.')
+        c.run(f'chmod +x {run_script}')
         c.run('rm *.json')
         for f in files:
             c.put(f, '.')
@@ -169,19 +172,18 @@ def run(ctx):
 
     COMMANDS:	fab run
     '''
+    run_script = 'offchainapi-aws-run.sh'
     num_of_commands = 100
 
     set_hosts(ctx)
-    for i, host in enumerate(ctx.hosts):
-        command = 'cd off-chain-api && '
-        command += 'python3.7 src/scripts/run_remote_perf.py '
-        command += f'{host}.json '
-        command += f'{num_of_commands}' if i == 0 else '0'
-        print(command)
+    for host in ctx.hosts:
+        path = f'{host}.json '
+        runs = f'{num_of_commands}' if host == ctx.hosts[-1] else '0'
 
         # NOTE: Calling tmux in threaded groups does not work (bug in Fabric?).
         c = Connection(host, user=ctx.user, connect_kwargs=ctx.connect_kwargs)
-        c.run(f'tmux new -d -s "offchainapi" {command}')
+        #with ctx.cd('off-chain-api'):
+        c.run(f'tmux new -d -s "offchainapi" ./{run_script} {path} {runs}')
 
 
 @task

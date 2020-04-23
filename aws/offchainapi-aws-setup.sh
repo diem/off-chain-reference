@@ -21,3 +21,6 @@ sudo apt install -y python3.7
 sudo apt install -y python3-pip
 python3.7 -m pip install pip
 (cd off-chain-api && pip install -r requirements.txt)
+
+# Install nginx.
+sudo apt install nginx
