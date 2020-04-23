@@ -112,9 +112,11 @@ async def main_perf(my_configs_path, other_configs_path, num_of_commands=0):
     # Start server.
     loop = asyncio.new_event_loop()
     Thread(target=node.start, args=(loop,), daemon=True).start()
+    logging.info(f'VASP {my_addr} is running.')
 
     # Stop here if there are no commands to send.
     if num_of_commands == 0:
+        logging.info('No commands to execute: exiting now.')
         sys.exit()
 
     # Get the channel to the other vasp.
@@ -134,6 +136,8 @@ async def main_perf(my_configs_path, other_configs_path, num_of_commands=0):
         commands += [cmd]
 
     # Send commands.
+    logging.info('Start measurements:')
+    logging.info(f'Sending {num_of_commands} commands to {other_addr}.')
     start_time = time.perf_counter()
 
     async def send(node, commands):
