@@ -131,7 +131,7 @@ def update(ctx):
 
     COMMANDS:	fab update
     '''
-    UPLOAD_FILES = True
+    UPLOAD_FILES = False
 
     run_script = 'offchainapi-aws-run.sh'
     port = 8090

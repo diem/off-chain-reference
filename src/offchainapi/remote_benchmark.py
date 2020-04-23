@@ -38,7 +38,7 @@ class SimpleVASPInfo(VASPInfo):
         raise NotImplementedError()
 
     def get_peer_base_url(self, other_addr):
-        return self.other_configs['base_url']
+        return f'{self.other_configs['base_url']}:{self.other_configs['port']}'
 
     def is_authorised_VASP(self, certificate, other_addr):
         return True
@@ -101,20 +101,12 @@ async def main_perf(my_configs_path, other_configs_path, num_of_commands=0):
         }
     '''
     assert num_of_commands >= 0
+    logging.basicConfig(level=logging.DEBUG)
 
     my_configs = load_configs(my_configs_path)
     other_configs = load_configs(other_configs_path)
     my_addr = my_configs['addr']
     other_addr = other_configs['addr']
-
-    logging.basicConfig(level=logging.DEBUG)
-    '''
-    logging.basicConfig(
-        level=logging.INFO,
-        format=f'[{my_addr.as_str()}][%(asctime)s] %(message)s',
-        datefmt='%m/%d/%Y %I:%M:%S %p'
-    )
-    '''
 
     node = PerfVasp(my_configs, other_configs)
     logging.info(f'Created VASP {my_addr.as_str()}.')
