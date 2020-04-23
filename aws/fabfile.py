@@ -168,7 +168,7 @@ def run(ctx):
 
     set_hosts(ctx)
     for i, host in enumerate(ctx.hosts):
-        command = 'cd off-chain-api && pwd && '
+        command = 'cd off-chain-api && '
         command += 'python3.7 src/scripts/run_remote_perf.py '
         command += f'{host}.json '
         command += f'{num_of_commands}' if i == 0 else '0'

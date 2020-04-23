@@ -1,5 +1,5 @@
 import asyncio
-import glob
+from glob import glob
 import sys
 sys.path += ['src/.']
 
