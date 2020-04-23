@@ -138,11 +138,12 @@ def check_status(role, old_status, new_status, other_status):
 # The logic to process a payment from either side.
 class PaymentProcessor(CommandProcessor):
 
-    def __init__(self, business, storage_factory):
+    def __init__(self, business, storage_factory, loop=None):
         self.business = business
 
         # Asyncio support
         self.loop = None
+
         # print('Creating event loop', self.loop)
         self.t = None
 
@@ -156,26 +157,12 @@ class PaymentProcessor(CommandProcessor):
 
     # ------ Machinery for supporting async Business context ------
 
-    def start_processor(self):
-        """ Start the asyncio loop to process commands """
-        def main_loop(loop):
-            asyncio.set_event_loop(loop)
-            print('Entring event loop', loop)
-            loop.run_forever()
-            self.t = None
-            self.loop = None
-        
-        self.loop = asyncio.new_event_loop()
-        self.t = Thread(target=main_loop, args=(self.loop,))
-        self.t.start()
-
     async def process_command_async(self, vasp, channel, executor, command,
                                     status_success, error=None):
         self.command_id += 1
         self.pending_commands[self.command_id] = (vasp, channel, executor,
                                                   command, status_success,
                                                   error)
-        
         if status_success:
             dependencies = executor.object_store
             new_version = command.get_new_version()
@@ -183,24 +170,12 @@ class PaymentProcessor(CommandProcessor):
             new_payment = await self.payment_process_async(payment)
             if new_payment is not None and new_payment.has_changed():
                 new_cmd = PaymentCommand(new_payment)
-                channel.sequence_command_local(new_cmd)
+                request = channel.sequence_command_local(new_cmd)
         else:
             # TODO: Log the error, but do nothing
             if command.origin == channel.myself:
                 pass # log failure of our own command :(
-        
 
-    async def stop_loop(self):
-        """ Coroutine to stop the event loop """
-        if self.loop is not None:
-            self.loop.stop()
-
-    def stop_processor(self):
-        """ A syncronous function to stop the event loop """
-        if self.loop is not None:
-            fut = asyncio.run_coroutine_threadsafe(self.stop_loop(), self.loop)
-        # fut.result()
-    
 
     # -------- Implements CommandProcessor interface ---------
 
@@ -209,9 +184,10 @@ class PaymentProcessor(CommandProcessor):
 
     def check_command(self, vasp, channel, executor, command):
         """ Called when receiving a new payment command to validate it. All checks here
-        are blocking subsequent comments, and therefore they must be quick to ensure 
+        are blocking subsequent comments, and therefore they must be quick to ensure
         performance. As a result we only do local syntactic checks that require no lookup
         into the VASP potentially remote stores or accounts. """
+
         dependencies = executor.object_store
 
         new_version = command.get_new_version()
@@ -246,8 +222,13 @@ class PaymentProcessor(CommandProcessor):
                 self.check_new_update(old_payment, new_payment)
 
     def process_command(self, vasp, channel, executor, command, status_success, error=None):
-        fut = asyncio.run_coroutine_threadsafe(self.process_command_async(vasp, channel, executor, command, status_success, error), self.loop)
-        self.futs += [fut]
+        """ Processes a command to generate more subsequent commands. This schedules a
+            talk that will be executed later. """
+        fut = self.loop.create_task(self.process_command_async(vasp, channel, executor, command, status_success, error))
+        if __debug__:
+            # Log the futures here to execute them inidividually
+            # when testing.
+            self.futs += [fut]
         return fut
 
     # ----------- END of CommandProcessor interface ---------
