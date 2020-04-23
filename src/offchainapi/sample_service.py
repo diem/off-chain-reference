@@ -339,7 +339,7 @@ class sample_vasp:
 
     def process_response(self, other_vasp, request_json):
         channel = self.get_channel(other_vasp)
-        channel.parse_handle_response(request_json)
+        channel.parse_handle_response(request_json, encoded=True)
 
     def run_server(self):
         self.network_server.run()

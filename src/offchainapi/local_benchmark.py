@@ -148,6 +148,17 @@ async def main_perf():
     elapsed = (time.perf_counter() - s)
     print(f'Commands executed in {elapsed:0.2f} seconds.')
     print(f'Success #: {success_number}/{len(commands)}')
+
+
+    # Esure they were register as successes on both sides.
+    Asucc = len([x for x in channelAB.executor.command_status_sequence if x])
+    Atotal =   len(channelAB.executor.command_status_sequence)
+    print(f'Peer A successes: {Asucc}/{Atotal}')
+
+    Bsucc = len([x for x in channelBA.executor.command_status_sequence if x])
+    Btotal =   len(channelBA.executor.command_status_sequence)
+    print(f'Peer B successes: {Bsucc}/{Btotal}')
+
     print(f'Estimate throughput #: {len(commands)/elapsed} Tx/s')
 
     import sys
