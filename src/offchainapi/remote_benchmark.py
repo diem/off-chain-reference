@@ -80,8 +80,9 @@ def load_configs(configs_path):
     assert 'base_url' in configs
     assert 'port' in configs
 
-    configs['addr'] = LibraAddress.encode_to_Libra_address(configs['addr'].encode())
-    configs['port'] = int(configs['addr'])
+    bytes_addr = configs['addr'].encode()
+    configs['addr'] = LibraAddress.encode_to_Libra_address(bytes_addr)
+    configs['port'] = int(configs['port'])
     return configs
 
 
