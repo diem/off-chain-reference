@@ -27,7 +27,10 @@ class Aionet:
         logging.debug(f'Register route {route}')
         self.app.add_routes([web.post(route, self.handle_request)])
         if __debug__:
-            self.app.add_routes([web.post('/', self.handle_request_debug)])
+            self.app.add_routes([
+                web.post('/', self.handle_request_debug),
+                web.get('/', self.handle_request_debug)
+            ])
 
     def __del__(self):
         if self.session:
