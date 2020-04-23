@@ -17,6 +17,7 @@ from aiohttp import web
 import sys
 from json import loads
 
+
 class SimpleVASPInfo(VASPInfo):
     ''' Simple implementation of VASPInfo. '''
 
@@ -100,7 +101,11 @@ async def main_perf(my_configs_path, other_configs_path, num_of_commands=0):
         }
     '''
     assert num_of_commands >= 0
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format=f'[{my_addr.as_str()}][%(asctime)s] %(message)s',
+        datefmt='%m/%d/%Y %I:%M:%S %p'
+    )
 
     my_configs = load_configs(my_configs_path)
     other_configs = load_configs(other_configs_path)
@@ -112,11 +117,11 @@ async def main_perf(my_configs_path, other_configs_path, num_of_commands=0):
     # Start server.
     loop = asyncio.new_event_loop()
     Thread(target=node.start, args=(loop,), daemon=True).start()
-    logging.info(f'VASP {my_addr} is running.')
+    logging.info(f'VASP {my_addr.as_str()} is running.')
 
     # Stop here if there are no commands to send.
     if num_of_commands == 0:
-        logging.info('No commands to execute: exiting now.')
+        logging.info('No commands to send: exiting now.')
         sys.exit()
 
     # Get the channel to the other vasp.
@@ -136,8 +141,10 @@ async def main_perf(my_configs_path, other_configs_path, num_of_commands=0):
         commands += [cmd]
 
     # Send commands.
-    logging.info('Start measurements:')
-    logging.info(f'Sending {num_of_commands} commands to {other_addr}.')
+    logging.info(
+        ('Start measurements:'
+         f'Sending {num_of_commands} commands to {other_addr.as_str()}.')
+    )
     start_time = time.perf_counter()
 
     async def send(node, commands):
