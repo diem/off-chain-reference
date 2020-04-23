@@ -16,7 +16,7 @@ import asyncio
 from aiohttp import web
 import sys
 from json import loads
-
+import aiohttp
 
 class SimpleVASPInfo(VASPInfo):
     ''' Simple implementation of VASPInfo. '''
