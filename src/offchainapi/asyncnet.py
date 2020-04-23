@@ -145,8 +145,5 @@ class Aionet:
             self.send_command(other_addr, command), loop
         )
 
-    async def run(self, **kwargs):
-        await web.run_app(self.app, **kwargs)
-
     def get_runner(self):
         return web.AppRunner(self.app)

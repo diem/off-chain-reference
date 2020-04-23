@@ -114,7 +114,7 @@ async def main_perf(my_configs_path, other_configs_path, num_of_commands=0):
     logging.info(f'Created VASP {my_addr.as_str()}.')
 
     if num_of_commands == 0:
-        await node.net_handler.run(port=my_configs['port'])
+        node.net_handler.app.run_app(port=my_configs['port'])
         while True:
             time.sleep(1)
 
