@@ -109,7 +109,7 @@ async def main_perf(my_configs_path, other_configs_path, num_of_commands=0):
     node = PerfVasp(my_configs, other_configs)
 
     logging.basicConfig(
-        level=logging.DEBUG,
+        level=logging.INFO,
         format=f'[{my_addr.as_str()}][%(asctime)s] %(message)s',
         datefmt='%m/%d/%Y %I:%M:%S %p'
     )
