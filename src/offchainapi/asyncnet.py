@@ -29,6 +29,12 @@ class Aionet:
         if __debug__:
             self.app.add_routes([web.post('/', self.handle_request_debug)])
 
+    def __del__(self):
+        if self.session:
+            loop = asyncio.new_event_loop()
+            loop.run_until_complete(self.session.close())
+
+
     def close_connection(self):
         # TODO: must eventually call: await self.session.close()
         pass
@@ -70,12 +76,9 @@ class Aionet:
             raise web.HTTPForbidden
 
         # Perform the request, send back the reponse.
-        # TODO: here we may place the request in a queue and have it
-        #       handled by a central task per channel to ensure we
-        #       handle requests, and send responses strictly in sequence.
         try:
             request_json = await request.json()
-            # TODO: It is a bit silly to call dumps here...
+            # TODO: Handle the timeout error here
             response = await channel.parse_handle_request_to_future(request_json, encoded=False)
         except json.decoder.JSONDecodeError as e:
             # Raised if the request does not contain valid JSON.
@@ -85,7 +88,6 @@ class Aionet:
             raise web.HTTPBadRequest
 
         # Send back the response
-        channel.process_waiting_requests()
         return web.json_response(response.content)
 
     async def send_request(self, other_addr, json_request):
