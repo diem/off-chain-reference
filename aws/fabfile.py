@@ -133,7 +133,7 @@ def update(ctx):
     '''
     UPLOAD_FILES = False
 
-    port = 80
+    port = 8090
     set_hosts(ctx)
 
     # Update code.
