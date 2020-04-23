@@ -113,6 +113,9 @@ async def main_perf(my_configs_path, other_configs_path, num_of_commands=0):
     node = PerfVasp(my_configs, other_configs)
     logging.info(f'Created VASP {my_addr.as_str()}.')
 
+    if num_of_commands == 0:
+        node.net_handler.run(port=my_configs['port'])
+
     # Start server.
     loop = asyncio.new_event_loop()
     Thread(target=node.start, args=(loop,), daemon=True).start()
