@@ -105,10 +105,6 @@ async def main_perf(my_configs_path, other_configs_path, num_of_commands=0):
     my_configs = load_configs(my_configs_path)
     other_configs = load_configs(other_configs_path)
 
-    print(my_configs)
-    print(other_configs)
-    sys.exit()
-
     # Create VASP.
     my_addr = my_configs['addr']
     node = PerfVasp(my_configs, other_configs)

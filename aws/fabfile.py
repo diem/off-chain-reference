@@ -131,6 +131,8 @@ def update(ctx):
 
     COMMANDS:	fab update
     '''
+    UPLOAD_FILES = False
+
     port = 80
     set_hosts(ctx)
 
@@ -149,6 +151,9 @@ def update(ctx):
         files += [f'{host}.json']
         with open(files[-1], 'w') as f:
             f.write(dumps(configs))
+
+    if not UPLOAD_FILES:
+        return
 
     # Upload files.
     for host in ctx.hosts:
