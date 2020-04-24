@@ -1,3 +1,8 @@
+'''
+RUN SERVER: python src/scripts/run_remote_perf.py 127.0.0.1.json
+
+RUN CLIENT: python src/scripts/run_remote_perf.py 13.53.148.138.json 10
+'''
 import asyncio
 from glob import glob
 import sys
@@ -14,13 +19,6 @@ assert len(files) == 2
 other_configs_path = files[1] if my_configs_path == files[0] else files[0]
 
 if num_of_commands > 0:
-    '''
-    asyncio.run(
-        remote_benchmark.run_client(
-            my_configs_path, other_configs_path, num_of_commands
-        )
-    )
-    '''
     remote_benchmark.run_client(
         my_configs_path, other_configs_path, num_of_commands
     )
