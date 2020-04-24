@@ -1,5 +1,6 @@
 import asyncio
 from threading import Thread
+import logging
 
 from .business import BusinessContext, \
     BusinessNotAuthorized, BusinessValidationFailure, \
@@ -163,19 +164,22 @@ class PaymentProcessor(CommandProcessor):
         self.pending_commands[self.command_id] = (vasp, channel, executor,
                                                   command, status_success,
                                                   error)
-        if status_success:
-            dependencies = executor.object_store
-            new_version = command.get_new_version()
-            payment = command.get_object(new_version, dependencies)
-            new_payment = await self.payment_process_async(payment)
-            if new_payment is not None and new_payment.has_changed():
-                new_cmd = PaymentCommand(new_payment)
-                request = channel.sequence_command_local(new_cmd)
-        else:
-            # TODO: Log the error, but do nothing
-            if command.origin == channel.myself:
-                pass # log failure of our own command :(
+        try:
+            if status_success:
+                dependencies = executor.object_store
+                new_version = command.get_new_version()
+                payment = command.get_object(new_version, dependencies)
+                new_payment = await self.payment_process_async(payment)
+                if new_payment is not None and new_payment.has_changed():
+                    new_cmd = PaymentCommand(new_payment)
+                    request = channel.sequence_command_local(new_cmd)
+            else:
+                # TODO: Log the error, but do nothing
+                if command.origin == channel.myself:
+                    pass
 
+        except Exception as e:
+            logging.error(f'Payment processing error: {e}')
 
     # -------- Implements CommandProcessor interface ---------
 
