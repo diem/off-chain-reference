@@ -27,4 +27,5 @@ setuptools.setup(
         'pytest-httpserver',
         'coverage'
     ],
+    version="0.0.1.dev1",
 )

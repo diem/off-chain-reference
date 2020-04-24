@@ -186,7 +186,9 @@ def make_payment_status_lattice():
 ''' A global variable describing the payment protocol status process '''
 payment_status_process = make_payment_status_lattice()
 
-def filter_by_heights(jointprocess, heights):
+# These function just pretty print the status hierarchy
+
+def filter_by_heights(jointprocess, heights):  # pragma: no cover
     process = set(jointprocess)
     for item in list(jointprocess):
         ((s0, s1),(e0, e1)) = item
@@ -198,13 +200,13 @@ def filter_by_heights(jointprocess, heights):
             process.remove(item)
     return process
 
-def sort_function(status_heights):
+def sort_function(status_heights):  # pragma: no cover
     def status_pair_key(spair):
         return [status_heights[i] for i in spair]
     return status_pair_key
 
 
-def print_status_transmition_updates(status_heights):
+def print_status_transmition_updates(status_heights):  # pragma: no cover
 
     sender_progress = filter_one_sided_progress(payment_status_process,1)
     all_starts = set([st for (st, en) in sender_progress])

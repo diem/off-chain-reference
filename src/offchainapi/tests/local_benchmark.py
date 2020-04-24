@@ -3,7 +3,7 @@
 # Run as:
 # $ python -m cProfile -s tottime src/scripts/run_perf.py > report.txt
 #
-from ..business import VASPInfo
+from ..business import VASPInfo, BusinessContext
 from ..libra_address import LibraAddress
 from ..payment_logic import PaymentCommand
 from ..status_logic import Status
@@ -11,9 +11,8 @@ from ..payment import PaymentAction, PaymentActor, PaymentObject
 from ..core import Vasp
 
 import logging
-logging.basicConfig(level=logging.ERROR)
-
 from unittest.mock import MagicMock
+from mock import AsyncMock
 from threading import Thread
 import time
 import asyncio
@@ -68,7 +67,7 @@ async def main_perf():
     VASPa = Vasp(PeerA_addr,
                  host = 'localhost',
                  port = 8091,
-                 business_context = MagicMock(),
+                 business_context = MagicMock(spec=BusinessContext),
                  info_context = SimpleVASPInfo(),
                  database ={})
 
@@ -80,7 +79,7 @@ async def main_perf():
     VASPb = Vasp(PeerB_addr,
                 host = 'localhost',
                 port = 8092,
-                business_context = MagicMock(),
+                business_context = MagicMock(spec=BusinessContext),
                 info_context = SimpleVASPInfo(),
                 database ={})
 
