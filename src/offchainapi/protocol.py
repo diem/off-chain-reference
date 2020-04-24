@@ -315,28 +315,28 @@ class VASPPairChannel:
             fut = asyncio.Future(loop=loop)
 
         logging.debug(f'Request Received {self.other.as_str()}  -> {self.myself.as_str()}')
-        with self.rlock:
-            try:
-                # Parse the request whoever necessary
-                req_dict = json.loads(json_command) if encoded else json_command
-                request = CommandRequestObject.from_json_data_dict(req_dict, JSONFlag.NET)
+        try:
+            # Parse the request whoever necessary
+            req_dict = json.loads(json_command) if encoded else json_command
+            request = CommandRequestObject.from_json_data_dict(req_dict, JSONFlag.NET)
 
-                # Here test if it is the next one in order
-                # (1) It is not in the next window
-                # (3) The server is not waiting for replies
-                if not (self.other_next_seq() < request.seq  < request.seq + self.request_window) and \
+            # Here test if it is the next one in order
+            # (1) It is not in the next window
+            # (3) The server is not waiting for replies
+            if not (self.other_next_seq() < request.seq  < request.seq + self.request_window) and \
                     not (self.is_server() and self.num_pending_responses() > 0) or \
-                        nowait:
+                    nowait:
+                with self.rlock:
                     response = self.handle_request(request)
-                else:
-                    self.waiting_requests[request.seq] += [(json_command, encoded, fut, time.time())]
-                    return fut
-            except JSONParsingError:
-                response = make_parsing_error()
-                full_response = self.send_response(response, encoded=False)
-            except Exception as e:
-                fut.set_exception(e)
+            else:
+                self.waiting_requests[request.seq] += [(json_command, encoded, fut, time.time())]
                 return fut
+        except JSONParsingError:
+            response = make_parsing_error()
+            full_response = self.send_response(response, encoded=False)
+        except Exception as e:
+            fut.set_exception(e)
+            return fut
 
         # Prepare the response.
         full_response = self.send_response(response, encoded=False)
@@ -431,31 +431,31 @@ class VASPPairChannel:
         if fut is None:
             fut = asyncio.Future(loop=loop)
 
-        with self.rlock:
-            try:
-                resp_dict = json.loads(json_response) if encoded else json_response
-                response = CommandResponseObject.from_json_data_dict(resp_dict, JSONFlag.NET)
+        try:
+            resp_dict = json.loads(json_response) if encoded else json_response
+            response = CommandResponseObject.from_json_data_dict(resp_dict, JSONFlag.NET)
 
-                # Check if this has to wait
-                next_response_seq = self.next_final_sequence()
-                command_seq = response.command_seq
-                if command_seq is None \
-                    or not (next_response_seq < command_seq < next_response_seq + self.response_window) \
-                    or nowait:
+            # Check if this has to wait
+            next_response_seq = self.next_final_sequence()
+            command_seq = response.command_seq
+            if command_seq is None \
+                or not (next_response_seq < command_seq < next_response_seq + self.response_window) \
+                or nowait:
+                with self.rlock:
                     result = self.handle_response(response)
-                    fut.set_result(result)
+                fut.set_result(result)
 
-                else:
-                    self.waiting_response[command_seq] += [(json_response, encoded, fut)]
+            else:
+                self.waiting_response[command_seq] += [(json_response, encoded, fut)]
 
-            except JSONParsingError as e:
-                # Log, but cannot reply: TODO
-                # Close the channel?
-                import traceback
-                traceback.print_exc()
-                fut.set_exception(e)
+        except JSONParsingError as e:
+            # Log, but cannot reply: TODO
+            # Close the channel?
+            import traceback
+            traceback.print_exc()
+            fut.set_exception(e)
 
-            return fut
+        return fut
 
     def handle_response(self, response):
         with self.storage.atomic_writes() as tx_no:
