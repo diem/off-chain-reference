@@ -27,17 +27,27 @@ class Aionet:
         logging.debug(f'Register route {route}')
         self.app.add_routes([web.post(route, self.handle_request)])
         if __debug__:
-            self.app.add_routes([web.post('/', self.handle_request_debug)])
+            self.app.add_routes([
+                web.post('/', self.handle_request_debug),
+                web.get('/', self.handle_request_debug)
+            ])
+
+        self.watchdog_period = 10.0  # seconds
 
     def __del__(self):
         if self.session:
             loop = asyncio.new_event_loop()
             loop.run_until_complete(self.session.close())
 
+    async def watchdog_task(self):
+        ''' Provides a debug view of pending requests and replies '''
+        logging.debug('Start Network Watchdog')
+        while True:
+            for k in self.vasp.channel_store:
+                channel = self.vasp.channel_store[k]
+                logging.debug(f'{len(channel.waiting_requests), len(channel.waiting_response)}')
+            await asyncio.sleep(self.watchdog_period)
 
-    def close_connection(self):
-        # TODO: must eventually call: await self.session.close()
-        pass
 
     def get_url(self, base_url, other_addr_str, other_is_server=False):
         if other_is_server:
@@ -56,7 +66,7 @@ class Aionet:
     async def handle_request(self, request):
         # TODO: Could there be errors when creating LibraAddress?
         other_addr = LibraAddress(request.match_info['other_addr'])
-        logging.debug(f'Data Received from {other_addr.as_str()}')
+        logging.debug(f'Request Received from {other_addr.as_str()}')
 
         # Try to get a channel with the other VASP.
         try:
@@ -79,7 +89,10 @@ class Aionet:
         try:
             request_json = await request.json()
             # TODO: Handle the timeout error here
-            response = await channel.parse_handle_request_to_future(request_json, encoded=False)
+            logging.debug(f'Data Received from {other_addr.as_str()}')
+            response = await channel.parse_handle_request_to_future(
+                request_json, encoded=False
+            )
         except json.decoder.JSONDecodeError as e:
             # Raised if the request does not contain valid JSON.
             logging.debug(f'Type Error {e}')
@@ -88,6 +101,8 @@ class Aionet:
             raise web.HTTPBadRequest
 
         # Send back the response
+        channel.process_waiting_messages()
+        logging.debug(f'Sending back response to {other_addr.as_str()}')
         return web.json_response(response.content)
 
     async def send_request(self, other_addr, json_request):
@@ -107,23 +122,26 @@ class Aionet:
 
         base_url = self.vasp.info_context.get_peer_base_url(other_addr)
         url = self.get_url(base_url, other_addr.as_str(), other_is_server=True)
+        logging.debug(f'Sending post request to {url}')
         # TODO: Handle errors with session.post
         async with self.session.post(url, json=json_request) as response:
             try:
                 json_response = await response.json()
-
-                logging.debug(json_response)
+                logging.debug(f'Json response: {json_response}')
 
                 # TODO: here, what if we receive responses out of order?
                 #       I think we should make a future-based parse_handle_response
                 #       that returns when there is a genuine success.
-                res =  channel.parse_handle_response(json_response, encoded=False)
+                res = channel.parse_handle_response(json_response, encoded=False)
+                logging.debug(f'Response parsed with status: {res}')
+                channel.process_waiting_messages()
                 return res
             except json.decoder.JSONDecodeError as e:
                 logging.debug(f'Type Error {e}')
                 return False
 
     async def send_command(self, other_addr, command):
+        logging.debug(f'Sending command to {other_addr.as_str()}.')
         try:
             channel = self.vasp.get_channel(other_addr)
         except BusinessNotAuthorized as e:
@@ -141,9 +159,6 @@ class Aionet:
         return asyncio.run_coroutine_threadsafe(
             self.send_command(other_addr, command), loop
         )
-
-    def run(self, **kwargs):
-        web.run_app(self.app, **kwargs)
 
     def get_runner(self):
         return web.AppRunner(self.app)

@@ -13,7 +13,6 @@ from .payment import PaymentAction, PaymentActor, PaymentObject
 from .asyncnet import Aionet
 
 import logging
-logging.basicConfig(level=logging.ERROR)
 
 import json
 from unittest.mock import MagicMock
@@ -51,6 +50,9 @@ class Vasp:
 
         self.site = web.TCPSite(runner, self.host, self.port)
         loop.run_until_complete(self.site.start())
+
+        loop.create_task(self.net_handler.watchdog_task())
+
 
     def new_command(self, addr, cmd):
         pass
