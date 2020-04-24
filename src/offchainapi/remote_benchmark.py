@@ -84,7 +84,7 @@ def run_server(my_configs_path, other_configs_path):
     # Create VASP.
     vasp = Vasp(
         my_addr,
-        host='localhost',
+        host='0.0.0.0',
         port=my_configs['port'],
         business_context=MagicMock(),
         info_context=SimpleVASPInfo(my_configs, other_configs),
@@ -94,7 +94,7 @@ def run_server(my_configs_path, other_configs_path):
 
     # Run VASP services.
     logging.info(f'Running VASP {my_addr.as_str()}.')
-    loop = asyncio.new_event_loop()
+    loop = asyncio.get_event_loop()
     vasp.start_services(loop)
     loop.run_forever()
 
@@ -123,7 +123,7 @@ def run_client(my_configs_path, other_configs_path, num_of_commands=10):
     # Create VASP.
     vasp = Vasp(
         my_addr,
-        host='localhost',
+        host='0.0.0.0',
         port=my_configs['port'],
         business_context=MagicMock(),
         info_context=SimpleVASPInfo(my_configs, other_configs),
@@ -174,13 +174,3 @@ def run_client(my_configs_path, other_configs_path, num_of_commands=10):
     logging.info(f'Commands executed in {elapsed:0.2f} seconds.')
     logging.info(f'Success #: {success_number}/{len(commands)}.')
     logging.info(f'Estimate throughput #: {len(commands)/elapsed} TPS.')
-
-    '''
-    # Esure they were register as successes on both sides.
-    channel = vasp.vasp.get_channel(other_addr)
-    Asucc = len([x for x in channelAB.executor.command_status_sequence if x])
-    Atotal = len(channelAB.executor.command_status_sequence)
-    print(f'Peer A successes: {Asucc}/{Atotal}')
-    '''
-
-    sys.exit()

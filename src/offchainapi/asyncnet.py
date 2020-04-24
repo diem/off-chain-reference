@@ -78,11 +78,9 @@ class Aionet:
             request_json = await request.json()
             # TODO: Handle the timeout error here
             logging.debug(f'Data Received from {other_addr.as_str()}')
-
             response = await channel.parse_handle_request_to_future(
                 request_json, encoded=False
             )
-            #response = channel.parse_handle_request(request_json, encoded=False)
         except json.decoder.JSONDecodeError as e:
             # Raised if the request does not contain valid JSON.
             logging.debug(f'Type Error {e}')
@@ -111,8 +109,8 @@ class Aionet:
 
         base_url = self.vasp.info_context.get_peer_base_url(other_addr)
         url = self.get_url(base_url, other_addr.as_str(), other_is_server=True)
+        logging.debug(f'Sending post request to {url}')
         # TODO: Handle errors with session.post
-        print(f'HERE 2: {url}')
         async with self.session.post(url, json=json_request) as response:
             try:
                 json_response = await response.json()
