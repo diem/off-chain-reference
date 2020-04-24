@@ -7,7 +7,6 @@ from ..protocol_messages import CommandRequestObject, CommandResponseObject, \
     OffChainError
 
 from pathlib import Path
-import OpenSSL.crypto
 import json
 from unittest.mock import MagicMock, patch
 import pytest
