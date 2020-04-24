@@ -1,12 +1,12 @@
-from .business import VASPInfo
-from .protocol import OffChainVASP
-from .libra_address import LibraAddress
-from .payment_logic import PaymentCommand, PaymentProcessor
-from .status_logic import Status
-from .storage import StorableFactory
-from .payment import PaymentAction, PaymentActor, PaymentObject
-from .asyncnet import Aionet
-from .core import Vasp
+from ..business import VASPInfo
+from ..protocol import OffChainVASP
+from ..libra_address import LibraAddress
+from ..payment_logic import PaymentCommand, PaymentProcessor
+from ..status_logic import Status
+from ..storage import StorableFactory
+from ..payment import PaymentAction, PaymentActor, PaymentObject
+from ..asyncnet import Aionet
+from ..core import Vasp
 
 import logging
 import json
@@ -75,7 +75,7 @@ def run_server(my_configs_path, other_configs_path):
             'port': <int>,
         }
     '''
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.INFO)
 
     my_configs = load_configs(my_configs_path)
     other_configs = load_configs(other_configs_path)
@@ -113,7 +113,7 @@ def run_client(my_configs_path, other_configs_path, num_of_commands=10):
         }
     '''
     assert num_of_commands > 0
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.INFO)
 
     my_configs = load_configs(my_configs_path)
     other_configs = load_configs(other_configs_path)
@@ -134,6 +134,7 @@ def run_client(my_configs_path, other_configs_path, num_of_commands=10):
     # Run VASP services.
     def start_services(vasp, loop):
         vasp.start_services(loop)
+        logging.debug('Start main loop')
         loop.run_forever()
 
     loop = asyncio.new_event_loop()
