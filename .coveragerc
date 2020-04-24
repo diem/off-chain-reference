@@ -2,3 +2,4 @@
 omit =
     src/offchainapi/tests/*
     src/offchainapi/sample/*
+    .tox/*
