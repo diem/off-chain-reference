@@ -37,11 +37,6 @@ class Aionet:
             loop = asyncio.new_event_loop()
             loop.run_until_complete(self.session.close())
 
-
-    def close_connection(self):
-        # TODO: must eventually call: await self.session.close()
-        pass
-
     def get_url(self, base_url, other_addr_str, other_is_server=False):
         if other_is_server:
             server = other_addr_str

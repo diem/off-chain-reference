@@ -18,6 +18,7 @@ import sys
 from json import loads
 import aiohttp
 
+
 class SimpleVASPInfo(VASPInfo):
     ''' Simple implementation of VASPInfo. '''
 
@@ -89,8 +90,28 @@ def load_configs(configs_path):
     return configs
 
 
-async def main_perf(my_configs_path, other_configs_path, num_of_commands=0):
-    ''' Run the VASP's server and commands to the other VASP.
+async def run_server(my_configs_path, other_configs_path):
+    ''' Run the server VASP. '''
+    logging.basicConfig(level=logging.DEBUG)
+
+    my_configs = load_configs(my_configs_path)
+    other_configs = load_configs(other_configs_path)
+    my_addr = my_configs['addr']
+
+    node = PerfVasp(my_configs, other_configs)
+    logging.info(f'Created VASP {my_addr.as_str()}.')
+
+    # Start server.
+    #aiohttp.web.run_app(node.net_handler.app, port=my_configs['port'])
+    loop = asyncio.new_event_loop()
+    Thread(target=node.start, args=(loop,), daemon=True).start()
+    logging.info(f'VASP {my_addr.as_str()} is running.')
+    while True:
+        time.sleep(1)
+
+
+async def run_client(my_configs_path, other_configs_path, num_of_commands=0):
+    ''' Run the VASP's client to commands to the other VASP.
 
     If <num_of_commands> is positive, the VASP sends as many commands to the
     other VASP. The arguments <my_configs_path> and <other_configs_path> are
@@ -102,7 +123,7 @@ async def main_perf(my_configs_path, other_configs_path, num_of_commands=0):
             'port': <int>,
         }
     '''
-    assert num_of_commands >= 0
+    assert num_of_commands > 0
     logging.basicConfig(level=logging.DEBUG)
 
     my_configs = load_configs(my_configs_path)
@@ -112,28 +133,6 @@ async def main_perf(my_configs_path, other_configs_path, num_of_commands=0):
 
     node = PerfVasp(my_configs, other_configs)
     logging.info(f'Created VASP {my_addr.as_str()}.')
-
-    if num_of_commands == 0:
-        aiohttp.web.run_app(node.net_handler.app, port=my_configs['port'])
-        while True:
-            time.sleep(1)
-
-    # Start server.
-    loop = asyncio.new_event_loop()
-    Thread(target=node.start, args=(loop,), daemon=True).start()
-    logging.info(f'VASP {my_addr.as_str()} is running.')
-
-    # Stop here if there are no commands to send.
-    if num_of_commands == 0:
-        logging.info(
-            ('No commands to send: '
-            f'waiting for commands from VASP {other_addr.as_str()}.')
-        )
-        while True:
-            time.sleep(1)
-
-    # Get the channel to the other vasp.
-    channel = node.vasp.get_channel(other_addr)
 
     # Make a payment commands.
     commands = []
@@ -148,18 +147,20 @@ async def main_perf(my_configs_path, other_configs_path, num_of_commands=0):
         commands += [cmd]
 
     # Send commands.
+    loop = asyncio.new_event_loop()
     logging.info(
         ('Start measurements: '
          f'sending {num_of_commands} commands to {other_addr.as_str()}.')
     )
     start_time = time.perf_counter()
 
-    async def send(node, commands):
+    async def send_commands(node, commands):
+        print('here')
         return await asyncio.gather(
             *[node.net_handler.send_command(other_addr, c) for c in commands]
         )
 
-    res = asyncio.run_coroutine_threadsafe(send(node, commands), loop)
+    res = asyncio.run_coroutine_threadsafe(send_commands(node, commands), loop)
     res = res.result()
 
     elapsed = (time.perf_counter() - start_time)
@@ -172,6 +173,7 @@ async def main_perf(my_configs_path, other_configs_path, num_of_commands=0):
 
     # Esure they were register as successes on both sides.
     '''
+    channel = node.vasp.get_channel(other_addr)
     Asucc = len([x for x in channelAB.executor.command_status_sequence if x])
     Atotal = len(channelAB.executor.command_status_sequence)
     print(f'Peer A successes: {Asucc}/{Atotal}')
