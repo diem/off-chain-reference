@@ -32,10 +32,22 @@ class Aionet:
                 web.get('/', self.handle_request_debug)
             ])
 
+        self.watchdog_period = 10.0  # seconds
+
     def __del__(self):
         if self.session:
             loop = asyncio.new_event_loop()
             loop.run_until_complete(self.session.close())
+
+    async def watchdog_task(self):
+        ''' Provides a debug view of pending requests and replies '''
+        logging.debug('Start Network Watchdog')
+        while True:
+            for k in self.vasp.channel_store:
+                channel = self.vasp.channel_store[k]
+                logging.debug(f'{len(channel.waiting_requests), len(channel.waiting_response)}')
+            await asyncio.sleep(self.watchdog_period)
+
 
     def get_url(self, base_url, other_addr_str, other_is_server=False):
         if other_is_server:
@@ -89,6 +101,7 @@ class Aionet:
             raise web.HTTPBadRequest
 
         # Send back the response
+        channel.process_waiting_messages()
         logging.debug(f'Sending back response to {other_addr.as_str()}')
         return web.json_response(response.content)
 
@@ -121,6 +134,7 @@ class Aionet:
                 #       that returns when there is a genuine success.
                 res = channel.parse_handle_response(json_response, encoded=False)
                 logging.debug(f'Response parsed with status: {res}')
+                channel.process_waiting_messages()
                 return res
             except json.decoder.JSONDecodeError as e:
                 logging.debug(f'Type Error {e}')

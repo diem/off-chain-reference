@@ -179,7 +179,7 @@ class PaymentProcessor(CommandProcessor):
                     pass
 
         except Exception as e:
-            logging.error(f'Payment processing error: {e}')
+            logging.debug(f'Payment processing error: {e}')
 
     # -------- Implements CommandProcessor interface ---------
 

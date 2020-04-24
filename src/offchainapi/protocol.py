@@ -227,21 +227,6 @@ class VASPPairChannel:
     def has_pending_responses(self):
         return self.would_retransmit()
 
-
-    def process_pending_requests_response(self):
-        """ The server re-schedules and executes pending requests, and cached
-            responses. """
-
-        # Process any requests that might be waiting, due to out
-        # of order delivery.
-        self.process_waiting_messages()
-
-        ## No need to make loop -- it will call again upon success
-        if self.next_final_sequence() in self.response_cache:
-            response = self.response_cache[self.next_final_sequence()]
-            self.handle_response(response)
-
-
     def apply_response_to_executor(self, request):
         """Signals to the executor the success or failure of a command."""
         assert request.response is not None
@@ -296,7 +281,7 @@ class VASPPairChannel:
 
         while self.other_next_seq() in self.waiting_requests:
             next_seq = self.other_next_seq()
-            list_of_requests = self.waiting[next_seq]
+            list_of_requests = self.waiting_requests[next_seq]
             for req_record in list_of_requests:
                 (json_command, encoded, fut, old_time) = req_record
 
@@ -507,7 +492,6 @@ class VASPPairChannel:
                     pass
 
                 self.apply_response_to_executor(request)
-                self.process_pending_requests_response()
                 return True
 
             elif response.command_seq < self.next_final_sequence():
@@ -519,7 +503,6 @@ class VASPPairChannel:
                 self.my_requests[request_seq] = request
 
                 self.apply_response_to_executor(request)
-                self.process_pending_requests_response()
                 return True
 
             elif response.command_seq > self.next_final_sequence():

@@ -8,7 +8,7 @@ from glob import glob
 import sys
 sys.path += ['src/.']
 
-from offchainapi import remote_benchmark
+from offchainapi.tests import remote_benchmark
 
 assert len(sys.argv) > 1
 my_configs_path = sys.argv[1]
