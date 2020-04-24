@@ -77,7 +77,9 @@ class Aionet:
         try:
             request_json = await request.json()
             # TODO: Handle the timeout error here
-            response = await channel.parse_handle_request_to_future(request_json, encoded=False)
+            response = await channel.parse_handle_request_to_future(
+                request_json, encoded=False
+            )
         except json.decoder.JSONDecodeError as e:
             # Raised if the request does not contain valid JSON.
             logging.debug(f'Type Error {e}')
@@ -106,22 +108,24 @@ class Aionet:
         base_url = self.vasp.info_context.get_peer_base_url(other_addr)
         url = self.get_url(base_url, other_addr.as_str(), other_is_server=True)
         # TODO: Handle errors with session.post
+        print(f'HERE 2: {url}')
         async with self.session.post(url, json=json_request) as response:
             try:
                 json_response = await response.json()
-
-                logging.debug(json_response)
+                logging.debug(f'Json response: {json_response}')
 
                 # TODO: here, what if we receive responses out of order?
                 #       I think we should make a future-based parse_handle_response
                 #       that returns when there is a genuine success.
                 res = channel.parse_handle_response(json_response, encoded=False)
+                logging.debug(f'Response parsed with status: {res}')
                 return res
             except json.decoder.JSONDecodeError as e:
                 logging.debug(f'Type Error {e}')
                 return False
 
     async def send_command(self, other_addr, command):
+        logging.debug(f'Sending command to {other_addr.as_str()}.')
         try:
             channel = self.vasp.get_channel(other_addr)
         except BusinessNotAuthorized as e:

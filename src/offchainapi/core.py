@@ -13,7 +13,7 @@ from .payment import PaymentAction, PaymentActor, PaymentObject
 from .asyncnet import Aionet
 
 import logging
-logging.basicConfig(level=logging.ERROR)
+logging.basicConfig(level=logging.DEBUG)
 
 import json
 from unittest.mock import MagicMock

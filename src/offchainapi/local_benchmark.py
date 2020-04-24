@@ -66,10 +66,6 @@ def start_thread_main(vasp, loop):
     global_dir[vasp.vasp.get_vasp_address().as_str()] = vasp
     loop.run_forever()
 
-async def execute(nodeA, nodeB, cmd):
-    ret = await nodeA.net_handler.send_command(nodeB.my_addr, cmd)
-    return ret
-
 async def main_perf():
     logging.basicConfig(level=logging.DEBUG)
 

@@ -6,6 +6,7 @@ from .status_logic import Status
 from .storage import StorableFactory
 from .payment import PaymentAction, PaymentActor, PaymentObject
 from .asyncnet import Aionet
+from .core import Vasp
 
 import logging
 import json
@@ -17,7 +18,6 @@ from aiohttp import web
 import sys
 from json import loads
 import aiohttp
-
 
 class SimpleVASPInfo(VASPInfo):
     ''' Simple implementation of VASPInfo. '''
@@ -47,34 +47,6 @@ class SimpleVASPInfo(VASPInfo):
         return True
 
 
-class PerfVasp:
-    ''' Minimal VASP for performance testing. '''
-
-    def __init__(self, my_configs, other_configs):
-        self.my_addr = my_configs['addr']
-        self.port = my_configs['port']
-        self.bc = MagicMock()
-        self.store = StorableFactory({})
-        self.info_context = SimpleVASPInfo(my_configs, other_configs)
-        self.pp = PaymentProcessor(self.bc, self.store)
-        self.vasp = OffChainVASP(
-            self.my_addr, self.pp, self.store, self.info_context
-        )
-        self.net_handler = Aionet(self.vasp)
-
-    def start(self, loop):
-        # Start the processor.
-        self.pp.start_processor()
-
-        # Start the server.
-        runner = self.net_handler.get_runner()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(runner.setup())
-        site = web.TCPSite(runner, 'localhost', self.port)
-        loop.run_until_complete(site.start())
-        loop.run_forever()
-
-
 def load_configs(configs_path):
     ''' Loads VASP configs from file. '''
     with open(configs_path, 'r') as f:
@@ -89,8 +61,11 @@ def load_configs(configs_path):
     configs['port'] = int(configs['port'])
     return configs
 
+def start_services(vasp, loop):
+    vasp.start_services(loop)
+    loop.run_forever()
 
-async def run_server(my_configs_path, other_configs_path):
+def run_server(my_configs_path, other_configs_path):
     ''' Run the server VASP. '''
     logging.basicConfig(level=logging.DEBUG)
 
@@ -98,19 +73,27 @@ async def run_server(my_configs_path, other_configs_path):
     other_configs = load_configs(other_configs_path)
     my_addr = my_configs['addr']
 
-    node = PerfVasp(my_configs, other_configs)
+    vasp = Vasp(
+        my_addr,
+        host='localhost',
+        port=my_configs['port'],
+        business_context=MagicMock(),
+        info_context=SimpleVASPInfo(my_configs, other_configs),
+        database={}
+    )
     logging.info(f'Created VASP {my_addr.as_str()}.')
 
     # Start server.
-    #aiohttp.web.run_app(node.net_handler.app, port=my_configs['port'])
+    #aiohttp.web.run_app(vasp.net_handler.app, port=my_configs['port'])
+
     loop = asyncio.new_event_loop()
-    Thread(target=node.start, args=(loop,), daemon=True).start()
+    Thread(target=start_services, args=(vasp,loop), daemon=True).start()
     logging.info(f'VASP {my_addr.as_str()} is running.')
     while True:
         time.sleep(1)
 
 
-async def run_client(my_configs_path, other_configs_path, num_of_commands=0):
+def run_client(my_configs_path, other_configs_path, num_of_commands=0):
     ''' Run the VASP's client to commands to the other VASP.
 
     If <num_of_commands> is positive, the VASP sends as many commands to the
@@ -131,8 +114,21 @@ async def run_client(my_configs_path, other_configs_path, num_of_commands=0):
     my_addr = my_configs['addr']
     other_addr = other_configs['addr']
 
-    node = PerfVasp(my_configs, other_configs)
+    # Create VASP.
+    vasp = Vasp(
+        my_addr,
+        host='localhost',
+        port=my_configs['port'],
+        business_context=MagicMock(),
+        info_context=SimpleVASPInfo(my_configs, other_configs),
+        database={}
+    )
     logging.info(f'Created VASP {my_addr.as_str()}.')
+
+    # Run VASP services.
+    loop = asyncio.new_event_loop()
+    Thread(target=start_services, args=(vasp, loop,), daemon=True).start()
+    logging.info(f'VASP services are running on port {vasp.port}.')
 
     # Make a payment commands.
     commands = []
@@ -147,20 +143,18 @@ async def run_client(my_configs_path, other_configs_path, num_of_commands=0):
         commands += [cmd]
 
     # Send commands.
-    loop = asyncio.new_event_loop()
     logging.info(
         ('Start measurements: '
          f'sending {num_of_commands} commands to {other_addr.as_str()}.')
     )
     start_time = time.perf_counter()
 
-    async def send_commands(node, commands):
-        print('here')
+    async def send_commands(vasp, commands):
         return await asyncio.gather(
-            *[node.net_handler.send_command(other_addr, c) for c in commands]
+            *[vasp.new_command_async(other_addr, c) for c in commands]
         )
 
-    res = asyncio.run_coroutine_threadsafe(send_commands(node, commands), loop)
+    res = asyncio.run_coroutine_threadsafe(send_commands(vasp, commands), loop)
     res = res.result()
 
     elapsed = (time.perf_counter() - start_time)
@@ -173,7 +167,7 @@ async def run_client(my_configs_path, other_configs_path, num_of_commands=0):
 
     # Esure they were register as successes on both sides.
     '''
-    channel = node.vasp.get_channel(other_addr)
+    channel = vasp.vasp.get_channel(other_addr)
     Asucc = len([x for x in channelAB.executor.command_status_sequence if x])
     Atotal = len(channelAB.executor.command_status_sequence)
     print(f'Peer A successes: {Asucc}/{Atotal}')
