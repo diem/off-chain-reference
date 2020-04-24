@@ -54,7 +54,7 @@ class Aionet:
     async def handle_request(self, request):
         # TODO: Could there be errors when creating LibraAddress?
         other_addr = LibraAddress(request.match_info['other_addr'])
-        logging.debug(f'Data Received from {other_addr.as_str()}')
+        logging.debug(f'Request Received from {other_addr.as_str()}')
 
         # Try to get a channel with the other VASP.
         try:
@@ -77,9 +77,12 @@ class Aionet:
         try:
             request_json = await request.json()
             # TODO: Handle the timeout error here
+            logging.debug(f'Data Received from {other_addr.as_str()}')
+
             response = await channel.parse_handle_request_to_future(
                 request_json, encoded=False
             )
+            #response = channel.parse_handle_request(request_json, encoded=False)
         except json.decoder.JSONDecodeError as e:
             # Raised if the request does not contain valid JSON.
             logging.debug(f'Type Error {e}')
@@ -88,6 +91,7 @@ class Aionet:
             raise web.HTTPBadRequest
 
         # Send back the response
+        logging.debug(f'Sending back response to {other_addr.as_str()}')
         return web.json_response(response.content)
 
     async def send_request(self, other_addr, json_request):

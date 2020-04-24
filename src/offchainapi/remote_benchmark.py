@@ -19,6 +19,7 @@ import sys
 from json import loads
 import aiohttp
 
+
 class SimpleVASPInfo(VASPInfo):
     ''' Simple implementation of VASPInfo. '''
 
@@ -61,18 +62,26 @@ def load_configs(configs_path):
     configs['port'] = int(configs['port'])
     return configs
 
-def start_services(vasp, loop):
-    vasp.start_services(loop)
-    loop.run_forever()
 
 def run_server(my_configs_path, other_configs_path):
-    ''' Run the server VASP. '''
+    ''' Run the VASP as server (do not send commands).
+
+    The arguments <my_configs_path> and <other_configs_path> are paths to
+    files describing the configurations of the current VASP and of the other
+    VASP, respectively. Configs are dict taking the following form:
+        configs = {
+            'addr': <LibraAddress>,
+            'base_url': <str>,
+            'port': <int>,
+        }
+    '''
     logging.basicConfig(level=logging.DEBUG)
 
     my_configs = load_configs(my_configs_path)
     other_configs = load_configs(other_configs_path)
     my_addr = my_configs['addr']
 
+    # Create VASP.
     vasp = Vasp(
         my_addr,
         host='localhost',
@@ -83,23 +92,20 @@ def run_server(my_configs_path, other_configs_path):
     )
     logging.info(f'Created VASP {my_addr.as_str()}.')
 
-    # Start server.
-    #aiohttp.web.run_app(vasp.net_handler.app, port=my_configs['port'])
-
+    # Run VASP services.
+    logging.info(f'Running VASP {my_addr.as_str()}.')
     loop = asyncio.new_event_loop()
-    Thread(target=start_services, args=(vasp,loop), daemon=True).start()
-    logging.info(f'VASP {my_addr.as_str()} is running.')
-    while True:
-        time.sleep(1)
+    vasp.start_services(loop)
+    loop.run_forever()
 
 
-def run_client(my_configs_path, other_configs_path, num_of_commands=0):
-    ''' Run the VASP's client to commands to the other VASP.
+def run_client(my_configs_path, other_configs_path, num_of_commands=10):
+    ''' Run the VASP's client to send commands to the other VASP.
 
-    If <num_of_commands> is positive, the VASP sends as many commands to the
-    other VASP. The arguments <my_configs_path> and <other_configs_path> are
-    paths to files describing the configurations of the current VASP and of
-    the other VASP, respectively. Configs are dict taking the following form:
+    The VASP sends <num_of_commands> commands to the other VASP.
+    The arguments <my_configs_path> and <other_configs_path> are paths to
+    files describing the configurations of the current VASP and of the other
+    VASP, respectively. Configs are dict taking the following form:
         configs = {
             'addr': <LibraAddress>,
             'base_url': <str>,
@@ -126,8 +132,12 @@ def run_client(my_configs_path, other_configs_path, num_of_commands=0):
     logging.info(f'Created VASP {my_addr.as_str()}.')
 
     # Run VASP services.
+    def start_services(vasp, loop):
+        vasp.start_services(loop)
+        loop.run_forever()
+
     loop = asyncio.new_event_loop()
-    Thread(target=start_services, args=(vasp, loop,), daemon=True).start()
+    Thread(target=start_services, args=(vasp, loop), daemon=True).start()
     logging.info(f'VASP services are running on port {vasp.port}.')
 
     # Make a payment commands.
@@ -161,12 +171,12 @@ def run_client(my_configs_path, other_configs_path, num_of_commands=0):
 
     # Display performance and success rate.
     success_number = sum([1 for r in res if r])
-    print(f'Commands executed in {elapsed:0.2f} seconds.')
-    print(f'Success #: {success_number}/{len(commands)}.')
-    print(f'Estimate throughput #: {len(commands)/elapsed} TPS.')
+    logging.info(f'Commands executed in {elapsed:0.2f} seconds.')
+    logging.info(f'Success #: {success_number}/{len(commands)}.')
+    logging.info(f'Estimate throughput #: {len(commands)/elapsed} TPS.')
 
-    # Esure they were register as successes on both sides.
     '''
+    # Esure they were register as successes on both sides.
     channel = vasp.vasp.get_channel(other_addr)
     Asucc = len([x for x in channelAB.executor.command_status_sequence if x])
     Atotal = len(channelAB.executor.command_status_sequence)
