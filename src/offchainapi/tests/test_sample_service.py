@@ -1,4 +1,4 @@
-from ..sample_service import sample_business, sample_vasp
+from ..sample.sample_service import sample_business, sample_vasp
 from ..payment_logic import Status, PaymentProcessor, PaymentCommand
 from ..payment import PaymentActor, PaymentObject
 from ..libra_address import LibraAddress
@@ -7,7 +7,6 @@ from ..protocol_messages import CommandRequestObject, CommandResponseObject, \
     OffChainError
 
 from pathlib import Path
-import OpenSSL.crypto
 import json
 from unittest.mock import MagicMock, patch
 import pytest

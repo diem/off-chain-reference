@@ -5,7 +5,7 @@ from ..business import BusinessForceAbort, \
 from ..utils import JSONFlag, JSONSerializable
 from ..payment import PaymentObject
 from ..libra_address import LibraAddress
-from ..sample_command import SampleCommand
+from ..sample.sample_command import SampleCommand
 
 from unittest.mock import MagicMock
 from mock import AsyncMock
@@ -66,14 +66,6 @@ def test_payment_command_missing_dependency_fail(payment):
     with pytest.raises(PaymentLogicError):
         cmd.get_object(new_payment.get_version(), {})
 
-'''
-@pytest.fixture
-def payment_processor_context():
-    bcm = AsyncMock(spec=BusinessContext)
-    store = StorableFactory({})
-    proc = PaymentProcessor(bcm, store)
-    return proc
-'''
 
 def test_payment_create_from_recipient(payment, processor):
     bcm = processor.business_context()

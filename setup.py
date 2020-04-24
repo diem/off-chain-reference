@@ -19,12 +19,13 @@ setuptools.setup(
     python_requires='>=3.7',
     install_requires=[
         'aiohttp',
-        'Flask',
+        # ALL of the below are for testing
         'mock',
-        'pyOpenSSL',
         'pytest',
+        'pytest-cov',
         'pytest-aiohttp',
         'pytest-httpserver',
-        'requests'
+        'coverage'
     ],
+    version="0.0.1.dev1",
 )
