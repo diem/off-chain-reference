@@ -1,11 +1,11 @@
-from .payment import PaymentActor, PaymentAction, PaymentObject, KYCData
-from .business import BusinessContext, VASPInfo
-from .storage import StorableFactory
-from .payment_logic import Status, PaymentProcessor
-from .protocol import OffChainVASP, VASPPairChannel
-from .executor import ProtocolExecutor
-from .command_processor import CommandProcessor
-from .libra_address import LibraAddress
+from ..payment import PaymentActor, PaymentAction, PaymentObject, KYCData
+from ..business import BusinessContext, VASPInfo
+from ..storage import StorableFactory
+from ..payment_logic import Status, PaymentProcessor
+from ..protocol import OffChainVASP, VASPPairChannel
+from ..executor import ProtocolExecutor
+from ..command_processor import CommandProcessor
+from ..libra_address import LibraAddress
 
 import types
 import json

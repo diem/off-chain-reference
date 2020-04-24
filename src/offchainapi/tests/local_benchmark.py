@@ -3,28 +3,20 @@
 # Run as:
 # $ python -m cProfile -s tottime src/scripts/run_perf.py > report.txt
 #
-from .business import BusinessContext, BusinessForceAbort, \
-BusinessValidationFailure, VASPInfo
-from .protocol import OffChainVASP
-from .libra_address import LibraAddress
-from .protocol_messages import CommandRequestObject
-from .payment_logic import PaymentCommand, PaymentProcessor
-from .status_logic import Status
-from .storage import StorableFactory
-from .payment import PaymentAction, PaymentActor, PaymentObject
-from .asyncnet import Aionet
-
-from .core import Vasp
+from ..business import VASPInfo
+from ..libra_address import LibraAddress
+from ..payment_logic import PaymentCommand
+from ..status_logic import Status
+from ..payment import PaymentAction, PaymentActor, PaymentObject
+from ..core import Vasp
 
 import logging
 logging.basicConfig(level=logging.ERROR)
 
-import json
 from unittest.mock import MagicMock
 from threading import Thread
 import time
 import asyncio
-from aiohttp import web
 
 # A stand alone performance test.
 
