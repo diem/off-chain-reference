@@ -82,15 +82,8 @@ def other_addr(three_addresses):
 
 
 @pytest.fixture
-def asset_path(request):
-    asset_path = Path(request.fspath).resolve()
-    asset_path = asset_path.parents[3] / 'test_vectors'
-    return asset_path
-
-
-@pytest.fixture
-def vasp(my_addr, asset_path):
-    return sample_vasp(my_addr, asset_path)
+def vasp(my_addr):
+    return sample_vasp(my_addr)
 
 
 @pytest.fixture(params=[
@@ -227,9 +220,9 @@ def test_vasp_simple(simple_request_json, vasp, other_addr, loop):
         pass
 
 
-def test_vasp_simple_wrong_VASP(simple_request_json, asset_path, other_addr, loop):
+def test_vasp_simple_wrong_VASP(simple_request_json, other_addr, loop):
     my_addr = LibraAddress.encode_to_Libra_address(b'X'*16)
-    vasp = sample_vasp(my_addr, asset_path)
+    vasp = sample_vasp(my_addr)
     vasp.pp.loop = loop
 
     try:
@@ -244,20 +237,11 @@ def test_vasp_simple_wrong_VASP(simple_request_json, asset_path, other_addr, loo
         pass
 
 
-
 def test_vasp_response(simple_response_json_error, vasp, other_addr):
     vasp.process_response(other_addr, simple_response_json_error)
 
-def test_sample_vasp_info_is_authorised(request, asset_path):
-    cert_file = Path(request.fspath).resolve()
-    cert_file = cert_file.parents[3] / 'test_vectors' / 'client_cert.pem'
-    cert_file = cert_file.resolve()
-    with open(cert_file, 'rt') as f:
-        cert_str = f.read()
-    cert = OpenSSL.crypto.load_certificate(
-        OpenSSL.crypto.FILETYPE_PEM, cert_str
-    )
+def test_sample_vasp_info_is_authorised(request):
     my_addr   = LibraAddress.encode_to_Libra_address(b'B'*16)
     other_addr = LibraAddress.encode_to_Libra_address(b'A'*16)
-    vc = sample_vasp(my_addr, asset_path)
-    assert vc.info_context.is_authorised_VASP(cert, other_addr)
+    vc = sample_vasp(my_addr)
+    assert vc.info_context.is_authorised_VASP('anything', other_addr)
