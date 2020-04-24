@@ -59,7 +59,7 @@ def test(ctx):
     '''
     set_hosts(ctx)
     g = Group(*ctx.hosts, user=ctx.user, connect_kwargs=ctx.connect_kwargs)
-    g.run('echo "Hello, World!"')
+    g.run('host myip.opendns.com resolver1.opendns.com | grep address')
 
 
 @task
@@ -129,15 +129,19 @@ def install(ctx):
 def update(ctx):
     ''' Update the software from Github.
 
+    UPLOAD_FILES:
+        False: Only update the code from GitHub.
+        True: Update the code and upload new config files.
+
     COMMANDS:	fab update
     '''
-    UPLOAD_FILES = False
+    UPLOAD_FILES = True
 
     run_script = 'offchainapi-aws-run.sh'
     port = 8090
-    set_hosts(ctx)
 
     # Update code.
+    set_hosts(ctx)
     g = Group(*ctx.hosts, user=ctx.user, connect_kwargs=ctx.connect_kwargs)
     g.run('(cd off-chain-api/ && git pull)')
 
@@ -161,9 +165,9 @@ def update(ctx):
         c = Connection(host, user=ctx.user, connect_kwargs=ctx.connect_kwargs)
         c.put(run_script, '.')
         c.run(f'chmod +x {run_script}')
-        c.run('rm *.json')
+        c.run('rm off-chain-api/*.json || true')
         for f in files:
-            c.put(f, '.')
+            c.put(f, './off-chain-api')
 
 
 @task
@@ -173,7 +177,7 @@ def run(ctx):
     COMMANDS:	fab run
     '''
     run_script = 'offchainapi-aws-run.sh'
-    num_of_commands = 100
+    num_of_commands = 10
 
     set_hosts(ctx)
     for host in ctx.hosts:
@@ -182,7 +186,6 @@ def run(ctx):
 
         # NOTE: Calling tmux in threaded groups does not work (bug in Fabric?).
         c = Connection(host, user=ctx.user, connect_kwargs=ctx.connect_kwargs)
-        #with ctx.cd('off-chain-api'):
         c.run(f'tmux new -d -s "offchainapi" ./{run_script} {path} {runs}')
 
 
@@ -202,11 +205,12 @@ def kill(ctx):
     g = Group(*ctx.hosts, user=ctx.user, connect_kwargs=ctx.connect_kwargs)
 
     # Kill process.
-    g.run(f'tmux kill-server || true')
+    g.run('tmux kill-server || true')
 
     # Reset state and delete logs.
     if RESET:
-        raise NotImplemented
+        g.run('rm off-chain-api/*.log* || true')
+        g.run('rm off-chain-api/*.json || true')
 
 
 @task
@@ -215,4 +219,7 @@ def status(ctx):
 
     COMMANDS:	fab status
     '''
-    raise NotImplemented
+    set_hosts(ctx)
+    host = ctx.hosts[-1]
+    c = Connection(host, user=ctx.user, connect_kwargs=ctx.connect_kwargs)
+    c.run('cat ./off-chain-api/*.log*')
