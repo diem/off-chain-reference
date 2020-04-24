@@ -177,7 +177,7 @@ def run(ctx):
     COMMANDS:	fab run
     '''
     run_script = 'offchainapi-aws-run.sh'
-    num_of_commands = 10
+    num_of_commands = 100
 
     set_hosts(ctx)
     for host in ctx.hosts:
