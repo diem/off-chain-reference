@@ -6,10 +6,8 @@ from .protocol_messages import CommandRequestObject
 from .payment_logic import PaymentCommand, PaymentProcessor
 from .status_logic import Status
 from .storage import StorableFactory
-from .auth_networking import AuthNetworkServer, NetworkFactory
 
 import json
-import OpenSSL.crypto
 
 business_config = """[
     {
@@ -32,59 +30,36 @@ business_config = """[
 
 
 class sample_vasp_info(VASPInfo):
-    def __init__(self, assets_path):
-
-        # assets_path = '../test_vectors/'
-
-        tls_cert = assets_path / 'server_cert.pem'
-        tls_key = assets_path / 'server_key.pem'
-        all_peers_tls_cert = assets_path / 'client_cert.pem'
-
+    def __init__(self):
         peerA_addr = LibraAddress.encode_to_Libra_address(b'A'*16).as_str()
-        each_peer_tls_cert = {
-            peerA_addr: str(assets_path / 'client_cert.pem'),
-        }
         each_peer_base_url = {
             peerA_addr: 'https://peerA.com',
         }
 
-        self.tls_cert = str(tls_cert)
-        self.tls_key = str(tls_key)
-        self.all_peers_tls_cert = str(all_peers_tls_cert)
-        self.each_peer_tls_cert = each_peer_tls_cert
         self.each_peer_base_url = each_peer_base_url
+        pass
 
     def get_TLS_certificate_path(self):
-        return self.tls_cert
+        raise NotImplementedError()
 
     def get_TLS_key_path(self):
-        return self.tls_key
+        raise NotImplementedError()
 
     def get_peer_TLS_certificate_path(self, other_addr):
-        assert other_addr.as_str() in self.each_peer_tls_cert
-        return self.each_peer_tls_cert[other_addr.as_str()]
+        raise NotImplementedError()
 
     def get_all_peers_TLS_certificate_path(self):
-        return self.all_peers_tls_cert
+        raise NotImplementedError()
 
     def get_peer_base_url(self, other_addr):
         assert other_addr.as_str() in self.each_peer_base_url
         return self.each_peer_base_url[other_addr.as_str()]
 
     def is_authorised_VASP(self, certificate, other_addr):
-        # The check below should always pass: if we managed to open a channel
-        # with another VASP, we should have already loaded its certificate.
-        assert other_addr.as_str() in self.each_peer_tls_cert
-
-        # Check that the certificate provided with the request matches the
+        # TODO: Check that the certificate provided with the request matches the
         # certificate we have in store for the given address.
-        cert_file = self.each_peer_tls_cert[other_addr.as_str()]
-        with open(cert_file, 'rt') as f:
-            cert_str = f.read()
-        local_cert = OpenSSL.crypto.load_certificate(
-            OpenSSL.crypto.FILETYPE_PEM, cert_str
-        )
-        return local_cert.get_serial_number() == certificate.get_serial_number()
+
+        return True
 
 
 class sample_business(BusinessContext):
@@ -295,23 +270,15 @@ class sample_business(BusinessContext):
 
 class sample_vasp:
 
-    def __init__(self, my_addr, assets_path):
+    def __init__(self, my_addr):
         self.my_addr = my_addr
         self.bc = sample_business(self.my_addr)
         self.store        = StorableFactory({})
-        self.info_context = sample_vasp_info(assets_path)
+        self.info_context = sample_vasp_info()
 
         self.pp = PaymentProcessor(self.bc, self.store)
         self.vasp = OffChainVASP(
             self.my_addr, self.pp, self.store, self.info_context
-        )
-
-        # The network server
-        self.network_server = AuthNetworkServer(
-            self.vasp,
-            self.info_context.get_TLS_key_path(),
-            self.info_context.get_TLS_certificate_path(),
-            self.info_context.get_all_peers_TLS_certificate_path()
         )
 
     def collect_messages(self):
@@ -340,6 +307,3 @@ class sample_vasp:
     def process_response(self, other_vasp, request_json):
         channel = self.get_channel(other_vasp)
         channel.parse_handle_response(request_json, encoded=True)
-
-    def run_server(self):
-        self.network_server.run()
