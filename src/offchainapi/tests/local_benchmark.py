@@ -3,28 +3,19 @@
 # Run as:
 # $ python -m cProfile -s tottime src/scripts/run_perf.py > report.txt
 #
-from .business import BusinessContext, BusinessForceAbort, \
-BusinessValidationFailure, VASPInfo
-from .protocol import OffChainVASP
-from .libra_address import LibraAddress
-from .protocol_messages import CommandRequestObject
-from .payment_logic import PaymentCommand, PaymentProcessor
-from .status_logic import Status
-from .storage import StorableFactory
-from .payment import PaymentAction, PaymentActor, PaymentObject
-from .asyncnet import Aionet
-
-from .core import Vasp
+from ..business import VASPInfo, BusinessContext
+from ..libra_address import LibraAddress
+from ..payment_logic import PaymentCommand
+from ..status_logic import Status
+from ..payment import PaymentAction, PaymentActor, PaymentObject
+from ..core import Vasp
 
 import logging
-logging.basicConfig(level=logging.ERROR)
-
-import json
 from unittest.mock import MagicMock
+from mock import AsyncMock
 from threading import Thread
 import time
 import asyncio
-from aiohttp import web
 
 # A stand alone performance test.
 
@@ -72,7 +63,7 @@ async def main_perf():
     VASPa = Vasp(PeerA_addr,
                  host = 'localhost',
                  port = 8091,
-                 business_context = MagicMock(),
+                 business_context = MagicMock(spec=BusinessContext),
                  info_context = SimpleVASPInfo(),
                  database ={})
 
@@ -84,7 +75,7 @@ async def main_perf():
     VASPb = Vasp(PeerB_addr,
                 host = 'localhost',
                 port = 8092,
-                business_context = MagicMock(),
+                business_context = MagicMock(spec=BusinessContext),
                 info_context = SimpleVASPInfo(),
                 database ={})
 
