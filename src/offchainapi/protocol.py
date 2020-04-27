@@ -435,8 +435,6 @@ class VASPPairChannel:
             if self.is_client() and request.command_seq > self.next_final_sequence():
                 # We must wait, since we cannot give an answer
                 # before sequencing previous commands.
-
-                self.logger(f'Command seq {request.command_seq} next cmd seq {self.next_final_sequence()}')
                 response = make_protocol_error(request, code='wait')
                 if raise_on_wait:
                     raise OffChainOutOfOrder(response)
@@ -521,6 +519,9 @@ class VASPPairChannel:
             traceback.print_exc()
             fut.set_exception(e)
 
+        except OffChainOutOfOrder:
+            self.waiting_response[command_seq] += [(json_response, encoded, fut)]
+
         return fut
 
     def handle_response(self, response):
@@ -570,8 +571,8 @@ class VASPPairChannel:
             return self.my_requests[request_seq].is_success()
 
         # This is too high -- wait for more data.
-        if response.command_seq > self.next_final_sequence():
-            raise OffChainOutOfOrder(f'Expect command seq {self.next_final_sequence()} but got higher {response.command_seq}')
+        if response.command_seq > self.next_final_sequence() or not (response.command_seq == self.executor.last_confirmed):
+            raise OffChainOutOfOrder(f'Expect command seq {self.next_final_sequence()} but got {response.command_seq}')
 
         # Read and write back response into request
         request = self.my_requests[request_seq]

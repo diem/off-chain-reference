@@ -165,7 +165,7 @@ class PaymentProcessor(CommandProcessor):
         for T in self.pending_tasks:
             if not T.done() or T.cancelled():
                 T.cancel()
-        self.pending_tasks = None
+        self.pending_tasks = []
 
     # ----------- END of CommandProcessor interface ---------
 
