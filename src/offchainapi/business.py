@@ -26,7 +26,8 @@ class BusinessContext:
 
     def open_channel_to(self, other_vasp_info):
         ''' Requests authorization to open a channel to another VASP.
-            If it is authorized nothing is returned. If not an exception is raised.
+            If it is authorized nothing is returned. If not an exception is
+            raised.
 
             Can raise:
                 BusinessNotAuthorized
@@ -50,7 +51,8 @@ class BusinessContext:
         return not self.is_sender(payment)
 
     async def check_account_existence(self, payment):
-        ''' Checks that the actor (sub-account / sub-address) on this VASP exists. This may be either
+        ''' Checks that the actor (sub-account / sub-address) on this VASP
+            exists. This may be either
             the recipient or the sender, since VASPs can initiate payments
             in both directions. If not throw a BusinessValidationFailure.
 
@@ -59,9 +61,7 @@ class BusinessContext:
 
         raise NotImplementedError()
 
-
 # ----- VASP Signature -----
-
 
     def validate_recipient_signature(self, payment):
         ''' Validates the recipient signature is correct. Raise a
@@ -148,17 +148,17 @@ class BusinessContext:
                 - Sender of funds intends to perform the payment (VASPs can
                   initiate payments from an account on the other VASP.)
                 - KYC information provided ON BOTH SIDES is correct and to the
-                  VASPs satisfaction. On payment creation a VASP may suggest KYC
-                  information on both sides.
+                  VASPs satisfaction. On payment creation a VASP may suggest
+                  KYC information on both sides.
 
             If all the above are true, then return True.
             If any of the above are untrue throw an BusinessForceAbort.
             If any more KYC is necessary then return False.
             If there is a need for more time throw BusinessAsyncInterupt.
 
-            This acts as the finality barrier and last check for this VASP. After
-            this call returns True this VASP can no more abort the payment
-            (unless the other VASP aborts it).
+            This acts as the finality barrier and last check for this VASP.
+            After this call returns True this VASP can no more abort the
+            payment (unless the other VASP aborts it).
 
             Returns bool: True or False
 
@@ -182,8 +182,8 @@ class BusinessContext:
 
     async def has_settled(self, payment):
         ''' Returns whether the payment was settled on chain. If the payment can
-            be settled also package it and settle it on chain. This function may
-            be called multiple times for the same payment, but any on-chain
+            be settled also package it and settle it on chain. This function
+            may be called multiple times for the same payment, but any on-chain
             operation should be performed only once per payment.
 
             Returns a bool: True or False
@@ -256,13 +256,12 @@ class VASPInfo:
         """ Get the path to the PEM bundle containing the TLS certificates of
         all authorised peer VASPs.
 
-            Returns a str: path to a single file containing all TLS certificates.
+            Returns a str: path to a single file containing all TLS
+            certificates.
         """
         raise NotImplementedError()
 
-
     # --- The functions below are currently unused ---
-
 
     def get_libra_address(self):
         """ The settlement Libra address for this channel"""
@@ -270,7 +269,8 @@ class VASPInfo:
 
     def get_parent_address(self):
         """ The VASP Parent address for this channel. High level logic is common
-        to all Libra addresses under a parent to ensure consistency and compliance."""
+        to all Libra addresses under a parent to ensure consistency and
+        compliance."""
         raise NotImplementedError()
 
     def is_unhosted(self):
