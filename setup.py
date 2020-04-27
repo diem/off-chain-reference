@@ -19,13 +19,14 @@ setuptools.setup(
     python_requires='>=3.7',
     install_requires=[
         'aiohttp',
-        # ALL of the below are for testing
+        # ALL of the below are for testing & docs
         'mock',
         'pytest',
         'pytest-cov',
         'pytest-aiohttp',
         'pytest-httpserver',
-        'coverage'
+        'coverage',
+        'sphinx'
     ],
     version="0.0.1.dev1",
 )

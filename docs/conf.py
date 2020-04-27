@@ -5,7 +5,7 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 
 ### Command to construct the API docs
-# $ sphinx-apidoc -o source/ ../src/offchainapi
+# $ sphinx-apidoc -o _source/ ../src/offchainapi ../src/offchainapi/tests ../src/offchainapi/sample
 
 
 # -- Path setup --------------------------------------------------------------

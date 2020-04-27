@@ -9,12 +9,9 @@ from urllib.parse import urljoin
 import json
 
 
-def make_net_app(vasp):
-    return Aionet(vasp)
-
-
 class Aionet:
     def __init__(self, vasp):
+        ''' Initializes the network system with a OffChainVASP instance. '''
         self.vasp = vasp
 
         # TODO: This should be a dict holding one session per other vasp.
@@ -34,22 +31,29 @@ class Aionet:
 
         self.watchdog_period = 10.0  # seconds
 
-    def __del__(self):
+    async def close(self):
+        ''' Close the open Http client session and the network object. '''
         if self.session:
-            loop = asyncio.new_event_loop()
-            loop.run_until_complete(self.session.close())
+            await self.session.close()
+            self.session = None
+
 
     async def watchdog_task(self):
-        ''' Provides a debug view of pending requests and replies '''
+        ''' Provides a priodic debug view of pending requests and replies '''
         logging.debug('Start Network Watchdog')
-        while True:
-            for k in self.vasp.channel_store:
-                channel = self.vasp.channel_store[k]
-                logging.debug(f'{len(channel.waiting_requests), len(channel.waiting_response)}')
-            await asyncio.sleep(self.watchdog_period)
-
+        try:
+            while True:
+                for k in self.vasp.channel_store:
+                    channel = self.vasp.channel_store[k]
+                    logging.debug(f'Wait-Req: {len(channel.waiting_requests)} Wait-Resp: {len(channel.waiting_response)}')
+                await asyncio.sleep(self.watchdog_period)
+        except GeneratorExit:
+            logging.debug('Watchdog graceful exit')
+        else:
+            logging.debug('Watchdog NON-graceful exit')
 
     def get_url(self, base_url, other_addr_str, other_is_server=False):
+        ''' Composes the URL for the Off-chain API VASP end point.'''
         if other_is_server:
             server = other_addr_str
             client = self.vasp.get_vasp_address().as_str()
@@ -64,6 +68,7 @@ class Aionet:
             return web.Response(text='Hello, world')
 
     async def handle_request(self, request):
+        ''' Main Http server handler for incomming OffChainAPI requests. '''
         # TODO: Could there be errors when creating LibraAddress?
         other_addr = LibraAddress(request.match_info['other_addr'])
         logging.debug(f'Request Received from {other_addr.as_str()}')
@@ -106,6 +111,7 @@ class Aionet:
         return web.json_response(response.content)
 
     async def send_request(self, other_addr, json_request):
+        ''' Uses an HTTP client to send an OffChainAPI request to another VASP.'''
         logging.debug(f'Connect to {other_addr.as_str()}')
 
         # Initialize the client.
@@ -141,6 +147,7 @@ class Aionet:
                 return False
 
     async def send_command(self, other_addr, command):
+        ''' Sends a new command to the VASP with LibraAddress `other_addr` '''
         logging.debug(f'Sending command to {other_addr.as_str()}.')
         try:
             channel = self.vasp.get_channel(other_addr)
@@ -161,4 +168,5 @@ class Aionet:
         )
 
     def get_runner(self):
+        ''' Gets an object to that needs to be run in an even loop to register the server. '''
         return web.AppRunner(self.app)

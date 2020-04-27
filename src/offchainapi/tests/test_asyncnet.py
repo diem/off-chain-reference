@@ -1,4 +1,4 @@
-from ..asyncnet import Aionet, make_net_app
+from ..asyncnet import Aionet
 from ..payment import PaymentActor, PaymentObject
 from ..payment_logic import PaymentCommand
 from ..protocol_messages import CommandRequestObject
@@ -53,7 +53,7 @@ def response_json():
 def net_handler(vasp):
     vasp.info_context.is_authorised_VASP.return_value = True
     vasp.info_context.get_base_url.return_value = '/'
-    return make_net_app(vasp)
+    return Aionet(vasp)
 
 
 @pytest.fixture
@@ -80,7 +80,7 @@ async def server(net_handler, tester_addr, aiohttp_server, response_json):
 
 def test_init(vasp):
     vasp.info_context.get_base_url.return_value = '/'
-    make_net_app(vasp)
+    Aionet(vasp)
 
 
 async def test_handle_request_debug(client):
@@ -101,7 +101,7 @@ async def test_handle_request_business_not_authorised(vasp, url, json_request,
                                                       aiohttp_client):
     vasp.info_context.is_authorised_VASP.return_value = True
     vasp.business_context.open_channel_to.side_effect = BusinessNotAuthorized
-    net_handler = make_net_app(vasp)
+    net_handler = Aionet(vasp)
     client = await aiohttp_client(net_handler.app)
     response = await client.post(url, json=json_request)
     assert response.status == 401
@@ -109,7 +109,7 @@ async def test_handle_request_business_not_authorised(vasp, url, json_request,
 
 async def test_handle_request_forbidden(vasp, url, json_request, aiohttp_client):
     vasp.info_context.is_authorised_VASP.return_value = False
-    net_handler = make_net_app(vasp)
+    net_handler = Aionet(vasp)
     client = await aiohttp_client(net_handler.app)
     response = await client.post(url, json=json_request)
     assert response.status == 403

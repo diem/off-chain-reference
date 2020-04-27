@@ -25,10 +25,6 @@ V0 States
         * abort                     -- signals that the transactions is to be
                                        aborted.
 
-V1 States (TODO)
----------
-
-        * in_batch                  -- payment is included in a batch
 """
 
 from collections import defaultdict

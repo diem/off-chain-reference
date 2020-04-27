@@ -55,7 +55,15 @@ global_dir = {}
 def start_thread_main(vasp, loop):
     vasp.start_services(loop)
     global_dir[vasp.vasp.get_vasp_address().as_str()] = vasp
-    loop.run_forever()
+
+    try:
+        loop.run_forever()
+    finally:
+        loop.run_until_complete(loop.shutdown_asyncgens())
+        loop.close()
+
+    logging.debug('VASP loop exit')
+
 
 async def main_perf():
     logging.basicConfig(level=logging.DEBUG)
@@ -135,6 +143,9 @@ async def main_perf():
     print(f'Peer B successes: {Bsucc}/{Btotal}')
 
     print(f'Estimate throughput #: {len(commands)/elapsed} Tx/s')
+
+    VASPa.close()
+    VASPb.close()
 
     import sys
     sys.exit()
