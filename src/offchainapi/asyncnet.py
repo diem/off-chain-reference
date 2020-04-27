@@ -138,7 +138,7 @@ class Aionet:
                 # TODO: here, what if we receive responses out of order?
                 #       I think we should make a future-based parse_handle_response
                 #       that returns when there is a genuine success.
-                res = channel.parse_handle_response(json_response, encoded=False)
+                res = await channel.parse_handle_response_to_future(json_response, encoded=False)
                 self.logger.debug(f'Response parsed with status: {res}')
                 channel.process_waiting_messages()
                 return res

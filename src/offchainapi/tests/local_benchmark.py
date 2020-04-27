@@ -66,7 +66,7 @@ def start_thread_main(vasp, loop):
 
 
 async def main_perf():
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.ERROR)
 
     VASPa = Vasp(PeerA_addr,
                  host = 'localhost',
