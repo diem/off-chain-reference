@@ -11,7 +11,6 @@ from ..payment import PaymentAction, PaymentActor, PaymentObject
 from ..core import Vasp
 
 import logging
-from unittest.mock import MagicMock
 from mock import AsyncMock
 from threading import Thread
 import time
@@ -22,9 +21,10 @@ import asyncio
 PeerA_addr = LibraAddress.encode_to_Libra_address(b'A'*16)
 PeerB_addr = LibraAddress.encode_to_Libra_address(b'B'*16)
 peer_address = {
-    PeerA_addr.as_str() : 'http://localhost:8091',
-    PeerB_addr.as_str() : 'http://localhost:8092',
+    PeerA_addr.as_str(): 'http://localhost:8091',
+    PeerB_addr.as_str(): 'http://localhost:8092',
 }
+
 
 class SimpleVASPInfo(VASPInfo):
 
@@ -50,7 +50,9 @@ class SimpleVASPInfo(VASPInfo):
     def is_authorised_VASP(self, certificate, other_addr):
         return True
 
+
 global_dir = {}
+
 
 def start_thread_main(vasp, loop):
     vasp.start_services(loop)
@@ -115,12 +117,13 @@ async def main_perf():
             sender, receiver, f'ref {cid}', 'orig_ref', 'desc', action
         )
         cmd = PaymentCommand(payment)
-        commands += [ cmd ]
+        commands += [cmd]
 
     s = time.perf_counter()
 
     async def send100(nodeA, commands):
-        res = await asyncio.gather( *[nodeA.new_command_async(nodeB.my_addr, cmd) for cmd in commands] )
+        res = await asyncio.gather(
+            *[nodeA.new_command_async(nodeB.my_addr, cmd) for cmd in commands])
         return res
 
     res = asyncio.run_coroutine_threadsafe(send100(nodeA, commands), loopA)
@@ -131,14 +134,13 @@ async def main_perf():
     print(f'Commands executed in {elapsed:0.2f} seconds.')
     print(f'Success #: {success_number}/{len(commands)}')
 
-
     # Esure they were register as successes on both sides.
     Asucc = len([x for x in channelAB.executor.command_status_sequence if x])
-    Atotal =   len(channelAB.executor.command_status_sequence)
+    Atotal = len(channelAB.executor.command_status_sequence)
     print(f'Peer A successes: {Asucc}/{Atotal}')
 
     Bsucc = len([x for x in channelBA.executor.command_status_sequence if x])
-    Btotal =   len(channelBA.executor.command_status_sequence)
+    Btotal = len(channelBA.executor.command_status_sequence)
     print(f'Peer B successes: {Bsucc}/{Btotal}')
 
     print(f'Estimate throughput #: {len(commands)/elapsed} Tx/s')

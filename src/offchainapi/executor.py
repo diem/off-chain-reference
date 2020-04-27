@@ -97,7 +97,7 @@ class ProtocolExecutor:
             the executor, as well as the storage context to persist
             the command sequence.
         """
-        self.logger = logging.getLogger(name=f'executor.{self.other.as_str()}')
+
 
         if __debug__:
             # No need for this import unless we are debugging
@@ -107,6 +107,8 @@ class ProtocolExecutor:
 
         self.processor = processor
         self.channel = channel
+        other_name = self.channel.get_other_address().as_str()
+        self.logger = logging.getLogger(name=f'executor.{other_name}')
 
         # <STARTS to persist>
 

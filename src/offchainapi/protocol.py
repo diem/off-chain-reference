@@ -293,17 +293,29 @@ class VASPPairChannel:
         ''' Executes any requets that are now capable of executing, and were
             not before due to being received out of order. '''
 
+        self.logger.debug(f'Activate Waiting on Seq {self.other_next_seq()} Cmd Seq {self.next_final_sequence()}')
         while self.next_final_sequence() in self.waiting_response:
             next_cmd_seq = self.executor.last_confirmed
-            list_of_responses = self.waiting_response[next_cmd_seq]
+
+            # Take a copy of the pending responses
+            list_of_responses =  self.waiting_response[next_cmd_seq]
+            del self.waiting_response[next_cmd_seq]
+
             for resp_record in list_of_responses:
                 (json_command, encoded, fut) = resp_record
                 self.parse_handle_response_to_future(json_command, encoded, fut)
-            del self.waiting_response[next_cmd_seq]
+
+            # Break if we made no progress
+            if next_cmd_seq == self.next_final_sequence():
+                break
 
         while self.other_next_seq() in self.waiting_requests:
             next_seq = self.other_next_seq()
+
+            # Take a copy of the pending requests
             list_of_requests = self.waiting_requests[next_seq]
+            del self.waiting_requests[next_seq]
+
             for req_record in list_of_requests:
                 (json_command, encoded, fut, old_time) = req_record
 
@@ -311,7 +323,11 @@ class VASPPairChannel:
                 # any processes waiting on it.
                 self.parse_handle_request_to_future(json_command, encoded, fut)
 
-            del self.waiting_requests[next_seq]
+            # Break if no progress is made
+            if next_seq == self.other_next_seq():
+                break
+
+
 
 
     def parse_handle_request_to_future(self, json_command, encoded=False, fut=None, nowait=False, loop=None):
@@ -342,15 +358,24 @@ class VASPPairChannel:
 
             # Here test if it is the next one in order
             # (1) It is not in the next window
-            # (3) The server is not waiting for replies
+            # (2) The server is not waiting for replies
             if not (self.other_next_seq() < request.seq  < request.seq + self.request_window) and \
                     not (self.is_server() and self.num_pending_responses() > 0) or \
                     nowait:
                 with self.rlock:
-                    response = self.handle_request(request)
+                    # Going ahead to process the request
+                    self.logger.debug(f'Processing Req Seq #{request.seq}')
+                    response = self.handle_request(request, raise_on_wait=True)
             else:
+                # We wait for this requets's turn
+                self.logger.debug(f'Waiting Req Seq #{request.seq}')
                 self.waiting_requests[request.seq] += [(json_command, encoded, fut, time.time())]
                 return fut
+        except OffChainOutOfOrder:
+            # We were told to wait for this requests turn
+            self.logger.debug(f'Except. Waiting Req Seq #{request.seq} Len: {len(self.waiting_requests)}')
+            self.waiting_requests[request.seq] += [(json_command, encoded, fut, time.time())]
+            return fut
         except JSONParsingError:
             response = make_parsing_error()
             full_response = self.send_response(response, encoded=False)
@@ -364,11 +389,11 @@ class VASPPairChannel:
         return fut
 
 
-    def handle_request(self, request):
-        with self.storage.atomic_writes() as tx_no:
-            return self._handle_request(request)
+    def handle_request(self, request, raise_on_wait=False):
+        with self.storage.atomic_writes() as _:
+            return self._handle_request(request, raise_on_wait)
 
-    def _handle_request(self, request):
+    def _handle_request(self, request, raise_on_wait):
         """ Handles a request received by this VASP.
 
             Returns a network record of the response to the request.
@@ -400,18 +425,21 @@ class VASPPairChannel:
         # As a server we first wait for the status of all server
         # requests to sequence any new client requests.
         if self.is_server() and self.num_pending_responses() > 0:
-            # TODO [issue #38]: Ideally, the channel should return None,
-            # and the server network should wait until a response is available
-            # before answering the client.
             response = make_protocol_error(request, code='wait')
+            if raise_on_wait:
+                raise OffChainOutOfOrder(response)
             return response
 
         # Sequence newer requests
         if request.seq == self.other_next_seq():
             if self.is_client() and request.command_seq > self.next_final_sequence():
-                # We must wait, since we cannot give an answer before sequencing
-                # previous commands.
+                # We must wait, since we cannot give an answer
+                # before sequencing previous commands.
+
+                self.logger(f'Command seq {request.command_seq} next cmd seq {self.next_final_sequence()}')
                 response = make_protocol_error(request, code='wait')
+                if raise_on_wait:
+                    raise OffChainOutOfOrder(response)
                 return response
 
             seq = self.next_final_sequence()

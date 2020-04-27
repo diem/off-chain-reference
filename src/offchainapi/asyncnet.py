@@ -109,8 +109,8 @@ class Aionet:
             # TODO: Handle the timeout error here
             self.logger.debug(f'Data Received from {other_addr.as_str()}')
             response = await channel.parse_handle_request_to_future(
-                request_json, encoded=False
-            )
+                request_json, encoded=False)
+
         except json.decoder.JSONDecodeError as e:
             # Raised if the request does not contain valid JSON.
             self.logger.debug(f'Type Error {e}')
@@ -119,7 +119,9 @@ class Aionet:
             raise web.HTTPBadRequest
 
         # Send back the response
+        self.logger.debug(f'Process Waiting messages')
         channel.process_waiting_messages()
+
         self.logger.debug(f'Sending back response to {other_addr.as_str()}')
         return web.json_response(response.content)
 
@@ -153,6 +155,8 @@ class Aionet:
                 res = await channel.parse_handle_response_to_future(
                     json_response, encoded=False)
                 self.logger.debug(f'Response parsed with status: {res}')
+
+                self.logger.debug(f'Process Waiting messages')
                 channel.process_waiting_messages()
                 return res
             except json.decoder.JSONDecodeError as e:
