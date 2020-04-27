@@ -5,7 +5,6 @@ from .protocol_messages import CommandRequestObject, CommandResponseObject, \
     make_parsing_error, make_command_error
 from .utils import JSONParsingError, JSONFlag
 from .libra_address import LibraAddress
-from .storage import StorableFactory
 
 import json
 from collections import namedtuple, defaultdict

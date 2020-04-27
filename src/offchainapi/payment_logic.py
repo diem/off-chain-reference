@@ -141,7 +141,7 @@ class PaymentProcessor(CommandProcessor):
         # Asyncio support
         self.loop = None
         self.net  = None
-        self.logger = logging.Logger(name='root.payproc')
+        self.logger = logging.getLogger(name='payproc')
 
         # The processor state -- only access through event loop to prevent
         # mutlithreading bugs.

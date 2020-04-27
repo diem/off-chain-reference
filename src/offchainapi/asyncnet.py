@@ -12,7 +12,8 @@ import json
 class Aionet:
     def __init__(self, vasp):
         ''' Initializes the network system with a OffChainVASP instance. '''
-        self.logger = logging.Logger(name='off-chain.aionet')
+        self.logger = logging.getLogger(name='aionet')
+
         self.vasp = vasp
 
         # For the moment hold one session per VASP.
