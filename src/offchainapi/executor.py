@@ -98,7 +98,6 @@ class ProtocolExecutor:
             the command sequence.
         """
 
-
         if __debug__:
             # No need for this import unless we are debugging
             from .protocol import VASPPairChannel

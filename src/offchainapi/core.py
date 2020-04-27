@@ -82,7 +82,8 @@ class Vasp:
         return await self.net_handler.send_command(addr, cmd)
 
     async def close_async(self):
-        ''' Await this to cleanly close the network stack. '''
+        ''' Await this to cleanly close the network
+           and any pending commands being processed. '''
 
         # Close the network
         await self.net_handler.close()

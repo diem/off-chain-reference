@@ -1,11 +1,14 @@
 import base64
 
+
 # Helper classes
 class LibraAddressError(Exception):
     pass
 
+
 class LibraAddress:
-    """ An interface that abstracts a Libra Address and bit manipulations on it."""
+    """ An interface that abstracts a Libra Address
+        and bit manipulations on it."""
 
     def __init__(self, encoded_address):
         try:
@@ -14,13 +17,11 @@ class LibraAddress:
             else:
                 self.encoded_address = encoded_address.decode('ascii')
             self.decoded_address = base64.b64decode(self.encoded_address)
-        except:
+        except Exception:
             raise LibraAddressError()
-    
-    #def plain(self):
-    #    return self.encoded_address
-    
+
     def as_str(self):
+        ''' Returns a string representation of the LibraAddress. '''
         return self.encoded_address
 
     @classmethod
@@ -36,9 +37,9 @@ class LibraAddress:
     def equal(self, other):
         return isinstance(other, LibraAddress) \
             and self.decoded_address == other.decoded_address
-    
+
     def __eq__(self, other):
         return self.equal(other)
-    
+
     def __hash__(self):
         return self.decoded_address.__hash__()

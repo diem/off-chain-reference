@@ -1,13 +1,7 @@
-import asyncio
-import logging
+from .executor import ProtocolCommand
+from .payment import PaymentObject
+from .utils import JSONSerializable
 
-from .business import BusinessContext, \
-    BusinessNotAuthorized, BusinessValidationFailure, \
-    BusinessForceAbort
-from .executor import ProtocolCommand, CommandProcessor
-from .payment import Status, PaymentObject
-from .status_logic import status_heights_MUST
-from .utils import JSONSerializable, JSONFlag
 
 # Functions to check incoming diffs
 class PaymentLogicError(Exception):
@@ -67,7 +61,6 @@ class PaymentCommand(ProtocolCommand):
             return updated_payment
 
         raise PaymentLogicError("Can depdend on no or one other payemnt")
-
 
     def get_json_data_dict(self, flag):
         ''' Get a data dictionary compatible with JSON serilization
