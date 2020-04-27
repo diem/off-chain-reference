@@ -303,7 +303,20 @@ class VASPPairChannel:
 
     def parse_handle_request_to_future(self, json_command, encoded=False, fut=None, nowait=False, loop=None):
         ''' Handles a request provided as a json_string and returns
-            a future that triggers when the command is processed.'''
+            a future that triggers when the command is processed.
+
+            Parameters:
+                * json_command : the json CommandRequest serialized object
+                * encoded : True if json_command is a string or False if it is
+                  a dict.
+                * loop : the event loop to use
+                * nowait : feed requests commands even out of order without
+                  waiting.
+
+            Returns:
+                * A (NetMessage) instance containing the response to the request.
+
+            '''
 
         if fut is None:
             fut = asyncio.Future(loop=loop)
@@ -413,14 +426,31 @@ class VASPPairChannel:
             assert False
 
     def parse_handle_response(self, json_response, encoded=False):
-        ''' Handles a response provided as a json string. '''
+        ''' Calls `parse_handle_response_to_future` but respoves the future and returns the result. '''
         loop = asyncio.new_event_loop()
         fut = self.parse_handle_response_to_future(json_response, encoded, nowait=True, loop=loop)
         return fut.result()
 
     def parse_handle_response_to_future(self, json_response, encoded=False, fut=None, nowait=False, loop=None):
         ''' Handles a response provided as a json string. Returns a future
-            that fires when the response is processed.'''
+            that fires when the response is processed. You may `await` this future
+            from an asyncio coroutine.
+
+            Parameters:
+                * json_response : the response received
+                * encoded : True if the json_response is a json string, or False if it is a dictionary.
+                * nowait : do not wait for the reponse to be in order, and feed it directly to the protocol state machine.
+                * loop : the event loop in which this should be executed.
+
+            Response:
+                * Returns True if the command was a success or False if it was not a success (Command error).
+
+            Raises:
+                * On protocol error it throws an exception (OffChainProtocolError).
+                * On an unrecoverabe error it throws an (OffChainException).
+                * In case the response is out of order (due to nowait=True) then an (OffChainOutOfOrder) is raised.
+
+            '''
         self.logger.debug(f'Response Received -> {self.myself.as_str()}')
 
         if fut is None:
