@@ -80,13 +80,19 @@ class Vasp:
 
     async def close_async(self):
         ''' Await this to cleanly close the network stack. '''
+
+        # Close the network
         await self.net_handler.close()
+
+        # Cancel all pensing command processing tasks
+        self.pp.cancel_pending_tasks()
+
         if self.loop is not None:
-            self.loop.stop()
             self.loop = None
 
     def close(self):
         ''' Syncronous and thread safe version of `close_async`. '''
+
         if self.loop is not None:
             res = asyncio.run_coroutine_threadsafe(self.close_async(), self.loop)
             res.result()

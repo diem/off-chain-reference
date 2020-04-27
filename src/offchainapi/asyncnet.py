@@ -12,7 +12,7 @@ import json
 class Aionet:
     def __init__(self, vasp):
         ''' Initializes the network system with a OffChainVASP instance. '''
-        self.logger = logging.Logger('aionet')
+        self.logger = logging.Logger(name='off-chain.aionet')
         self.vasp = vasp
 
         # For the moment hold one session per VASP.
@@ -31,6 +31,7 @@ class Aionet:
             ])
 
         self.watchdog_period = 10.0  # seconds
+        self.watchdog_task_obj = None
 
     async def close(self):
         ''' Close the open Http client session and the network object. '''
@@ -38,6 +39,13 @@ class Aionet:
             session = self.session
             self.session = None
             await session.close()
+
+        if self.watchdog_task_obj is not None:
+            self.watchdog_task_obj.cancel()
+
+
+    def schedule_watchdog(self, loop):
+        self.watchdog_task_obj = loop.create_task(self.watchdog_task())
 
     async def watchdog_task(self):
         ''' Provides a priodic debug view of pending requests and replies '''

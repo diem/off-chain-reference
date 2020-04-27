@@ -17,8 +17,8 @@ class StructureException(Exception):
 
 
 class StructureChecker:
-    ''' A class that allows us to keep track of objects in terms of 
-    diffs, namely operations that mutate their fields. Also does 
+    ''' A class that allows us to keep track of objects in terms of
+    diffs, namely operations that mutate their fields. Also does
     automatic type checking and checking for mutability/immutability
     and required / optional fields.'''
 
@@ -29,7 +29,7 @@ class StructureChecker:
         assert self.fields
         self.data = {}
         self.update_record = []
-    
+
     def __getattr__(self, name):
         ''' Provide a more humaine interface to the data '''
         if name == "data":
@@ -77,7 +77,7 @@ class StructureChecker:
                 else:
                     diff[field] = str(self.data[field])
         return diff
-    
+
     def has_changed(self):
         parse = self.parse_map()
         for new_diff in self.update_record:
@@ -89,8 +89,18 @@ class StructureChecker:
             if parse_more:
                 if self.data[field].has_changed():
                     return True
-        
+
         return False
+
+    def what_changed(self):
+        parse = self.parse_map()
+        for new_diff in self.update_record:
+            yield new_diff
+
+        for field in self.data:
+            _, parse_more = parse[field]
+            if parse_more:
+                yield from self.data[field].what_changed()
 
 
     def __eq__(self, other):
@@ -108,14 +118,14 @@ class StructureChecker:
     @classmethod
     def from_full_record(cls, diff, base_instance = None):
         ''' Constructs an instance from a diff. '''
-        
+
         if base_instance is None:
             self = cls.__new__(cls)
             StructureChecker.__init__(self)
         else:
             # TODO: Profile and see if this deep copy is necessary.
             self = base_instance
-        
+
         parse = cls.parse_map()
         new_diff = {}
         for field in diff:
@@ -150,7 +160,7 @@ class StructureChecker:
         return self
 
     def custom_update_checks(self, diff):
-        ''' Overwrite this class to implement more complex 
+        ''' Overwrite this class to implement more complex
             custom checks on a diff. '''
         pass
 
@@ -221,23 +231,23 @@ class JSONSerializable:
     def from_json_data_dict(cls, data, flag, self=None):
         ''' Construct the object from a serlialized JSON data dictionary (from json.loads). '''
         raise NotImplementedError()
-    
+
     @classmethod
     def json_type(cls):
         ''' Overwrite this method to have a nicer json type identifier.'''
         return str(cls)
-    
+
     @classmethod
     def register(cls, other_cls):
         cls.json_type_map[other_cls.json_type()] = other_cls
         return other_cls
-    
+
     @classmethod
     def add_object_type(cls, value_dict):
         assert 'ObjectType' not in value_dict
         value_dict['ObjectType'] = cls.json_type()
         return value_dict
-    
+
     @classmethod
     def parse(cls, data, flag):
         if 'ObjectType' not in data:

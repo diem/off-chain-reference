@@ -9,5 +9,5 @@ import logging
 from offchainapi.tests import local_benchmark
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.ERROR)
     asyncio.run(local_benchmark.main_perf())

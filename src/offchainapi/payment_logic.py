@@ -1,5 +1,4 @@
 import asyncio
-from threading import Thread
 import logging
 
 from .business import BusinessContext, \
@@ -8,10 +7,7 @@ from .business import BusinessContext, \
 from .executor import ProtocolCommand, CommandProcessor
 from .payment import Status, PaymentObject
 from .status_logic import status_heights_MUST
-from .libra_address import LibraAddress
-
-from .storage import StorableFactory
-from .utils import JSONSerializable
+from .utils import JSONSerializable, JSONFlag
 
 # Note: ProtocolCommand is JSONSerializable, so no need to extend again.
 @JSONSerializable.register
@@ -155,6 +151,9 @@ class PaymentProcessor(CommandProcessor):
         self.pending_commands = {}
         self.futs = []
 
+        # Task management for graceful shutdown
+        self.pending_tasks = []
+
     def set_network(self, net):
         ''' Assigns a concrete network for this command processor to use. '''
         assert self.net is None
@@ -165,8 +164,8 @@ class PaymentProcessor(CommandProcessor):
     async def process_command_async(self, vasp, channel, executor, command,
                                     seq, status_success, error=None):
 
+        me = channel.get_my_address().as_str()[:4]
         self.logger.debug(f'Process cmd {seq}')
-        print('@'*10, f'Process cmd {seq}')
         self.command_id += 1
         self.pending_commands[self.command_id] = (vasp, channel, executor,
                                                   command, status_success,
@@ -175,32 +174,28 @@ class PaymentProcessor(CommandProcessor):
             if status_success:
                 # Only respond to commands by other side?
                 if command.origin != channel.myself:
-                    print(f'XXXXXXX: {channel.get_my_address().as_str()}: SUCCESS {seq}')
                     dependencies = executor.object_store
                     new_version = command.get_new_version()
                     payment = command.get_object(new_version, dependencies)
-                    print('@'*10, f'Process cmd {seq}: got objects')
                     new_payment = await self.payment_process_async(payment)
-                    print('@'*10, f'Processed payment command cmd {seq}')
+
                     if new_payment is not None and new_payment.has_changed():
                         new_cmd = PaymentCommand(new_payment)
-                        # request = channel.sequence_command_local(new_cmd)
                         if self.net is not None:
                             await self.net.send_command(
                                 channel.get_other_address(), new_cmd)
-                        print('@'*10, f'Added command cmd {seq}')
             else:
                 # TODO: Log the error, but do nothing
-                print('@'*10, f'Error cmd {seq}', error)
+                self.logger.debug('Error cmd {seq}: {erro}')
 
+        except asyncio.CancelledError:
+            self.logger.debug(f'Cancel processing: {seq}')
+            pass
 
         except Exception as e:
             self.logger.debug(f'Payment processing error: {e}')
-            self.logger.exception(e)
-            print('@'*10, f'Exception cmd {seq}')
-            print('!!'*10, e)
+            print(e)
 
-        print('@'*10, f'End Process cmd {seq}')
     # -------- Implements CommandProcessor interface ---------
 
     def business_context(self):
@@ -250,15 +245,25 @@ class PaymentProcessor(CommandProcessor):
             talk that will be executed later. """
 
         self.logger.debug(f'Schedule cmd {seq}')
-        print('@'*10, f'Schedule cmd {seq}')
         fut = self.loop.create_task(self.process_command_async(
             vasp, channel, executor, command, seq, status_success, error))
+
+        # Update the list of pending tasks
+        self.pending_tasks = [T for T in self.pending_tasks if not T.done()]
+        self.pending_tasks += [fut]
+
+        # Log the futures here to execute them inidividually
+        # when testing.
         if __debug__:
-            # Log the futures here to execute them inidividually
-            # when testing.
             self.futs += [fut]
-        print('@'*10, f'End Schedule cmd {seq}')
+
         return fut
+
+    def cancel_pending_tasks(self):
+        for T in self.pending_tasks:
+            if not T.done() or T.cancelled():
+                T.cancel()
+        self.pending_tasks = None
 
     # ----------- END of CommandProcessor interface ---------
 
