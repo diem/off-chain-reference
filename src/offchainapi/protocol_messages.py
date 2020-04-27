@@ -18,8 +18,11 @@ class OffChainProtocolError(Exception):
         self.protocol_error = protocol_error
         return self
 
+    def __str__(self):
+        return self.__repr__()
+
     def __repr__(self):
-        return f'OffChainProtocolError: {self.protocol_error}'
+        return f'OffChainProtocolError: {str(self.protocol_error)}'
 
 class OffChainError(JSONSerializable):
     def __init__(self, protocol_error=True, code=None):
@@ -48,6 +51,9 @@ class OffChainError(JSONSerializable):
             return OffChainError(bool(data['protocol_error']), str(data['code']))
         except Exception as e:
             raise JSONParsingError(*e.args)
+
+    def __str__(self):
+        return self.__repr__()
 
     def __repr__(self):
         return f'OffChainError({self.code}, protocol={self.protocol_error})'

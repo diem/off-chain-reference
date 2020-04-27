@@ -186,15 +186,15 @@ class PaymentProcessor(CommandProcessor):
                                 channel.get_other_address(), new_cmd)
             else:
                 # TODO: Log the error, but do nothing
-                self.logger.debug('Error cmd {seq}: {erro}')
+                self.logger.error(f'Cmd #{seq}: {error}')
 
         except asyncio.CancelledError:
-            self.logger.debug(f'Cancel processing: {seq}')
+            self.logger.debug(f'Cancel processing: Cmd #{seq}')
             pass
 
         except Exception as e:
-            self.logger.debug(f'Payment processing error: {e}')
-            print(e)
+            self.logger.error(f'Payment processing error: seq #{seq}: {str(e)}')
+            self.logger.exception(e)
 
     # -------- Implements CommandProcessor interface ---------
 
