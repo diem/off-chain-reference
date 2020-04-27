@@ -6,13 +6,11 @@ from ..protocol import OffChainVASP, VASPPairChannel
 from ..executor import ProtocolExecutor
 from ..command_processor import CommandProcessor
 from ..libra_address import LibraAddress
-from ..payment_command import PaymentCommand
 
 import types
-import json
 import dbm
 from copy import deepcopy
-from unittest.mock import MagicMock, PropertyMock
+from unittest.mock import MagicMock
 from mock import AsyncMock
 import pytest
 

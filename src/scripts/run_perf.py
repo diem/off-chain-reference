@@ -1,10 +1,10 @@
 """ A simple script that runs a local performance test,
     incl. networking and storage. """
 
-import sys
-sys.path += ['src/.']
 import asyncio
 import logging
+import sys
+sys.path += ['src/.']
 
 from offchainapi.tests import local_benchmark
 

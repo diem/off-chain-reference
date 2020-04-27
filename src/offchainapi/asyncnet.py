@@ -18,21 +18,22 @@ class Aionet:
 
         # For the moment hold one session per VASP.
         self.session = None
-
         self.app = web.Application()
 
         # Register routes.
         route = self.get_url('/', '{other_addr}')
-        self.logger.debug(f'Register route {route}')
         self.app.add_routes([web.post(route, self.handle_request)])
+        self.logger.debug(f'Register route {route}')
+
         if __debug__:
             self.app.add_routes([
                 web.post('/', self.handle_request_debug),
                 web.get('/', self.handle_request_debug)
             ])
 
+        # The watchdog process variables
         self.watchdog_period = 10.0  # seconds
-        self.watchdog_task_obj = None
+        self.watchdog_task_obj = None  # Store the task here to cancel
 
     async def close(self):
         ''' Close the open Http client session and the network object. '''

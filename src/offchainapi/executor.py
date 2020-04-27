@@ -1,3 +1,5 @@
+import logging
+
 from .utils import JSONSerializable, JSONFlag
 from .command_processor import CommandProcessor
 from .libra_address import LibraAddress
@@ -95,6 +97,8 @@ class ProtocolExecutor:
             the executor, as well as the storage context to persist
             the command sequence.
         """
+        self.logger = logging.getLogger(name=f'executor.{self.other.as_str()}')
+
         if __debug__:
             # No need for this import unless we are debugging
             from .protocol import VASPPairChannel
@@ -140,7 +144,14 @@ class ProtocolExecutor:
     def set_outcome(self, command, is_success, seq, error=None):
         ''' Execute successful commands, and notify of failed commands'''
         vasp, channel, executor = self.get_context()
-        self.processor.process_command(vasp, channel, executor, command, seq, is_success, error)
+        self.processor.process_command(
+            vasp,
+            channel,
+            executor,
+            command,
+            seq,
+            is_success,
+            error)
 
     def next_seq(self):
         ''' Returns the next sequence number in the common sequence.'''
@@ -158,9 +169,11 @@ class ProtocolExecutor:
 
         try:
             # Check all dependencies are live
-            all_good = all(version in self.object_liveness \
-                           and self.object_liveness[version] \
-                           for version in dependencies)
+            all_good = all(
+                version in self.object_liveness
+                and self.object_liveness[version]
+                for version in dependencies)
+
             if not all_good:
                 raise ExecutorException('Required objects do not exist')
 
@@ -168,11 +181,10 @@ class ProtocolExecutor:
             vasp, channel, executor = self.get_context()
             self.processor.check_command(vasp, channel, executor, command)
 
-        # TODO: have a less catch-all exception here to detect expected vs.
-        #       unexpected exceptions (Issue #33)
         except Exception as e:
             all_good = False
             type_str = f'{str(type(e))}: {str(e)}'
+            self.logger.error(type_str)
             raise ExecutorException(type_str)
 
         finally:

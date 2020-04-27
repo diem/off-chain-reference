@@ -9,8 +9,10 @@ from .asyncnet import Aionet
 import asyncio
 from aiohttp import web
 
+
 class Vasp:
-    def __init__(self, my_addr, host, port, business_context, info_context, database):
+    def __init__(self, my_addr, host, port, business_context,
+                 info_context, database):
         ''' Creates a VASP with the standard networking and storage backend.
 
         Parameters:
@@ -68,7 +70,8 @@ class Vasp:
             command to the other VASP. Returns a concurrent Future object,
             on which the caller can get a result(). '''
         if self.loop is not None:
-            res = asyncio.run_coroutine_threadsafe(self.new_command_async(addr, cmd), self.loop)
+            res = asyncio.run_coroutine_threadsafe(
+                self.new_command_async(addr, cmd), self.loop)
             return res
         else:
             raise RuntimeError('Event loop is None.')
@@ -94,7 +97,8 @@ class Vasp:
         ''' Syncronous and thread safe version of `close_async`. '''
 
         if self.loop is not None:
-            res = asyncio.run_coroutine_threadsafe(self.close_async(), self.loop)
+            res = asyncio.run_coroutine_threadsafe(
+                self.close_async(), self.loop)
             res.result()
         else:
             raise RuntimeError('Event loop is None.')

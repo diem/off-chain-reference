@@ -13,7 +13,9 @@ import logging
 import asyncio
 import time
 
+""" A Class to store messages meant to be sent on a network. """
 NetMessage = namedtuple('NetMessage', ['src', 'dst', 'type', 'content'])
+
 
 class OffChainVASP:
     """Manages the off-chain protocol on behalf of one VASP. """
@@ -77,8 +79,10 @@ class OffChainVASP:
         ''' Returns a storage factory for this system. '''
         return self.storage_factory
 
+
 class VASPPairChannel:
-    """Represents the state of an off-chain bi-directional channel bewteen two VASPs"""
+    """ Represents the state of an off-chain bi-directional
+        channel bewteen two VASPs"""
 
     def __init__(self, myself, other, vasp, storage, processor):
         """ Initialize the channel between two VASPs.
@@ -106,7 +110,10 @@ class VASPPairChannel:
 
         # Check we are not making a channel with ourselves
         if self.myself.as_str() == self.other.as_str():
-            raise Exception('Must talk to another VASP:', self.myself.as_str(), self.other.as_str())
+            raise OffChainException(
+                'Must talk to another VASP:',
+                self.myself.as_str(),
+                self.other.as_str())
 
         # A reentrant lock to manage access.
         self.rlock = RLock()
@@ -186,9 +193,16 @@ class VASPPairChannel:
     def send_request(self, request):
         """ A hook to send a request to other VASP"""
         json_string = request.get_json_data_dict(JSONFlag.NET)
-        net_message = NetMessage(self.myself, self.other, CommandRequestObject, json_string)
+        net_message = NetMessage(
+            self.myself,
+            self.other,
+            CommandRequestObject,
+            json_string)
+
+        # Only used in unit tests
         if __debug__:
             self.net_queue += [net_message]
+
         self.logger.debug(f'Request SENT -> {self.other.as_str()}')
         return net_message
 
