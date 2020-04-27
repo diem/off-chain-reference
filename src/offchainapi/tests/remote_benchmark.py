@@ -23,9 +23,10 @@ import aiohttp
 class SimpleVASPInfo(VASPInfo):
     ''' Simple implementation of VASPInfo. '''
 
-    def __init__(self, my_configs, other_configs):
+    def __init__(self, my_configs, other_configs, port=None):
         self.my_configs = my_configs
         self.other_configs = other_configs
+        self.port = port
 
     def get_TLS_certificate_path(self):
         raise NotImplementedError()
@@ -41,7 +42,7 @@ class SimpleVASPInfo(VASPInfo):
 
     def get_peer_base_url(self, other_addr):
         base_url = self.other_configs['base_url']
-        port = self.other_configs['port']
+        port = self.port if self.port != None else self.other_configs['port']
         return f'{base_url}:{port}'
 
     def is_authorised_VASP(self, certificate, other_addr):
@@ -99,7 +100,7 @@ def run_server(my_configs_path, other_configs_path):
     loop.run_forever()
 
 
-def run_client(my_configs_path, other_configs_path, num_of_commands=10):
+def run_client(my_configs_path, other_configs_path, num_of_commands=10, port=None):
     ''' Run the VASP's client to send commands to the other VASP.
 
     The VASP sends <num_of_commands> commands to the other VASP.
@@ -126,7 +127,7 @@ def run_client(my_configs_path, other_configs_path, num_of_commands=10):
         host='0.0.0.0',
         port=my_configs['port'],
         business_context=MagicMock(),
-        info_context=SimpleVASPInfo(my_configs, other_configs),
+        info_context=SimpleVASPInfo(my_configs, other_configs, port),
         database={}
     )
     logging.info(f'Created VASP {my_addr.as_str()}.')

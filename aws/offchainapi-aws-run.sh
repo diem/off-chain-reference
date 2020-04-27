@@ -14,7 +14,10 @@ if [ "$2" != "" ]; then
 fi
 
 LOG_FILE="$CONFIGS_PATH.logs.txt"
+if [ "$3" != "" ]; then
+	LOG_FILE=$3
+fi
 
 cd off-chain-api
-python3.7 src/scripts/run_remote_perf.py \
+python3.7 -O src/scripts/run_remote_perf.py \
 	$CONFIGS_PATH $NUM_OF_COMMANDS > $LOG_FILE 2>&1

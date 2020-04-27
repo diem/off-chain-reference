@@ -5,6 +5,7 @@ from fabric import task, Connection, ThreadingGroup as Group
 from paramiko import RSAKey
 import os
 from json import dumps
+import time
 
 ec2 = boto3.client('ec2')
 region = os.environ.get("AWS_EC2_REGION")
@@ -138,7 +139,7 @@ def update(ctx):
     UPLOAD_FILES = True
 
     run_script = 'offchainapi-aws-run.sh'
-    port = 8090
+    port = 8090  # NOTE: Not a simple param, update nginx config accordingly.
 
     # Update code.
     set_hosts(ctx)
@@ -161,6 +162,7 @@ def update(ctx):
         return
 
     # Upload files.
+    print('Uploading files..')
     for host in ctx.hosts:
         c = Connection(host, user=ctx.user, connect_kwargs=ctx.connect_kwargs)
         c.put(run_script, '.')
@@ -168,25 +170,48 @@ def update(ctx):
         c.run('rm off-chain-api/*.json || true')
         for f in files:
             c.put(f, './off-chain-api')
+    print('done.')
 
 
 @task
-def run(ctx):
+def nginx(ctx):
+    ''' Configure NGINX.
+
+    COMMANDS:   fab config
+    '''
+    nginx_conf = 'reverse-proxy.conf'
+
+    set_hosts(ctx)
+    for host in ctx.hosts:
+        c = Connection(host, user=ctx.user, connect_kwargs=ctx.connect_kwargs)
+        c.put(nginx_conf, '.')
+        c.sudo(f'mv {nginx_conf} /etc/nginx/sites-available || true')
+        command = f'ln -s /etc/nginx/sites-available/{nginx_conf}'
+        command += f' /etc/nginx/sites-enabled/{nginx_conf}'
+        command += ' || true'
+        c.sudo(command)
+        c.sudo('service nginx restart')
+
+
+@task
+def run(ctx, num_of_commands=100, id=0):
     ''' Runs experiments with the specified configs.
 
     COMMANDS:	fab run
     '''
     run_script = 'offchainapi-aws-run.sh'
-    num_of_commands = 100
 
     set_hosts(ctx)
     for host in ctx.hosts:
         path = f'{host}.json '
         runs = f'{num_of_commands}' if host == ctx.hosts[-1] else '0'
+        logfile = f'{host}-{num_of_commands}-{id}.logs.txt'
 
         # NOTE: Calling tmux in threaded groups does not work (bug in Fabric?).
         c = Connection(host, user=ctx.user, connect_kwargs=ctx.connect_kwargs)
-        c.run(f'tmux new -d -s "offchainapi" ./{run_script} {path} {runs}')
+        c.run(f'tmux new -d -s "offchainapi" ./{run_script} {path} {runs} {logfile}')
+        if host == ctx.hosts[-1]:
+            print(f'The client is {host}.')
 
 
 @task
@@ -215,11 +240,32 @@ def kill(ctx):
 
 @task
 def status(ctx):
-    ''' Prints the execution progress.
+    ''' Prints info about the execution progress.
 
     COMMANDS:	fab status
     '''
     set_hosts(ctx)
     host = ctx.hosts[-1]
     c = Connection(host, user=ctx.user, connect_kwargs=ctx.connect_kwargs)
-    c.run('cat ./off-chain-api/*.log*')
+    c.run('cat ./off-chain-api/*.log* || true')
+
+
+@task
+def tps(ctx):
+    ''' Runs TPS measurement and print results to logs.
+
+    COMMANDS:	fab tps
+    '''
+    configs = range(1000, 11000, 1000)
+    repeats = 5
+
+    for repeat in range(repeats):
+        print(f'Progress: {repeat+1}/{repeats}')
+        for num_of_commands in configs:
+            kill(ctx)
+            time.sleep(0.5)
+            run(ctx, num_of_commands=num_of_commands, id=repeat)
+            time.sleep(30)
+
+    time.sleep(1)
+    status(ctx)
