@@ -85,6 +85,9 @@ class PaymentProcessor(CommandProcessor):
 
                     if new_payment is not None and new_payment.has_changed():
                         new_cmd = PaymentCommand(new_payment)
+                        # TODO: here we need to separate storage of the
+                        # request, from the actual transmission and response
+                        # from the other side.
                         if self.net is not None:
                             await self.net.send_command(
                                 channel.get_other_address(), new_cmd)
@@ -162,6 +165,7 @@ class PaymentProcessor(CommandProcessor):
         return fut
 
     def cancel_pending_tasks(self):
+        ''' Cancels all the pending command requests. '''
         for T in self.pending_tasks:
             if not T.done() or T.cancelled():
                 T.cancel()
