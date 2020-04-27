@@ -15,17 +15,17 @@ def test_handlers(payment, executor):
     object_store = executor.object_store
 
     bcm = MagicMock(spec=BusinessContext)
-    
+
     class Stats(CommandProcessor):
         def __init__(self, bc):
             self.success_no = 0
             self.failure_no = 0
             self.bc = bc
-        
+
         def business_context(self):
             return self.bc
 
-        def process_command(self, vasp, channel, executor, command, status, error=None):
+        def process_command(self, vasp, channel, executor, command, seq, status, error=None):
             if status:
                 self.success_no += 1
             else:
@@ -52,18 +52,18 @@ def test_handlers(payment, executor):
     assert cmd2.dependencies == list(cmd1.creates_versions)
     assert cmd3.dependencies == list(cmd1.creates_versions)
 
-    with store as tx_no: 
+    with store as tx_no:
         pe.sequence_next_command(cmd1)
         v1 = cmd1.creates_versions[0]
         assert v1 not in object_store
 
         pe.set_success(0)
         assert v1 in object_store
-    
+
     assert v1 in object_store
     assert len(object_store) == 1
-    
-    with store as tx_no: 
+
+    with store as tx_no:
         assert v1 in object_store
         pe.sequence_next_command(cmd2)
         object_store._check_invariant()
@@ -74,7 +74,7 @@ def test_handlers(payment, executor):
         pe.set_success(1)
         assert v2 in object_store
         object_store._check_invariant()
-    
+
     object_store._check_invariant()
 
     assert v1 != v2
@@ -84,9 +84,9 @@ def test_handlers(payment, executor):
 
     #print('Store keys:', list(object_store.keys()))
     #print('deps', cmd3.dependencies)
-    
+
     with pytest.raises(ExecutorException):
-        with store as tx_no: 
+        with store as tx_no:
             pe.sequence_next_command(cmd3)
             # pe.set_fail(2)
 

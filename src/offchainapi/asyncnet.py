@@ -34,9 +34,10 @@ class Aionet:
 
     async def close(self):
         ''' Close the open Http client session and the network object. '''
-        if self.session:
-            await self.session.close()
+        if self.session is not None:
+            session = self.session
             self.session = None
+            await session.close()
 
     async def watchdog_task(self):
         ''' Provides a priodic debug view of pending requests and replies '''

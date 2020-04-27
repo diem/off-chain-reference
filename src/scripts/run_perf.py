@@ -4,7 +4,10 @@
 import sys
 sys.path += ['src/.']
 import asyncio
+import logging
 
 from offchainapi.tests import local_benchmark
 
-asyncio.run(local_benchmark.main_perf())
+if __name__ == '__main__':
+    logging.basicConfig(level=logging.DEBUG)
+    asyncio.run(local_benchmark.main_perf())

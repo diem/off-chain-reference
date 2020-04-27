@@ -33,10 +33,12 @@ class Vasp:
         self.store = StorableFactory({})
         self.info_context = info_context
         self.pp = PaymentProcessor(self.bc, self.store)
+
         self.vasp = OffChainVASP(
             self.my_addr, self.pp, self.store, self.info_context
         )
         self.net_handler = Aionet(self.vasp)
+        self.pp.set_network(self.net_handler)
 
         # Later init
         self.site = None

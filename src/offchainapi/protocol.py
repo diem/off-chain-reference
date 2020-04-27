@@ -240,7 +240,7 @@ class VASPPairChannel:
         if request.is_success():
             self.executor.set_success(response.command_seq)
         else:
-            self.executor.set_fail(response.command_seq)
+            self.executor.set_fail(response.command_seq, response.error)
 
     def sequence_command_local(self, off_chain_command):
         """ The local VASP attempts to sequence a new off-chain command."""

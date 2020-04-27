@@ -8,6 +8,6 @@ class CommandProcessor:
         ''' Checks a command in the full context to see if it is acceptable or not. '''
         pass
 
-    def process_command(self, vasp, channel, executor, command, status, error=None):
+    def process_command(self, vasp, channel, executor, command, seq, status, error=None):
         ''' Processes a command. '''
         pass

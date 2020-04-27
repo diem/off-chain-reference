@@ -66,26 +66,25 @@ def start_thread_main(vasp, loop):
 
 
 async def main_perf():
-    logging.basicConfig(level=logging.ERROR)
-
     VASPa = Vasp(PeerA_addr,
-                 host = 'localhost',
-                 port = 8091,
-                 business_context = MagicMock(spec=BusinessContext),
-                 info_context = SimpleVASPInfo(),
-                 database ={})
+                 host='localhost',
+                 port=8091,
+                 business_context=AsyncMock(spec=BusinessContext),
+                 info_context=SimpleVASPInfo(),
+                 database={})
 
     loopA = asyncio.new_event_loop()
     tA = Thread(target=start_thread_main, args=(VASPa, loopA), daemon=True)
     tA.start()
     print('Start Node A')
 
-    VASPb = Vasp(PeerB_addr,
-                host = 'localhost',
-                port = 8092,
-                business_context = MagicMock(spec=BusinessContext),
-                info_context = SimpleVASPInfo(),
-                database ={})
+    VASPb = Vasp(
+        PeerB_addr,
+        host='localhost',
+        port=8092,
+        business_context=AsyncMock(spec=BusinessContext),
+        info_context=SimpleVASPInfo(),
+        database={})
 
     loopB = asyncio.new_event_loop()
 
@@ -108,7 +107,7 @@ async def main_perf():
 
     # Define a payment command
     commands = []
-    for cid in range(100):
+    for cid in range(5):
         sender = PaymentActor(PeerA_addr.as_str(), 'aaaa', Status.none, [])
         receiver = PaymentActor(PeerB_addr.as_str(), 'bbbb', Status.none, [])
         action = PaymentAction(10, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')

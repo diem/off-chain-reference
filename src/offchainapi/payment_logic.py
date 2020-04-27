@@ -144,9 +144,8 @@ class PaymentProcessor(CommandProcessor):
 
         # Asyncio support
         self.loop = None
-
-        # print('Creating event loop', self.loop)
-        self.t = None
+        self.net  = None
+        self.logger = logging.Logger(name='root.payproc')
 
         # The processor state -- only access through event loop to prevent
         # mutlithreading bugs.
@@ -156,31 +155,52 @@ class PaymentProcessor(CommandProcessor):
         self.pending_commands = {}
         self.futs = []
 
+    def set_network(self, net):
+        ''' Assigns a concrete network for this command processor to use. '''
+        assert self.net is None
+        self.net = net
+
     # ------ Machinery for supporting async Business context ------
 
     async def process_command_async(self, vasp, channel, executor, command,
-                                    status_success, error=None):
+                                    seq, status_success, error=None):
+
+        self.logger.debug(f'Process cmd {seq}')
+        print('@'*10, f'Process cmd {seq}')
         self.command_id += 1
         self.pending_commands[self.command_id] = (vasp, channel, executor,
                                                   command, status_success,
                                                   error)
         try:
             if status_success:
-                dependencies = executor.object_store
-                new_version = command.get_new_version()
-                payment = command.get_object(new_version, dependencies)
-                new_payment = await self.payment_process_async(payment)
-                if new_payment is not None and new_payment.has_changed():
-                    new_cmd = PaymentCommand(new_payment)
-                    request = channel.sequence_command_local(new_cmd)
+                # Only respond to commands by other side?
+                if command.origin != channel.myself:
+                    print(f'XXXXXXX: {channel.get_my_address().as_str()}: SUCCESS {seq}')
+                    dependencies = executor.object_store
+                    new_version = command.get_new_version()
+                    payment = command.get_object(new_version, dependencies)
+                    print('@'*10, f'Process cmd {seq}: got objects')
+                    new_payment = await self.payment_process_async(payment)
+                    print('@'*10, f'Processed payment command cmd {seq}')
+                    if new_payment is not None and new_payment.has_changed():
+                        new_cmd = PaymentCommand(new_payment)
+                        # request = channel.sequence_command_local(new_cmd)
+                        if self.net is not None:
+                            await self.net.send_command(
+                                channel.get_other_address(), new_cmd)
+                        print('@'*10, f'Added command cmd {seq}')
             else:
                 # TODO: Log the error, but do nothing
-                if command.origin == channel.myself:
-                    pass
+                print('@'*10, f'Error cmd {seq}', error)
+
 
         except Exception as e:
-            logging.debug(f'Payment processing error: {e}')
+            self.logger.debug(f'Payment processing error: {e}')
+            self.logger.exception(e)
+            print('@'*10, f'Exception cmd {seq}')
+            print('!!'*10, e)
 
+        print('@'*10, f'End Process cmd {seq}')
     # -------- Implements CommandProcessor interface ---------
 
     def business_context(self):
@@ -225,14 +245,19 @@ class PaymentProcessor(CommandProcessor):
                 old_payment = dependencies[old_version]
                 self.check_new_update(old_payment, new_payment)
 
-    def process_command(self, vasp, channel, executor, command, status_success, error=None):
+    def process_command(self, vasp, channel, executor, command, seq, status_success, error=None):
         """ Processes a command to generate more subsequent commands. This schedules a
             talk that will be executed later. """
-        fut = self.loop.create_task(self.process_command_async(vasp, channel, executor, command, status_success, error))
+
+        self.logger.debug(f'Schedule cmd {seq}')
+        print('@'*10, f'Schedule cmd {seq}')
+        fut = self.loop.create_task(self.process_command_async(
+            vasp, channel, executor, command, seq, status_success, error))
         if __debug__:
             # Log the futures here to execute them inidividually
             # when testing.
             self.futs += [fut]
+        print('@'*10, f'End Schedule cmd {seq}')
         return fut
 
     # ----------- END of CommandProcessor interface ---------

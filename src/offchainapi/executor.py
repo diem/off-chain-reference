@@ -120,19 +120,19 @@ class ProtocolExecutor:
         self.object_store = storage_factory.make_dict('object_store', SharedObject, root=other_vasp)
         # Maps of version numbers -> bool, where True = live, and False = not live.
         self.object_liveness = storage_factory.make_dict('object_liveness', bool, root=other_vasp)
-        
+
         # <ENDS to persist>
 
     @property
     def last_confirmed(self):
-        """ The index of the last confirmed (success or fail) 
+        """ The index of the last confirmed (success or fail)
             command in the sequence """
         return len(self.command_status_sequence)
 
-    def set_outcome(self, command, is_success):
+    def set_outcome(self, command, is_success, seq, error=None):
         ''' Execute successful commands, and notify of failed commands'''
         vasp, channel, executor = self.get_context()
-        self.processor.process_command(vasp, channel, executor, command, is_success)
+        self.processor.process_command(vasp, channel, executor, command, seq, is_success, error)
 
     def next_seq(self):
         ''' Returns the next sequence number in the common sequence.'''
@@ -200,9 +200,9 @@ class ProtocolExecutor:
 
         # Call the command processor.
         self.command_status_sequence += [True]
-        self.set_outcome(command, is_success=True)
+        self.set_outcome(command, is_success=True, seq=seq_no)
 
-    def set_fail(self, seq_no):
+    def set_fail(self, seq_no, error=None):
         ''' Sets the command at a specific sequence number to be a failure.
 
             Remove all potentially live objects from the database, to trigger
@@ -213,4 +213,4 @@ class ProtocolExecutor:
 
         # Call the command processor.
         command = self.command_sequence[seq_no]
-        self.set_outcome(command, is_success=False)
+        self.set_outcome(command, is_success=False, seq=seq_no, error=error)
