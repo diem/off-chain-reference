@@ -1,6 +1,23 @@
 from .utils import JSONSerializable, JSONParsingError, JSONFlag
 # from executor import SampleCommand
 
+class OffChainException(Exception):
+    pass
+
+class OffChainOutOfOrder(Exception):
+    pass
+
+
+class OffChainProtocolError(Exception):
+    ''' This class denotes protocol errors, namely errors at the
+        OffChain protocols level rather than the command sequencing level. '''
+
+    @staticmethod
+    def make(protocol_error):
+        self = OffChainProtocolError()
+        self.protocol_error = protocol_error
+        return self
+
 class OffChainError(JSONSerializable):
     def __init__(self, protocol_error=True, code=None):
         self.protocol_error = protocol_error
@@ -123,12 +140,11 @@ class CommandResponseObject(JSONSerializable):
             and self.error  == other.error
 
 
-    def not_protocol_failure(self):
+    def is_protocol_failure(self):
         """ Returns True if the request has a response that is not a protocol
             failure (and we can recover from it)
         """
-        return self.status == 'success' or (
-                self.status == 'failure' and not self.error.protocol_error)
+        return self.status == 'failure' and self.error.protocol_error
 
     # define serialization interface
 

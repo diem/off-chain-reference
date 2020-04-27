@@ -1,6 +1,7 @@
 from ..protocol import VASPPairChannel, make_protocol_error
 from ..executor import ExecutorException
-from ..protocol_messages import CommandRequestObject, CommandResponseObject
+from ..protocol_messages import CommandRequestObject, \
+    CommandResponseObject, OffChainProtocolError, OffChainException, OffChainOutOfOrder
 from ..sample.sample_command import SampleCommand
 from ..command_processor import CommandProcessor
 from ..utils import JSONSerializable, JSONFlag
@@ -105,11 +106,25 @@ class RandomRun(object):
             if Case[2] and len(to_client_response) > 0:
                 rep = to_client_response.pop(0)
                 # assert req.client_sequence_number is not None
-                client.handle_response(rep)
+                try:
+                    client.handle_response(rep)
+                except OffChainProtocolError:
+                    pass
+                except OffChainException:
+                    raise
+                except OffChainOutOfOrder:
+                    pass
 
             if Case[3] and len(to_server_response) > 0:
                 rep = to_server_response.pop(0)
-                server.handle_response(rep)
+                try:
+                    server.handle_response(rep)
+                except OffChainProtocolError:
+                    pass
+                except OffChainException:
+                    raise
+                except OffChainOutOfOrder:
+                    pass
 
             # Retransmit
             if Case[4] and random.random() > 0.10:

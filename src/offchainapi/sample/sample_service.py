@@ -2,7 +2,8 @@ from ..business import BusinessContext, BusinessForceAbort, \
     BusinessValidationFailure, VASPInfo
 from ..protocol import OffChainVASP
 from ..libra_address import LibraAddress
-from ..protocol_messages import CommandRequestObject
+from ..protocol_messages import CommandRequestObject, OffChainProtocolError, \
+    OffChainException, OffChainOutOfOrder
 from ..payment_logic import PaymentCommand, PaymentProcessor
 from ..status_logic import Status
 from ..storage import StorableFactory
@@ -306,4 +307,11 @@ class sample_vasp:
 
     def process_response(self, other_vasp, request_json):
         channel = self.get_channel(other_vasp)
-        channel.parse_handle_response(request_json, encoded=True)
+        try:
+            channel.parse_handle_response(request_json, encoded=True)
+        except OffChainProtocolError:
+            pass
+        except OffChainException:
+            pass
+        except OffChainOutOfOrder:
+            pass

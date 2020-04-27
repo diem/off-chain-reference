@@ -1,7 +1,7 @@
 from ..asyncnet import Aionet
 from ..payment import PaymentActor, PaymentObject
 from ..payment_logic import PaymentCommand
-from ..protocol_messages import CommandRequestObject
+from ..protocol_messages import CommandRequestObject, OffChainException
 from ..utils import JSONFlag
 from ..payment_logic import Status
 from ..business import BusinessNotAuthorized
@@ -123,10 +123,10 @@ async def test_handle_request_bad_payload(client, url):
 async def test_send_request(net_handler, tester_addr, server, json_request):
     base_url = f'http://{server.host}:{server.port}'
     net_handler.vasp.info_context.get_peer_base_url.return_value = base_url
-    ret = await net_handler.send_request(tester_addr, json_request)
-    # This returns False since the vasp did not emit the command; so it does
+    with pytest.raises(OffChainException):
+        ret = await net_handler.send_request(tester_addr, json_request)
+    # Raises since the vasp did not emit the command; so it does
     # not expect a response.
-    assert not ret
 
 
 async def test_send_command(net_handler, tester_addr, server, command):

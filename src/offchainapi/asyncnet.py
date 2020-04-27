@@ -12,16 +12,17 @@ import json
 class Aionet:
     def __init__(self, vasp):
         ''' Initializes the network system with a OffChainVASP instance. '''
+        self.logger = logging.Logger('aionet')
         self.vasp = vasp
 
-        # TODO: This should be a dict holding one session per other vasp.
+        # For the moment hold one session per VASP.
         self.session = None
 
         self.app = web.Application()
 
         # Register routes.
         route = self.get_url('/', '{other_addr}')
-        logging.debug(f'Register route {route}')
+        self.logger.debug(f'Register route {route}')
         self.app.add_routes([web.post(route, self.handle_request)])
         if __debug__:
             self.app.add_routes([
@@ -37,20 +38,19 @@ class Aionet:
             await self.session.close()
             self.session = None
 
-
     async def watchdog_task(self):
         ''' Provides a priodic debug view of pending requests and replies '''
-        logging.debug('Start Network Watchdog')
+        self.logger.debug('Start Network Watchdog')
         try:
             while True:
                 for k in self.vasp.channel_store:
                     channel = self.vasp.channel_store[k]
-                    logging.debug(f'Wait-Req: {len(channel.waiting_requests)} Wait-Resp: {len(channel.waiting_response)}')
+                    self.logger.debug(f'Wait-Req: {len(channel.waiting_requests)} Wait-Resp: {len(channel.waiting_response)}')
                 await asyncio.sleep(self.watchdog_period)
         except GeneratorExit:
-            logging.debug('Watchdog graceful exit')
+            self.logger.debug('Watchdog graceful exit')
         else:
-            logging.debug('Watchdog NON-graceful exit')
+            self.logger.debug('Watchdog NON-graceful exit')
 
     def get_url(self, base_url, other_addr_str, other_is_server=False):
         ''' Composes the URL for the Off-chain API VASP end point.'''
@@ -71,14 +71,14 @@ class Aionet:
         ''' Main Http server handler for incomming OffChainAPI requests. '''
         # TODO: Could there be errors when creating LibraAddress?
         other_addr = LibraAddress(request.match_info['other_addr'])
-        logging.debug(f'Request Received from {other_addr.as_str()}')
+        self.logger.debug(f'Request Received from {other_addr.as_str()}')
 
         # Try to get a channel with the other VASP.
         try:
             channel = self.vasp.get_channel(other_addr)
         except BusinessNotAuthorized as e:
             # Raised if the other VASP is not an authorised business.
-            logging.debug(f'Not Authorized {e}')
+            self.logger.debug(f'Not Authorized {e}')
             raise web.HTTPUnauthorized
 
         # Verify that the other VASP is authorised to submit the request;
@@ -87,32 +87,32 @@ class Aionet:
         if not self.vasp.info_context.is_authorised_VASP(
             client_certificate, other_addr
         ):
-            logging.debug(f'Not Authorized')
+            self.logger.debug(f'Not Authorized')
             raise web.HTTPForbidden
 
         # Perform the request, send back the reponse.
         try:
             request_json = await request.json()
             # TODO: Handle the timeout error here
-            logging.debug(f'Data Received from {other_addr.as_str()}')
+            self.logger.debug(f'Data Received from {other_addr.as_str()}')
             response = await channel.parse_handle_request_to_future(
                 request_json, encoded=False
             )
         except json.decoder.JSONDecodeError as e:
             # Raised if the request does not contain valid JSON.
-            logging.debug(f'Type Error {e}')
+            self.logger.debug(f'Type Error {e}')
             import traceback
             traceback.print_exc()
             raise web.HTTPBadRequest
 
         # Send back the response
         channel.process_waiting_messages()
-        logging.debug(f'Sending back response to {other_addr.as_str()}')
+        self.logger.debug(f'Sending back response to {other_addr.as_str()}')
         return web.json_response(response.content)
 
     async def send_request(self, other_addr, json_request):
         ''' Uses an HTTP client to send an OffChainAPI request to another VASP.'''
-        logging.debug(f'Connect to {other_addr.as_str()}')
+        self.logger.debug(f'Connect to {other_addr.as_str()}')
 
         # Initialize the client.
         if self.session is None:
@@ -123,37 +123,37 @@ class Aionet:
             channel = self.vasp.get_channel(other_addr)
         except BusinessNotAuthorized as e:
             # Raised if the other VASP is not an authorised business.
-            logging.debug(f'Not Authorized {e}')
+            self.logger.debug(f'Not Authorized {e}')
             return False
 
         base_url = self.vasp.info_context.get_peer_base_url(other_addr)
         url = self.get_url(base_url, other_addr.as_str(), other_is_server=True)
-        logging.debug(f'Sending post request to {url}')
+        self.logger.debug(f'Sending post request to {url}')
         # TODO: Handle errors with session.post
         async with self.session.post(url, json=json_request) as response:
             try:
                 json_response = await response.json()
-                logging.debug(f'Json response: {json_response}')
+                self.logger.debug(f'Json response: {json_response}')
 
                 # TODO: here, what if we receive responses out of order?
                 #       I think we should make a future-based parse_handle_response
                 #       that returns when there is a genuine success.
                 res = channel.parse_handle_response(json_response, encoded=False)
-                logging.debug(f'Response parsed with status: {res}')
+                self.logger.debug(f'Response parsed with status: {res}')
                 channel.process_waiting_messages()
                 return res
             except json.decoder.JSONDecodeError as e:
-                logging.debug(f'Type Error {e}')
+                self.logger.debug(f'Type Error {e}')
                 return False
 
     async def send_command(self, other_addr, command):
         ''' Sends a new command to the VASP with LibraAddress `other_addr` '''
-        logging.debug(f'Sending command to {other_addr.as_str()}.')
+        self.logger.debug(f'Sending command to {other_addr.as_str()}.')
         try:
             channel = self.vasp.get_channel(other_addr)
         except BusinessNotAuthorized as e:
             # Raised if the other VASP is not an authorised business.
-            logging.debug(f'Not Authorized {e}')
+            self.logger.debug(f'Not Authorized {e}')
             return False
 
         request = channel.sequence_command_local(command)
