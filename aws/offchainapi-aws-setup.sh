@@ -11,7 +11,7 @@ sudo apt -y autoremove
 git config --global credential.helper store
 
 # Get the repo (the testbed brancha).
-git clone -b aws https://github.com/calibra/off-chain-api.git
+git clone https://github.com/calibra/off-chain-api.git
 
 # Install Python and all dependencies.
 sudo apt install -y software-properties-common
@@ -23,4 +23,5 @@ python3.7 -m pip install pip
 (cd off-chain-api && pip install -r requirements.txt)
 
 # Install nginx.
-sudo apt install nginx
+sudo apt -y install nginx
+sudo unlink /etc/nginx/sites-enabled/default
