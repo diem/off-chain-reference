@@ -108,18 +108,26 @@ class ProtocolExecutor:
 
         # Configure storage hierarchy
         storage_factory = channel.storage
-        root = storage_factory.make_value(channel.get_my_address().as_str(), None)
-        other_vasp = storage_factory.make_value(channel.get_other_address().as_str(), None, root=root)
+        root = storage_factory.make_value(
+            channel.get_my_address().as_str(), None)
+        other_vasp = storage_factory.make_value(
+            channel.get_other_address().as_str(), None, root=root)
 
-        # The common sequence of commands & and their status for those committed
-        self.command_sequence = storage_factory.make_list('command_sequence', ProtocolCommand, root=other_vasp)
-        self.command_status_sequence = storage_factory.make_list('command_status_sequence', bool, root=other_vasp)
+        # The common sequence of commands & and their
+        # status for those committed
+        self.command_sequence = storage_factory.make_list(
+            'command_sequence', ProtocolCommand, root=other_vasp)
+        self.command_status_sequence = storage_factory.make_list(
+            'command_status_sequence', bool, root=other_vasp)
 
         # This is the primary store of shared objects.
         # It maps version numbers -> objects
-        self.object_store = storage_factory.make_dict('object_store', SharedObject, root=other_vasp)
-        # Maps of version numbers -> bool, where True = live, and False = not live.
-        self.object_liveness = storage_factory.make_dict('object_liveness', bool, root=other_vasp)
+        self.object_store = storage_factory.make_dict(
+            'object_store', SharedObject, root=other_vasp)
+        # Maps of version numbers -> bool,
+        #   where True = live, and False = not live.
+        self.object_liveness = storage_factory.make_dict(
+            'object_liveness', bool, root=other_vasp)
 
         # <ENDS to persist>
 

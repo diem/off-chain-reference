@@ -15,7 +15,7 @@ class SharedObject(JSONSerializable):
     def new_version(self, new_version = None):
         ''' Make a deep copy of an object with a new version number '''
         clone = deepcopy(self)
-        clone.previous_versions = [ self.get_version() ]
+        clone.previous_versions = [self.get_version()]
         clone.version = new_version
         if clone.version is None:
             clone.version = get_unique_string()
@@ -25,19 +25,19 @@ class SharedObject(JSONSerializable):
     def get_version(self):
         ''' Return a unique version number to this object and version '''
         return self.version
-    
+
     def set_version(self, version):
         ''' Sets the version of the objects. Useful for contructors. '''
         self.version = version
 
-    def get_json_data_dict(self, flag, update_dict = None):
+    def get_json_data_dict(self, flag, update_dict=None):
         ''' Get a data dictionary compatible with JSON serilization (json.dumps) '''
         if update_dict is None:
             update_dict = {}
 
         update_dict.update({
-            'version' : self.version,
-            'previous_versions' : self.previous_versions,
+            'version': self.version,
+            'previous_versions': self.previous_versions,
         })
 
         self.add_object_type(update_dict)

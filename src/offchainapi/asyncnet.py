@@ -44,7 +44,6 @@ class Aionet:
         if self.watchdog_task_obj is not None:
             self.watchdog_task_obj.cancel()
 
-
     def schedule_watchdog(self, loop):
         self.watchdog_task_obj = loop.create_task(self.watchdog_task())
 
@@ -55,7 +54,10 @@ class Aionet:
             while True:
                 for k in self.vasp.channel_store:
                     channel = self.vasp.channel_store[k]
-                    self.logger.debug(f'Wait-Req: {len(channel.waiting_requests)} Wait-Resp: {len(channel.waiting_response)}')
+                    len_req = len(channel.waiting_requests)
+                    len_resp = len(channel.waiting_response)
+                    self.logger.debug(
+                        f'Wait-Req: {len_req} Wait-Resp: {len_resp}')
                 await asyncio.sleep(self.watchdog_period)
         except GeneratorExit:
             self.logger.debug('Watchdog graceful exit')
@@ -121,7 +123,8 @@ class Aionet:
         return web.json_response(response.content)
 
     async def send_request(self, other_addr, json_request):
-        ''' Uses an HTTP client to send an OffChainAPI request to another VASP.'''
+        ''' Uses an HTTP client to send an OffChainAPI request
+            to another VASP.'''
         self.logger.debug(f'Connect to {other_addr.as_str()}')
 
         # Initialize the client.
@@ -134,7 +137,7 @@ class Aionet:
         except BusinessNotAuthorized as e:
             # Raised if the other VASP is not an authorised business.
             self.logger.debug(f'Not Authorized {e}')
-            return False
+            raise e
 
         base_url = self.vasp.info_context.get_peer_base_url(other_addr)
         url = self.get_url(base_url, other_addr.as_str(), other_is_server=True)
@@ -145,16 +148,18 @@ class Aionet:
                 json_response = await response.json()
                 self.logger.debug(f'Json response: {json_response}')
 
-                # TODO: here, what if we receive responses out of order?
-                #       I think we should make a future-based parse_handle_response
-                #       that returns when there is a genuine success.
-                res = await channel.parse_handle_response_to_future(json_response, encoded=False)
+                # Wait in case the requests are sent out of order.
+                res = await channel.parse_handle_response_to_future(
+                    json_response, encoded=False)
                 self.logger.debug(f'Response parsed with status: {res}')
                 channel.process_waiting_messages()
                 return res
             except json.decoder.JSONDecodeError as e:
                 self.logger.debug(f'Type Error {e}')
-                return False
+                raise e
+            except Exception as e:
+                self.logger.debug(f'Type Error {e}')
+                raise e
 
     async def send_command(self, other_addr, command):
         ''' Sends a new command to the VASP with LibraAddress `other_addr` '''
@@ -178,5 +183,6 @@ class Aionet:
         )
 
     def get_runner(self):
-        ''' Gets an object to that needs to be run in an even loop to register the server. '''
+        ''' Gets an object to that needs to be run in an
+            event loop to register the server. '''
         return web.AppRunner(self.app)
