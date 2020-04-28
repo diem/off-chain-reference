@@ -185,8 +185,14 @@ def nginx(ctx):
     set_hosts(ctx)
     for host in ctx.hosts:
         c = Connection(host, user=ctx.user, connect_kwargs=ctx.connect_kwargs)
-        for file in tls_material:
-            c.put(file, '.')
+
+        # TLS certificates and keys.
+        c.put('server_cert.pem', '.')
+        c.put('server_key.pem', '.')
+        c.sudo('cp server_cert.pem /etc/ssl/certs')
+        c.sudo('update-ca-certificates')
+
+        # NGINX Config.
         c.put(nginx_conf, '.')
         c.sudo(f'mv {nginx_conf} /etc/nginx/sites-available || true')
         command = f'ln -s /etc/nginx/sites-available/{nginx_conf}'
