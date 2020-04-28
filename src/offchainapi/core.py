@@ -12,23 +12,25 @@ from aiohttp import web
 
 
 class Vasp:
+    ''' Creates a VASP with the standard networking and storage backend.
+
+    Parameters:
+        my_addr : a LibraAddress of this VASP
+        host    : a domain name for this VASP
+        port    : the port on which the server listens
+        business_context : The business contraxt of the VASP implementing
+                            the BusinessContext interface.
+        info_context     : The information context for the VASP
+                            implementing the VASPInfo interface.
+        database : A persistent key value store to be used by the storage
+                    systems as a backend.
+
+    Returns a VASP object.
+    '''
+
     def __init__(self, my_addr, host, port, business_context,
                  info_context, database):
-        ''' Creates a VASP with the standard networking and storage backend.
 
-        Parameters:
-            my_addr : a LibraAddress of this VASP
-            host    : a domain name for this VASP
-            port    : the port on which the server listens
-            business_context : The business contraxt of the VASP implementing
-                               the BusinessContext interface.
-            info_context     : The information context for the VASP
-                               implementing the VASPInfo interface.
-            database : A persistent key value store to be used by the storage
-                       systems as a backend.
-
-        Returns a VASP object.
-        '''
         # Initiaize all VASP related objects
         self.my_addr = my_addr              # Our Address
         self.host = host                    # Our Host name
@@ -83,18 +85,6 @@ class Vasp:
         # Run the watchdor task to log statistics
         self.net_handler.schedule_watchdog(loop, period=watch_period)
 
-    def new_command(self, addr, cmd):
-        ''' A synchronous version of `new_command_async`. It sends a new
-            command to the other VASP. Returns a concurrent Future object,
-            on which the caller can get a result().
-            '''
-        if self.loop is not None:
-            res = asyncio.run_coroutine_threadsafe(
-                self.new_command_async(addr, cmd), self.loop)
-            return res
-        else:
-            raise RuntimeError('Event loop is None.')
-
     async def new_command_async(self, addr, cmd):
         ''' Sends a new command to the other VASP and returns a
             boolean indicating success or failure of the command,
@@ -120,6 +110,36 @@ class Vasp:
             return await self.net_handler.send_request(addr, req)
         except NetworkException:
             return req
+
+    def new_command(self, addr, cmd):
+        ''' A synchronous version of `new_command_async`. It sends a new
+            command to the other VASP. Returns a concurrent Future object,
+            on which the caller can get a result().
+            '''
+        if self.loop is not None:
+            res = asyncio.run_coroutine_threadsafe(
+                self.new_command_async(addr, cmd), self.loop)
+            return res
+        else:
+            raise RuntimeError('Event loop is None.')
+
+    def get_payment_by_ref(self, reference_id):
+        """ Returns the latest version of the PaymentObject
+            with the given reference ID.
+
+            Parameters:
+                * reference_id (str): the reference ID of a payment.
+
+            Returns:
+                A PaymentObject with the reference ID given.
+
+            Raises:
+                KeyError in case a payment with the
+                given reference does not exist.
+
+            """
+        payment = self.pp.get_latest_payment_by_ref_id(reference_id)
+        return payment
 
     async def close_async(self):
         ''' Await this to cleanly close the network

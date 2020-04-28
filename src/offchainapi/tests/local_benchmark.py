@@ -109,6 +109,7 @@ async def main_perf():
 
     # Define a payment command
     commands = []
+    payments = []
     for cid in range(100):
         sender = PaymentActor(PeerA_addr.as_str(), 'aaaa', Status.none, [])
         receiver = PaymentActor(PeerB_addr.as_str(), 'bbbb', Status.none, [])
@@ -116,6 +117,7 @@ async def main_perf():
         payment = PaymentObject(
             sender, receiver, f'ref {cid}', 'orig_ref', 'desc', action
         )
+        payments += [payment]
         cmd = PaymentCommand(payment)
         commands += [cmd]
 
@@ -130,6 +132,12 @@ async def main_perf():
     res = asyncio.run_coroutine_threadsafe(send100(VASPa, commands), loopA)
     res = res.result()
     elapsed = (time.perf_counter() - s)
+
+    # Check that all the payments have been processed and stored.
+    for payment in payments:
+        ref = payment.reference_id
+        payment2 = VASPa.get_payment_by_ref(ref)
+        assert payment2.get_version() == payment.get_version()
 
     # Print some statistics
     success_number = sum([1 for r in res if r])

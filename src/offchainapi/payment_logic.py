@@ -3,7 +3,7 @@ import logging
 
 from .business import BusinessForceAbort
 from .executor import CommandProcessor
-from .payment import Status
+from .payment import Status, PaymentObject
 from .status_logic import status_heights_MUST
 from .payment_command import PaymentCommand, PaymentLogicError
 from .asyncnet import NetworkException
@@ -49,6 +49,11 @@ class PaymentProcessor(CommandProcessor):
 
         # The processor state -- only access through event loop to prevent
         # mutlithreading bugs.
+        self.storage_factory = storage_factory
+        with self.storage_factory.atomic_writes():
+            root = storage_factory.make_value('processor', None)
+            self.reference_id_index = storage_factory.make_dict(
+                'reference_id_index', PaymentObject, root)
 
         # TODO: how much of this do we want to persist?
         self.command_id = 0
@@ -165,6 +170,29 @@ class PaymentProcessor(CommandProcessor):
         """ Processes a command to generate more subsequent commands. This schedules a
             talk that will be executed later. """
 
+        # Update the payment object index to support retieval by payment index
+        if status_success:
+            dependencies_objects = executor.object_store
+            new_version = command.get_new_version()
+            payment = command.get_object(new_version, dependencies_objects)
+
+            # Update the Index of Reference ID -> Payment
+            ref_id = payment.reference_id
+
+            with self.storage_factory.atomic_writes():
+                if ref_id in self.reference_id_index:
+                    # We get the dependencies of the old payment
+                    old_version = self.reference_id_index[ref_id].get_version()
+
+                    # We check that the previous version is present.
+                    # If so we update it with the new one.
+                    dependencies_versions = command.get_dependencies()
+                    if old_version in dependencies_versions:
+                        self.reference_id_index[ref_id] = payment
+                else:
+                    self.reference_id_index[ref_id] = payment
+
+        # Spin further command processing in its own task
         self.logger.debug(f'Schedule cmd {seq}')
         fut = self.loop.create_task(self.process_command_async(
             vasp, channel, executor, command, seq, status_success, error))
@@ -175,6 +203,13 @@ class PaymentProcessor(CommandProcessor):
             self.futs += [fut]
 
         return fut
+
+    def get_latest_payment_by_ref_id(self, ref_id):
+        ''' Returns the latest payment version with the reference ID provided.'''
+        if ref_id in self.reference_id_index:
+            return self.reference_id_index[ref_id]
+        else:
+            raise KeyError(ref_id)
 
     # ----------- END of CommandProcessor interface ---------
 
