@@ -65,6 +65,7 @@ class Aionet:
                     self.logger.info(
                         f'''
 Channel: {channel.get_my_address().as_str()} <-> {channel.get_other_address().as_str()}
+Queues: my: {len(channel.my_requests)} other: {len(channel.other_requests)}
 Retransmit: {channel.would_retransmit()}
 Wait-Req: {len_req} Wait-Resp: {len_resp}''')
                 await asyncio.sleep(self.watchdog_period)

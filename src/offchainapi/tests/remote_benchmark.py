@@ -78,7 +78,7 @@ def run_server(my_configs_path, other_configs_path):
             'port': <int>,
         }
     '''
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.DEBUG)
 
     my_configs = load_configs(my_configs_path)
     other_configs = load_configs(other_configs_path)

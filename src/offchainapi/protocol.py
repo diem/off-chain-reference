@@ -619,11 +619,16 @@ class VASPPairChannel:
                     if request.has_response():
                         next_retransmit += 1
                     else:
-                        if do_retransmit:
-                            request_to_send = request
+                        request_to_send = request
                         break
-                self.next_retransmit.set_value(next_retransmit)
+
+                if next_retransmit != self.next_retransmit.get_value():
+                    self.next_retransmit.set_value(next_retransmit)
 
         # Send request outside the lock to allow for asynchronous
         # sending methods.
-        return self.send_request(request) if request_to_send != None else None
+        if not do_retransmit:
+            return request is not None
+        else:
+            return self.send_request(request) if request_to_send is not None \
+                else None
