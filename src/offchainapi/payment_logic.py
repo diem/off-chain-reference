@@ -9,6 +9,7 @@ from .payment import Status, PaymentObject
 from .status_logic import status_heights_MUST
 from .utils import JSONSerializable, JSONFlag
 from .payment_command import PaymentCommand, PaymentLogicError
+from .asyncnet import NetworkException
 
 def check_status(role, old_status, new_status, other_status):
     ''' Check that the new status is valid.
@@ -55,9 +56,6 @@ class PaymentProcessor(CommandProcessor):
         self.pending_commands = {}
         self.futs = []
 
-        # Task management for graceful shutdown
-        self.pending_tasks = []
-
     def set_network(self, net):
         ''' Assigns a concrete network for this command processor to use. '''
         assert self.net is None
@@ -91,10 +89,14 @@ class PaymentProcessor(CommandProcessor):
                             await self.net.send_command(
                                 channel.get_other_address(), new_cmd)
             else:
-                self.logger.error(f'Cmd #{seq}: {error}')
+                self.logger.error(f'Command #{seq} Failure: {error}')
 
-        except asyncio.CancelledError:
-            self.logger.debug(f'Cancel processing: Cmd #{seq}')
+        # Prevent the next catch-all handler from catching canceled exceptions.
+        except asyncio.CancelledError as e:
+            raise e
+
+        except NetworkException as e:
+             self.logger.debug(f'Network error: seq #{seq}: {str(e)}')
 
         except Exception as e:
             self.logger.error(f'Payment processing error: seq #{seq}: {str(e)}')
@@ -152,23 +154,12 @@ class PaymentProcessor(CommandProcessor):
         fut = self.loop.create_task(self.process_command_async(
             vasp, channel, executor, command, seq, status_success, error))
 
-        # Update the list of pending tasks
-        self.pending_tasks = [T for T in self.pending_tasks if not T.done()]
-        self.pending_tasks += [fut]
-
         # Log the futures here to execute them inidividually
         # when testing.
         if __debug__:
             self.futs += [fut]
 
         return fut
-
-    def cancel_pending_tasks(self):
-        ''' Cancels all the pending command requests. '''
-        for T in self.pending_tasks:
-            if not T.done() or T.cancelled():
-                T.cancel()
-        self.pending_tasks = []
 
     # ----------- END of CommandProcessor interface ---------
 
@@ -232,7 +223,7 @@ class PaymentProcessor(CommandProcessor):
 
         # Ensure nothing on our side was changed by this update
         if payment.data[role] != new_payment.data[role]:
-            raise PaymentLogicError('Cannot change %s information.' % role)
+            raise PaymentLogicError(f'Cannot change {role} information.')
 
         # Ensure valid transitions
         check_status(other_role, old_other_status, other_status, status)

@@ -7,6 +7,7 @@ from .storage import StorableFactory
 from .asyncnet import Aionet
 
 import asyncio
+import logging
 from aiohttp import web
 
 
@@ -45,6 +46,10 @@ class Vasp:
         # Later init
         self.site = None
         self.loop = None
+        self.runner = None
+
+        # Logger
+        self.logger = logging.getLogger(f'VASP.{my_addr.as_str()}')
 
     def start_services(self, loop):
         ''' Registers services with the even loop provided '''
@@ -55,15 +60,15 @@ class Vasp:
         self.loop = loop
 
         # Start the server
-        runner = self.net_handler.get_runner()
-        loop.run_until_complete(runner.setup())
+        self.runner = self.net_handler.get_runner()
+        loop.run_until_complete(self.runner.setup())
 
-        self.site = web.TCPSite(runner, self.host, self.port)
+        self.site = web.TCPSite(self.runner, self.host, self.port)
         loop.run_until_complete(self.site.start())
 
         if __debug__:
             # Run the watchdor task to log statistics
-            loop.create_task(self.net_handler.watchdog_task())
+            self.net_handler.schedule_watchdog(loop, period=1.0)
 
     def new_command(self, addr, cmd):
         ''' A synchronous version of `new_command_async`. It sends a new
@@ -86,17 +91,31 @@ class Vasp:
            and any pending commands being processed. '''
 
         # Close the network
+        self.logger.info('Closing the network ...')
+        await self.runner.cleanup()
         await self.net_handler.close()
 
-        # Cancel all pensing command processing tasks
-        self.pp.cancel_pending_tasks()
+        # Send the cancel signal to all pending tasks
+        other_tasks = []
+        for T in asyncio.all_tasks():
+            # Ignore our own task
+            if T == asyncio.current_task():
+                continue
+            # Cancel and save the task.
+            T.cancel()
+            other_tasks += [T]
 
+        self.logger.info('Cancelling all tasks ...')
+        await asyncio.gather(*other_tasks, return_exceptions=True)
+
+        self.logger.info('Closing loop ...')
+        self.loop.stop()
         if self.loop is not None:
             self.loop = None
 
     def close(self):
         ''' Syncronous and thread safe version of `close_async`. '''
-
+        assert self.loop is not None
         if self.loop is not None:
             res = asyncio.run_coroutine_threadsafe(
                 self.close_async(), self.loop)

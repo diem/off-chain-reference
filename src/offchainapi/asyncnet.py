@@ -1,13 +1,17 @@
 from .business import BusinessNotAuthorized
 from .libra_address import LibraAddress
 
+
 import aiohttp
 from aiohttp import web
+from aiohttp.client_exceptions import ClientError
 import asyncio
 import logging
 from urllib.parse import urljoin
 import json
 
+class NetworkException(Exception):
+    pass
 
 class Aionet:
     def __init__(self, vasp):
@@ -45,25 +49,27 @@ class Aionet:
         if self.watchdog_task_obj is not None:
             self.watchdog_task_obj.cancel()
 
-    def schedule_watchdog(self, loop):
+    def schedule_watchdog(self, loop, period = 10.0):
+        self.watchdog_period = period
         self.watchdog_task_obj = loop.create_task(self.watchdog_task())
 
     async def watchdog_task(self):
         ''' Provides a priodic debug view of pending requests and replies '''
-        self.logger.debug('Start Network Watchdog')
+        self.logger.info('Start Network Watchdog')
         try:
             while True:
                 for k in self.vasp.channel_store:
                     channel = self.vasp.channel_store[k]
                     len_req = len(channel.waiting_requests)
                     len_resp = len(channel.waiting_response)
-                    self.logger.debug(
-                        f'Wait-Req: {len_req} Wait-Resp: {len_resp}')
+                    self.logger.info(
+                        f'''
+Channel: {channel.get_my_address().as_str()} <-> {channel.get_other_address().as_str()}
+Retransmit: {channel.would_retransmit()}
+Wait-Req: {len_req} Wait-Resp: {len_resp}''')
                 await asyncio.sleep(self.watchdog_period)
-        except GeneratorExit:
-            self.logger.debug('Watchdog graceful exit')
-        else:
-            self.logger.debug('Watchdog NON-graceful exit')
+        finally:
+            self.logger.info('Stop Network Watchdog')
 
     def get_url(self, base_url, other_addr_str, other_is_server=False):
         ''' Composes the URL for the Off-chain API VASP end point.'''
@@ -113,7 +119,7 @@ class Aionet:
 
         except json.decoder.JSONDecodeError as e:
             # Raised if the request does not contain valid JSON.
-            self.logger.debug(f'Type Error {e}')
+            self.logger.debug(f'Type Error {str(e)}')
             import traceback
             traceback.print_exc()
             raise web.HTTPBadRequest
@@ -146,25 +152,30 @@ class Aionet:
         url = self.get_url(base_url, other_addr.as_str(), other_is_server=True)
         self.logger.debug(f'Sending post request to {url}')
         # TODO: Handle errors with session.post
-        async with self.session.post(url, json=json_request) as response:
-            try:
-                json_response = await response.json()
-                self.logger.debug(f'Json response: {json_response}')
+        try:
+            async with self.session.post(url, json=json_request) as response:
+                try:
+                    json_response = await response.json()
+                    self.logger.debug(f'Json response: {json_response}')
 
-                # Wait in case the requests are sent out of order.
-                res = await channel.parse_handle_response_to_future(
-                    json_response, encoded=False)
-                self.logger.debug(f'Response parsed with status: {res}')
+                    # Wait in case the requests are sent out of order.
+                    res = await channel.parse_handle_response_to_future(
+                        json_response, encoded=False)
+                    self.logger.debug(f'Response parsed with status: {res}')
 
-                self.logger.debug(f'Process Waiting messages')
-                channel.process_waiting_messages()
-                return res
-            except json.decoder.JSONDecodeError as e:
-                self.logger.debug(f'Type Error {e}')
-                raise e
-            except Exception as e:
-                self.logger.debug(f'Type Error {e}')
-                raise e
+                    self.logger.debug(f'Process Waiting messages')
+                    channel.process_waiting_messages()
+                    return res
+                except json.decoder.JSONDecodeError as e:
+                    self.logger.debug(f'JSONDecodeError {str(e)}')
+                    raise e
+                except asyncio.CancelledError as e:
+                    raise e
+                except Exception as e:
+                    self.logger.debug(f'Exception {type(e)}: {str(e)}')
+                    raise e
+        except ClientError as e:
+            raise NetworkException(e)
 
     async def send_command(self, other_addr, command):
         ''' Sends a new command to the VASP with LibraAddress `other_addr` '''

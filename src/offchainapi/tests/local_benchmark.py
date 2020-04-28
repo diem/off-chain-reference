@@ -54,9 +54,16 @@ class SimpleVASPInfo(VASPInfo):
 global_dir = {}
 
 
-def start_thread_main(vasp, loop):
-    vasp.start_services(loop)
+async def update_dir(vasp):
     global_dir[vasp.vasp.get_vasp_address().as_str()] = vasp
+
+
+def start_thread_main(vasp, loop):
+    # Initialize the VASP services.
+    vasp.start_services(loop)
+
+    # Run this once the loop is running
+    loop.create_task(update_dir(vasp))
 
     try:
         loop.run_forever()
@@ -66,46 +73,35 @@ def start_thread_main(vasp, loop):
 
     logging.debug('VASP loop exit')
 
-
-async def main_perf():
-    VASPa = Vasp(PeerA_addr,
-                 host='localhost',
-                 port=8091,
-                 business_context=AsyncMock(spec=BusinessContext),
-                 info_context=SimpleVASPInfo(),
-                 database={})
-
-    loopA = asyncio.new_event_loop()
-    tA = Thread(target=start_thread_main, args=(VASPa, loopA), daemon=True)
-    tA.start()
-    print('Start Node A')
-
-    VASPb = Vasp(
-        PeerB_addr,
+def make_new_VASP(Peer_addr, port):
+    VASPx = Vasp(
+        Peer_addr,
         host='localhost',
-        port=8092,
+        port=port,
         business_context=AsyncMock(spec=BusinessContext),
         info_context=SimpleVASPInfo(),
         database={})
 
-    loopB = asyncio.new_event_loop()
+    loop = asyncio.new_event_loop()
+    t = Thread(target=start_thread_main, args=(VASPx, loop))
+    t.start()
+    print(f'Start Node {port}')
+    return (VASPx, loop, t)
 
-    tB = Thread(target=start_thread_main, args=(VASPb, loopB), daemon=True)
-    tB.start()
-    print('Start Node B')
+async def main_perf():
+    VASPa, loopA, tA = make_new_VASP(PeerA_addr, port=8091)
+    VASPb, loopB, tB = make_new_VASP(PeerB_addr, port=8092)
 
-    time.sleep(1.0)
+    await asyncio.sleep(2.0)
     print('Inject commands')
-    time.sleep(1.0)
+    await asyncio.sleep(1.0)
     while len(global_dir) != 2:
-        time.sleep(0.1)
+        await asyncio.sleep(0.1)
     print(global_dir)
 
     # Get the channel from A -> B
-    nodeA = global_dir[PeerA_addr.as_str()]
-    channelAB = nodeA.vasp.get_channel(PeerB_addr)
-    nodeB = global_dir[PeerB_addr.as_str()]
-    channelBA = nodeB.vasp.get_channel(PeerA_addr)
+    channelAB = VASPa.vasp.get_channel(PeerB_addr)
+    channelBA = VASPb.vasp.get_channel(PeerA_addr)
 
     # Define a payment command
     commands = []
@@ -123,16 +119,21 @@ async def main_perf():
 
     async def send100(nodeA, commands):
         res = await asyncio.gather(
-            *[nodeA.new_command_async(nodeB.my_addr, cmd) for cmd in commands])
+            *[nodeA.new_command_async(VASPb.my_addr, cmd) for cmd in commands], return_exceptions=True)
         return res
 
-    res = asyncio.run_coroutine_threadsafe(send100(nodeA, commands), loopA)
+    res = asyncio.run_coroutine_threadsafe(send100(VASPa, commands), loopA)
     res = res.result()
 
     success_number = sum([1 for r in res if r])
     elapsed = (time.perf_counter() - s)
     print(f'Commands executed in {elapsed:0.2f} seconds.')
     print(f'Success #: {success_number}/{len(commands)}')
+
+    # In case you want to wait for other responses to settle
+    #for t in range(10):
+    #    print('waiting', t)
+    #    await asyncio.sleep(1.0)
 
     # Esure they were register as successes on both sides.
     Asucc = len([x for x in channelAB.executor.command_status_sequence if x])
@@ -148,5 +149,5 @@ async def main_perf():
     VASPa.close()
     VASPb.close()
 
-    import sys
-    sys.exit()
+    #import sys
+    #sys.exit()
