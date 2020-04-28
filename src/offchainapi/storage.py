@@ -7,7 +7,9 @@ from .utils import JSONFlag, JSONSerializable, get_unique_string
 
 
 def key_join(strs):
-    return '||'.join(strs)
+    ''' Joins a sequence of strings to form a storage key. '''
+    # Ensure this is parseable and one-to-one to avoid collisions.
+    return '||'.join([f'[{len(s)}:{s}]' for s in strs])
 
 
 class Storable:
@@ -40,9 +42,17 @@ class Storable:
 
 
 class StorableFactory:
-    ''' This class maintains an overview of the full storage subsystem.'''
+    ''' This class maintains an overview of the full storage subsystem,
+    and creates specific classes for values, lists and dictionary like
+    types that can be stored persistently. It also provides a context
+    manager to provide atomic, all-or-nothing crash resistent
+    transactions.'''
 
     def __init__(self, db):
+        """ Initialize the ``StorableFactory`` with a persistent key-value
+        store ``db``. In case the db already contains data the initializer
+        runs the crash recovery procedure to cleanly re-open it."""
+
         self.rlock = RLock()
         self.db = db
         self.current_transaction = None
@@ -57,19 +67,50 @@ class StorableFactory:
         self.crash_recovery()
 
     def make_value(self, name, xtype, root=None, default=None):
-        ''' A new value-like storable'''
+        ''' Makes a new value-like storable.
+
+            Parameters:
+                * name : a string representing the name of the object.
+                * xtype : the type of the object. It may be a simple type
+                  or a subclass of JSONSerializable.
+                * root : another storable object that acts as a logical
+                  folder to this one.
+                * default : the default value of the storable.
+
+        '''
+        assert default is None or type(default) == xtype
         v = StorableValue(self, name, xtype, root, default)
         v.factory = self
         return v
 
     def make_list(self, name, xtype, root):
-        ''' A new list-like storable'''
+        ''' Makes a new list-like storable. The type of the objects
+            stored is xtype, or any subclass of JSONSerializable.
+
+            Parameters:
+                * name : a string representing the name of the object.
+                * xtype : the type of the object stored in the list.
+                  It may be a simple type or a subclass of
+                  JSONSerializable.
+                * root : another storable object that acts as a logical
+                  folder to this one.
+        '''
         v = StorableList(self, name, xtype, root)
         v.factory = self
         return v
 
     def make_dict(self, name, xtype, root):
-        ''' A new map-like storable'''
+        ''' A new map-like storable object.
+
+            Parameters:
+                * name : a string representing the name of the object.
+                * xtype : the type of the object stored in the map.
+                  It may be a simple type or a subclass of
+                  JSONSerializable. The keys are always strings.
+                * root : another storable object that acts as a logical
+                  folder to this one.
+
+        '''
         v = StorableDict(self, name, xtype, root)
         v.factory = self
         return v
@@ -110,7 +151,9 @@ class StorableFactory:
         self.del_cache.add(key)
 
     def persist_cache(self):
-        ''' Safely persist the cache once the transaction is over. '''
+        ''' Safely persist the cache once the transaction is over.
+            This is called internally when the context manager exists.
+        '''
 
         from itertools import chain
 
@@ -165,8 +208,15 @@ class StorableFactory:
     # Define the interfaces as a context manager
 
     def atomic_writes(self):
-        ''' Returns a context that ensures
-            all writes in its body are atomic '''
+        ''' Returns a context manager that ensures
+            all writes in its body on the objects created by this
+            StorableFactory are atomic.
+
+            Attempting to write to the objects created by this
+            StorableFactory outside the context manager will
+            throw an exception. The context manager is re-entrant
+            and commits to disk occur when the outmost context
+            manager (with) exits.'''
         return self
 
     def __enter__(self):
@@ -189,7 +239,19 @@ class StorableFactory:
 class StorableDict(Storable):
     """ Implements a persistent dictionary like type. Entries are stored
         by key directly, and a separate doubly linked list structure is
-        stored to enable traversal of keys and values. """
+        stored to enable traversal of keys and values.
+
+        Supports:
+            * __getitem__(self, key)
+            * __setitem__(self, key, value)
+            * keys(self)
+            * values(self)
+            * __len__(self)
+            * __contains__(self, item)
+            * __delitem__(self, key)
+
+        Keys should be strings or any object with a unique str representation.
+        """
 
     def __init__(self, db, name, xtype, root=None):
 
@@ -331,6 +393,17 @@ class StorableDict(Storable):
 
 
 class StorableList(Storable):
+    ''' A list-like object that can be stored.
+
+    Supports:
+        * __getitem__(self, key)
+        * __setitem__(self, key, value)
+        * __len__(self)
+        * __iadd__(self, other)
+
+    Keys are always integers.
+    '''
+
 
     def __init__(self, db, name, xtype, root=None):
         if root is None:
@@ -412,6 +485,9 @@ class StorableValue(Storable):
                 self.set_value(default)
 
     def set_value(self, value):
+        ''' Sets the vale for this instance.
+            Value must be of the right type namely ``xtype``.
+        '''
         json_data = json.dumps(self.pre_proc(value))
         key = self._base_key_str
         self.db[key] = json_data
@@ -419,6 +495,7 @@ class StorableValue(Storable):
         self.value = value
 
     def get_value(self):
+        ''' Get the value for this object. '''
         key = self._base_key_str
         encoded_value = self.db[key]
         val = json.loads(encoded_value)
@@ -427,6 +504,7 @@ class StorableValue(Storable):
         return self.value
 
     def exists(self):
+        ''' Tests if this value exist in storage. '''
         return self.has_value or self._base_key_str in self.db
 
     def base_key(self):

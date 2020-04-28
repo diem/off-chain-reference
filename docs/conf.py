@@ -37,6 +37,9 @@ extensions = [
     'sphinx.ext.viewcode',
 ]
 
+# custom commands
+autodoc_member_order = 'bysource'
+
 # Check out napoleon docs: https://www.sphinx-doc.org/en/master/usage/extensions/napoleon.html
 # check out autodoc docs: https://www.sphinx-doc.org/en/master/usage/extensions/autodoc.html
 
