@@ -272,7 +272,7 @@ class VASPPairChannel:
                     self.executor.sequence_next_command(
                         off_chain_command,
                         do_not_sequence_errors=True)
-                    self.logger.info('Server Sequence Command #{request.command_seq}')
+                    self.logger.info(f'Server Sequence Command #{request.command_seq}')
 
                 self.my_requests += [request]
 
