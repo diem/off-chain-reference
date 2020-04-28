@@ -27,9 +27,9 @@ class KYCData(StructureChecker):
         # Tests JSON parsing before accepting blob
         if 'blob' in diff:
             data = json.loads(diff['blob'])
-            if not 'payment_reference_id' in data:
+            if 'payment_reference_id' not in data:
                 raise StructureException('Missing: field payment_reference_id')
-            if not 'type' in data:
+            if 'type' not in data:
                 raise StructureException('Missing: field type')
 
 
@@ -57,8 +57,11 @@ class PaymentActor(StructureChecker):
     def custom_update_checks(self, diff):
         # If any of kyc data, signature or certificate is provided, we expect
         # all the other fields as well
-        missing = set(["kyc_data", "kyc_signature", "kyc_certificate"]) - set(diff.keys())
-        if len(missing) !=0 and len(missing)!=3:
+        missing = set([
+                    "kyc_data",
+                    "kyc_signature",
+                    "kyc_certificate"]) - set(diff.keys())
+        if len(missing) != 0 and len(missing) != 3:
             raise StructureException('Missing: field %s' % (str(missing),))
 
         if 'status' in diff and not isinstance(diff['status'], Status):
@@ -122,6 +125,7 @@ class PaymentAction(StructureChecker):
 
         # TODO[issue #1]: Check timestamp format?
 
+
 @JSONSerializable.register
 class PaymentObject(SharedObject, StructureChecker, JSONSerializable):
 
@@ -167,9 +171,9 @@ class PaymentObject(SharedObject, StructureChecker, JSONSerializable):
             'recipient_signature': signature
         })
 
-
-    def get_json_data_dict(self, flag, update_dict = None):
-        ''' Get a data dictionary compatible with JSON serilization (json.dumps) '''
+    def get_json_data_dict(self, flag, update_dict=None):
+        ''' Get a data dictionary compatible with
+            JSON serilization (json.dumps) '''
         json_data = {}
         json_data = SharedObject.get_json_data_dict(self, flag, json_data)
         json_data['data'] = self.get_full_diff_record()
@@ -177,7 +181,8 @@ class PaymentObject(SharedObject, StructureChecker, JSONSerializable):
 
     @classmethod
     def from_json_data_dict(cls, data, flag, self=None):
-        ''' Construct the object from a serlialized JSON data dictionary (from json.loads). '''
+        ''' Construct the object from a serlialized
+            JSON data dictionary (from json.loads). '''
         self = PaymentObject.from_full_record(data['data'])
         SharedObject.from_json_data_dict(data, flag, self)
         return self

@@ -5,8 +5,10 @@ from threading import RLock
 
 from .utils import JSONFlag, JSONSerializable, get_unique_string
 
+
 def key_join(strs):
     return '||'.join(strs)
+
 
 class Storable:
     """ Base class for objects that can be stored """
@@ -35,6 +37,7 @@ class Storable:
             return self.xtype.parse(val, JSONFlag.STORE)
         else:
             return self.xtype(val)
+
 
 class StorableFactory:
     ''' This class maintains an overview of the full storage subsystem.'''
@@ -85,7 +88,8 @@ class StorableFactory:
     def __setitem__(self, key, value):
         # Ensure all writes are within a transaction.
         if self.current_transaction is None:
-            raise RuntimeError('Writes must happen within a transaction context')
+            raise RuntimeError(
+                'Writes must happen within a transaction context')
         self.cache[key] = value
         if key in self.del_cache:
             self.del_cache.remove(key)
@@ -99,7 +103,8 @@ class StorableFactory:
 
     def __delitem__(self, key):
         if self.current_transaction is None:
-            raise RuntimeError('Writes must happen within a transaction context')
+            raise RuntimeError(
+                'Writes must happen within a transaction context')
         if key in self.cache:
             del self.cache[key]
         self.del_cache.add(key)
@@ -116,7 +121,7 @@ class StorableFactory:
             if key in self.db:
                 old_entries[key] = self.db[key]
             else:
-                non_existent_entries += [ key ]
+                non_existent_entries += [key]
 
         backup_data = json.dumps([old_entries, non_existent_entries])
         self.db['__backup_recovery'] = backup_data
@@ -160,7 +165,8 @@ class StorableFactory:
     # Define the interfaces as a context manager
 
     def atomic_writes(self):
-        ''' Returns a context that ensures all writes in its body are atomic '''
+        ''' Returns a context that ensures
+            all writes in its body are atomic '''
         return self
 
     def __enter__(self):
@@ -179,14 +185,16 @@ class StorableFactory:
         finally:
             self.rlock.release()
 
+
 class StorableDict(Storable):
+    """ Implements a persistent dictionary like type. Entries are stored
+        by key directly, and a separate doubly linked list structure is
+        stored to enable traversal of keys and values. """
 
     def __init__(self, db, name, xtype, root=None):
-        """ Implements a persistent dictionary like type. Entries are stored
-            by key directly, and a separate doubly linked list structure is
-            stored to enable traversal of keys and values. """
+
         if root is None:
-            self.root = [ '' ]
+            self.root = ['']
         else:
             self.root = root.base_key()
         self.name = name
@@ -241,7 +249,6 @@ class StorableDict(Storable):
 
         if __debug__:
             self._check_invariant()
-
 
     def __setitem__(self, key, value):
         db_key, _ = self.derive_keys(key)
@@ -338,7 +345,6 @@ class StorableList(Storable):
         if not self.length.exists():
             self.length.set_value(0)
 
-
     def base_key(self):
         return self.root + [self.name]
 
@@ -356,13 +362,13 @@ class StorableList(Storable):
         if type(key) is not int:
             raise KeyError('Key must be an int.')
         xlen = len(self)
-        if not 0<= key < xlen:
+        if not 0 <= key < xlen:
             raise KeyError('Key does not exist')
         db_key = key_join(self.base_key() + [str(key)])
         self.db[db_key] = json.dumps(self.pre_proc(value))
 
     def __len__(self):
-        xlen =  self.length.get_value()
+        xlen = self.length.get_value()
         assert type(xlen) is int
         return xlen
 
@@ -404,7 +410,6 @@ class StorableValue(Storable):
             self.value = None
             if default is not None:
                 self.set_value(default)
-
 
     def set_value(self, value):
         json_data = json.dumps(self.pre_proc(value))
