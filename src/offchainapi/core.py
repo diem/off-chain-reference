@@ -29,21 +29,29 @@ class Vasp:
 
         Returns a VASP object.
         '''
-        self.my_addr = my_addr
-        self.host = host
-        self.port = port
-        self.bc = business_context
-        self.store = StorableFactory({})
-        self.info_context = info_context
+        # Initiaize all VASP related objects
+        self.my_addr = my_addr              # Our Address
+        self.host = host                    # Our Host name
+        self.port = port                    # Our server listening port
+        self.bc = business_context          # Our Business Context
+        self.database = database            # A key-value store
+        self.info_context = info_context    # Our info context
+
+        # Make default storage
+        self.store = StorableFactory(database)
+        # Make default PaymentProcessor
         self.pp = PaymentProcessor(self.bc, self.store)
 
+        # Make root OffChainVasp Object
         self.vasp = OffChainVASP(
             self.my_addr, self.pp, self.store, self.info_context
         )
+        # Make default aiohttp based network
         self.net_handler = Aionet(self.vasp)
-        self.pp.set_network(self.net_handler)
+        self.pp.set_network(self.net_handler)  # Set handler for processor
 
-        # Later init
+        # Initialize later those ...
+        # (When calling `start_services`)
         self.site = None
         self.loop = None
         self.runner = None
@@ -51,29 +59,35 @@ class Vasp:
         # Logger
         self.logger = logging.getLogger(f'VASP.{my_addr.as_str()}')
 
-    def start_services(self, loop):
-        ''' Registers services with the even loop provided '''
+    def start_services(self, loop, watch_period=10.0):
+        ''' Registers services with the even loop provided.
+
+        Parameters:
+            * loop : an asyncio event loop on which to register services.
+            * watch_period : the time (seconds) beween activating the
+              network watchdog to trigger debug info and retransmits.
+
+        '''
         asyncio.set_event_loop(loop)
 
         # Assign a loop  to the processor
         self.pp.loop = loop
         self.loop = loop
 
-        # Start the server
+        # Start the http server
         self.runner = self.net_handler.get_runner()
         loop.run_until_complete(self.runner.setup())
-
         self.site = web.TCPSite(self.runner, self.host, self.port)
         loop.run_until_complete(self.site.start())
 
-        if __debug__:
-            # Run the watchdor task to log statistics
-            self.net_handler.schedule_watchdog(loop, period=1.0)
+        # Run the watchdor task to log statistics
+        self.net_handler.schedule_watchdog(loop, period=watch_period)
 
     def new_command(self, addr, cmd):
         ''' A synchronous version of `new_command_async`. It sends a new
             command to the other VASP. Returns a concurrent Future object,
-            on which the caller can get a result(). '''
+            on which the caller can get a result().
+            '''
         if self.loop is not None:
             res = asyncio.run_coroutine_threadsafe(
                 self.new_command_async(addr, cmd), self.loop)
@@ -83,7 +97,14 @@ class Vasp:
 
     async def new_command_async(self, addr, cmd):
         ''' Sends a command to the other VASP and returns a boolean
-            indicating success or failure of the command. '''
+            indicating success or failure of the command.
+
+            Parameters:
+                * addr : A LibraAddress of the VASP to which to send the
+                         command.
+                * cmd  : A command (PaymentCommand) instance.
+
+            '''
         return await self.net_handler.send_command(addr, cmd)
 
     async def close_async(self):
