@@ -151,7 +151,7 @@ def update(ctx):
     for i, host in enumerate(ctx.hosts):
         configs = {
             "addr": chr(65+i)*16,
-            "base_url": f'http://{host}',
+            "base_url": f'{host}',
             "port": port
         }
         files += [f'{host}.json']
@@ -179,11 +179,14 @@ def nginx(ctx):
 
     COMMANDS:   fab config
     '''
-    nginx_conf = 'reverse-proxy.conf'
+    nginx_conf = 'offchainapi-nginx.conf'
+    tls_material = ['server_cert.pem', 'server_key.pem']
 
     set_hosts(ctx)
     for host in ctx.hosts:
         c = Connection(host, user=ctx.user, connect_kwargs=ctx.connect_kwargs)
+        for file in tls_material:
+            c.put(file, '.')
         c.put(nginx_conf, '.')
         c.sudo(f'mv {nginx_conf} /etc/nginx/sites-available || true')
         command = f'ln -s /etc/nginx/sites-available/{nginx_conf}'
@@ -194,7 +197,7 @@ def nginx(ctx):
 
 
 @task
-def run(ctx, num_of_commands=100, id=0):
+def run(ctx, num_of_commands=100, port=80, id=0):
     ''' Runs experiments with the specified configs.
 
     COMMANDS:	fab run
@@ -209,7 +212,9 @@ def run(ctx, num_of_commands=100, id=0):
 
         # NOTE: Calling tmux in threaded groups does not work (bug in Fabric?).
         c = Connection(host, user=ctx.user, connect_kwargs=ctx.connect_kwargs)
-        c.run(f'tmux new -d -s "offchainapi" ./{run_script} {path} {runs} {logfile}')
+        command = 'tmux new -d -s "offchainapi"'
+        command += f' ./{run_script} {path} {runs} {port} {logfile}'
+        c.run(command)
         if host == ctx.hosts[-1]:
             print(f'The client is {host}.')
 
@@ -218,13 +223,14 @@ def run(ctx, num_of_commands=100, id=0):
 def kill(ctx):
     ''' Kill the process on all machines and (optionally) clear all state.
 
-    RESET:
-        False: Only kill the process.
-        True: Kill the process and delete all state and logs.
+    CONFIG:
+        0: Only kill the process.
+        1: Kill the process and delete logs.
+        2: Kill the process and delete all state and logs.
 
     COMMANDS:   fab kill
     '''
-    RESET = False
+    CONFIG = 1
 
     set_hosts(ctx)
     g = Group(*ctx.hosts, user=ctx.user, connect_kwargs=ctx.connect_kwargs)
@@ -233,8 +239,9 @@ def kill(ctx):
     g.run('tmux kill-server || true')
 
     # Reset state and delete logs.
-    if RESET:
+    if CONFIG > 0:
         g.run('rm off-chain-api/*.log* || true')
+    if CONFIG > 1:
         g.run('rm off-chain-api/*.json || true')
 
 
@@ -256,16 +263,42 @@ def tps(ctx):
 
     COMMANDS:	fab tps
     '''
-    configs = range(1000, 11000, 1000)
-    repeats = 5
+    configs = range(10000, 100000+1, 10000)
+    repeats = 9
+    offset = 5
+    port = 80
+
+    def compute_delay(num_of_commands):
+        return 30 * num_of_commands / 5000 if num_of_commands > 5000 else 30
 
     for repeat in range(repeats):
-        print(f'Progress: {repeat+1}/{repeats}')
-        for num_of_commands in configs:
+        for i, num_of_commands in enumerate(configs):
+            executed, total = (i+1) + repeat*len(configs), repeats*len(configs)
+            print(f'Progress: {executed}/{total}')
             kill(ctx)
             time.sleep(0.5)
-            run(ctx, num_of_commands=num_of_commands, id=repeat)
-            time.sleep(30)
+            run(ctx, num_of_commands=num_of_commands, id=repeat+offset, port=port)
+            time.sleep(compute_delay(num_of_commands))
 
-    time.sleep(1)
+    kill(ctx)
+    status(ctx)
+
+
+@task
+def latency(ctx):
+    ''' Runs latency measurement and print results to logs.
+
+    COMMANDS:	fab latency
+    '''
+    repeats = 100
+    port = 80
+
+    for repeat in range(repeats):
+        print(f'Progress: {repeat}/{torepeatstal}')
+        kill(ctx)
+        time.sleep(0.5)
+        run(ctx, num_of_commands=1, id=repeat, port=port)
+        time.sleep(5)
+
+    kill(ctx)
     status(ctx)

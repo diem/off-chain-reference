@@ -13,11 +13,16 @@ if [ "$2" != "" ]; then
 	NUM_OF_COMMANDS=$2
 fi
 
-LOG_FILE="$CONFIGS_PATH.logs.txt"
+PORT=80
 if [ "$3" != "" ]; then
-	LOG_FILE=$3
+	PORT=$3
+fi
+
+LOG_FILE="$CONFIGS_PATH.logs.txt"
+if [ "$4" != "" ]; then
+	LOG_FILE=$4
 fi
 
 cd off-chain-api
 python3.7 -O src/scripts/run_remote_perf.py \
-	$CONFIGS_PATH $NUM_OF_COMMANDS > $LOG_FILE 2>&1
+	$CONFIGS_PATH $NUM_OF_COMMANDS $PORT > $LOG_FILE 2>&1
