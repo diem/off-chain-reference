@@ -1,4 +1,4 @@
-from ..business import VASPInfo
+from ..business import VASPInfo, BusinessContext
 from ..protocol import OffChainVASP
 from ..libra_address import LibraAddress
 from ..payment_logic import PaymentCommand, PaymentProcessor
@@ -10,7 +10,7 @@ from ..core import Vasp
 
 import logging
 import json
-from unittest.mock import MagicMock
+from mock import AsyncMock
 from threading import Thread
 import time
 import asyncio
@@ -41,9 +41,10 @@ class SimpleVASPInfo(VASPInfo):
         raise NotImplementedError()
 
     def get_peer_base_url(self, other_addr):
+        protocol = 'https://' if self.port == 443 else 'http://'
         base_url = self.other_configs['base_url']
         port = self.port if self.port != None else self.other_configs['port']
-        return f'{base_url}:{port}'
+        return f'{protocol}{base_url}:{port}'
 
     def is_authorised_VASP(self, certificate, other_addr):
         return True
@@ -87,7 +88,7 @@ def run_server(my_configs_path, other_configs_path):
         my_addr,
         host='0.0.0.0',
         port=my_configs['port'],
-        business_context=MagicMock(),
+        business_context=AsyncMock(spec=BusinessContext),
         info_context=SimpleVASPInfo(my_configs, other_configs),
         database={}
     )
@@ -126,7 +127,7 @@ def run_client(my_configs_path, other_configs_path, num_of_commands=10, port=Non
         my_addr,
         host='0.0.0.0',
         port=my_configs['port'],
-        business_context=MagicMock(),
+        business_context=AsyncMock(spec=BusinessContext),
         info_context=SimpleVASPInfo(my_configs, other_configs, port),
         database={}
     )

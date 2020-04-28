@@ -25,3 +25,4 @@ python3.7 -m pip install pip
 # Install nginx.
 sudo apt -y install nginx
 sudo unlink /etc/nginx/sites-enabled/default
+sudo openssl dhparam -out /etc/nginx/dhparam.pem 4096
