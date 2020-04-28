@@ -57,9 +57,6 @@ class sample_vasp_info(VASPInfo):
         return self.each_peer_base_url[other_addr.as_str()]
 
     def is_authorised_VASP(self, certificate, other_addr):
-        # TODO: Check that the certificate provided with the request matches the
-        # certificate we have in store for the given address.
-
         return True
 
 

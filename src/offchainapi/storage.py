@@ -357,8 +357,6 @@ class StorableDict(Storable):
         return xlen
 
     def __delitem__(self, key):
-        # TODO: remove
-        # assert False
         db_key, db_key_LL = self.derive_keys(key)
         if db_key in self.db:
             xlen = self.length.get_value()
@@ -366,7 +364,6 @@ class StorableDict(Storable):
             del self.db[db_key]
 
             # Now fix the LL structure
-            # db_key_LL = str(self.base_key() / 'LL' / str(key))
             ll_entry = json.loads(self.db[db_key_LL])
             prev_key, next_key, _, _ = tuple(ll_entry)
 

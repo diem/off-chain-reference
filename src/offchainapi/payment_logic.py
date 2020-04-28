@@ -86,9 +86,7 @@ class PaymentProcessor(CommandProcessor):
 
                     if new_payment is not None and new_payment.has_changed():
                         new_cmd = PaymentCommand(new_payment)
-                        # TODO: here we need to separate storage of the
-                        # request, from the actual transmission and response
-                        # from the other side.
+
                         if self.net is not None:
                             other_addr = channel.get_other_address()
                             request = self.net.sequence_command(
@@ -233,10 +231,10 @@ class PaymentProcessor(CommandProcessor):
             a valid payemnt. If a validation error occurs, then an exception
             is thrown.
 
-            NOTE: the VASP may be the RECEIVER of the new payment, for example
+            `NOTE: the VASP may be the RECEIVER of the new payment, for example
             for person to person payment initiated by the sender. The VASP
             may also be the SENDER for the payment, such as in cases where a
-            merchant is charging an account, a refund, or a standing order.
+            merchant is charging an account, a refund, or a standing order.`
 
             The only real check is that that status for the VASP that has
             not created the payment must be none, to allow for checks and
@@ -258,7 +256,8 @@ class PaymentProcessor(CommandProcessor):
             raise PaymentLogicError(
                 'Receiver cannot be in %s.' % Status.needs_recipient_signature
             )
-        # TODO: CHeck status here according to status_logic
+
+        # TODO: Check status here according to status_logic
 
         self.check_signatures(new_payment)
 
@@ -313,9 +312,9 @@ class PaymentProcessor(CommandProcessor):
         new_payment = payment.new_version()
 
         try:
+
+            # We set our status as abort.
             if other_status == Status.abort:
-                # We set our status as abort
-                # TODO: ensure valid abort from the other side elsewhere
                 current_status = Status.abort
 
             if current_status == Status.none:

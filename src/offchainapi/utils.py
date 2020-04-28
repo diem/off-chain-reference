@@ -120,7 +120,6 @@ class StructureChecker:
             self = cls.__new__(cls)
             StructureChecker.__init__(self)
         else:
-            # TODO: Profile and see if this deep copy is necessary.
             self = base_instance
 
         parse = cls.parse_map()
@@ -150,8 +149,7 @@ class StructureChecker:
                         new_diff[field] = xtype(diff[field])
 
             else:
-                # We tolerate fielse we do not know about, but ignore them
-                # TODO: log unknown fields?
+                # We tolerate fields we do not know about, but ignore them.
                 pass
 
         self.update(new_diff)

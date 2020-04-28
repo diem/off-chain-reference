@@ -109,7 +109,7 @@ Wait-Req: {len_req} Wait-Resp: {len_resp}''')
 
     async def handle_request(self, request):
         ''' Main Http server handler for incomming OffChainAPI requests. '''
-        # TODO: Could there be errors when creating LibraAddress?
+
         other_addr = LibraAddress(request.match_info['other_addr'])
         self.logger.debug(f'Request Received from {other_addr.as_str()}')
 
@@ -123,7 +123,7 @@ Wait-Req: {len_req} Wait-Resp: {len_resp}''')
 
         # Verify that the other VASP is authorised to submit the request;
         # ie. that 'other_addr' matches the certificate.
-        client_certificate = None  # TODO: Get certificate from ...
+        client_certificate = None
         if not self.vasp.info_context.is_authorised_VASP(
             client_certificate, other_addr
         ):

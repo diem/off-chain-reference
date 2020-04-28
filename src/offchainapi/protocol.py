@@ -532,10 +532,6 @@ class VASPPairChannel:
             fut.set_result(result)
 
         except JSONParsingError as e:
-            # Log, but cannot reply: TODO
-            # Close the channel?
-            import traceback
-            traceback.print_exc()
             fut.set_exception(e)
 
         except OffChainOutOfOrder as e:
