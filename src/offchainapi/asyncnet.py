@@ -155,7 +155,15 @@ Wait-Req: {len_req} Wait-Resp: {len_resp}''')
 
     async def send_request(self, other_addr, json_request):
         ''' Uses an HTTP client to send an OffChainAPI request
-            to another VASP.'''
+            to another VASP.
+
+            Parameters:
+                * other_addr : The LibraAddress of the other VASP.
+                * json_request : a Dict that is a serialized request,
+                  ready to be sent across the network.
+
+            Can raise a NetworkException.
+            '''
         self.logger.debug(f'Connect to {other_addr.as_str()}')
 
         # Initialize the client.
@@ -163,17 +171,12 @@ Wait-Req: {len_req} Wait-Resp: {len_resp}''')
             self.session = aiohttp.ClientSession()
 
         # Try to get a channel with the other VASP.
-        try:
-            channel = self.vasp.get_channel(other_addr)
-        except BusinessNotAuthorized as e:
-            # Raised if the other VASP is not an authorised business.
-            self.logger.debug(f'Not Authorized {e}')
-            raise e
+        channel = self.vasp.get_channel(other_addr)
 
         base_url = self.vasp.info_context.get_peer_base_url(other_addr)
         url = self.get_url(base_url, other_addr.as_str(), other_is_server=True)
         self.logger.debug(f'Sending post request to {url}')
-        # TODO: Handle errors with session.post
+
         try:
             async with self.session.post(url, json=json_request) as response:
                 try:
@@ -199,26 +202,28 @@ Wait-Req: {len_req} Wait-Resp: {len_resp}''')
         except ClientError as e:
             raise NetworkException(e)
 
-    async def send_command(self, other_addr, command):
-        ''' Sends a new command to the VASP with LibraAddress `other_addr` '''
-        self.logger.debug(f'Sending command to {other_addr.as_str()}.')
-        try:
-            channel = self.vasp.get_channel(other_addr)
-        except BusinessNotAuthorized as e:
-            # Raised if the other VASP is not an authorised business.
-            self.logger.debug(f'Not Authorized {e}')
-            return False
+    def sequence_command(self, other_addr, command):
+        ''' Sequences a new command to the local queue, ready to be
+            sent to the other VASP.
 
+            Parameters:
+                * other_addr : the LibraAddress of the other VASP.
+                * command : A ProtocolCommand instance.
+
+            Returns:
+                * An instance of a CommandRequestObject
+                  representing the command.
+
+            Upon successful completing the sender should call
+            `send_request` to actually send the request to the other
+            side. However, even if that fails subsequent retrasmissions
+            will automatically re-send the request.
+         '''
+
+        channel = self.vasp.get_channel(other_addr)
         request = channel.sequence_command_local(command)
-        return await self.send_request(other_addr, request.content)
-
-    def sync_new_command(self, other_addr, command, loop):
-        ''' Returns a future that can be used to trigger a callback when
-        a result is available.
-        '''
-        return asyncio.run_coroutine_threadsafe(
-            self.send_command(other_addr, command), loop
-        )
+        request = request[3]
+        return request
 
     def get_runner(self):
         ''' Gets an object to that needs to be run in an

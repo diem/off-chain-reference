@@ -208,7 +208,7 @@ def test_vasp_simple(simple_request_json, vasp, other_addr, loop):
         assert len(vasp.pp.futs) == 1
         for fut in vasp.pp.futs:
             vasp.pp.loop.run_until_complete(fut)
-            # fut.result()
+            fut.result()
 
 
         #requests = vasp.collect_messages()

@@ -4,7 +4,7 @@
 from .protocol import OffChainVASP
 from .payment_logic import PaymentProcessor
 from .storage import StorableFactory
-from .asyncnet import Aionet
+from .asyncnet import Aionet, NetworkException
 
 import asyncio
 import logging
@@ -96,16 +96,30 @@ class Vasp:
             raise RuntimeError('Event loop is None.')
 
     async def new_command_async(self, addr, cmd):
-        ''' Sends a command to the other VASP and returns a boolean
-            indicating success or failure of the command.
+        ''' Sends a new command to the other VASP and returns a
+            boolean indicating success or failure of the command,
+            or a request in case of a network falure.
 
             Parameters:
                 * addr : A LibraAddress of the VASP to which to send the
                          command.
                 * cmd  : A command (PaymentCommand) instance.
 
+            Returns:
+                Bool : in case of no failure it returns a Bool indicating
+                whether the sequenced command was successful or not. OR
+                In case of a network failure returns an instance of a
+                CommandRequestObject represented as a json dict that can be
+                retransmitted.
+
+            Note that the automatic retransmission will eventually re-sent
+            the request until progress is made.
             '''
-        return await self.net_handler.send_command(addr, cmd)
+        req = self.net_handler.sequence_command(addr, cmd)
+        try:
+            return await self.net_handler.send_request(addr, req)
+        except NetworkException:
+            return req
 
     async def close_async(self):
         ''' Await this to cleanly close the network

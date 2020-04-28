@@ -122,7 +122,7 @@ async def main_perf():
     async def send100(nodeA, commands):
         res = await asyncio.gather(
             *[nodeA.new_command_async(VASPb.my_addr, cmd) for cmd in commands],
-            return_exceptions=True)
+            return_exceptions=False)
         return res
 
     # Execute 100 requests

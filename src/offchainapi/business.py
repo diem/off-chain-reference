@@ -84,10 +84,12 @@ class BusinessContext:
 
             Returns a set of status indicating to level of kyc to provide,
             that can include:
+
                 - needs_stable_id
                 - needs_kyc_data
                 - needs_recipient_signature
-            an empty set indicates no KYC should be provided at this moment.
+
+            An empty set indicates no KYC should be provided at this moment.
 
             Can raise:
                 BusinessForceAbort
@@ -102,6 +104,7 @@ class BusinessContext:
                 - needs_stable_id
                 - needs_kyc_data
                 - needs_recipient_signature
+
             or the current status if no new information is required.
 
             Can raise:
@@ -175,6 +178,7 @@ class BusinessContext:
 
             Must never raise
                 BusinessForceAbort
+
             since it is called when we are ready to settle.
 
         '''
@@ -190,6 +194,7 @@ class BusinessContext:
 
             Cannot raise:
                 BusinessForceAbort
+
             since this is called past the finality barrier.
         '''
         raise NotImplementedError()

@@ -9,5 +9,5 @@ sys.path += ['src/.']
 from offchainapi.tests import local_benchmark
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.ERROR)
     asyncio.run(local_benchmark.main_perf())

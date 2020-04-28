@@ -180,7 +180,7 @@ def nginx(ctx):
     COMMANDS:   fab config
     '''
     nginx_conf = 'offchainapi-nginx.conf'
-    tls_material = ['server_cert.pem', 'server_key.pem']
+    # tls_material = ['server_cert.pem', 'server_key.pem']
 
     set_hosts(ctx)
     for host in ctx.hosts:
@@ -283,7 +283,8 @@ def tps(ctx):
             print(f'Progress: {executed}/{total}')
             kill(ctx)
             time.sleep(0.5)
-            run(ctx, num_of_commands=num_of_commands, id=repeat+offset, port=port)
+            run(ctx, num_of_commands=num_of_commands,
+                id=repeat+offset, port=port)
             time.sleep(compute_delay(num_of_commands))
 
     kill(ctx)

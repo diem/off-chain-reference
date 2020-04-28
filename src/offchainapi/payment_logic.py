@@ -85,8 +85,10 @@ class PaymentProcessor(CommandProcessor):
                         # request, from the actual transmission and response
                         # from the other side.
                         if self.net is not None:
-                            await self.net.send_command(
-                                channel.get_other_address(), new_cmd)
+                            other_addr = channel.get_other_address()
+                            request = self.net.sequence_command(
+                                other_addr, new_cmd)
+                            await self.net.send_request(other_addr, request)
             else:
                 self.logger.error(f'Command #{seq} Failure: {error}')
 
@@ -125,27 +127,32 @@ class PaymentProcessor(CommandProcessor):
             new_payment.receiver.address
             ])
 
-        if len(parties) != 2:
-            raise PaymentLogicError(f'Wrong number of parties to payment: \
-                {str(parties)}')
+        needed_parties = set([
+            channel.get_my_address().as_str(),
+            channel.get_other_address().as_str()
+        ])
 
-        my_addr = channel.get_my_address().as_str()
-        if my_addr not in parties:
-            raise PaymentLogicError(f'Payment parties does not include \
-                own VASP ({my_addr}): {parties}')
+        if parties != needed_parties:
+            raise PaymentLogicError(f'Wrong Parties: expected {needed_parties} \
+                but got {str(parties)}')
 
         other_addr = channel.get_other_address().as_str()
-        if other_addr not in parties:
-            raise PaymentLogicError('Payment parties does not include other \
-                party (%s): %s' % (other_addr, str(parties)))
 
+        # Ensure the originator is one of the VASPs in the channel
         origin = command.get_origin().as_str()
         if origin not in parties:
             raise PaymentLogicError('Command originates from wrong party')
 
+        # Only check the commands we get from others.
         if origin == other_addr:
-            # Only check the commands we get from others.
             if command.dependencies == []:
+
+                # Check that the other VASP is the sender?
+                # Or allow for fund pull flows here?
+                #
+                # if new_payment.sender.address != other_addr:
+                #    raise PaymentLogicError('Initiator must be the sender of funds.')
+
                 self.check_new_payment(new_payment)
             else:
                 old_version = command.get_previous_version()
