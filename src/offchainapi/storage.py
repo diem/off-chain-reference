@@ -1,8 +1,6 @@
 # The main storage interface
 
-import dbm
 import json
-from pathlib import PosixPath
 from threading import RLock
 
 from .utils import JSONFlag, JSONSerializable, get_unique_string
@@ -19,7 +17,7 @@ class Storable:
         self.factory = None
 
     def pre_proc(self, val):
-        """ Pre-processing of objects before storage. By default 
+        """ Pre-processing of objects before storage. By default
             it calls get_json_data_dict for JSONSerializable objects or
             their base type. eg int('10'). The result must be a structure
             that can be passed to json.dumps.
@@ -28,7 +26,7 @@ class Storable:
             return val.get_json_data_dict(JSONFlag.STORE)
         else:
             return self.xtype(val)
-    
+
     def post_proc(self, val):
         """ Post-processing to convert a json parsed structure into a Python
             object. It uses parse on JSONSerializable objects, and otherwise
@@ -55,7 +53,7 @@ class StorableFactory:
         # Check and fix the database, if this is needed
         self.crash_recovery()
 
-    def make_value(self, name, xtype, root = None, default=None):
+    def make_value(self, name, xtype, root=None, default=None):
         ''' A new value-like storable'''
         v = StorableValue(self, name, xtype, root, default)
         v.factory = self
@@ -73,7 +71,7 @@ class StorableFactory:
         v.factory = self
         return v
 
-    # Define central interfaces as a dictionary structure 
+    # Define central interfaces as a dictionary structure
     # (with no keys or value enumeration)
 
     def __getitem__(self, key):
@@ -91,24 +89,24 @@ class StorableFactory:
         self.cache[key] = value
         if key in self.del_cache:
             self.del_cache.remove(key)
-    
+
     def __contains__(self, item):
         if item in self.del_cache:
             return False
         if item in self.cache:
             return True
         return item in self.db
-    
+
     def __delitem__(self, key):
         if self.current_transaction is None:
             raise RuntimeError('Writes must happen within a transaction context')
         if key in self.cache:
             del self.cache[key]
         self.del_cache.add(key)
-        
+
     def persist_cache(self):
         ''' Safely persist the cache once the transaction is over. '''
-        
+
         from itertools import chain
 
         # Create a backup of all affected values.
@@ -119,7 +117,7 @@ class StorableFactory:
                 old_entries[key] = self.db[key]
             else:
                 non_existent_entries += [ key ]
-        
+
         backup_data = json.dumps([old_entries, non_existent_entries])
         self.db['__backup_recovery'] = backup_data
         # TODO: call to flush to disk
@@ -130,7 +128,7 @@ class StorableFactory:
         for item in self.del_cache:
             if item in self.db:
                 del self.db[item]
-        
+
         # Upon completion of write, clean up
         del self.db['__backup_recovery']
         self.cache = {}
@@ -142,20 +140,20 @@ class StorableFactory:
 
         if '__backup_recovery' not in self.db:
             return
-        
+
         # Recover the old good state.
         backup_data = json.loads(self.db['__backup_recovery'])
         old_entries = backup_data[0]
         non_existent_entries = backup_data[1]
 
         # Note, this may be executed many times in case of crash during
-        # crash recovery. 
+        # crash recovery.
         for item in old_entries:
             self.db[item] = old_entries[item]
         for item in non_existent_entries:
             if item in self.db:
                 del self.db[item]
-        
+
         # TODO: Ensure the writes are complete?
         del self.db['__backup_recovery']
 
@@ -209,7 +207,7 @@ class StorableDict(Storable):
                 # [prev_LL_key, next_LL_key, db_key, key]
                 first_ll_entry = json.loads(self.db[first_value_key])
                 assert first_ll_entry[0] is None
-        
+
     def base_key(self):
         return self.root + [self.name]
 
@@ -220,7 +218,7 @@ class StorableDict(Storable):
     def _ll_cons(self, key):
         db_key, db_key_LL = self.derive_keys(key)
         assert db_key_LL not in self.db
-        
+
         if self.first_key.exists():
             # All new entries to the front
             first_value_key = self.first_key.get_value()
@@ -237,16 +235,16 @@ class StorableDict(Storable):
         else:
             # This is the first entry, setup the record and first key
             ll_entry = [None, None, str(db_key), key]
-        
+
         self.first_key.set_value(db_key_LL)
         self.db[db_key_LL] = json.dumps(ll_entry)
-    
+
         if __debug__:
             self._check_invariant()
 
 
     def __setitem__(self, key, value):
-        db_key, _ = self.derive_keys(key)  
+        db_key, _ = self.derive_keys(key)
         data = json.dumps(self.pre_proc(value))
 
         # Ensure nothing fails after that
@@ -261,7 +259,7 @@ class StorableDict(Storable):
 
         if __debug__:
             self._check_invariant()
-    
+
     def keys(self):
         if __debug__:
             self._check_invariant()
@@ -275,7 +273,7 @@ class StorableDict(Storable):
             yield ll_entry[3]
             if ll_value_key is None:
                 break
-    
+
     def values(self):
         for k in self.keys():
             yield self[k]
@@ -303,7 +301,7 @@ class StorableDict(Storable):
                 prev_entry = json.loads(self.db[prev_key])
                 prev_entry[1] = next_key
                 self.db[prev_key] = json.dumps(prev_entry)
-            
+
             next_entry = None
             if next_key is not None:
                 next_entry = json.loads(self.db[next_key])
@@ -312,9 +310,9 @@ class StorableDict(Storable):
                 if prev_key is None:
                     _, next_db_key_LL = self.derive_keys(next_key)
                     self.first_key.set_value(next_key)
-            
+
             del self.db[db_key_LL]
-            
+
     def derive_keys(self, item):
         key = key_join(self.base_key() + [str(item)])
         key_LL = key_join(self.base_key() + ['LL', str(item)])
@@ -326,7 +324,7 @@ class StorableDict(Storable):
 
 
 class StorableList(Storable):
-    
+
     def __init__(self, db, name, xtype, root=None):
         if root is None:
             self.root = ['']
@@ -343,7 +341,7 @@ class StorableList(Storable):
 
     def base_key(self):
         return self.root + [self.name]
-    
+
     def __getitem__(self, key):
         if type(key) is not int:
             raise KeyError('Key must be an int.')
@@ -367,7 +365,7 @@ class StorableList(Storable):
         xlen =  self.length.get_value()
         assert type(xlen) is int
         return xlen
-    
+
     def __iadd__(self, other):
         for item in other:
             assert isinstance(item, self.xtype)
@@ -383,7 +381,7 @@ class StorableList(Storable):
 
 class StorableValue(Storable):
     """ Implements a cached persistent value. The value is stored to storage
-        but a cached variant is stored for quick reads. 
+        but a cached variant is stored for quick reads.
     """
 
     def __init__(self, db, name, xtype, root=None, default=None):
@@ -406,8 +404,8 @@ class StorableValue(Storable):
             self.value = None
             if default is not None:
                 self.set_value(default)
-        
-        
+
+
     def set_value(self, value):
         json_data = json.dumps(self.pre_proc(value))
         key = self._base_key_str
@@ -422,7 +420,7 @@ class StorableValue(Storable):
         self.value = self.post_proc(val)
         self.has_value = True
         return self.value
-    
+
     def exists(self):
         return self.has_value or self._base_key_str in self.db
 

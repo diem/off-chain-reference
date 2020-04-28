@@ -513,13 +513,8 @@ class VASPPairChannel:
         try:
             resp_dict = json.loads(json_response) if encoded else json_response
             response = CommandResponseObject.from_json_data_dict(resp_dict, JSONFlag.NET)
-
-            # Check if this has to wait
-            next_response_seq = self.next_final_sequence()
             command_seq = response.command_seq
-            #if command_seq is None \
-            #    or not (next_response_seq < command_seq < next_response_seq + self.response_window) \
-            #    or nowait:
+
             with self.rlock:
                 result = self.handle_response(response)
             fut.set_result(result)
@@ -542,7 +537,7 @@ class VASPPairChannel:
         return fut
 
     def handle_response(self, response):
-        with self.storage.atomic_writes() as tx_no:
+        with self.storage.atomic_writes() as _:
             return self._handle_response(response)
 
     def _handle_response(self, response):
@@ -576,15 +571,20 @@ class VASPPairChannel:
 
             # Check the reponse is the same and log warning otherwise.
             if self.my_requests[request_seq].response != response:
-                excp =  OffChainException('Got duplicate but different responses.')
+                excp =  OffChainException(
+                    'Got duplicate but different responses.')
                 excp.reponse1 = self.my_requests[request_seq].response
                 excp.response2 = response
                 raise excp
             return self.my_requests[request_seq].is_success()
 
         # This is too high -- wait for more data.
-        if response.command_seq > self.next_final_sequence() or not (response.command_seq == self.executor.last_confirmed):
-            raise OffChainOutOfOrder(f'Expect command seq {self.next_final_sequence()} but got {response.command_seq}')
+        if response.command_seq > self.next_final_sequence() \
+                or not (response.command_seq == self.executor.last_confirmed):
+            next_cmd_seq = self.next_final_sequence()
+            actual_cmd_seq = response.command_seq
+            msg = f'Expect command seq {next_cmd_seq} but got {actual_cmd_seq}'
+            raise OffChainOutOfOrder(msg)
 
         # Read and write back response into request
         request = self.my_requests[request_seq]
@@ -627,7 +627,7 @@ class VASPPairChannel:
         request_to_send = None
 
         with self.rlock:
-            with self.storage.atomic_writes() as tx_no:
+            with self.storage.atomic_writes():
                 next_retransmit = self.next_retransmit.get_value()
                 while next_retransmit < len(self.my_requests):
                     request = self.my_requests[next_retransmit]

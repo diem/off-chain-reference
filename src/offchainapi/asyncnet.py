@@ -66,7 +66,8 @@ class Aionet:
                     len_resp = len(channel.waiting_response)
 
                     role = ['Client', 'Server'][channel.is_server()]
-                    waiting = channel.is_server() and channel.would_retransmit()
+                    waiting = channel.is_server() \
+                        and channel.would_retransmit()
                     me = channel.get_my_address().as_str()
                     other = channel.get_other_address().as_str()
 

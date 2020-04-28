@@ -73,6 +73,7 @@ def start_thread_main(vasp, loop):
 
     logging.debug('VASP loop exit')
 
+
 def make_new_VASP(Peer_addr, port):
     VASPx = Vasp(
         Peer_addr,
@@ -87,6 +88,7 @@ def make_new_VASP(Peer_addr, port):
     t.start()
     print(f'Start Node {port}')
     return (VASPx, loop, t)
+
 
 async def main_perf():
     VASPa, loopA, tA = make_new_VASP(PeerA_addr, port=8091)
@@ -115,22 +117,25 @@ async def main_perf():
         cmd = PaymentCommand(payment)
         commands += [cmd]
 
-    s = time.perf_counter()
-
     async def send100(nodeA, commands):
         res = await asyncio.gather(
-            *[nodeA.new_command_async(VASPb.my_addr, cmd) for cmd in commands], return_exceptions=True)
+            *[nodeA.new_command_async(VASPb.my_addr, cmd) for cmd in commands],
+            return_exceptions=True)
         return res
 
+    # Execute 100 requests
+    s = time.perf_counter()
     res = asyncio.run_coroutine_threadsafe(send100(VASPa, commands), loopA)
     res = res.result()
-
-    success_number = sum([1 for r in res if r])
     elapsed = (time.perf_counter() - s)
+
+    # Print some statistics
+    success_number = sum([1 for r in res if r])
     print(f'Commands executed in {elapsed:0.2f} seconds.')
     print(f'Success #: {success_number}/{len(commands)}')
 
     # In case you want to wait for other responses to settle
+    #
     # for t in range(10):
     #     print('waiting', t)
     #     await asyncio.sleep(1.0)
@@ -146,8 +151,6 @@ async def main_perf():
 
     print(f'Estimate throughput #: {len(commands)/elapsed} Tx/s')
 
+    # Close the loops
     VASPa.close()
     VASPb.close()
-
-    #import sys
-    #sys.exit()
