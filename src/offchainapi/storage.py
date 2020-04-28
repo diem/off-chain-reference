@@ -13,10 +13,12 @@ def key_join(strs):
 
 
 class Storable:
-    """ Base class for objects that can be stored """
+    """ Base class for objects that can be stored
+
+    Specify the type (or base type) of the objects to be stored
+    """
 
     def __init__(self, xtype):
-        """ Specify the type (or base type) of the objects to be stored """
         self.xtype = xtype
         self.factory = None
 
@@ -46,13 +48,14 @@ class StorableFactory:
     and creates specific classes for values, lists and dictionary like
     types that can be stored persistently. It also provides a context
     manager to provide atomic, all-or-nothing crash resistent
-    transactions.'''
+    transactions.
+
+    Initialize the ``StorableFactory`` with a persistent key-value
+    store ``db``. In case the db already contains data the initializer
+    runs the crash recovery procedure to cleanly re-open it.
+    '''
 
     def __init__(self, db):
-        """ Initialize the ``StorableFactory`` with a persistent key-value
-        store ``db``. In case the db already contains data the initializer
-        runs the crash recovery procedure to cleanly re-open it."""
-
         self.rlock = RLock()
         self.db = db
         self.current_transaction = None
@@ -330,6 +333,7 @@ class StorableDict(Storable):
             self._check_invariant()
 
     def keys(self):
+        ''' An iterator over the keys of the dictionary. '''
         if __debug__:
             self._check_invariant()
 
@@ -344,6 +348,7 @@ class StorableDict(Storable):
                 break
 
     def values(self):
+        ''' An iterator over the values of the dictionary. '''
         for k in self.keys():
             yield self[k]
 
@@ -403,7 +408,6 @@ class StorableList(Storable):
 
     Keys are always integers.
     '''
-
 
     def __init__(self, db, name, xtype, root=None):
         if root is None:

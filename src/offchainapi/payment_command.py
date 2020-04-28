@@ -5,19 +5,20 @@ from .utils import JSONSerializable
 
 # Functions to check incoming diffs
 class PaymentLogicError(Exception):
+    """ Indicated a payment processing error. """
     pass
 
 
 # Note: ProtocolCommand is JSONSerializable, so no need to extend again.
 @JSONSerializable.register
 class PaymentCommand(ProtocolCommand):
-    def __init__(self, payment):
-        ''' Creates a new Payment command based on the diff from the given payment.
+    ''' Creates a new ``PaymentCommand`` based on a given payment.
 
-            It depedends on the payment object that the payment diff extends
-            (in case it updates a previous payment). It creates the object
-            with the version number of the payment provided.
-        '''
+        The  command creates the object version of the payment given
+        and depends on any previous versions of the given payment.
+    '''
+
+    def __init__(self, payment):
         ProtocolCommand.__init__(self)
         self.dependencies = list(payment.previous_versions)
         self.creates_versions = [payment.get_version()]

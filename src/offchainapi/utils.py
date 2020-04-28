@@ -243,7 +243,7 @@ class JSONSerializable:
     @classmethod
     def json_type(cls):
         ''' Overwrite this method to have a nicer json type identifier.'''
-        return str(cls)
+        return str(cls.__name__)
 
     @classmethod
     def register(cls, other_cls):

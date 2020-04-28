@@ -156,7 +156,8 @@ class PaymentProcessor(CommandProcessor):
                 # Or allow for fund pull flows here?
                 #
                 # if new_payment.sender.address != other_addr:
-                #    raise PaymentLogicError('Initiator must be the sender of funds.')
+                #    raise PaymentLogicError('Initiator must be \
+                #        the sender of funds.')
 
                 self.check_new_payment(new_payment)
             else:
@@ -205,7 +206,8 @@ class PaymentProcessor(CommandProcessor):
         return fut
 
     def get_latest_payment_by_ref_id(self, ref_id):
-        ''' Returns the latest payment version with the reference ID provided.'''
+        ''' Returns the latest payment version with
+            the reference ID provided.'''
         if ref_id in self.reference_id_index:
             return self.reference_id_index[ref_id]
         else:

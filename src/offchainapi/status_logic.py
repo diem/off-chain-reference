@@ -5,24 +5,18 @@
 V0 States
 ---------
 
-        * None                      -- denotes the status of
-                                       an object that does not exist
-        * needs_stable_id           -- requests the other VASP for
-                                       a stable identifier for
-                                       the payment recipient.
-        * needs_kyc_data            -- requires the other VASP
-                                       to provide KYC data.
-        * ready_for_settlement      -- signals that the party is ready to
-                                       settle the transaction.
-        * needs_recipient_signature -- requests the recipient VASP to sign the
-                                       identifier for this transaction to put
-                                       it on chain.
-        * signed                    -- The recipient signed the transaction to
-                                       settle
-        * settled                   -- a Libra transaction settles this
-                                       transaction
-        * abort                     -- signals that the transactions is to be
-                                       aborted.
+    * None  -- denotes the status of an object that does not exist
+    * needs_stable_id -- requests the other VASP for a stable identifier
+      for the payment recipient.
+    * needs_kyc_data -- requires the other VASP to provide KYC data.
+    * ready_for_settlement -- signals that the party is ready to settle
+      the transaction.
+    * needs_recipient_signature -- requests the recipient VASP to sign the
+      identifier for this transaction to put it on chain.
+    * signed -- The recipient signed the transaction to settle
+    * settled -- a Libra transaction settles this transaction
+    * abort - signals that the transactions is to be aborted.
+
 """
 
 from collections import defaultdict

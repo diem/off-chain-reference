@@ -16,8 +16,10 @@ class NetworkException(Exception):
 
 
 class Aionet:
+    ''' A network client and server using aiohttp. Initialize
+        the network system with a OffChainVASP instance. '''
+
     def __init__(self, vasp):
-        ''' Initializes the network system with a OffChainVASP instance. '''
         self.logger = logging.getLogger(name='aionet')
 
         self.vasp = vasp
@@ -52,6 +54,8 @@ class Aionet:
             self.watchdog_task_obj.cancel()
 
     def schedule_watchdog(self, loop, period=10.0):
+        ''' Creates and schedues the watchdog periodic process.
+        It logs basic statistics for all channels and retransmits. '''
         self.watchdog_period = period
         self.watchdog_task_obj = loop.create_task(self.watchdog_task())
 
@@ -70,6 +74,7 @@ class Aionet:
                         and channel.would_retransmit()
                     me = channel.get_my_address().as_str()
                     other = channel.get_other_address().as_str()
+                    # TODO: Retransmit a few of the requests here.
 
                     len_my = len(channel.my_requests)
                     len_oth = len(channel.other_requests)
