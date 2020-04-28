@@ -168,6 +168,12 @@ class Aionet:
             except json.decoder.JSONDecodeError as e:
                 self.logger.debug(f'Type Error {e}')
                 raise e
+            except aiohttp.client_exceptions.ContentTypeError as e:
+                # Raied when the server replies with wrong content type.
+                self.logger.debug(f'ContentTypeError Error {e}')
+                import traceback
+                traceback.print_exc()
+                raise e
             except Exception as e:
                 self.logger.debug(f'Type Error {e}')
                 raise e
