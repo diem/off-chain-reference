@@ -117,6 +117,12 @@ class Aionet:
             import traceback
             traceback.print_exc()
             raise web.HTTPBadRequest
+        except aiohttp.client_exceptions.ContentTypeError as e:
+            # Raied when the server replies with wrong content type.
+            self.logger.debug(f'ContentTypeError Error {e}')
+            import traceback
+            traceback.print_exc()
+            raise web.HTTPBadRequest
 
         # Send back the response
         self.logger.debug(f'Process Waiting messages')
