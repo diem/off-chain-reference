@@ -66,12 +66,14 @@ def start_thread_main(vasp, loop):
     loop.create_task(update_dir(vasp))
 
     try:
+        # Start the loop
         loop.run_forever()
     finally:
+        # Do clean up
         loop.run_until_complete(loop.shutdown_asyncgens())
         loop.close()
 
-    logging.debug('VASP loop exit')
+    logging.debug('VASP loop exit...')
 
 
 def make_new_VASP(Peer_addr, port):

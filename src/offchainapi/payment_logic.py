@@ -1,15 +1,13 @@
 import asyncio
 import logging
 
-from .business import BusinessContext, \
-    BusinessNotAuthorized, BusinessValidationFailure, \
-    BusinessForceAbort
-from .executor import ProtocolCommand, CommandProcessor
-from .payment import Status, PaymentObject
+from .business import BusinessForceAbort
+from .executor import CommandProcessor
+from .payment import Status
 from .status_logic import status_heights_MUST
-from .utils import JSONSerializable, JSONFlag
 from .payment_command import PaymentCommand, PaymentLogicError
 from .asyncnet import NetworkException
+
 
 def check_status(role, old_status, new_status, other_status):
     ''' Check that the new status is valid.
@@ -37,6 +35,7 @@ def check_status(role, old_status, new_status, other_status):
             (role, Status.ready_for_settlement)
         )
 
+
 # The logic to process a payment from either side.
 class PaymentProcessor(CommandProcessor):
 
@@ -45,8 +44,8 @@ class PaymentProcessor(CommandProcessor):
 
         # Asyncio support
         self.loop = None
-        self.net  = None
-        self.logger = logging.getLogger(name='payproc')
+        self.net = None
+        self.logger = logging.getLogger(name='Processor')
 
         # The processor state -- only access through event loop to prevent
         # mutlithreading bugs.
@@ -96,10 +95,11 @@ class PaymentProcessor(CommandProcessor):
             raise e
 
         except NetworkException as e:
-             self.logger.debug(f'Network error: seq #{seq}: {str(e)}')
+            self.logger.debug(f'Network error: seq #{seq}: {str(e)}')
 
         except Exception as e:
-            self.logger.error(f'Payment processing error: seq #{seq}: {str(e)}')
+            self.logger.error(
+                f'Payment processing error: seq #{seq}: {str(e)}')
             self.logger.exception(e)
 
     # -------- Implements CommandProcessor interface ---------
@@ -109,29 +109,35 @@ class PaymentProcessor(CommandProcessor):
 
     def check_command(self, vasp, channel, executor, command):
         """ Called when receiving a new payment command to validate it. All checks here
-        are blocking subsequent comments, and therefore they must be quick to ensure
-        performance. As a result we only do local syntactic checks that require no lookup
-        into the VASP potentially remote stores or accounts. """
+        are blocking subsequent comments, and therefore they must be quick
+        to ensure performance. As a result we only do local syntactic checks
+        that require no lookup into the VASP potentially remote stores
+        or accounts. """
 
         dependencies = executor.object_store
 
         new_version = command.get_new_version()
         new_payment = command.get_object(new_version, dependencies)
 
-        ## Ensure that the two parties involved are in the VASP channel
-        parties = set([new_payment.sender.address,
-                            new_payment.receiver.address ])
+        # Ensure that the two parties involved are in the VASP channel
+        parties = set([
+            new_payment.sender.address,
+            new_payment.receiver.address
+            ])
 
         if len(parties) != 2:
-            raise PaymentLogicError('Wrong number of parties to payment: ' + str(parties))
+            raise PaymentLogicError(f'Wrong number of parties to payment: \
+                {str(parties)}')
 
         my_addr = channel.get_my_address().as_str()
         if my_addr not in parties:
-            raise PaymentLogicError('Payment parties does not include own VASP (%s): %s' % (my_addr, str(parties)))
+            raise PaymentLogicError(f'Payment parties does not include \
+                own VASP ({my_addr}): {parties}')
 
         other_addr = channel.get_other_address().as_str()
         if other_addr not in parties:
-            raise PaymentLogicError('Payment parties does not include other party (%s): %s' % (other_addr, str(parties)))
+            raise PaymentLogicError('Payment parties does not include other \
+                party (%s): %s' % (other_addr, str(parties)))
 
         origin = command.get_origin().as_str()
         if origin not in parties:
@@ -146,7 +152,9 @@ class PaymentProcessor(CommandProcessor):
                 old_payment = dependencies[old_version]
                 self.check_new_update(old_payment, new_payment)
 
-    def process_command(self, vasp, channel, executor, command, seq, status_success, error=None):
+    def process_command(
+            self, vasp, channel, executor, command,
+            seq, status_success, error=None):
         """ Processes a command to generate more subsequent commands. This schedules a
             talk that will be executed later. """
 
@@ -164,32 +172,32 @@ class PaymentProcessor(CommandProcessor):
     # ----------- END of CommandProcessor interface ---------
 
     def check_signatures(self, payment):
-        ''' Utility function that checks all signatures present for validity '''
+        ''' Utility function that checks all signatures present
+            for validity'''
         business = self.business
         role = ['sender', 'receiver'][business.is_recipient(payment)]
         other_role = ['sender', 'receiver'][role == 'sender']
 
-        if 'kyc_signature' in  payment.data[other_role].data:
+        if 'kyc_signature' in payment.data[other_role].data:
             business.validate_kyc_signature(payment)
 
         if role == 'sender' and 'recipient_signature' in payment.data:
             business.validate_recipient_signature(payment)
-
 
     def check_new_payment(self, new_payment):
         ''' Checks a diff for a new payment from the other VASP, and returns
             a valid payemnt. If a validation error occurs, then an exception
             is thrown.
 
-            NOTE: the VASP may be the RECEIVER of the new payment, for example for
-                person to person payment initiated by the sender. The VASP may
-                also be the SENDER for the payment, such as in cases where a
-                merchant is charging an account, a refund, or a standing order.
+            NOTE: the VASP may be the RECEIVER of the new payment, for example
+            for person to person payment initiated by the sender. The VASP
+            may also be the SENDER for the payment, such as in cases where a
+            merchant is charging an account, a refund, or a standing order.
 
-                The only real check is that that status for the VASP that has
-                not created the payment must be none, to allow for checks and
-                potential aborts. However, KYC information on both sides may
-                be included by the other party, and should be checked.
+            The only real check is that that status for the VASP that has
+            not created the payment must be none, to allow for checks and
+            potential aborts. However, KYC information on both sides may
+            be included by the other party, and should be checked.
             '''
         business = self.business
         # new_payment = PaymentObject.create_from_record(initial_diff)
@@ -198,9 +206,11 @@ class PaymentProcessor(CommandProcessor):
         other_role = ['sender', 'receiver'][role == 'sender']
         other_status = new_payment.data[other_role].status
         if new_payment.data[role].status != Status.none:
-            raise PaymentLogicError('Sender set receiver status or vice-versa.')
+            raise PaymentLogicError(
+                'Sender set receiver status or vice-versa.')
 
-        if other_role == 'receiver' and other_status == Status.needs_recipient_signature:
+        if other_role == 'receiver' \
+                and other_status == Status.needs_recipient_signature:
             raise PaymentLogicError(
                 'Receiver cannot be in %s.' % Status.needs_recipient_signature
             )
@@ -230,9 +240,9 @@ class PaymentProcessor(CommandProcessor):
 
         self.check_signatures(new_payment)
 
-
     def payment_process(self, payment):
-        ''' A syncronous version of payment processing -- largely used for pytests '''
+        ''' A syncronous version of payment processing -- largely
+            used for pytests '''
         loop = self.loop
         if self.loop is None:
             loop = asyncio.new_event_loop()
@@ -272,11 +282,15 @@ class PaymentProcessor(CommandProcessor):
                                   Status.needs_kyc_data,
                                   Status.needs_recipient_signature}:
 
-                # Request KYC -- this may be async in case of need for user input
-                current_status = await business.next_kyc_level_to_request(new_payment)
+                # Request KYC -- this may be async in case
+                # of need for user input
+                current_status = await business.next_kyc_level_to_request(
+                    new_payment)
 
-                # Provide KYC -- this may be async in case of need for user input
-                kyc_to_provide = await business.next_kyc_to_provide(new_payment)
+                # Provide KYC -- this may be async in case
+                # of need for user input
+                kyc_to_provide = await business.next_kyc_to_provide(
+                    new_payment)
 
                 if Status.needs_stable_id in kyc_to_provide:
                     stable_id = await business.get_stable_id(new_payment)
@@ -287,22 +301,27 @@ class PaymentProcessor(CommandProcessor):
                     new_payment.data[role].add_kyc_data(*extended_kyc)
 
                 if Status.needs_recipient_signature in kyc_to_provide:
-                    signature = await business.get_recipient_signature(new_payment)
+                    signature = await business.get_recipient_signature(
+                        new_payment)
                     new_payment.add_recipient_signature(signature)
 
             # Check if we have all the KYC we need
-            if current_status not in { Status.ready_for_settlement, Status.settled }:
+            if current_status not in {
+                    Status.ready_for_settlement,
+                    Status.settled}:
                 ready = await business.ready_for_settlement(new_payment)
                 if ready:
                     current_status = Status.ready_for_settlement
 
-            if current_status == Status.ready_for_settlement and await business.has_settled(new_payment):
+            if current_status == Status.ready_for_settlement \
+                    and await business.has_settled(new_payment):
                 current_status = Status.settled
 
         except BusinessForceAbort:
 
-            # We cannot abort once we said we are ready_for_settlement or beyond
-            # However we will catch a wrong change in the check when we change status.
+            # We cannot abort once we said we are ready_for_settlement
+            # or beyond. However we will catch a wrong change in the
+            # check when we change status.
             current_status = Status.abort
 
         check_status(role, status, current_status, other_status)
