@@ -230,7 +230,7 @@ def kill(ctx):
 
     COMMANDS:   fab kill
     '''
-    CONFIG = 0
+    CONFIG = 1
 
     set_hosts(ctx)
     g = Group(*ctx.hosts, user=ctx.user, connect_kwargs=ctx.connect_kwargs)

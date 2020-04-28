@@ -11,6 +11,7 @@ from ..core import Vasp
 import logging
 import json
 from mock import AsyncMock
+from unittest.mock import MagicMock
 from threading import Thread
 import time
 import asyncio
@@ -88,7 +89,7 @@ def run_server(my_configs_path, other_configs_path):
         my_addr,
         host='0.0.0.0',
         port=my_configs['port'],
-        business_context=AsyncMock(spec=BusinessContext),
+        business_context=MagicMock(spec=BusinessContext),
         info_context=SimpleVASPInfo(my_configs, other_configs),
         database={}
     )
@@ -127,7 +128,7 @@ def run_client(my_configs_path, other_configs_path, num_of_commands=10, port=Non
         my_addr,
         host='0.0.0.0',
         port=my_configs['port'],
-        business_context=AsyncMock(spec=BusinessContext),
+        business_context=MagicMock(spec=BusinessContext),
         info_context=SimpleVASPInfo(my_configs, other_configs, port),
         database={}
     )
