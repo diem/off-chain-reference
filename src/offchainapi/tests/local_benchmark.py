@@ -131,9 +131,9 @@ async def main_perf():
     print(f'Success #: {success_number}/{len(commands)}')
 
     # In case you want to wait for other responses to settle
-    #for t in range(10):
-    #    print('waiting', t)
-    #    await asyncio.sleep(1.0)
+    # for t in range(10):
+    #     print('waiting', t)
+    #     await asyncio.sleep(1.0)
 
     # Esure they were register as successes on both sides.
     Asucc = len([x for x in channelAB.executor.command_status_sequence if x])

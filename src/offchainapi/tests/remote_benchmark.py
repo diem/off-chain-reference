@@ -78,7 +78,7 @@ def run_server(my_configs_path, other_configs_path):
             'port': <int>,
         }
     '''
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.INFO)
 
     my_configs = load_configs(my_configs_path)
     other_configs = load_configs(other_configs_path)
@@ -100,7 +100,12 @@ def run_server(my_configs_path, other_configs_path):
     loop = asyncio.get_event_loop()
     vasp.start_services(loop)
     logging.info(f'VASP services are running on port {vasp.port}.')
-    loop.run_forever()
+
+    try:
+        loop.run_forever()
+    finally:
+        loop.run_until_complete(loop.shutdown_asyncgens())
+        loop.close()
 
 
 def run_client(my_configs_path, other_configs_path, num_of_commands=10, port=0):
@@ -121,7 +126,7 @@ def run_client(my_configs_path, other_configs_path, num_of_commands=10, port=0):
         }
     '''
     assert num_of_commands > 0
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.INFO)
 
     my_configs = load_configs(my_configs_path)
     other_configs = load_configs(other_configs_path)
@@ -143,10 +148,15 @@ def run_client(my_configs_path, other_configs_path, num_of_commands=10, port=0):
     def start_services(vasp, loop):
         vasp.start_services(loop)
         logging.debug('Start main loop')
-        loop.run_forever()
+        try:
+            loop.run_forever()
+        finally:
+            loop.run_until_complete(loop.shutdown_asyncgens())
+            loop.close()
 
     loop = asyncio.new_event_loop()
-    Thread(target=start_services, args=(vasp, loop), daemon=True).start()
+    t = Thread(target=start_services, args=(vasp, loop), daemon=True)
+    t.start()
     logging.info(f'VASP services are running on port {vasp.port}.')
 
     # Make a payment commands.
@@ -174,7 +184,7 @@ def run_client(my_configs_path, other_configs_path, num_of_commands=10, port=0):
     async def send_commands(vasp, commands):
         return await asyncio.gather(
             *[vasp.new_command_async(other_addr, c) for c in commands],
-            return_exceptions=False
+            return_exceptions=True
         )
 
     res = asyncio.run_coroutine_threadsafe(send_commands(vasp, commands), loop)

@@ -272,6 +272,7 @@ class VASPPairChannel:
                     self.executor.sequence_next_command(
                         off_chain_command,
                         do_not_sequence_errors=True)
+                    self.logger.info('Server Sequence Command #{request.command_seq}')
 
                 self.my_requests += [request]
 
@@ -293,9 +294,14 @@ class VASPPairChannel:
         ''' Executes any requets that are now capable of executing, and were
             not before due to being received out of order. '''
 
-        self.logger.debug(f'Activate Waiting on Seq {self.other_next_seq()} Cmd Seq {self.next_final_sequence()}')
-        while self.next_final_sequence() in self.waiting_response:
+        self.logger.debug(f'''Activate:
+            Remote Seq {self.other_next_seq()}
+            Command Seq #{self.next_final_sequence()}
+            Last Confirmed: {self.executor.last_confirmed}''')
+
+        while self.executor.last_confirmed in self.waiting_response:
             next_cmd_seq = self.executor.last_confirmed
+            self.logger.debug(f'Activate: Response for #{next_cmd_seq}')
 
             # Take a copy of the pending responses
             list_of_responses =  self.waiting_response[next_cmd_seq]
@@ -303,14 +309,15 @@ class VASPPairChannel:
 
             for resp_record in list_of_responses:
                 (json_command, encoded, fut) = resp_record
-                self.parse_handle_response_to_future(json_command, encoded, fut)
+                _ = self.parse_handle_response_to_future(json_command, encoded, fut)
 
             # Break if we made no progress
-            if next_cmd_seq == self.next_final_sequence():
+            if next_cmd_seq == self.executor.last_confirmed:
                 break
 
         while self.other_next_seq() in self.waiting_requests:
             next_seq = self.other_next_seq()
+            self.logger.debug(f'Activate: Request for #{next_seq}')
 
             # Take a copy of the pending requests
             list_of_requests = self.waiting_requests[next_seq]
@@ -321,7 +328,7 @@ class VASPPairChannel:
 
                 # Call, and this will update the future and unblocks
                 # any processes waiting on it.
-                self.parse_handle_request_to_future(json_command, encoded, fut)
+                _ = self.parse_handle_request_to_future(json_command, encoded, fut)
 
             # Break if no progress is made
             if next_seq == self.other_next_seq():
@@ -355,27 +362,25 @@ class VASPPairChannel:
             # Parse the request whoever necessary
             req_dict = json.loads(json_command) if encoded else json_command
             request = CommandRequestObject.from_json_data_dict(req_dict, JSONFlag.NET)
+            with self.rlock:
+                # Going ahead to process the request
+                self.logger.debug(f'Processing Req Seq #{request.seq}')
+                response = self.handle_request(request, raise_on_wait=True)
 
-            # Here test if it is the next one in order
-            # (1) It is not in the next window
-            # (2) The server is not waiting for replies
-            if not (self.other_next_seq() < request.seq  < request.seq + self.request_window) and \
-                    not (self.is_server() and self.num_pending_responses() > 0) or \
-                    nowait:
-                with self.rlock:
-                    # Going ahead to process the request
-                    self.logger.debug(f'Processing Req Seq #{request.seq}')
-                    response = self.handle_request(request, raise_on_wait=True)
-            else:
-                # We wait for this requets's turn
-                self.logger.debug(f'Waiting Req Seq #{request.seq}')
-                self.waiting_requests[request.seq] += [(json_command, encoded, fut, time.time())]
+        except OffChainOutOfOrder as e:
+            if nowait:
+
+                # No waiting -- so bubble up the error response.
+                response = e.args[0]
+                fut.set_result(response)
                 return fut
-        except OffChainOutOfOrder:
-            # We were told to wait for this requests turn
-            self.logger.debug(f'Except. Waiting Req Seq #{request.seq} Len: {len(self.waiting_requests)}')
-            self.waiting_requests[request.seq] += [(json_command, encoded, fut, time.time())]
+
+            else:
+                # We were told to wait for this requests turn
+                self.logger.debug(f'Except. Waiting Req Seq #{request.seq} Len: {len(self.waiting_requests)}')
+                self.waiting_requests[request.seq] += [(json_command, encoded, fut, time.time())]
             return fut
+
         except JSONParsingError:
             response = make_parsing_error()
             full_response = self.send_response(response, encoded=False)
@@ -424,45 +429,56 @@ class VASPPairChannel:
 
         # As a server we first wait for the status of all server
         # requests to sequence any new client requests.
-        if self.is_server() and self.num_pending_responses() > 0:
+        # We also wait to acknowledge previous requests before
+        # acknowledging the next ones
+        if self.is_server() and self.has_pending_responses() \
+                or request.seq > self.other_next_seq():
             response = make_protocol_error(request, code='wait')
             if raise_on_wait:
                 raise OffChainOutOfOrder(response)
             return response
 
         # Sequence newer requests
-        if request.seq == self.other_next_seq():
-            if self.is_client() and request.command_seq > self.next_final_sequence():
-                # We must wait, since we cannot give an answer
-                # before sequencing previous commands.
-                response = make_protocol_error(request, code='wait')
-                if raise_on_wait:
-                    raise OffChainOutOfOrder(response)
-                return response
+        assert request.seq == self.other_next_seq()
+        assert (self.is_server() and request.command_seq == None) \
+            or (self.is_client() and request.command_seq != None)
 
-            seq = self.next_final_sequence()
-            try:
-                self.executor.sequence_next_command(request.command,
-                                    do_not_sequence_errors = False)
-                response = make_success_response(request)
-            except ExecutorException as e:
-                response = make_command_error(request, str(e))
-
-            # Write back to storage
-            request.response = response
-            request.response.command_seq = seq
-            self.other_requests += [request]
-            self.apply_response_to_executor(request)
-            return request.response
-
-        elif request.seq > self.other_next_seq():
-            # We have received the other side's request without receiving the
-            # previous one
-            response = make_protocol_error(request, code='missing')
+        if self.is_client() and request.command_seq != self.next_final_sequence():
+            # We must wait, since we cannot give an answer
+            # before sequencing previous commands.
+            response = make_protocol_error(request, code='wait')
+            if raise_on_wait:
+                raise OffChainOutOfOrder(response)
             return response
-        else:
-            # OK: Previous cases are exhaustive
-            assert False
+
+        # What is the sequence of this request.
+        # Either given by the server to the client, or made by the server.
+        # Due to the guard conditions above this will always
+        # be self.next_final_sequence()
+        seq = self.next_final_sequence()
+
+        try:
+            self.executor.sequence_next_command(request.command,
+                                do_not_sequence_errors = False)
+            response = make_success_response(request)
+        except ExecutorException as e:
+            response = make_command_error(request, str(e))
+
+        # Write back to storage
+        request.response = response
+        request.response.command_seq = seq
+        self.other_requests += [request]
+        self.apply_response_to_executor(request)
+        return request.response
+
+        #elif request.seq > self.other_next_seq():
+        #    # We have received the other side's request without receiving the
+        #    # previous one
+        #    response = make_protocol_error(request, code='missing')
+        #    return response
+        #else:
+        #    # OK: Previous cases are exhaustive
+        #    assert False
 
     def parse_handle_response(self, json_response, encoded=False):
         ''' Calls `parse_handle_response_to_future` but respoves the future and returns the result. '''
@@ -502,15 +518,12 @@ class VASPPairChannel:
             # Check if this has to wait
             next_response_seq = self.next_final_sequence()
             command_seq = response.command_seq
-            if command_seq is None \
-                or not (next_response_seq < command_seq < next_response_seq + self.response_window) \
-                or nowait:
-                with self.rlock:
-                    result = self.handle_response(response)
-                fut.set_result(result)
-
-            else:
-                self.waiting_response[command_seq] += [(json_response, encoded, fut)]
+            #if command_seq is None \
+            #    or not (next_response_seq < command_seq < next_response_seq + self.response_window) \
+            #    or nowait:
+            with self.rlock:
+                result = self.handle_response(response)
+            fut.set_result(result)
 
         except JSONParsingError as e:
             # Log, but cannot reply: TODO
@@ -519,8 +532,13 @@ class VASPPairChannel:
             traceback.print_exc()
             fut.set_exception(e)
 
-        except OffChainOutOfOrder:
-            self.waiting_response[command_seq] += [(json_response, encoded, fut)]
+        except OffChainOutOfOrder as e:
+            # If we were told to not wait, raise this.
+            if nowait:
+                fut.set_exception(e)
+            else:
+                # Otherwise wait for longer.
+                self.waiting_response[command_seq] += [(json_response, encoded, fut)]
 
         return fut
 
