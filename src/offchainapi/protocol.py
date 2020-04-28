@@ -554,11 +554,6 @@ class VASPPairChannel:
         if not request_seq < len(self.my_requests):
             raise OffChainException(f'''Response for seq {request_seq} received, but has requests only up to seq < {len(self.my_requests)}''')
 
-        # Optimization -- no need to retransmit since we got a response.
-        next_expected = self.next_retransmit.get_value()
-        if next_expected == request_seq:
-            self.next_retransmit.set_value(next_expected + 1)
-
         # Idenpotent: We have already processed the response
         if self.my_requests[request_seq].has_response():
 
@@ -578,6 +573,9 @@ class VASPPairChannel:
         request = self.my_requests[request_seq]
         request.response = response
         self.my_requests[request_seq] = request
+
+        # Optimization -- update the retransmit index.
+        self.would_retransmit()
 
         # Add the next command to the common sequence.
         if response.command_seq == self.next_final_sequence():
@@ -628,7 +626,7 @@ class VASPPairChannel:
         # Send request outside the lock to allow for asynchronous
         # sending methods.
         if not do_retransmit:
-            return request is not None
+            return request_to_send is not None
         else:
             return self.send_request(request) if request_to_send is not None \
                 else None

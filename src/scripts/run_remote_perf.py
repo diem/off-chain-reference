@@ -1,7 +1,7 @@
 '''
-RUN SERVER: python src/scripts/run_remote_perf.py 127.0.0.1.json
+RUN SERVER: python3 -O src/scripts/run_remote_perf.py test_config_A.json
 
-RUN CLIENT: python src/scripts/run_remote_perf.py 13.53.148.138.json 10
+RUN CLIENT: python3 -O src/scripts/run_remote_perf.py test_config_B.json 10
 '''
 import asyncio
 from glob import glob
@@ -13,7 +13,7 @@ from offchainapi.tests import remote_benchmark
 assert len(sys.argv) > 1
 my_configs_path = sys.argv[1]
 num_of_commands = int(sys.argv[2]) if len(sys.argv) > 2 else 0
-port = int(sys.argv[3]) if len(sys.argv) > 3 else None
+port = int(sys.argv[3]) if len(sys.argv) > 3 else 0
 
 files = glob('*.json')
 assert len(files) == 2

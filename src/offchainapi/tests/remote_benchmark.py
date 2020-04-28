@@ -24,7 +24,7 @@ import aiohttp
 class SimpleVASPInfo(VASPInfo):
     ''' Simple implementation of VASPInfo. '''
 
-    def __init__(self, my_configs, other_configs, port=None):
+    def __init__(self, my_configs, other_configs, port=0):
         self.my_configs = my_configs
         self.other_configs = other_configs
         self.port = port
@@ -44,7 +44,7 @@ class SimpleVASPInfo(VASPInfo):
     def get_peer_base_url(self, other_addr):
         protocol = 'https://' if self.port == 443 else 'http://'
         base_url = self.other_configs['base_url']
-        port = self.port if self.port != None else self.other_configs['port']
+        port = self.port if self.port != 0 else self.other_configs['port']
         return f'{protocol}{base_url}:{port}'
 
     def is_authorised_VASP(self, certificate, other_addr):
@@ -99,13 +99,18 @@ def run_server(my_configs_path, other_configs_path):
     logging.info(f'Running VASP {my_addr.as_str()}.')
     loop = asyncio.get_event_loop()
     vasp.start_services(loop)
+    logging.info(f'VASP services are running on port {vasp.port}.')
     loop.run_forever()
 
 
-def run_client(my_configs_path, other_configs_path, num_of_commands=10, port=None):
+def run_client(my_configs_path, other_configs_path, num_of_commands=10, port=0):
     ''' Run the VASP's client to send commands to the other VASP.
 
-    The VASP sends <num_of_commands> commands to the other VASP.
+    The VASP sends <num_of_commands> commands to the other VASP, on port <port>.
+    If <port> is 0, the VASP defaults to the port specified in <other_configs>.
+    Being able to easily modify the port allows to quickly test performance
+    in different situations, such as HTTP, HTTPS, or custom port.
+
     The arguments <my_configs_path> and <other_configs_path> are paths to
     files describing the configurations of the current VASP and of the other
     VASP, respectively. Configs are dict taking the following form:
@@ -116,7 +121,7 @@ def run_client(my_configs_path, other_configs_path, num_of_commands=10, port=Non
         }
     '''
     assert num_of_commands > 0
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.DEBUG)
 
     my_configs = load_configs(my_configs_path)
     other_configs = load_configs(other_configs_path)
@@ -160,6 +165,9 @@ def run_client(my_configs_path, other_configs_path, num_of_commands=10, port=Non
     logging.info(
         ('Start measurements: '
          f'sending {num_of_commands} commands to {other_addr.as_str()}.')
+    )
+    logging.info(
+        f'The target URL is {vasp.info_context.get_peer_base_url(other_addr)}'
     )
     start_time = time.perf_counter()
 
