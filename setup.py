@@ -26,7 +26,9 @@ setuptools.setup(
         'pytest-aiohttp',
         'pytest-httpserver',
         'coverage',
-        'sphinx'
+        'sphinx',
+        'boto3',
+        'fabric'
     ],
     version="0.0.1.dev1",
 )

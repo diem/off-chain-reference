@@ -10,8 +10,10 @@ import logging
 from urllib.parse import urljoin
 import json
 
+
 class NetworkException(Exception):
     pass
+
 
 class Aionet:
     def __init__(self, vasp):
@@ -49,7 +51,7 @@ class Aionet:
         if self.watchdog_task_obj is not None:
             self.watchdog_task_obj.cancel()
 
-    def schedule_watchdog(self, loop, period = 10.0):
+    def schedule_watchdog(self, loop, period=10.0):
         self.watchdog_period = period
         self.watchdog_task_obj = loop.create_task(self.watchdog_task())
 
@@ -68,10 +70,13 @@ class Aionet:
                     me = channel.get_my_address().as_str()
                     other = channel.get_other_address().as_str()
 
+                    len_my = len(channel.my_requests)
+                    len_oth = len(channel.other_requests)
+
                     self.logger.info(
                         f'''
 Channel: {me} [{role}] <-> {other}
-Queues: my: {len(channel.my_requests)} (Wait: {waiting}) other: {len(channel.other_requests)}
+Queues: my: {len_my} (Wait: {waiting}) other: {len_oth}
 Retransmit: {channel.would_retransmit()}
 Wait-Req: {len_req} Wait-Resp: {len_resp}''')
                 await asyncio.sleep(self.watchdog_period)
