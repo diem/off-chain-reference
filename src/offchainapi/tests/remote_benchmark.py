@@ -166,7 +166,7 @@ def run_client(my_configs_path, other_configs_path, num_of_commands=10, port=Non
     async def send_commands(vasp, commands):
         return await asyncio.gather(
             *[vasp.new_command_async(other_addr, c) for c in commands],
-            return_exceptions=True
+            return_exceptions=False
         )
 
     res = asyncio.run_coroutine_threadsafe(send_commands(vasp, commands), loop)
