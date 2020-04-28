@@ -14,15 +14,16 @@ on-chain. It supports:
 Installation & Testing
 ----------------------
 
-To install :py:mod:`offchainapi` follow these steps:
-
-* Execute ``git clone`` to clone the repository (https://github.com/calibra/off-chain-api).
-* Execure ``tox`` within the root directory run all tests.
-* Execute ``python setup.py install`` from the root directory to install to an environment.
-
 For development we recommend working in a virtual environment populated
 using ``pip install -r requirements.txt``. You can run tests using the ``pytest``
 command from the root directory, and execute sample scripts in ``src\scripts``.
+
+To install :py:mod:`offchainapi` follow these steps:
+
+* Execute ``git clone`` to clone the repository (https://github.com/calibra/off-chain-api).
+* Execure ``tox`` within the root directory run all tests. This will also run coverage tests and create a ``htmlcov`` directory with line by line coverage results in HTML.
+* Execute ``python setup.py install`` from the root directory to install to an environment.
+* Execute ``make html`` within the ``docs`` directory to build the Sphinx API docs.
 
 Where to start
 --------------
