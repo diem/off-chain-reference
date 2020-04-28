@@ -89,7 +89,7 @@ def run_server(my_configs_path, other_configs_path):
         my_addr,
         host='0.0.0.0',
         port=my_configs['port'],
-        business_context=MagicMock(spec=BusinessContext),
+        business_context=AsyncMock(spec=BusinessContext),
         info_context=SimpleVASPInfo(my_configs, other_configs),
         database={}
     )
@@ -128,7 +128,7 @@ def run_client(my_configs_path, other_configs_path, num_of_commands=10, port=Non
         my_addr,
         host='0.0.0.0',
         port=my_configs['port'],
-        business_context=MagicMock(spec=BusinessContext),
+        business_context=AsyncMock(spec=BusinessContext),
         info_context=SimpleVASPInfo(my_configs, other_configs, port),
         database={}
     )
