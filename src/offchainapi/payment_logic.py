@@ -1,12 +1,12 @@
-import asyncio
-import logging
-
 from .business import BusinessForceAbort
 from .executor import CommandProcessor
 from .payment import Status, PaymentObject
 from .status_logic import status_heights_MUST
 from .payment_command import PaymentCommand, PaymentLogicError
 from .asyncnet import NetworkException
+
+import asyncio
+import logging
 
 
 def check_status(role, old_status, new_status, other_status):
@@ -15,15 +15,15 @@ def check_status(role, old_status, new_status, other_status):
     '''
     if role == 'receiver' and new_status == Status.needs_recipient_signature:
         raise PaymentLogicError(
-            'Receiver cannot be in %s.' % Status.needs_recipient_signature
+            f'Receiver cannot be in {Status.needs_recipient_signature}.'
         )
 
     if status_heights_MUST[new_status] < status_heights_MUST[old_status]:
         raise PaymentLogicError(
-            'Invalid transition: %s: %s -> %s' % (role, old_status, new_status)
+            f'Invalid transition: {role}: {old_status} -> {new_status}'
         )
 
-    # Prevent unilateral aborts after the finality barrier:
+    # Prevent unilateral aborts after the finality barrier.
     finality_barrier = status_heights_MUST[Status.ready_for_settlement]
     cond = status_heights_MUST[old_status] >= finality_barrier
     cond &= new_status == Status.abort
@@ -31,13 +31,13 @@ def check_status(role, old_status, new_status, other_status):
     cond &= old_status != Status.abort
     if cond:
         raise PaymentLogicError(
-            '%s cannot unilaterally abort after reaching %s.' %
-            (role, Status.ready_for_settlement)
+            (f'{role} cannot unilaterally abort after'
+             f'reaching {Status.ready_for_settlement}.')
         )
 
 
-# The logic to process a payment from either side.
 class PaymentProcessor(CommandProcessor):
+    ''' The logic to process a payment from either side. '''
 
     def __init__(self, business, storage_factory, loop=None):
         self.business = business
@@ -90,7 +90,8 @@ class PaymentProcessor(CommandProcessor):
                         if self.net is not None:
                             other_addr = channel.get_other_address()
                             request = self.net.sequence_command(
-                                other_addr, new_cmd)
+                                other_addr, new_cmd
+                            )
                             await self.net.send_request(other_addr, request)
             else:
                 self.logger.error(f'Command #{seq} Failure: {error}')
@@ -113,11 +114,13 @@ class PaymentProcessor(CommandProcessor):
         return self.business
 
     def check_command(self, vasp, channel, executor, command):
-        """ Called when receiving a new payment command to validate it. All checks here
-        are blocking subsequent comments, and therefore they must be quick
-        to ensure performance. As a result we only do local syntactic checks
-        that require no lookup into the VASP potentially remote stores
-        or accounts. """
+        ''' Called when receiving a new payment command to validate it.
+
+        All checks here are blocking subsequent comments, and therefore they
+        must be quick to ensure performance. As a result we only do local
+        syntactic checks hat require no lookup into the VASP potentially
+        remote stores or accounts.
+        '''
 
         dependencies = executor.object_store
 
@@ -128,7 +131,7 @@ class PaymentProcessor(CommandProcessor):
         parties = set([
             new_payment.sender.address,
             new_payment.receiver.address
-            ])
+        ])
 
         needed_parties = set([
             channel.get_my_address().as_str(),
@@ -214,8 +217,7 @@ class PaymentProcessor(CommandProcessor):
     # ----------- END of CommandProcessor interface ---------
 
     def check_signatures(self, payment):
-        ''' Utility function that checks all signatures present
-            for validity'''
+        ''' Utility function that checks all signatures present for validity'''
         business = self.business
         role = ['sender', 'receiver'][business.is_recipient(payment)]
         other_role = ['sender', 'receiver'][role == 'sender']
@@ -231,7 +233,7 @@ class PaymentProcessor(CommandProcessor):
             a valid payemnt. If a validation error occurs, then an exception
             is thrown.
 
-            `NOTE: the VASP may be the RECEIVER of the new payment, for example
+            NOTE: the VASP may be the RECEIVER of the new payment, for example
             for person to person payment initiated by the sender. The VASP
             may also be the SENDER for the payment, such as in cases where a
             merchant is charging an account, a refund, or a standing order.`
@@ -274,11 +276,11 @@ class PaymentProcessor(CommandProcessor):
         old_other_status = payment.data[other_role].status
         other_status = new_payment.data[other_role].status
 
-        # Ensure nothing on our side was changed by this update
+        # Ensure nothing on our side was changed by this update.
         if payment.data[role] != new_payment.data[role]:
             raise PaymentLogicError(f'Cannot change {role} information.')
 
-        # Ensure valid transitions
+        # Ensure valid transitions.
         check_status(other_role, old_other_status, other_status, status)
 
         self.check_signatures(new_payment)
