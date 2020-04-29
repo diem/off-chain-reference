@@ -216,7 +216,7 @@ def test_payment_process_receiver_new_payment(payment, processor):
     bcm.next_kyc_level_to_request.side_effect = [Status.none]
     bcm.next_kyc_to_provide.side_effect = [{Status.none}]
     bcm.ready_for_settlement.side_effect = [ True ]
-    bcm.want_single_payment_settlement.side_effect = [True]
+
     bcm.has_settled.side_effect = [False]
     new_payment2 = processor.payment_process(new_payment)
     assert new_payment2.receiver.status == Status.ready_for_settlement
@@ -226,7 +226,7 @@ def test_payment_process_receiver_new_payment(payment, processor):
     bcm.next_kyc_level_to_request.side_effect = [Status.none]
     bcm.next_kyc_to_provide.side_effect = [{Status.none}]
     bcm.ready_for_settlement.side_effect = [ True ]
-    bcm.want_single_payment_settlement.side_effect = [True]
+
     bcm.has_settled.side_effect = [True]
     new_payment3 = processor.payment_process(new_payment2)
     assert new_payment3.receiver.status == Status.settled

@@ -26,7 +26,13 @@ class KYCData(StructureChecker):
     def custom_update_checks(self, diff):
         # Tests JSON parsing before accepting blob
         if 'blob' in diff:
-            data = json.loads(diff['blob'])
+            try:
+                data = json.loads(diff['blob'])
+            except Exception as e:
+                raise StructureException(
+                    f'JSON Parsing Exception :'
+                    f'ensure KYCData is a valid JSON object ({e})')
+
             if 'payment_reference_id' not in data:
                 raise StructureException('Missing: field payment_reference_id')
             if 'type' not in data:
@@ -61,8 +67,12 @@ class PaymentActor(StructureChecker):
                     "kyc_data",
                     "kyc_signature",
                     "kyc_certificate"]) - set(diff.keys())
-        if len(missing) != 0 and len(missing) != 3:
-            raise StructureException('Missing: field %s' % (str(missing),))
+        try:
+            if len(missing) != 0 and len(missing) != 3:
+                raise StructureException('Missing: field %s' % (str(missing),))
+        except Exception as e:
+            print(diff)
+            raise
 
         if 'status' in diff and not isinstance(diff['status'], Status):
             raise StructureException('Wrong status: %s' % diff['status'])

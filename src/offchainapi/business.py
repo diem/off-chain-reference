@@ -34,12 +34,6 @@ class BusinessContext:
         '''
         raise NotImplementedError()
 
-    def get_vasp_info_by_libra_address(self, libra_address):
-        ''' Returns a VASPInfo instance for the other VASP. This requires
-            reading the latest authoritative information from the chain.
-        '''
-        raise NotImplementedError()
-
     # ----- Actors -----
 
     def is_sender(self, payment):
@@ -157,7 +151,6 @@ class BusinessContext:
             If all the above are true, then return True.
             If any of the above are untrue throw an BusinessForceAbort.
             If any more KYC is necessary then return False.
-            If there is a need for more time throw BusinessAsyncInterupt.
 
             This acts as the finality barrier and last check for this VASP.
             After this call returns True this VASP can no more abort the
@@ -168,20 +161,6 @@ class BusinessContext:
             Can raise:
                 BusinessForceAbort
             '''
-        raise NotImplementedError()
-
-    async def want_single_payment_settlement(self, payment):
-        ''' Ask the business logic whether to move this payment
-            for settlement on chain (rather than in any other way, eg. batch,
-            etc). Returns True to proceed to settle the single payment on
-            chain, or False to not do so.
-
-            Must never raise
-                BusinessForceAbort
-
-            since it is called when we are ready to settle.
-
-        '''
         raise NotImplementedError()
 
     async def has_settled(self, payment):

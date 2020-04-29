@@ -133,6 +133,7 @@ Wait-Req: {len_req} Wait-Resp: {len_resp}''')
         # Perform the request, send back the reponse.
         try:
             request_json = await request.json()
+
             # TODO: Handle the timeout error here
             self.logger.debug(f'Data Received from {other_addr.as_str()}')
             response = await channel.parse_handle_request_to_future(

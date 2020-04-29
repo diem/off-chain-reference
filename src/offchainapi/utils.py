@@ -137,6 +137,7 @@ class StructureChecker:
                         existing_instance = self.data[field]
                         self.data[field] = xtype.from_full_record(
                             diff[field], existing_instance)
+                        new_diff[field] = self.data[field]
                     else:
                         new_diff[field] = xtype.from_full_record(diff[field])
                 else:

@@ -241,9 +241,6 @@ class sample_business(BusinessContext):
         # We are not ready to settle yet!
         return False
 
-    async def want_single_payment_settlement(self, payment):
-        return True
-
     async def has_settled(self, payment):
         if payment.sender.status == Status.settled:
             # In this VASP we consider we are ready to settle when the sender

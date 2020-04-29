@@ -186,6 +186,8 @@ class ProtocolExecutor:
             all_good = False
             type_str = f'{str(type(e))}: {str(e)}'
             self.logger.error(type_str)
+            self.logger.exception(e)
+
             raise ExecutorException(type_str)
 
         finally:
