@@ -269,13 +269,13 @@ class StorableDict(Storable):
         # We create a doubly linked list to support traveral with O(1) lookup
         # addition and creation.
         meta = StorableValue(db, '__META', str, root=self)
-        self.first_key = StorableValue(db, '__FIRST_KEY', str, root=meta)
+        self.first_key = StorableValue(db, '__FIRST_KEY', str, root=meta, default='_NONE')
         self.first_key.debug = True
         self.length = StorableValue(db, '__LEN', int, root=meta, default=0)
 
     if __debug__:
         def _check_invariant(self):
-            if self.first_key.exists():
+            if self.first_key.get_value() != '_NONE':
                 first_value_key = self.first_key.get_value()
                 # [prev_LL_key, next_LL_key, db_key, key]
                 first_ll_entry = json.loads(self.db[first_value_key])
@@ -292,7 +292,7 @@ class StorableDict(Storable):
         db_key, db_key_LL = self.derive_keys(key)
         assert db_key_LL not in self.db
 
-        if self.first_key.exists():
+        if self.first_key.get_value() != '_NONE':
             # All new entries to the front
             first_value_key = self.first_key.get_value()
             assert first_value_key is not None
@@ -337,7 +337,7 @@ class StorableDict(Storable):
         if __debug__:
             self._check_invariant()
 
-        if not self.first_key.exists():
+        if not self.first_key.get_value() != '_NONE':
             return
         ll_value_key = self.first_key.get_value()
         while True:
@@ -382,7 +382,13 @@ class StorableDict(Storable):
                     _, next_db_key_LL = self.derive_keys(next_key)
                     self.first_key.set_value(next_key)
 
+            if next_key is None and prev_key is None:
+                # The Linked List needs to become empty.
+                self.first_key.set_value('_NONE')
+
             del self.db[db_key_LL]
+        else:
+            raise KeyError(key)
 
     def derive_keys(self, item):
         key = key_join(self.base_key() + [str(item)])

@@ -146,13 +146,13 @@ class ProtocolExecutor:
         ''' Execute successful commands, and notify of failed commands'''
         vasp, channel, executor = self.get_context()
         self.processor.process_command(
-            vasp,
-            channel,
-            executor,
-            command,
-            seq,
-            is_success,
-            error)
+            vasp=vasp,
+            channel=channel,
+            executor=executor,
+            command=command,
+            seq=seq,
+            status_success=is_success,
+            error=error)
 
     def next_seq(self):
         ''' Returns the next sequence number in the common sequence.'''

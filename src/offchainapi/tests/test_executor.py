@@ -25,8 +25,10 @@ def test_handlers(payment, executor):
         def business_context(self):
             return self.bc
 
-        def process_command(self, vasp, channel, executor, command, seq, status, error=None):
-            if status:
+        def process_command(
+                self, vasp, channel, executor, command, seq,
+                status_success, error=None):
+            if status_success:
                 self.success_no += 1
             else:
                 self.failure_no += 1

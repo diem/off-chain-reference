@@ -9,7 +9,24 @@ import asyncio
 import logging
 
 class PaymentProcessor(CommandProcessor):
-    ''' The logic to process a payment from either side. '''
+    ''' The logic to process a payment from either side.
+
+    The processor checks commands as they are received from the other
+    VASP. When a command from the other VASP is successful it is
+    passed on to potentially lead to a further command. It is also
+    notified of sequenced commands that failed, and the error that
+    lead to that failure.
+
+    Crash-recovery strategy: The processor must only process each
+    command once. Foor this purpose the Executor passes commands
+    in the order they have been sequenced by the lower-level
+    protocol on each channel, and does so only once for each command
+    in the sequence for each channel.
+
+    The Processor must store those commands, and ensure they have
+    all been suitably processed upon a potential crash and recovery.
+
+    '''
 
     def __init__(self, business, storage_factory, loop=None):
         self.business = business
@@ -27,9 +44,11 @@ class PaymentProcessor(CommandProcessor):
             self.reference_id_index = storage_factory.make_dict(
                 'reference_id_index', PaymentObject, root)
 
-        # TODO: how much of this do we want to persist?
-        self.command_id = 0
-        self.pending_commands = {}
+            # TODO: how much of this do we want to persist?
+            self.pending_commands = storage_factory.make_dict(
+                'command_log', bool, root)
+
+
         self.futs = []
 
     def set_network(self, net):
@@ -37,16 +56,40 @@ class PaymentProcessor(CommandProcessor):
         assert self.net is None
         self.net = net
 
+    # ------ Machinery for crash tolerance.
+
+    def command_unique_id(self, channel, seq):
+        ''' Returns a string that uniquerly identifies this
+            command for the local VASP.'''
+        other_str = channel.get_other_address().as_str()
+        return f'{other_str}_{seq}'
+
+    def persist_command_obligation(self, vasp, channel, executor, command,
+                                   seq, status_success, error=None):
+        ''' Persists the command to ensure its future execution. '''
+        uid = self.command_unique_id(channel, seq)
+        self.pending_commands[uid] = True
+
+    def obligation_exists(self, channel, seq):
+        uid = self.command_unique_id(channel, seq)
+        return uid in self.pending_commands
+
+    def release_command_obligation(self, channel, seq):
+        ''' Once the command is executed, and a potential response stored,
+            this function allows us to remove the obligation to process
+            the command. '''
+        uid = self.command_unique_id(channel, seq)
+        del self.pending_commands[uid]
+
     # ------ Machinery for supporting async Business context ------
 
     async def process_command_async(self, vasp, channel, executor, command,
                                     seq, status_success, error=None):
 
-        self.logger.debug(f'Process cmd {seq}')
-        self.command_id += 1
-        self.pending_commands[self.command_id] = (vasp, channel, executor,
-                                                  command, status_success,
-                                                  error)
+        other_str = channel.get_other_address().as_str()
+        self.logger.debug(f'Process Command {other_str}.#{seq}')
+        assert self.obligation_exists(channel, seq), 'DOES NOT EXIT?'
+
         try:
             if status_success:
                 # Only respond to commands by other side.
@@ -61,12 +104,26 @@ class PaymentProcessor(CommandProcessor):
 
                         if self.net is not None:
                             other_addr = channel.get_other_address()
-                            request = self.net.sequence_command(
-                                other_addr, new_cmd
-                            )
+
+                            # This context ensure that either we both
+                            # write the next request & free th obligation
+                            # Or none of the two.
+                            with self.storage_factory.atomic_writes():
+                                request = self.net.sequence_command(
+                                    other_addr, new_cmd
+                                )
+
+                                # Crash-recovery: Once a request is ordered to
+                                # be sent out we can consider this command
+                                # done.
+                                self.release_command_obligation(channel, seq)
+
+                            # Attempt to send it to the other VASP.
                             await self.net.send_request(other_addr, request)
             else:
                 self.logger.error(f'Command #{seq} Failure: {error}')
+                with self.storage_factory.atomic_writes():
+                    self.release_command_obligation(channel, seq)
 
         # Prevent the next catch-all handler from catching canceled exceptions.
         except asyncio.CancelledError as e:
@@ -153,18 +210,27 @@ class PaymentProcessor(CommandProcessor):
             # Update the Index of Reference ID -> Payment
             ref_id = payment.reference_id
 
-            with self.storage_factory.atomic_writes():
-                if ref_id in self.reference_id_index:
-                    # We get the dependencies of the old payment
-                    old_version = self.reference_id_index[ref_id].get_version()
+            # This is all called by the executor within a write lock
+            # so no need for an extra:
+            # with self.storage_factory.atomic_writes():
 
-                    # We check that the previous version is present.
-                    # If so we update it with the new one.
-                    dependencies_versions = command.get_dependencies()
-                    if old_version in dependencies_versions:
-                        self.reference_id_index[ref_id] = payment
-                else:
+            if ref_id in self.reference_id_index:
+                # We get the dependencies of the old payment
+                old_version = self.reference_id_index[ref_id].get_version()
+
+                # We check that the previous version is present.
+                # If so we update it with the new one.
+                dependencies_versions = command.get_dependencies()
+                if old_version in dependencies_versions:
                     self.reference_id_index[ref_id] = payment
+            else:
+                self.reference_id_index[ref_id] = payment
+
+        # We record an obligation to process this command, even
+        # after crash recovery.
+        self.persist_command_obligation(
+            vasp, channel, executor,
+            command, seq, status_success, error)
 
         # Spin further command processing in its own task
         self.logger.debug(f'Schedule cmd {seq}')
