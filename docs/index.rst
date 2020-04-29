@@ -1,4 +1,4 @@
-Offchainapi documentation
+Offchainapi Documentation
 =========================
 
 The Libra Off-Chain API is a protocol that allows Virtual Asset Service Providers (VASPs)
@@ -28,7 +28,7 @@ To install :py:mod:`offchainapi` follow these steps:
 Where to start
 --------------
 
-We suggest that you expore the API in the following order:
+We suggest that you explore the API in the following order:
 
 * :py:mod:`offchainapi.payment` -- defines the PaymentObject and subobjects that allow VASPs to define payments.
 * :py:mod:`offchainapi.payment_command` -- Defines the basic PaymentCommand that thinly wraps the PaymentObject.
