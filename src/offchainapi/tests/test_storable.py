@@ -6,7 +6,6 @@ from ..protocol_messages import make_success_response, CommandRequestObject, \
 
 import pytest
 
-
 def test_dict(db):
     D = StorableDict(db, 'mary', int)
     D['x'] = 10
@@ -55,7 +54,6 @@ def test_dict_dict_del_to_empty():
     D['x'] = True
     del D['x']
     D['y'] = True
-
     del D['y']
     assert len(D) == 0
 
