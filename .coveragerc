@@ -1,5 +1,10 @@
 [run]
+
+include =
+    .tox/py37/lib/python3.7/site-packages/offchainapi/*
+
 omit =
-    src/offchainapi/tests/*
+    .tox/py37/lib/python3.7/site-packages/offchainapi/tests/*
+    .tox/py37/lib/python3.7/site-packages/offchainapi/sample/*
+    src/offchainapi/tests/test_*.py
     src/offchainapi/sample/*
-    .tox/*

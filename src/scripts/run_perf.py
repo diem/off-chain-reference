@@ -3,10 +3,14 @@
 
 import asyncio
 import logging
-import sys
-sys.path += ['src/.']
 
-from offchainapi.tests import local_benchmark
+try:
+    from offchainapi.tests import local_benchmark
+except:
+    print('Use Local Version... ')
+    import sys
+    sys.path += ['src/.']
+    from offchainapi.tests import local_benchmark
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.ERROR)
