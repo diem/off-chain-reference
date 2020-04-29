@@ -162,7 +162,7 @@ class StructureChecker:
         pass
 
     def update(self, diff):
-        ''' Applies changes to the object and checks for validity rules '''
+        ''' Applies changes to the object and checks for validity rules. '''
         # Check all types and write mode before update
         all_fields = set()
         updates = False
@@ -175,19 +175,21 @@ class StructureChecker:
                 if not isinstance(value, field_type):
                     actual_type = type(value)
                     raise StructureException(
-                        'Wrong type: field %s, expected %s but got %s' %
-                        (field, field_type, actual_type))
+                        f'Wrong type: field {field}, expected {field_type} '
+                        f'but got {actual_type}'
+                    )
 
                 # Check you can write again
                 if field in self.data and write_mode == WRITE_ONCE:
                     if self.data[field] != diff[field]:
                         raise StructureException(
-                            'Wrong update: field %s cannot be changed' % field)
+                            f'Wrong update: field {field} cannot be changed'
+                        )
 
         # Check we are not updating unknown fields
         for key in diff:
             if key not in all_fields:
-                raise StructureException('Unknown: field %s' % key)
+                raise StructureException(f'Unknown: field {key}')
 
         # Finally update
         for key in diff:
@@ -197,7 +199,7 @@ class StructureChecker:
 
         for field, field_type, required, _ in self.fields:
             if required and field not in self.data:
-                raise StructureException('Missing field: %s' % field)
+                raise StructureException(f'Missing field: {field}')
 
         # Do custom checks on object
         self.custom_update_checks(diff)

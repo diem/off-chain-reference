@@ -8,34 +8,6 @@ from .asyncnet import NetworkException
 import asyncio
 import logging
 
-
-def check_status(role, old_status, new_status, other_status):
-    ''' Check that the new status is valid.
-        Otherwise raise PaymentLogicError
-    '''
-    if role == 'receiver' and new_status == Status.needs_recipient_signature:
-        raise PaymentLogicError(
-            f'Receiver cannot be in {Status.needs_recipient_signature}.'
-        )
-
-    if status_heights_MUST[new_status] < status_heights_MUST[old_status]:
-        raise PaymentLogicError(
-            f'Invalid transition: {role}: {old_status} -> {new_status}'
-        )
-
-    # Prevent unilateral aborts after the finality barrier.
-    finality_barrier = status_heights_MUST[Status.ready_for_settlement]
-    cond = status_heights_MUST[old_status] >= finality_barrier
-    cond &= new_status == Status.abort
-    cond &= other_status != Status.abort
-    cond &= old_status != Status.abort
-    if cond:
-        raise PaymentLogicError(
-            (f'{role} cannot unilaterally abort after'
-             f'reaching {Status.ready_for_settlement}.')
-        )
-
-
 class PaymentProcessor(CommandProcessor):
     ''' The logic to process a payment from either side. '''
 
@@ -116,10 +88,10 @@ class PaymentProcessor(CommandProcessor):
     def check_command(self, vasp, channel, executor, command):
         ''' Called when receiving a new payment command to validate it.
 
-        All checks here are blocking subsequent comments, and therefore they
-        must be quick to ensure performance. As a result we only do local
-        syntactic checks hat require no lookup into the VASP potentially
-        remote stores or accounts.
+            All checks here are blocking subsequent comments, and therefore they
+            must be quick to ensure performance. As a result we only do local
+            syntactic checks hat require no lookup into the VASP potentially
+            remote stores or accounts.
         '''
 
         dependencies = executor.object_store
@@ -169,8 +141,8 @@ class PaymentProcessor(CommandProcessor):
     def process_command(
             self, vasp, channel, executor, command,
             seq, status_success, error=None):
-        """ Processes a command to generate more subsequent commands. This schedules a
-            talk that will be executed later. """
+        ''' Processes a command to generate more subsequent commands.
+        This schedules a talk that will be executed later. '''
 
         # Update the payment object index to support retieval by payment index
         if status_success:
@@ -216,6 +188,40 @@ class PaymentProcessor(CommandProcessor):
 
     # ----------- END of CommandProcessor interface ---------
 
+    def check_status(self, role, old_status, new_status, other_status):
+        ''' Check that the new status is valid.
+            Otherwise raise PaymentLogicError.
+        '''
+        other_role = ['sender', 'receiver'][role == 'sender']
+
+        # The receiver cannot be in state 'needs_recipient_signature'.
+        my_state_is_bad = role == 'receiver'
+        my_state_is_bad &= new_status == Status.needs_recipient_signature
+        other_state_is_bad = other_role == 'receiver'
+        other_state_is_bad &= other_status == Status.needs_recipient_signature
+        if my_state_is_bad or other_state_is_bad:
+            raise PaymentLogicError(
+                f'Receiver cannot be in {Status.needs_recipient_signature}.'
+            )
+
+        # Ensure progress is mades.
+        if status_heights_MUST[new_status] < status_heights_MUST[old_status]:
+            raise PaymentLogicError(
+                f'Invalid transition: {role}: {old_status} -> {new_status}'
+            )
+
+        # Prevent unilateral aborts after the finality barrier.
+        finality_barrier = status_heights_MUST[Status.ready_for_settlement]
+        break_finality_barrier = status_heights_MUST[old_status] >= finality_barrier
+        break_finality_barrier &= new_status == Status.abort
+        break_finality_barrier &= other_status != Status.abort
+        break_finality_barrier &= old_status != Status.abort
+        if break_finality_barrier:
+            raise PaymentLogicError(
+                f'{role} cannot unilaterally abort after '
+                f'reaching {Status.ready_for_settlement}.'
+            )
+
     def check_signatures(self, payment):
         ''' Utility function that checks all signatures present for validity'''
         business = self.business
@@ -242,31 +248,25 @@ class PaymentProcessor(CommandProcessor):
             not created the payment must be none, to allow for checks and
             potential aborts. However, KYC information on both sides may
             be included by the other party, and should be checked.
-            '''
+        '''
         business = self.business
-        # new_payment = PaymentObject.create_from_record(initial_diff)
 
         role = ['sender', 'receiver'][business.is_recipient(new_payment)]
         other_role = ['sender', 'receiver'][role == 'sender']
         other_status = new_payment.data[other_role].status
         if new_payment.data[role].status != Status.none:
             raise PaymentLogicError(
-                'Sender set receiver status or vice-versa.')
-
-        if other_role == 'receiver' \
-                and other_status == Status.needs_recipient_signature:
-            raise PaymentLogicError(
-                'Receiver cannot be in %s.' % Status.needs_recipient_signature
+                'Sender set receiver status or vice-versa.'
             )
 
-        # TODO: Check status here according to status_logic
-
+        self.check_status(role, Status.none, Status.none, other_status)
         self.check_signatures(new_payment)
 
     def check_new_update(self, payment, new_payment):
-        ''' Checks a diff updating an existing payment. On success
-            returns the new payment object. All check are fast to ensure
-            a timely response (cannot support async operations).
+        ''' Checks a diff updating an existing payment.
+
+            On success returns the new payment object. All check are fast to
+            ensure a timely response (cannot support async operations).
         '''
         business = self.business
 
@@ -280,9 +280,7 @@ class PaymentProcessor(CommandProcessor):
         if payment.data[role] != new_payment.data[role]:
             raise PaymentLogicError(f'Cannot change {role} information.')
 
-        # Ensure valid transitions.
-        check_status(other_role, old_other_status, other_status, status)
-
+        self.check_status(other_role, old_other_status, other_status, status)
         self.check_signatures(new_payment)
 
     def payment_process(self, payment):
@@ -369,7 +367,7 @@ class PaymentProcessor(CommandProcessor):
             # check when we change status.
             current_status = Status.abort
 
-        check_status(role, status, current_status, other_status)
+        self.check_status(role, status, current_status, other_status)
         new_payment.data[role].change_status(current_status)
 
         return new_payment

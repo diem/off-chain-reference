@@ -64,10 +64,10 @@ class PaymentActor(StructureChecker):
         # If any of kyc data, signature or certificate is provided, we expect
         # all the other fields as well
         missing = set([
-                    "kyc_data",
-                    "kyc_signature",
-                    "kyc_certificate"]) - set(diff.keys())
-
+            "kyc_data",
+            "kyc_signature",
+            "kyc_certificate"
+        ]) - set(diff.keys())
         if len(missing) != 0 and len(missing) != 3:
             raise StructureException('Missing: field %s' % (str(missing),))
 
