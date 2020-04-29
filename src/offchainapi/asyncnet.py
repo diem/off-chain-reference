@@ -1,7 +1,6 @@
 from .business import BusinessNotAuthorized
 from .libra_address import LibraAddress
 
-
 import aiohttp
 from aiohttp import web
 from aiohttp.client_exceptions import ClientError
@@ -16,8 +15,12 @@ class NetworkException(Exception):
 
 
 class Aionet:
-    ''' A network client and server using aiohttp. Initialize
-        the network system with a OffChainVASP instance. '''
+    """A network client and server using aiohttp. Initialize
+    the network system with a OffChainVASP instance.
+
+    Args:
+        vasp (OffChainVASP): The  OffChainVASP instance.
+    """
 
     def __init__(self, vasp):
         self.logger = logging.getLogger(name='aionet')
@@ -39,9 +42,9 @@ class Aionet:
                 web.get('/', self.handle_request_debug)
             ])
 
-        # The watchdog process variables
+        # The watchdog process variables.
         self.watchdog_period = 10.0  # seconds
-        self.watchdog_task_obj = None  # Store the task here to cancel
+        self.watchdog_task_obj = None  # Store the task here to cancel.
 
     async def close(self):
         ''' Close the open Http client session and the network object. '''
@@ -54,14 +57,20 @@ class Aionet:
             self.watchdog_task_obj.cancel()
 
     def schedule_watchdog(self, loop, period=10.0):
-        ''' Creates and schedues the watchdog periodic process.
-        It logs basic statistics for all channels and retransmits. '''
+        """ Creates and schedues the watchdog periodic process.
+        It logs basic statistics for all channels and retransmits.
+
+        Args:
+            loop (asyncio.AbstractEventLoopPolicy): The event loop.
+            period (float, optional): The refresh period in seconds.
+                Defaults to 10.0.
+        """
         self.watchdog_period = period
         self.watchdog_task_obj = loop.create_task(self.watchdog_task())
 
     async def watchdog_task(self):
-        ''' Provides a priodic debug view of pending requests and replies '''
-        self.logger.info('Start Network Watchdog')
+        ''' Provides a priodic debug view of pending requests and replies. '''
+        self.logger.info('Start Network Watchdog.')
         try:
             while True:
                 for k in self.vasp.channel_store:
@@ -81,19 +90,30 @@ class Aionet:
 
                     self.logger.info(
                         f'''
-Channel: {me} [{role}] <-> {other}
-Queues: my: {len_my} (Wait: {waiting}) other: {len_oth}
-Retransmit: {channel.would_retransmit()}
-Wait-Req: {len_req} Wait-Resp: {len_resp}''')
+                        Channel: {me} [{role}] <-> {other}
+                        Queues: my: {len_my} (Wait: {waiting}) other: {len_oth}
+                        Retransmit: {channel.would_retransmit()}
+                        Wait-Req: {len_req} Wait-Resp: {len_resp}'''
+                    )
                 await asyncio.sleep(self.watchdog_period)
         except Exception as e:
             self.logger.error('XXXXXXX')
             self.logger.error(e)
         finally:
-            self.logger.info('Stop Network Watchdog')
+            self.logger.info('Stop Network Watchdog.')
 
     def get_url(self, base_url, other_addr_str, other_is_server=False):
-        ''' Composes the URL for the Off-chain API VASP end point.'''
+        """Composes the URL for the Off-chain API VASP end point.
+
+        Args:
+            base_url (str): The base url.
+            other_addr_str (str): The address of the other VASP as a string.
+            other_is_server (bool, optional): Whether the other VASP is the
+                server. Defaults to False.
+
+        Returns:
+            str: The complete URL for the Off-chain API VASP end point
+        """
         if other_is_server:
             server = other_addr_str
             client = self.vasp.get_vasp_address().as_str()
@@ -108,7 +128,20 @@ Wait-Req: {len_req} Wait-Resp: {len_resp}''')
             return web.Response(text='Hello, world')
 
     async def handle_request(self, request):
-        ''' Main Http server handler for incomming OffChainAPI requests. '''
+        """Main Http server handler for incomming OffChainAPI requests.
+
+        Args:
+            request (CommandRequestObject): The request from the other VASP.
+
+        Raises:
+            aiohttp.web.HTTPUnauthorized: An exception for 401 Unauthorized.
+            aiohttp.web.HTTPForbidden: An exception for 403 Forbidden.
+            aiohttp.web.HTTPBadRequest: An exception for 400 Bad Request
+
+        Returns:
+            aiohttp.web.Response: A json response with predefined
+            'application/json' content type and data encoded by json.dumps.
+        """
 
         other_addr = LibraAddress(request.match_info['other_addr'])
         self.logger.debug(f'Request Received from {other_addr.as_str()}')
@@ -134,42 +167,39 @@ Wait-Req: {len_req} Wait-Resp: {len_resp}''')
         try:
             request_json = await request.json()
 
-            # TODO: Handle the timeout error here
-            self.logger.debug(f'Data Received from {other_addr.as_str()}')
+            # TODO: Handle timeout errors here.
+            self.logger.debug(f'Data Received from {other_addr.as_str()}.')
             response = await channel.parse_handle_request_to_future(
                 request_json, encoded=False)
 
         except json.decoder.JSONDecodeError as e:
-            # Raised if the request does not contain valid JSON.
+            # Raised if the request does not contain valid json.
             self.logger.debug(f'Type Error {str(e)}')
-            import traceback
-            traceback.print_exc()
             raise web.HTTPBadRequest
         except aiohttp.client_exceptions.ContentTypeError as e:
-            # Raied when the server replies with wrong content type.
+            # Raised when the server replies with wrong content type;
+            # eg. text/html instead of json.
             self.logger.debug(f'ContentTypeError Error {e}')
-            import traceback
-            traceback.print_exc()
             raise web.HTTPBadRequest
 
-        # Send back the response
-        self.logger.debug(f'Process Waiting messages')
+        # Send back the response.
+        self.logger.debug(f'Process Waiting messages.')
         channel.process_waiting_messages()
-
-        self.logger.debug(f'Sending back response to {other_addr.as_str()}')
+        self.logger.debug(f'Sending back response to {other_addr.as_str()}.')
         return web.json_response(response.content)
 
     async def send_request(self, other_addr, json_request):
-        ''' Uses an HTTP client to send an OffChainAPI request
-            to another VASP.
+        """ Uses an Http client to send an OffChainAPI request to another VASP.
 
-            Parameters:
-                * other_addr : The LibraAddress of the other VASP.
-                * json_request : a Dict that is a serialized request,
-                  ready to be sent across the network.
+        Args:
+            other_addr (LibraAddress): The LibraAddress of the other VASP.
+            json_request (dict): a Dict that is a serialized request,
+                ready to be sent across the network.
 
-            Can raise a NetworkException.
-            '''
+        Raises:
+            NetworkException: [description]
+        """
+
         self.logger.debug(f'Connect to {other_addr.as_str()}')
 
         # Initialize the client.
@@ -212,19 +242,19 @@ Wait-Req: {len_req} Wait-Resp: {len_resp}''')
         ''' Sequences a new command to the local queue, ready to be
             sent to the other VASP.
 
-            Parameters:
-                * other_addr : the LibraAddress of the other VASP.
-                * command : A ProtocolCommand instance.
-
-            Returns:
-                * An instance of a CommandRequestObject
-                  representing the command.
-
             Upon successful completing the sender should call
             `send_request` to actually send the request to the other
             side. However, even if that fails subsequent retrasmissions
             will automatically re-send the request.
-         '''
+
+            Parameters:
+                other_addr (LibraAddress) : the LibraAddress of the other VASP.
+                command (ProtocolCommand) : A ProtocolCommand instance.
+
+            Returns:
+                CommandRequestObject : An instance of a CommandRequestObject
+                representing the command.
+        '''
 
         channel = self.vasp.get_channel(other_addr)
         request = channel.sequence_command_local(command)
@@ -233,5 +263,10 @@ Wait-Req: {len_req} Wait-Resp: {len_resp}''')
 
     def get_runner(self):
         ''' Gets an object to that needs to be run in an
-            event loop to register the server. '''
+            event loop to register the server.
+
+            Returns:
+                aiohttp.web.AppRunner: A runner for Application.
+
+        '''
         return web.AppRunner(self.app)
