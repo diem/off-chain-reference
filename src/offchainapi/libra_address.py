@@ -1,4 +1,4 @@
-import base64
+from binascii import unhexlify, hexlify
 
 
 # Helper classes
@@ -15,8 +15,9 @@ class LibraAddress:
             if type(encoded_address) == str:
                 self.encoded_address = encoded_address
             else:
+                assert type(encoded_address) == bytes
                 self.encoded_address = encoded_address.decode('ascii')
-            self.decoded_address = base64.b64decode(self.encoded_address)
+            self.decoded_address = unhexlify(self.encoded_address)
         except Exception:
             raise LibraAddressError()
 
@@ -26,7 +27,7 @@ class LibraAddress:
 
     @classmethod
     def encode_to_Libra_address(cls, raw_bytes):
-        return LibraAddress(base64.b64encode(raw_bytes))
+        return LibraAddress(hexlify(raw_bytes))
 
     def last_bit(self):
         return self.decoded_address[-1] & 1

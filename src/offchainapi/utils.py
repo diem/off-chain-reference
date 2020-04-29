@@ -1,6 +1,6 @@
 from enum import Enum
 from os import urandom
-from base64 import standard_b64encode
+from binascii import hexlify
 
 REQUIRED = True
 OPTIONAL = False
@@ -277,4 +277,4 @@ class JSONSerializable:
 # Utilities
 def get_unique_string():
     ''' Returns a strong random 16 byte string encoded in base64. '''
-    return standard_b64encode(urandom(16)).decode('ascii')
+    return hexlify(urandom(16)).decode('ascii')
