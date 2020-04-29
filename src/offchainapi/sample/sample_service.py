@@ -117,7 +117,8 @@ class sample_business(BusinessContext):
         if 'recipient_signature' in payment.data:
             if payment.recipient_signature == 'VALID':
                 return
-            raise BusinessValidationFailure('Invalid signature: %s' % payment.data.get('recipient_signature', 'Not present'))
+            sig = payment.data.get('recipient_signature', 'Not present')
+            raise BusinessValidationFailure(f'Invalid signature: {sig}')
 
     async def get_recipient_signature(self, payment):
         return 'VALID'

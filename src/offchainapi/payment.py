@@ -67,12 +67,9 @@ class PaymentActor(StructureChecker):
                     "kyc_data",
                     "kyc_signature",
                     "kyc_certificate"]) - set(diff.keys())
-        try:
-            if len(missing) != 0 and len(missing) != 3:
-                raise StructureException('Missing: field %s' % (str(missing),))
-        except Exception as e:
-            print(diff)
-            raise
+
+        if len(missing) != 0 and len(missing) != 3:
+            raise StructureException('Missing: field %s' % (str(missing),))
 
         if 'status' in diff and not isinstance(diff['status'], Status):
             raise StructureException('Wrong status: %s' % diff['status'])

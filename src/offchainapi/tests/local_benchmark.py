@@ -3,18 +3,20 @@
 # Run as:
 # $ python -m cProfile -s tottime src/scripts/run_perf.py > report.txt
 #
-from ..business import VASPInfo, BusinessContext
+from ..business import VASPInfo
 from ..libra_address import LibraAddress
 from ..payment_logic import PaymentCommand
 from ..status_logic import Status
-from ..payment import PaymentAction, PaymentActor, PaymentObject, KYCData
+from ..payment import PaymentAction, PaymentActor, PaymentObject
 from ..core import Vasp
+from .basic_business_context import BasicBusinessContext
 
 import logging
-from mock import AsyncMock
 from threading import Thread
 import time
 import asyncio
+
+
 
 # A stand alone performance test.
 
@@ -24,7 +26,6 @@ peer_address = {
     PeerA_addr.as_str(): 'http://localhost:8091',
     PeerB_addr.as_str(): 'http://localhost:8092',
 }
-
 
 class SimpleVASPInfo(VASPInfo):
 
@@ -38,104 +39,6 @@ class SimpleVASPInfo(VASPInfo):
     def is_authorised_VASP(self, certificate, other_addr):
         return True
 
-
-class BasicBusinessContext(BusinessContext):
-
-    def __init__(self, my_addr):
-        self.my_addr = my_addr
-
-    def open_channel_to(self, other_vasp_info):
-        return True
-
-    # ----- Actors -----
-
-    def is_sender(self, payment):
-        myself = self.my_addr.as_str()
-        return myself == payment.sender.address
-
-    def is_recipient(self, payment):
-        return not self.is_sender(payment)
-
-    async def check_account_existence(self, payment):
-        return True
-
-# ----- VASP Signature -----
-
-    def validate_recipient_signature(self, payment):
-        if 'recipient_signature' in payment.data:
-            recepient = payment.receiver.address
-            ref_id = payment.reference_id
-            expected_signature = f'{recepient}.{ref_id}.SIGNED'
-            return payment.recipient_signature == expected_signature
-        else:
-            return True
-
-    async def get_recipient_signature(self, payment):
-        myself = self.my_addr.as_str()
-        ref_id = payment.reference_id
-        return f'{myself}.{ref_id}.SIGNED'
-
-# ----- KYC/Compliance checks -----
-
-    async def next_kyc_to_provide(self, payment):
-        role = ['receiver', 'sender'][self.is_sender(payment)]
-        own_actor = payment.data[role]
-        kyc_data = set()
-
-        if 'kyc_data' not in own_actor.data:
-            kyc_data.add(Status.needs_kyc_data)
-
-        if role == 'receiver':
-            if 'recipient_signature' not in payment.data:
-                kyc_data.add(Status.needs_recipient_signature)
-
-        return kyc_data
-
-    async def next_kyc_level_to_request(self, payment):
-        other_role = ['sender', 'receiver'][self.is_sender(payment)]
-        other_actor = payment.data[other_role]
-
-        if 'kyc_data' not in other_actor.data:
-            return Status.needs_kyc_data
-
-        if other_role == 'receiver' \
-                and 'recipient_signature' not in payment.data:
-            return Status.needs_recipient_signature
-
-        return None
-
-    def validate_kyc_signature(self, payment):
-        return True
-
-    async def get_extended_kyc(self, payment):
-        ''' Returns the extended KYC information for this payment.
-            In the format: (kyc_data, kyc_signature, kyc_certificate), where
-            all fields are of type str.
-
-            Can raise:
-                   BusinessNotAuthorized.
-        '''
-        myself = self.my_addr.as_str()
-        ref_id = payment.reference_id
-        return (
-                KYCData(f"""{{
-                    "payment_reference_id": "{myself}.{ref_id}.KYC",
-                    "type": "person"
-                    }}"""),
-                f'{myself}.{ref_id}.KYC_SIGN',
-                f'{myself}.{ref_id}.KYC_CERT',
-            )
-
-    async def get_stable_id(self, payment):
-        raise NotImplementedError()
-
-# ----- Settlement -----
-
-    async def ready_for_settlement(self, payment):
-        return (await self.next_kyc_level_to_request(payment)) is None
-
-    async def has_settled(self, payment):
-        return True
 
 global_dir = {}
 
@@ -196,7 +99,7 @@ async def main_perf():
     # Define a payment command
     commands = []
     payments = []
-    for cid in range(1):
+    for cid in range(100):
         sender = PaymentActor(PeerA_addr.as_str(), 'aaaa', Status.none, [])
         receiver = PaymentActor(PeerB_addr.as_str(), 'bbbb', Status.none, [])
         action = PaymentAction(10, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
@@ -232,9 +135,9 @@ async def main_perf():
 
     # In case you want to wait for other responses to settle
     #
-    for t in range(10):
-        print('waiting', t)
-        await asyncio.sleep(1.0)
+    #for t in range(10):
+    #    print('waiting', t)
+    #    await asyncio.sleep(1.0)
 
     # Esure they were register as successes on both sides.
     Asucc = len([x for x in channelAB.executor.command_status_sequence if x])
