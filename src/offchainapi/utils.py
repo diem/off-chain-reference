@@ -17,7 +17,12 @@ class StructureChecker:
     ''' A class that allows us to keep track of objects in terms of
     diffs, namely operations that mutate their fields. Also does
     automatic type checking and checking for mutability/immutability
-    and required / optional fields.'''
+    and required / optional fields.
+
+    The actual fields of this object are held in a dictionary called
+    `data`. However direct access through __getattr__ and membership
+    quesries through __contains__ are supported, for ease of use.
+    '''
 
     fields = {}
 
@@ -35,6 +40,12 @@ class StructureChecker:
         if name in self.data:
             return self.data[name]
         raise AttributeError()
+
+    def __contains__(self, item):
+        ''' Allows for `in` boolean queries between attribute names
+            and the object itself. '''
+        return item in self.data
+
 
     def record(self, diff):
         ''' Record all diffs applied to the object '''

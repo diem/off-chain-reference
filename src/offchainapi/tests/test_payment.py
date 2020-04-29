@@ -87,7 +87,7 @@ def test_payment_actor_creation():
 
 def test_payment_actor_update_stable_id(sender_actor):
     sender_actor.add_stable_id('AAAA')
-    assert sender_actor.data['stable_id'] == 'AAAA'
+    assert sender_actor.stable_id == 'AAAA'
 
     with pytest.raises(StructureException):
         # Cannot add a new stable id
@@ -208,4 +208,4 @@ def test_payment_actor_update_bad_metadata_fails(sender_actor):
 
 def test_payment_actor_add_metadata(sender_actor):
     sender_actor.add_metadata('abcd')
-    assert sender_actor.data['metadata'] == ['abcd']
+    assert sender_actor.metadata == ['abcd']

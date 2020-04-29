@@ -40,13 +40,12 @@ def test_handlers(payment, executor):
     cmd1.set_origin(channel.get_my_address())
 
     pay2 = payment.new_version()
-    pay2.data['sender'].change_status(Status.needs_stable_id)
+    pay2.sender.change_status(Status.needs_stable_id)
     cmd2 = PaymentCommand(pay2)
     cmd2.set_origin(channel.get_my_address())
 
-
     pay3 = payment.new_version()
-    pay3.data['sender'].change_status(Status.needs_stable_id)
+    pay3.sender.change_status(Status.needs_stable_id)
     cmd3 = PaymentCommand(pay3)
     cmd3.set_origin(channel.get_my_address())
 

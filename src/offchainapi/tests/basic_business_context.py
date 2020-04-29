@@ -26,7 +26,7 @@ class BasicBusinessContext(BusinessContext):
 # ----- VASP Signature -----
 
     def validate_recipient_signature(self, payment):
-        assert 'recipient_signature' in payment.data
+        assert 'recipient_signature' in payment
         recepient = payment.receiver.address
         ref_id = payment.reference_id
         expected_signature = f'{recepient}.{ref_id}.SIGNED'
@@ -44,11 +44,11 @@ class BasicBusinessContext(BusinessContext):
         own_actor = payment.data[role]
         kyc_data = set()
 
-        if 'kyc_data' not in own_actor.data:
+        if 'kyc_data' not in own_actor:
             kyc_data.add(Status.needs_kyc_data)
 
         if role == 'receiver':
-            if 'recipient_signature' not in payment.data:
+            if 'recipient_signature' not in payment:
                 kyc_data.add(Status.needs_recipient_signature)
 
         return kyc_data
@@ -57,11 +57,11 @@ class BasicBusinessContext(BusinessContext):
         other_role = ['sender', 'receiver'][self.is_sender(payment)]
         other_actor = payment.data[other_role]
 
-        if 'kyc_data' not in other_actor.data:
+        if 'kyc_data' not in other_actor:
             return Status.needs_kyc_data
 
         if other_role == 'receiver' \
-                and 'recipient_signature' not in payment.data:
+                and 'recipient_signature' not in payment:
             return Status.needs_recipient_signature
 
         return None
@@ -69,7 +69,7 @@ class BasicBusinessContext(BusinessContext):
     def validate_kyc_signature(self, payment):
         other_role = ['sender', 'receiver'][self.is_sender(payment)]
         other_actor = payment.data[other_role]
-        assert 'kyc_data' in other_actor.data
+        assert 'kyc_data' in other_actor
         return True
 
     async def get_extended_kyc(self, payment):

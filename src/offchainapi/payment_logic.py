@@ -294,10 +294,11 @@ class PaymentProcessor(CommandProcessor):
         role = ['sender', 'receiver'][business.is_recipient(payment)]
         other_role = ['sender', 'receiver'][role == 'sender']
 
-        if 'kyc_signature' in payment.data[other_role].data:
+        other_actor = payment.data[other_role]
+        if 'kyc_signature' in other_actor:
             business.validate_kyc_signature(payment)
 
-        if role == 'sender' and 'recipient_signature' in payment.data:
+        if role == 'sender' and 'recipient_signature' in payment:
             business.validate_recipient_signature(payment)
 
     def check_new_payment(self, new_payment):
@@ -337,14 +338,19 @@ class PaymentProcessor(CommandProcessor):
         business = self.business
 
         role = ['sender', 'receiver'][business.is_recipient(new_payment)]
-        status = payment.data[role].status
         other_role = ['sender', 'receiver'][role == 'sender']
-        old_other_status = payment.data[other_role].status
-        other_status = new_payment.data[other_role].status
+        myself_actor = payment.data[role]
+        myself_actor_new = new_payment.data[role]
+        other_actor = payment.data[other_role]
 
         # Ensure nothing on our side was changed by this update.
-        if payment.data[role] != new_payment.data[role]:
+        if myself_actor != myself_actor_new:
             raise PaymentLogicError(f'Cannot change {role} information.')
+
+        # Check the status transition is valid.
+        status = myself_actor.status
+        old_other_status = other_actor.status
+        other_status = other_actor.status
 
         self.check_status(other_role, old_other_status, other_status, status)
         self.check_signatures(new_payment)
@@ -401,13 +407,14 @@ class PaymentProcessor(CommandProcessor):
                 kyc_to_provide = await business.next_kyc_to_provide(
                     new_payment)
 
+                myself_new_actor = new_payment.data[role]
                 if Status.needs_stable_id in kyc_to_provide:
                     stable_id = await business.get_stable_id(new_payment)
-                    new_payment.data[role].add_stable_id(stable_id)
+                    myself_new_actor.add_stable_id(stable_id)
 
                 if Status.needs_kyc_data in kyc_to_provide:
                     extended_kyc = await business.get_extended_kyc(new_payment)
-                    new_payment.data[role].add_kyc_data(*extended_kyc)
+                    myself_new_actor.add_kyc_data(*extended_kyc)
 
                 if Status.needs_recipient_signature in kyc_to_provide:
                     signature = await business.get_recipient_signature(
