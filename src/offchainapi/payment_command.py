@@ -5,7 +5,7 @@ from .utils import JSONSerializable
 
 # Functions to check incoming diffs
 class PaymentLogicError(Exception):
-    """ Indicated a payment processing error. """
+    """ Indicates a payment processing error. """
     pass
 
 
@@ -16,6 +16,9 @@ class PaymentCommand(ProtocolCommand):
 
         The  command creates the object version of the payment given
         and depends on any previous versions of the given payment.
+
+        Args:
+            payment (PaymentObject): The payment from which to build the command.
     '''
 
     def __init__(self, payment):

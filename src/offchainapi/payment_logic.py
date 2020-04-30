@@ -27,7 +27,6 @@ class PaymentProcessor(CommandProcessor):
 
     The Processor must store those commands, and ensure they have
     all been suitably processed upon a potential crash and recovery.
-
     '''
 
     def __init__(self, business, storage_factory, loop=None):
@@ -99,11 +98,22 @@ class PaymentProcessor(CommandProcessor):
 
     async def process_command_async(self, vasp, channel, executor, command,
                                     seq, status_success, error=None):
-        ''' The asyncronous command processing logic.
+
+        """ The asyncronous command processing logic.
 
         Checks all incomming commands from the other VASP, and determines if
         any new commands need to be issued from this VASP in response.
-        '''
+
+        Args:
+            vasp (OffChainVASP): The current VASP.
+            channel (VASPPairChannel):  A VASP channel.
+            executor (ProtocolExecutor): The protocol executor.
+            command (PaymentCommand): The current payment command.
+            seq (int): The sequence number of the payment command.
+            status (bool): Whether the command is a success or failure.
+            error (Exception, optional): The exception, if the command is a
+                    failure. Defaults to None.
+        """
 
         other_str = channel.get_other_address().as_str()
         self.logger.debug(f'Process Command {other_str}.#{seq}')
@@ -161,16 +171,11 @@ class PaymentProcessor(CommandProcessor):
     # -------- Implements CommandProcessor interface ---------
 
     def business_context(self):
+        ''' Overrides CommandProcessor. '''
         return self.business
 
     def check_command(self, vasp, channel, executor, command):
-        ''' Called when receiving a new payment command to validate it.
-
-            All checks here are blocking subsequent comments, and therefore
-            they must be quick to ensure performance. As a result we only
-            do local syntactic checks hat require no lookup into the VASP
-            potentially remote stores or accounts.
-        '''
+        ''' Overrides CommandProcessor. '''
 
         dependencies = executor.object_store
         new_version = command.get_new_version()
@@ -201,14 +206,6 @@ class PaymentProcessor(CommandProcessor):
         # Only check the commands we get from others.
         if origin == other_addr:
             if command.dependencies == []:
-
-                # Check that the other VASP is the sender?
-                # Or allow for fund pull flows here?
-                #
-                # if new_payment.sender.address != other_addr:
-                #    raise PaymentLogicError('Initiator must be \
-                #        the sender of funds.')
-
                 self.check_new_payment(new_payment)
             else:
                 old_version = command.get_previous_version()
@@ -218,11 +215,9 @@ class PaymentProcessor(CommandProcessor):
     def process_command(
             self, vasp, channel, executor, command,
             seq, status_success, error=None):
-        ''' Processes a command to generate more subsequent commands.
-            This schedules a task that will be executed later asynchronously.
-        '''
+        ''' Overrides CommandProcessor. '''
 
-        # Update the payment object index to support retieval by payment index
+        # Update the payment object index to support retieval by payment index.
         if status_success:
             payment = command.get_payment()
 
