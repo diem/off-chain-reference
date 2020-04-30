@@ -7,6 +7,8 @@ from .asyncnet import NetworkException
 
 import asyncio
 import logging
+import json
+
 
 class PaymentProcessor(CommandProcessor):
     ''' The logic to process a payment from either side.
@@ -46,7 +48,7 @@ class PaymentProcessor(CommandProcessor):
 
             # TODO: how much of this do we want to persist?
             self.pending_commands = storage_factory.make_dict(
-                'command_log', bool, root)
+                'command_log', str, root)
 
 
         self.futs = []
@@ -62,33 +64,49 @@ class PaymentProcessor(CommandProcessor):
         ''' Returns a string that uniquerly identifies this
             command for the local VASP.'''
         other_str = channel.get_other_address().as_str()
-        return f'{other_str}_{seq}'
+        data = json.dumps((other_str, seq))
+        return f'{other_str}_{seq}', data
 
     def persist_command_obligation(self, vasp, channel, executor, command,
                                    seq, status_success, error=None):
         ''' Persists the command to ensure its future execution. '''
-        uid = self.command_unique_id(channel, seq)
-        self.pending_commands[uid] = True
+        uid, data = self.command_unique_id(channel, seq)
+        self.pending_commands[uid] = data
 
     def obligation_exists(self, channel, seq):
-        uid = self.command_unique_id(channel, seq)
+        uid, _ = self.command_unique_id(channel, seq)
         return uid in self.pending_commands
 
     def release_command_obligation(self, channel, seq):
         ''' Once the command is executed, and a potential response stored,
             this function allows us to remove the obligation to process
             the command. '''
-        uid = self.command_unique_id(channel, seq)
+        uid, _ = self.command_unique_id(channel, seq)
         del self.pending_commands[uid]
+
+    def list_command_obligations(self):
+        ''' Returns a list of (other_address, command sequence) tuples denoting
+            the pending commands that need to be re-executed after a crash or
+            shutdown. '''
+        pending = []
+        for uid in self.pending_commands.keys():
+            data = self.pending_commands[uid]
+            (other_channel, seq) = json.loads(data)
+            pending += [(other_channel, seq)]
+        return pending
 
     # ------ Machinery for supporting async Business context ------
 
     async def process_command_async(self, vasp, channel, executor, command,
                                     seq, status_success, error=None):
+        ''' The asyncronous command processing logic.
+
+        Checks all incomming commands from the other VASP, and determines if
+        any new commands need to be issued from this VASP in response.
+        '''
 
         other_str = channel.get_other_address().as_str()
         self.logger.debug(f'Process Command {other_str}.#{seq}')
-        assert self.obligation_exists(channel, seq), 'DOES NOT EXIT?'
 
         try:
             if status_success:
@@ -116,13 +134,17 @@ class PaymentProcessor(CommandProcessor):
                                 # Crash-recovery: Once a request is ordered to
                                 # be sent out we can consider this command
                                 # done.
-                                self.release_command_obligation(channel, seq)
+                                if self.obligation_exists(channel, seq):
+                                    self.release_command_obligation(channel, seq)
 
                             # Attempt to send it to the other VASP.
                             await self.net.send_request(other_addr, request)
             else:
                 self.logger.error(f'Command #{seq} Failure: {error}')
-                with self.storage_factory.atomic_writes():
+
+            # If we are here we are done with this obligation
+            with self.storage_factory.atomic_writes():
+                if self.obligation_exists(channel, seq):
                     self.release_command_obligation(channel, seq)
 
         # Prevent the next catch-all handler from catching canceled exceptions.
@@ -214,6 +236,8 @@ class PaymentProcessor(CommandProcessor):
             # so no need for an extra:
             # with self.storage_factory.atomic_writes():
 
+            # Write the new payment to the index of payments by
+            # reference ID to support they GetPaymentAPI.
             if ref_id in self.reference_id_index:
                 # We get the dependencies of the old payment
                 old_version = self.reference_id_index[ref_id].get_version()
@@ -291,14 +315,13 @@ class PaymentProcessor(CommandProcessor):
     def check_signatures(self, payment):
         ''' Utility function that checks all signatures present for validity'''
         business = self.business
-        role = ['sender', 'receiver'][business.is_recipient(payment)]
-        other_role = ['sender', 'receiver'][role == 'sender']
+        is_sender = business.is_sender(payment)
+        other_actor = payment.receiver if is_sender else payment.sender
 
-        other_actor = payment.data[other_role]
         if 'kyc_signature' in other_actor:
             business.validate_kyc_signature(payment)
 
-        if role == 'sender' and 'recipient_signature' in payment:
+        if is_sender and 'recipient_signature' in payment:
             business.validate_recipient_signature(payment)
 
     def check_new_payment(self, new_payment):

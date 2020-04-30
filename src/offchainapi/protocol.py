@@ -659,3 +659,11 @@ class VASPPairChannel:
         else:
             return self.send_request(request) if request_to_send is not None \
                 else None
+
+    def pending_retransmit_number(self):
+        ''' Returns the number of requets that are waiting to be
+            retransmitted on this channel. '''
+        if not self.would_retransmit():
+            return 0
+
+        return len(self.my_requests) - self.next_retransmit.get_value()
