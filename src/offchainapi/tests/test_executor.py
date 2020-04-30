@@ -12,7 +12,7 @@ def test_handlers(payment, executor):
     store = channel.storage
     bcm = MagicMock(spec=BusinessContext)
 
-    object_store = executor.object_store
+    object_store = executor.object_liveness
 
     bcm = MagicMock(spec=BusinessContext)
 

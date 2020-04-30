@@ -3,7 +3,6 @@ import logging
 from .utils import JSONSerializable, JSONFlag
 from .command_processor import CommandProcessor
 from .libra_address import LibraAddress
-from .shared_object import SharedObject
 
 
 # Interface we need to do commands:
@@ -125,10 +124,6 @@ class ProtocolExecutor:
         self.command_status_sequence = storage_factory.make_list(
             'command_status_sequence', bool, root=other_vasp)
 
-        # This is the primary store of shared objects.
-        # It maps version numbers -> objects
-        self.object_store = storage_factory.make_dict(
-            'object_store', SharedObject, root=other_vasp)
         # Maps of version numbers -> bool,
         #   where True = live, and False = not live.
         self.object_liveness = storage_factory.make_dict(
@@ -217,9 +212,7 @@ class ProtocolExecutor:
         # Creates new objects
         new_versions = command.new_object_versions()
         for version in new_versions:
-            obj = command.get_object(version, self.object_store)
             self.object_liveness[version] = True
-            self.object_store[version] = obj
 
         # Call the command processor.
         self.command_status_sequence += [True]

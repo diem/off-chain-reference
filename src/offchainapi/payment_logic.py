@@ -4,6 +4,7 @@ from .payment import Status, PaymentObject
 from .status_logic import status_heights_MUST
 from .payment_command import PaymentCommand, PaymentLogicError
 from .asyncnet import NetworkException
+from .shared_object import SharedObject
 
 import asyncio
 import logging
@@ -45,6 +46,11 @@ class PaymentProcessor(CommandProcessor):
             root = storage_factory.make_value('processor', None)
             self.reference_id_index = storage_factory.make_dict(
                 'reference_id_index', PaymentObject, root)
+
+            # This is the primary store of shared objects.
+            # It maps version numbers -> objects
+            self.object_store = storage_factory.make_dict(
+                'object_store', SharedObject, root=root)
 
             # TODO: how much of this do we want to persist?
             self.pending_commands = storage_factory.make_dict(
@@ -172,7 +178,7 @@ class PaymentProcessor(CommandProcessor):
             potentially remote stores or accounts.
         '''
 
-        dependencies = executor.object_store
+        dependencies = self.object_store
         new_version = command.get_new_version()
         new_payment = command.get_object(new_version, dependencies)
 
@@ -224,6 +230,13 @@ class PaymentProcessor(CommandProcessor):
 
         # Update the payment object index to support retieval by payment index
         if status_success:
+
+            # Creates new objects
+            new_versions = command.new_object_versions()
+            for version in new_versions:
+                obj = command.get_object(version, self.object_store)
+                self.object_store[version] = obj
+
             payment = command.get_payment()
 
             # Update the Index of Reference ID -> Payment

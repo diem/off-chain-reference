@@ -442,8 +442,8 @@ def test_random_interleave_and_drop_and_invalid(two_channels):
     print("Server: Requests #%d  Responses #%d" %
           (server.xx_requests_stats, server.xx_replies_stats))
 
-    server_store_keys = server.executor.object_store.keys()
-    client_store_keys = client.executor.object_store.keys()
+    server_store_keys = server.executor.object_liveness.keys()
+    client_store_keys = client.executor.object_liveness.keys()
     assert set(server_store_keys) == set(client_store_keys)
 
 
