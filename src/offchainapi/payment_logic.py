@@ -27,7 +27,6 @@ class PaymentProcessor(CommandProcessor):
 
     The Processor must store those commands, and ensure they have
     all been suitably processed upon a potential crash and recovery.
-
     '''
 
     def __init__(self, business, storage_factory, loop=None):
