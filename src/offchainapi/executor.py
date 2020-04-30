@@ -255,7 +255,7 @@ class ProtocolExecutor:
 
             # Check the command is well formed.
             vasp, channel, executor = self.get_context()
-            self.processor.check_command(vasp, channel, executor, command)
+            self.processor.check_command(channel, command)
 
         except Exception as e:
             all_good = False

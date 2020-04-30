@@ -149,10 +149,10 @@ def test_check_command(payment, processor, executor):
         command = PaymentCommand(payment)
         command.set_origin(origin)
         if res:
-            processor.check_command(vasp, channel, executor, command)
+            processor.check_command(channel, command)
         else:
             with pytest.raises(PaymentLogicError):
-                processor.check_command(vasp, channel, executor, command)
+                processor.check_command(channel, command)
 
 
 def test_payment_process_receiver_new_payment(payment, processor):

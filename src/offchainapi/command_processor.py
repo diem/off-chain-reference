@@ -9,7 +9,7 @@ class CommandProcessor:
         '''
         raise NotImplementedError()
 
-    def check_command(self, vasp, channel, executor, command):
+    def check_command(self, channel, command):
         ''' Called when receiving a new payment command to validate it.
 
             All checks here are blocking subsequent comments, and therefore they
@@ -18,9 +18,7 @@ class CommandProcessor:
             remote stores or accounts.
 
             Args:
-                vasp (OffChainVASP): The current VASP.
                 channel (VASPPairChannel):  A VASP channel.
-                executor (ProtocolExecutor): The protocol executor.
                 command (PaymentCommand): The current payment.
         '''
         raise NotImplementedError()
