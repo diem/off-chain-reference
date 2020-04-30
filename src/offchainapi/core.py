@@ -15,15 +15,15 @@ class Vasp:
     ''' Creates a VASP with the standard networking and storage backend.
 
     Parameters:
-        my_addr : a LibraAddress of this VASP
-        host    : a domain name for this VASP
-        port    : the port on which the server listens
-        business_context : The business contraxt of the VASP implementing
-                            the BusinessContext interface.
-        info_context     : The information context for the VASP
-                            implementing the VASPInfo interface.
-        database : A persistent key value store to be used by the storage
-                    systems as a backend.
+        my_addr (LibraAddress) : A LibraAddress of this VASP.
+        host (str) : A domain name for this VASP.
+        port (int) : The port on which the server listens.
+        business_context (BusinessContext) : The business context of the VASP
+            implementing the BusinessContext interface.
+        info_context (VASPInfo) : The information context for the VASP
+            implementing the VASPInfo interface.
+        database (*) : A persistent key value store to be used
+            by the storage systems as a backend.
 
     Returns a VASP object.
     '''
@@ -31,26 +31,26 @@ class Vasp:
     def __init__(self, my_addr, host, port, business_context,
                  info_context, database):
 
-        # Initiaize all VASP related objects
-        self.my_addr = my_addr              # Our Address
-        self.host = host                    # Our Host name
-        self.port = port                    # Our server listening port
-        self.bc = business_context          # Our Business Context
-        self.database = database            # A key-value store
-        self.info_context = info_context    # Our info context
+        # Initiaize all VASP related objects.
+        self.my_addr = my_addr              # Our Address.
+        self.host = host                    # Our Host name.
+        self.port = port                    # Our server listening port.
+        self.bc = business_context          # Our Business Context.
+        self.database = database            # A key-value store.
+        self.info_context = info_context    # Our info context.
 
-        # Make default storage
+        # Make default storage.
         self.store = StorableFactory(database)
-        # Make default PaymentProcessor
+        # Make default PaymentProcessor.
         self.pp = PaymentProcessor(self.bc, self.store)
 
-        # Make root OffChainVasp Object
+        # Make root OffChainVasp Object.
         self.vasp = OffChainVASP(
             self.my_addr, self.pp, self.store, self.info_context
         )
-        # Make default aiohttp based network
+        # Make default aiohttp based network.
         self.net_handler = Aionet(self.vasp)
-        self.pp.set_network(self.net_handler)  # Set handler for processor
+        self.pp.set_network(self.net_handler) # Set handler for processor.
 
         # Initialize later those ...
         # (When calling `start_services`)
@@ -65,24 +65,26 @@ class Vasp:
         ''' Registers services with the even loop provided.
 
         Parameters:
-            * loop : an asyncio event loop on which to register services.
-            * watch_period : the time (seconds) beween activating the
-              network watchdog to trigger debug info and retransmits.
+            loop (asyncio.AbstractEventLoopPolicy): an asyncio event loop on
+                which to register services.
+            watch_period (float, optional): the time (seconds) beween
+                activating the network watchdog to trigger debug info and
+                retransmits. Defaults to 10.0.
 
         '''
         asyncio.set_event_loop(loop)
 
-        # Assign a loop  to the processor
+        # Assign a loop  to the processor.
         self.pp.loop = loop
         self.loop = loop
 
-        # Start the http server
+        # Start the http server.
         self.runner = self.net_handler.get_runner()
         loop.run_until_complete(self.runner.setup())
         self.site = web.TCPSite(self.runner, self.host, self.port)
         loop.run_until_complete(self.site.start())
 
-        # Run the watchdor task to log statistics
+        # Run the watchdor task to log statistics.
         self.net_handler.schedule_watchdog(loop, period=watch_period)
 
     async def new_command_async(self, addr, cmd):
@@ -91,16 +93,16 @@ class Vasp:
             or a request in case of a network falure.
 
             Parameters:
-                * addr : A LibraAddress of the VASP to which to send the
-                         command.
-                * cmd  : A command (PaymentCommand) instance.
+                addr (LibraAddress) : The address of the VASP to which to
+                    send the command.
+                cmd (PaymentCommand) : A payment command instance.
 
             Returns:
-                Bool : in case of no failure it returns a Bool indicating
-                whether the sequenced command was successful or not. OR
-                In case of a network failure returns an instance of a
-                CommandRequestObject represented as a json dict that can be
-                retransmitted.
+                In case of no failure it returns
+                a Bool indicating whether the sequenced command was
+                successful or not. OR In case of a network failure
+                returns an instance of a CommandRequestObject represented
+                as a json dict that can be retransmitted.
 
             Note that the automatic retransmission will eventually re-sent
             the request until progress is made.
@@ -112,10 +114,26 @@ class Vasp:
             return req
 
     def new_command(self, addr, cmd):
-        ''' A synchronous version of `new_command_async`. It sends a new
+        """ A synchronous version of `new_command_async`. It sends a new
             command to the other VASP. Returns a concurrent Future object,
             on which the caller can get a result().
-            '''
+
+            Args:
+                addr (LibraAddress): The address of the VASP to which to
+                                    send the command.
+                cmd (PaymentCommand): A payment command instance.
+
+            Raises:
+                RuntimeError: If the Event loop is None.
+
+            Returns:
+                bool or CommandRequestObject: In case of no failure it returns
+                a Bool indicating whether
+                the sequenced command was successful or not.
+                OR In case of a network failure returns an instance of
+                a CommandRequestObject represented as a json dict that
+                can be retransmitted.
+        """
         if self.loop is not None:
             res = asyncio.run_coroutine_threadsafe(
                 self.new_command_async(addr, cmd), self.loop)
@@ -128,16 +146,15 @@ class Vasp:
             with the given reference ID.
 
             Parameters:
-                * reference_id (str): the reference ID of a payment.
+                reference_id (str): The reference ID of a payment.
 
             Returns:
-                A PaymentObject with the reference ID given.
+                PaymentObject: A PaymentObject with the reference ID given.
 
             Raises:
-                KeyError in case a payment with the
-                given reference does not exist.
-
-            """
+                KeyError: In case a payment with the given reference
+                    does not exist.
+        """
         payment = self.pp.get_latest_payment_by_ref_id(reference_id)
         return payment
 
@@ -169,7 +186,11 @@ class Vasp:
             self.loop = None
 
     def close(self):
-        ''' Syncronous and thread safe version of `close_async`. '''
+        ''' Syncronous and thread safe version of `close_async`.
+
+            Raises:
+                RuntimeError: If the Event loop is None.
+        '''
         assert self.loop is not None
         if self.loop is not None:
             res = asyncio.run_coroutine_threadsafe(

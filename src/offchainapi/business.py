@@ -22,7 +22,7 @@ class BusinessForceAbort(Exception):
 
 
 class BusinessContext:
-    """ The interface a VASP should define to drive the Off-chain protocol """
+    """ The interface a VASP should define to drive the Off-chain protocol. """
 
     def open_channel_to(self, other_vasp_addr):
         """Requests authorization to open a channel to another VASP.
@@ -33,7 +33,7 @@ class BusinessContext:
             other_vasp_info (LibraAddress): The address of the other VASP.
 
         Raises:
-            BusinessNotAuthorized: Raised if the current VASP is not authorised
+            BusinessNotAuthorized: If the current VASP is not authorised
                     to connect with the other VASP.
         """
         raise NotImplementedError()
@@ -41,50 +41,63 @@ class BusinessContext:
     # ----- Actors -----
 
     def is_sender(self, payment):
-        ''' Returns true if the VASP is the sender of a payment.'''
+        """Returns true if the VASP is the sender of a payment.
+
+        Args:
+            payment (PaymentCommand): The concerned payment.
+
+        Returns:
+            bool: Whether the VASP is the sender of the payment.
+        """
         raise NotImplementedError()
 
     def is_recipient(self, payment):
-        ''' Returns true if the VASP is the recipient of a payment.'''
+        """ Returns true if the VASP is the recipient of a payment.
+
+        Args:
+            payment (PaymentCommand): The concerned payment.
+
+        Returns:
+            bool: Whether the VASP is the recipient of the payment.
+        """
         return not self.is_sender(payment)
 
     async def check_account_existence(self, payment):
         """ Checks that the actor (sub-account / sub-address) on this VASP
             exists. This may be either the recipient or the sender, since VASPs
-            can initiate payments in both directions. If not throw a
-            BusinessValidationFailure.
+            can initiate payments in both directions. If not throw an exception.
 
         Args:
             payment (PaymentCommand): The payment command containing the actors
                 to check.
 
         Raises:
-            BusinessValidationFailure: Raised if the account does not exist.
+            BusinessValidationFailure: If the account does not exist.
         """
         raise NotImplementedError()
 
 # ----- VASP Signature -----
 
     def validate_recipient_signature(self, payment):
-        """ Validates the recipient signature is correct. Raise a
-            BusinessValidationFailure is the signature is invalid
-            or not present. If the signature is valid do nothing.
+        """ Validates the recipient signature is correct. Raise an
+            exception if the signature is invalid or not present.
+            If the signature is valid do nothing.
 
         Args:
             payment (PaymentCommand): The payment command containing the
                 signature to check.
 
         Raises:
-            BusinessValidationFailure: Raised if the signature verification
-                fails.
+            BusinessValidationFailure: If the signature is invalid
+                    or not present.
         """
         raise NotImplementedError()
 
     async def get_recipient_signature(self, payment):
-        """Gets a recipient signature on the payment ID.
+        """ Gets a recipient signature on the payment ID.
 
         Args:
-            payment (PaymentCommand): The payment command to sign.
+            payment (PaymentCommand): The payment to sign.
         """
         raise NotImplementedError()
 
@@ -100,9 +113,9 @@ class BusinessContext:
             Returns:
                 Status: A set of status indicating to level of kyc to provide,
                 that can include:
-                    - needs_stable_id
-                    - needs_kyc_data
-                    - needs_recipient_signature
+                    - `status_logic.Status.needs_stable_id`
+                    - `status_logic.Status.needs_kyc_data`
+                    - `status_logic.Status.needs_recipient_signature`
 
             An empty set indicates no KYC should be provided at this moment.
 
@@ -121,9 +134,9 @@ class BusinessContext:
             Returns:
                 Status: The current status if no new information is required,
                 otherwise a status code from:
-                    - needs_stable_id
-                    - needs_kyc_data
-                    - needs_recipient_signature
+                    - `status_logic.Status.needs_stable_id`
+                    - `status_logic.Status.needs_kyc_data`
+                    - `status_logic.Status.needs_recipient_signature`
 
             Raises:
                 BusinessForceAbort : To abort the payment.
@@ -138,8 +151,8 @@ class BusinessContext:
                 payment (PaymentCommand): The concerned payment.
 
             Raises:
-                BusinessValidationFailure: If the signature is invalid or not
-                    present
+                BusinessValidationFailure: If the signature is invalid
+                    or not present.
         '''
         raise NotImplementedError()
 
@@ -150,7 +163,8 @@ class BusinessContext:
                 payment (PaymentCommand): The concerned payment.
 
             Raises:
-                   BusinessNotAuthorized.
+                   BusinessNotAuthorized: If the other VASP is not authorized to
+                    receive extended KYC data for this payment.
 
             Returns:
                 (str, str, str): Returns the extended KYC information for
@@ -167,7 +181,7 @@ class BusinessContext:
 
             Raises:
                 BusinessNotAuthorized: If the other VASP is not authorized to
-                    receive a stable ID.
+                    receive a stable ID for this payment.
 
             Returns:
                 str: A stable ID for the VASP user.
@@ -180,17 +194,17 @@ class BusinessContext:
         ''' Indicates whether a payment is ready for settlement as far as this
             VASP is concerned. Once it returns True it must never return False.
 
-            In particular it MUST check that:
+            In particular it **must** check that:
                 - Accounts exist and have the funds necessary.
                 - Sender of funds intends to perform the payment (VASPs can
                   initiate payments from an account on the other VASP.)
-                - KYC information provided ON BOTH SIDES is correct and to the
-                  VASPs satisfaction. On payment creation a VASP may suggest
+                - KYC information provided **on both sides** is correct and to
+                  the VASPs satisfaction. On payment creation a VASP may suggest
                   KYC information on both sides.
 
-            If all the above are true, then return True.
+            If all the above are true, then return `True`.
             If any of the above are untrue throw an BusinessForceAbort.
-            If any more KYC is necessary then return False.
+            If any more KYC is necessary then return `False`.
 
             This acts as the finality barrier and last check for this VASP.
             After this call returns True this VASP can no more abort the
@@ -212,8 +226,6 @@ class BusinessContext:
             be settled also package it and settle it on chain. This function
             may be called multiple times for the same payment, but any on-chain
             operation should be performed only once per payment.
-
-            Returns a bool: True or False
 
             Cannot raise:
                 BusinessForceAbort
