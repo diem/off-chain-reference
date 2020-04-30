@@ -96,9 +96,11 @@ class Aionet:
                         Wait-Req: {len_req} Wait-Resp: {len_resp}'''
                     )
                 await asyncio.sleep(self.watchdog_period)
+        except asyncio.CancelledError:
+            pass
         except Exception as e:
-            self.logger.error('XXXXXXX')
-            self.logger.error(e)
+            self.logger.error('Watchdog exception')
+            self.logger.exception(e)
         finally:
             self.logger.info('Stop Network Watchdog.')
 

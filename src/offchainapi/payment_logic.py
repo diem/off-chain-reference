@@ -1,5 +1,5 @@
 from .business import BusinessForceAbort
-from .executor import CommandProcessor
+from .executor import CommandProcessor, ProtocolCommand
 from .payment import Status, PaymentObject
 from .status_logic import status_heights_MUST
 from .payment_command import PaymentCommand, PaymentLogicError
@@ -53,7 +53,10 @@ class PaymentProcessor(CommandProcessor):
 
             # TODO: how much of this do we want to persist?
             self.pending_commands = storage_factory.make_dict(
-                'command_log', str, root)
+                'pending_commands', str, root)
+            self.command_cache = storage_factory.make_dict(
+                'command_cache', ProtocolCommand, root)
+
 
         # Storage for debug futures list
         self.futs = []
@@ -71,10 +74,11 @@ class PaymentProcessor(CommandProcessor):
         data = json.dumps((other_str, seq))
         return f'{other_str}_{seq}', data
 
-    def persist_command_obligation(self, other_str, seq):
+    def persist_command_obligation(self, other_str, seq, command):
         ''' Persists the command to ensure its future execution. '''
         uid, data = self.command_unique_id(other_str, seq)
         self.pending_commands[uid] = data
+        self.command_cache[uid] = command
 
     def obligation_exists(self, other_str, seq):
         uid, _ = self.command_unique_id(other_str, seq)
@@ -86,6 +90,7 @@ class PaymentProcessor(CommandProcessor):
             the command. '''
         uid, _ = self.command_unique_id(other_str, seq)
         del self.pending_commands[uid]
+        del self.command_cache[uid]
 
     def list_command_obligations(self):
         ''' Returns a list of (other_address, command sequence) tuples denoting
@@ -94,18 +99,33 @@ class PaymentProcessor(CommandProcessor):
         pending = []
         for uid in self.pending_commands.keys():
             data = self.pending_commands[uid]
-            (other_channel, seq) = json.loads(data)
-            pending += [(other_channel, seq)]
+            (other_address_str, seq) = json.loads(data)
+            command = self.command_cache[uid]
+            pending += [(other_address_str, command, seq)]
         return pending
+
+    async def retry_process_commands(self):
+        ''' A coroutine that attempts to re-processes any pending commands
+            after recovering from a crash. '''
+
+        pending_commands = self.list_command_obligations()
+        self.logger.info(f'Re-scheduling {len(pending_commands)} commands for'
+                         f' processing ...')
+        for (other_address_str, command, seq) in pending_commands:
+            self.loop.create_task(self.process_command_success_async(
+                other_address_str, command, seq))
 
     # ------ Machinery for supporting async Business context ------
 
-    async def process_command_failure_async(self, other_address_str, command, seq, error):
-        self.logger.error(f'Command with {other_address_str}.#{seq} Failure: {error}')
+    async def process_command_failure_async(
+            self, other_address_str, command, seq, error):
+        ''' Process any command failures from either ends of a channel.'''
+        self.logger.error(f'Command with {other_address_str}.#{seq}'
+                          f' Failure: {error}')
         return
 
-    async def process_command_success_async(self, other_address_str, command, seq):
-
+    async def process_command_success_async(
+            self, other_address_str, command, seq):
         """ The asyncronous command processing logic.
 
         Checks all incomming commands from the other VASP, and determines if
@@ -265,7 +285,7 @@ class PaymentProcessor(CommandProcessor):
 
         # We record an obligation to process this command, even
         # after crash recovery.
-        self.persist_command_obligation(other_str, seq)
+        self.persist_command_obligation(other_str, seq, command)
 
         # Spin further command processing in its own task
         self.logger.debug(f'Schedule cmd {seq}')

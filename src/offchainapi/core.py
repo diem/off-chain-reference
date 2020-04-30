@@ -87,6 +87,9 @@ class Vasp:
         # Run the watchdor task to log statistics.
         self.net_handler.schedule_watchdog(loop, period=watch_period)
 
+        # Reschedule commands to be processed, when the loop starts.
+        self.loop.create_task(self.pp.retry_process_commands())
+
     async def new_command_async(self, addr, cmd):
         ''' Sends a new command to the other VASP and returns a
             boolean indicating success or failure of the command,
