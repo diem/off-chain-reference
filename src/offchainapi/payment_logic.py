@@ -50,7 +50,7 @@ class PaymentProcessor(CommandProcessor):
             self.pending_commands = storage_factory.make_dict(
                 'command_log', str, root)
 
-
+        # Storage for debug futures list
         self.futs = []
 
     def set_network(self, net):
@@ -135,7 +135,8 @@ class PaymentProcessor(CommandProcessor):
                                 # be sent out we can consider this command
                                 # done.
                                 if self.obligation_exists(channel, seq):
-                                    self.release_command_obligation(channel, seq)
+                                    self.release_command_obligation(
+                                        channel, seq)
 
                             # Attempt to send it to the other VASP.
                             await self.net.send_request(other_addr, request)
@@ -167,10 +168,10 @@ class PaymentProcessor(CommandProcessor):
     def check_command(self, vasp, channel, executor, command):
         ''' Called when receiving a new payment command to validate it.
 
-            All checks here are blocking subsequent comments, and therefore they
-            must be quick to ensure performance. As a result we only do local
-            syntactic checks hat require no lookup into the VASP potentially
-            remote stores or accounts.
+            All checks here are blocking subsequent comments, and therefore
+            they must be quick to ensure performance. As a result we only
+            do local syntactic checks hat require no lookup into the VASP
+            potentially remote stores or accounts.
         '''
 
         dependencies = executor.object_store
@@ -221,7 +222,8 @@ class PaymentProcessor(CommandProcessor):
             self, vasp, channel, executor, command,
             seq, status_success, error=None):
         ''' Processes a command to generate more subsequent commands.
-        This schedules a talk that will be executed later. '''
+            This schedules a task that will be executed later asynchronously.
+        '''
 
         # Update the payment object index to support retieval by payment index
         if status_success:
@@ -232,8 +234,8 @@ class PaymentProcessor(CommandProcessor):
             # Update the Index of Reference ID -> Payment
             ref_id = payment.reference_id
 
-            # This is all called by the executor within a write lock
-            # so no need for an extra:
+            # NOTE: This is all called by the executor within a write lock
+            # all the way from the protocol code, so no need for an extra:
             # with self.storage_factory.atomic_writes():
 
             # Write the new payment to the index of payments by

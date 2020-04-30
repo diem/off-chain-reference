@@ -87,7 +87,7 @@ def test_handlers(payment, executor):
     #print('deps', cmd3.dependencies)
 
     with pytest.raises(ExecutorException):
-        with store as tx_no:
+        with store as _:
             pe.sequence_next_command(cmd3)
             # pe.set_fail(2)
 

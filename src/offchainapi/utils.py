@@ -46,7 +46,6 @@ class StructureChecker:
             and the object itself. '''
         return item in self.data
 
-
     def record(self, diff):
         ''' Record all diffs applied to the object '''
         self.update_record += [diff]

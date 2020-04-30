@@ -11,12 +11,9 @@ from ..payment import PaymentAction, PaymentActor, PaymentObject
 from ..core import Vasp
 from .basic_business_context import BasicBusinessContext
 
-import logging
 from threading import Thread
 import time
 import asyncio
-
-
 
 # A stand alone performance test.
 
@@ -26,6 +23,7 @@ peer_address = {
     PeerA_addr.as_str(): 'http://localhost:8091',
     PeerB_addr.as_str(): 'http://localhost:8092',
 }
+
 
 class SimpleVASPInfo(VASPInfo):
 

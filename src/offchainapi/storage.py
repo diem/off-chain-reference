@@ -269,7 +269,9 @@ class StorableDict(Storable):
         # We create a doubly linked list to support traveral with O(1) lookup
         # addition and creation.
         meta = StorableValue(db, '__META', str, root=self)
-        self.first_key = StorableValue(db, '__FIRST_KEY', str, root=meta, default='_NONE')
+        self.first_key = StorableValue(
+            db, '__FIRST_KEY', str,
+            root=meta, default='_NONE')
         self.first_key.debug = True
         self.length = StorableValue(db, '__LEN', int, root=meta, default=0)
 
