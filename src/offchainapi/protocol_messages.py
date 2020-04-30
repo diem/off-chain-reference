@@ -15,6 +15,14 @@ class OffChainProtocolError(Exception):
 
     @staticmethod
     def make(protocol_error):
+        """Make an OffChainProtocolError with a given error.
+
+        Args:
+            protocol_error (str): The protocol error representation.
+
+        Returns:
+            OffChainProtocolError: The error object.
+        """
         self = OffChainProtocolError()
         self.protocol_error = protocol_error
         return self
@@ -27,6 +35,14 @@ class OffChainProtocolError(Exception):
 
 
 class OffChainError(JSONSerializable):
+    """Represents an OffChainError.
+
+    Args:
+        protocol_error (bool, optional): Whether it is a protocol error.
+                                         Defaults to True.
+        code (int or None, optional): The error code. Defaults to None.
+    """
+
     def __init__(self, protocol_error=True, code=None):
         self.protocol_error = protocol_error
         self.code = code
@@ -37,8 +53,7 @@ class OffChainError(JSONSerializable):
             and self.code == other.code
 
     def get_json_data_dict(self, flag):
-        ''' Get a data dictionary compatible with JSON
-            serialization (json.dumps) '''
+        ''' Override JSONSerializable. '''
         data_dict = {
             "protocol_error": self.protocol_error,
             "code": self.code
@@ -50,6 +65,7 @@ class OffChainError(JSONSerializable):
 
     @classmethod
     def from_json_data_dict(cls, data, flag):
+        ''' Override JSONSerializable. '''
         try:
             return OffChainError(
                 bool(data['protocol_error']),
@@ -66,7 +82,7 @@ class OffChainError(JSONSerializable):
 
 @JSONSerializable.register
 class CommandRequestObject(JSONSerializable):
-    """Represents a command of the Off chain protocol"""
+    """ Represents a command of the Off chain protocol. """
 
     def __init__(self, command):
         self.seq = None          # The sequence in the local queue
@@ -78,7 +94,7 @@ class CommandRequestObject(JSONSerializable):
         self.response = None
 
     def __eq__(self, other):
-        ''' Define equality as field equality '''
+        ''' Define equality as field equality. '''
         return isinstance(other, CommandRequestObject) \
             and self.seq == other.seq \
             and self.command_seq == other.command_seq \
@@ -87,23 +103,37 @@ class CommandRequestObject(JSONSerializable):
             and self.response == other.response
 
     def is_same_command(self, other):
-        """ Returns true if the other command is the same as this one,
-            Used to detect conflicts in case of buggy corresponding VASP."""
+        """Returns true if the other command is the same as this one,
+            Used to detect conflicts in case of buggy corresponding VASP.
+
+        Args:
+            other (CommandRequestObject): Another command.
+
+        Returns:
+            bool: If the other command is the same as this one.
+        """
         return self.command == other.command
 
     def has_response(self):
-        """ Returns true if request had a response, false otherwise """
+        """Returns true if request had a response, false otherwise.
+
+        Returns:
+            bool: If request had a response.
+        """
         return self.response is not None
 
     def is_success(self):
-        """ Returns true if the response was a success """
+        """Returns true if the response was a success.
+
+        Returns:
+            bool: If the response was a success.
+        """
         assert self.has_response()
         return self.response.status == 'success'
 
     # define serialization interface
     def get_json_data_dict(self, flag):
-        ''' Get a data dictionary compatible with JSON
-            serilization (json.dumps) '''
+        ''' Override JSONSerializable. '''
         data_dict = {
             "seq": self.seq,
             "command": self.command.get_json_data_dict(flag),
@@ -127,8 +157,7 @@ class CommandRequestObject(JSONSerializable):
 
     @classmethod
     def from_json_data_dict(cls, data, flag):
-        ''' Construct the object from a serlialized JSON data
-            dictionary (from json.loads). '''
+        ''' Override JSONSerializable. '''
         try:
             # Use generic/dynamic parse functionality
             command = JSONSerializable.parse(data['command'], flag)
@@ -145,7 +174,7 @@ class CommandRequestObject(JSONSerializable):
 
 
 class CommandResponseObject(JSONSerializable):
-    """Represents a response to a command in the Off chain protocol"""
+    """Represents a response to a command in the Off chain protocol."""
 
     def __init__(self):
         # Start with no data
@@ -163,15 +192,17 @@ class CommandResponseObject(JSONSerializable):
 
     def is_protocol_failure(self):
         """ Returns True if the request has a response that is not a protocol
-            failure (and we can recover from it)
+            failure (and we can recover from it).
+
+        Returns:
+            bool: If the request has a response that is not a protocol failure.
         """
         return self.status == 'failure' and self.error.protocol_error
 
     # define serialization interface
 
     def get_json_data_dict(self, flag):
-        ''' Get a data disctionary compatible with
-            JSON serilization (json.dumps) '''
+        ''' Override JSONSerializable. '''
         data_dict = {
             "seq": self.seq,
             "command_seq": self.command_seq,
@@ -190,8 +221,7 @@ class CommandResponseObject(JSONSerializable):
 
     @classmethod
     def from_json_data_dict(cls, data, flag):
-        ''' Construct the object from a serlialized JSON data
-            dictionary (from json.loads). '''
+        ''' Override JSONSerializable. '''
         try:
             self = CommandResponseObject()
 
@@ -225,7 +255,14 @@ class CommandResponseObject(JSONSerializable):
 
 
 def make_success_response(request):
-    """ Constructs a CommandResponse signaling success"""
+    """Constructs a CommandResponse signaling success.
+
+    Args:
+        request (CommandRequestObject): The request object.
+
+    Returns:
+        CommandResponseObject: The generated response object.
+    """
     response = CommandResponseObject()
     response.seq = request.seq
     response.status = 'success'
@@ -236,6 +273,13 @@ def make_protocol_error(request, code=None):
     """ Constructs a CommandResponse signaling a protocol failure.
         We do not sequence or store such responses since we can recover
         from them.
+
+    Args:
+        request (CommandRequestObject): The request object.
+        code (int or None, optional): The error code. Defaults to None.
+
+    Returns:
+        CommandResponseObject: The generated response object.
     """
     response = CommandResponseObject()
     response.seq = request.seq
@@ -248,6 +292,9 @@ def make_parsing_error():
     """ Constructs a CommandResponse signaling a protocol failure.
         We do not sequence or store such responses since we can recover
         from them.
+
+    Returns:
+        CommandResponseObject: The generated response object.
     """
     response = CommandResponseObject()
     response.seq = None
@@ -259,6 +306,13 @@ def make_parsing_error():
 def make_command_error(request, code=None):
     """ Constructs a CommandResponse signaling a command failure.
         Those failures lead to a command being sequenced as a failure.
+
+    Args:
+        request (CommandRequestObject): The request object.
+        code (int or None, optional): The error code. Defaults to None.
+
+    Returns:
+        CommandResponseObject: The generated response object.
     """
     response = CommandResponseObject()
     response.seq = request.seq

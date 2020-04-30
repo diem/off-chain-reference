@@ -41,16 +41,23 @@ class SharedObject(JSONSerializable):
         return clone
 
     def get_version(self):
-        ''' Return a unique version number to this object and version '''
+        """Return a unique version number to this object and version.
+
+        Returns:
+            int: The version number.
+        """
         return self.version
 
     def set_version(self, version):
-        ''' Sets the version of the objects. Useful for contructors. '''
+        """ Sets the version of the objects. Useful for contructors.
+
+        Args:
+            version (int): The version of the object.
+        """
         self.version = version
 
     def get_json_data_dict(self, flag, update_dict=None):
-        ''' Get a data dictionary compatible with
-            JSON serilization (json.dumps) '''
+        ''' Override JSONSerializable. '''
         if update_dict is None:
             update_dict = {}
 
@@ -64,8 +71,7 @@ class SharedObject(JSONSerializable):
 
     @classmethod
     def from_json_data_dict(cls, data, flag, self=None):
-        ''' Construct the object from a serlialized
-            JSON data dictionary (from json.loads). '''
+        ''' Override JSONSerializable. '''
         if self is None:
             self = cls.__new__(cls)
         self.version = data['version']

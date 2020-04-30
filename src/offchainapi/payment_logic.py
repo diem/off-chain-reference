@@ -180,7 +180,6 @@ class PaymentProcessor(CommandProcessor):
                     if self.net is not None:
                         await self.net.send_request(other_address, request)
 
-
             # If we are here we are done with this obligation
             with self.storage_factory.atomic_writes():
                 if self.obligation_exists(other_address_str, seq):
