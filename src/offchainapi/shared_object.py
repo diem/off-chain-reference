@@ -22,12 +22,16 @@ class SharedObject(JSONSerializable):
         self.previous_versions = []  # Stores previous version of the object
 
     def new_version(self, new_version=None):
-        ''' Make a deep copy of an object with a new version number
+        """ Make a deep copy of an object with a new version number.
 
-            Parameters:
-                * new_version (Optional) -- a specific new version string
+        Args:
+            new_version (str, optional): a specific new version string
                   to use otherwise a fresh random new version is used.
-        '''
+                  Defaults to None.
+
+        Returns:
+            SharedObject: The new shared obeject.
+        """
         clone = deepcopy(self)
         clone.previous_versions = [self.get_version()]
         clone.version = new_version
