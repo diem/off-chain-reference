@@ -37,15 +37,27 @@ class PaymentCommand(ProtocolCommand):
             and self.command == other.command
 
     def get_object(self, version_number, dependencies):
-        ''' Returns the new payment object defined by this command. Since this
-            may depend on a previous payment (when it is an update) we need to
-            provide a dictionary of its dependencies.
-        '''
-        # First find dependencies & created objects
+        """ Returns the new payment object defined by this command. Since this
+        may depend on a previous payment (when it is an update) we need to
+        provide a dictionary of its dependencies.
+
+        Args:
+            version_number (int): The version number
+            dependencies (list): The list of dependencies.
+
+        Raises:
+            PaymentLogicError: If the payment depends on more than one other
+                               payment.
+
+        Returns:
+            PaymentObject: The updated payment.
+        """
+        # First find dependencies & created objects.
         new_version = self.get_new_version()
         if new_version != version_number:
             raise PaymentLogicError(
-                f"Unknown object {version_number} (only know {new_version})")
+                f"Unknown object {version_number} (only know {new_version})"
+            )
 
         # This indicates the command creates a fresh payment.
         if len(self.dependencies) == 0:
@@ -60,18 +72,20 @@ class PaymentCommand(ProtocolCommand):
             dep = self.dependencies[0]
             if dep not in dependencies:
                 raise PaymentLogicError(
-                    'Cound not find payment dependency: %s' % dep)
+                    f'Cound not find payment dependency: {dep}'
+                )
             dep_object = dependencies[dep]
 
-            # Need to get a deepcopy new version
+            # Need to get a deepcopy new version.
             updated_payment = dep_object.new_version(new_version)
             PaymentObject.from_full_record(
-                self.command, base_instance=updated_payment)
+                self.command, base_instance=updated_payment
+            )
 
             self.payment = updated_payment
             return updated_payment
 
-        raise PaymentLogicError("Can depdend on no or one other payemnt")
+        raise PaymentLogicError("Can depdend on no or one other payment.")
 
     def get_payment(self):
         if self.payment is None:
@@ -80,15 +94,37 @@ class PaymentCommand(ProtocolCommand):
 
     def get_json_data_dict(self, flag):
         ''' Get a data dictionary compatible with JSON serilization
-            (json.dumps) '''
+            (json.dumps).
+
+            Args:
+                flag (utils.JSONFlag): whether the JSON is intended
+                    for network transmission (NET) to another party or local
+                    storage (STORE).
+
+            Returns:
+                dict: A data dictionary compatible with JSON serilization.
+        '''
         data_dict = ProtocolCommand.get_json_data_dict(self, flag)
         data_dict['diff'] = self.command
         return data_dict
 
     @classmethod
     def from_json_data_dict(cls, data, flag):
-        ''' Construct the object from a serlialized JSON
-            data dictionary (from json.loads). '''
+        """ Construct the object from a serlialized JSON
+            data dictionary (from json.loads).
+
+        Args:
+            data (dict): A JSON data dictionary.
+            flag (utils.JSONFlag): whether the JSON is intended
+                    for network transmission (NET) to another party or local
+                    storage (STORE).
+
+        Raises:
+            PaymentLogicError: If there is an error while creating the payment.
+
+        Returns:
+            PaymentCommand: A PaymentCommand from the input data.
+        """
         self = super().from_json_data_dict(data, flag)
         # Thus super() is magic, but do not worry we get the right type:
         assert isinstance(self, PaymentCommand)
@@ -97,7 +133,8 @@ class PaymentCommand(ProtocolCommand):
 
         if len(self.dependencies) > 1:
             raise PaymentLogicError(
-                "A payment can only depend on a single previous payment")
+                "A payment can only depend on a single previous payment"
+            )
 
         if len(self.creates_versions) != 1:
             raise PaymentLogicError("A payment always creates a new payment")
@@ -106,17 +143,25 @@ class PaymentCommand(ProtocolCommand):
 
     # Helper functions for payment commands specifically
     def get_previous_version(self):
-        ''' Returns the version of the previous payment, or None if this
-            command creates a new payment '''
-        # This is  ensured from the constructors
+        """ Returns the version of the previous payment, or None if this
+        command creates a new payment
+
+        Returns:
+            The version of the previous payment, or None if this
+            command creates a new payment.
+        """
+        # This is  ensured from the constructors.
         assert len(self.dependencies) in [0, 1]
         if len(self.dependencies) == 0:
             return None
         return self.dependencies[0]
 
     def get_new_version(self):
-        ''' Returns the version number of the payment created or updated '''
+        ''' Returns the version number of the payment.
 
-        # Ensured from the constructors
+            Returns:
+                int: The version number of the payment.
+        '''
+        # Ensured from the constructors.
         assert len(self.creates_versions) == 1
         return self.creates_versions[0]
