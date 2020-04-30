@@ -33,6 +33,12 @@ def test_handlers(payment, executor):
             else:
                 self.failure_no += 1
 
+        def check_command(self, vasp, channel, executor, command):
+            return True
+
+
+
+
     stat = Stats(bcm)
     pe = ProtocolExecutor(channel, stat)
 
