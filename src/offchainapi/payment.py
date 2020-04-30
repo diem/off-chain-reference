@@ -8,30 +8,42 @@ import json
 
 
 class KYCData(StructureChecker):
+    """ The KYC data that can be attached to payments.
+
+        Args:
+            kyc_json_blob (str): blob containing KYC data.
+    """
+
     fields = [
         ('blob', str, REQUIRED, WRITE_ONCE)
     ]
 
     def __init__(self, kyc_json_blob):
-        # Keep as blob since we need to sign / verify byte string
+        # Keep as blob since we need to sign / verify byte string.
         StructureChecker.__init__(self)
         self.update({
             'blob': kyc_json_blob
         })
 
     def parse(self):
-        """ Parse the KYC blob and return a data dictionary. """
+        """ Parse the KYC blob and return a data dictionary.
+
+            Returns:
+                dict: KYC data as a dictionary.
+        """
         return json.loads(self.data['blob'])
 
     def custom_update_checks(self, diff):
-        # Tests JSON parsing before accepting blob
+        """ Override StructureChecker. """
+        # Tests JSON parsing before accepting blob.
         if 'blob' in diff:
             try:
                 data = json.loads(diff['blob'])
             except Exception as e:
                 raise StructureException(
                     f'JSON Parsing Exception :'
-                    f'ensure KYCData is a valid JSON object ({e})')
+                    f'ensure KYCData is a valid JSON object ({e})'
+                )
 
             if 'payment_reference_id' not in data:
                 raise StructureException('Missing: field payment_reference_id')
@@ -40,6 +52,15 @@ class KYCData(StructureChecker):
 
 
 class PaymentActor(StructureChecker):
+    """ Represents a payment actor.
+
+        Args:
+            address (LibraAddress): The address of the VASP.
+            subaddress (str): The subaddress of the account on the VASP.
+            status (utils.Status): The payment status for this actor.
+            metadata (list): Arbitrary metadata.
+    """
+
     fields = [
         ('address', str, REQUIRED, WRITE_ONCE),
         ('subaddress', str, REQUIRED, WRITE_ONCE),
@@ -61,6 +82,7 @@ class PaymentActor(StructureChecker):
         })
 
     def custom_update_checks(self, diff):
+        """ Override StructureChecker. """
         # If any of kyc data, signature or certificate is provided, we expect
         # all the other fields as well
         missing = set([
@@ -83,7 +105,13 @@ class PaymentActor(StructureChecker):
                         type(item))
 
     def add_kyc_data(self, kyc_data, kyc_signature, kyc_certificate):
-        ''' Add extended KYC information and kyc signature '''
+        """ Add extended KYC information and kyc signature.
+
+        Args:
+            kyc_data (str): The KYC data.
+            kyc_signature (str): The KYC signature.
+            kyc_certificate (str): The KYC certificate.
+        """
         self.update({
             'kyc_data': kyc_data,
             'kyc_signature': kyc_signature,
@@ -91,19 +119,31 @@ class PaymentActor(StructureChecker):
         })
 
     def add_metadata(self, item):
-        ''' Add an item to the metadata '''
+        """ Add an item to the metadata
+
+        Args:
+            item (*): The item to add to the metadata.
+        """
         self.update({
             'metadata': self.data['metadata'] + [item]
         })
 
     def change_status(self, status):
-        ''' Change the payment status for this actor '''
+        """ Change the payment status for this actor>
+
+        Args:
+            status (utils.Status): The new status.
+        """
         self.update({
             'status': status
         })
 
     def add_stable_id(self, stable_id):
-        ''' Add a stable id for this actor '''
+        """ Add a stable id for this actor.
+
+        Args:
+            stable_id (str): The stable id to add to the payment for this actor.
+        """
         self.update({
             'stable_id': stable_id
         })
@@ -118,6 +158,14 @@ class PaymentAction(StructureChecker):
     ]
 
     def __init__(self, amount, currency, action, timestamp):
+        """ Represents a payment account; eg. make a payment.
+
+        Args:
+            amount (int): The amount of the payment.
+            currency (str): The currency of the payment.
+            action (str): The action of the payment; eg. a refund.
+            timestamp (str): The timestamp of the payment.
+        """
         StructureChecker.__init__(self)
         self.update({
             'amount': amount,
@@ -127,6 +175,7 @@ class PaymentAction(StructureChecker):
         })
 
     def custom_update_checks(self, diff):
+        """ Override StructureChecker. """
         if 'amount' in diff and not diff['amount'] > 0:
             raise StructureException('Wrong amount: must be positive')
 
@@ -135,6 +184,16 @@ class PaymentAction(StructureChecker):
 
 @JSONSerializable.register
 class PaymentObject(SharedObject, StructureChecker, JSONSerializable):
+    """ Represents a payment object.
+
+        Args:
+            sender (PaymentActor): The sender actor.
+            receiver (PaymentActor): The recipient actor.
+            reference_id (str): The payment reference.
+            original_payment_reference_id (str): Original payment's reference.
+            description (str): A string description.
+            action (PaymentAction): The payment action.
+    """
 
     fields = [
         ('sender', PaymentActor, REQUIRED, WRITE_ONCE),
@@ -162,25 +221,36 @@ class PaymentObject(SharedObject, StructureChecker, JSONSerializable):
 
     @classmethod
     def create_from_record(cls, diff):
+        """ Create a apyment object from a diff.
+
+        Args:
+            diff (str): The diff from which to create the payment.
+
+        Returns:
+            PaymentObject: The created payment object.
+        """
         self = PaymentObject.from_full_record(diff)
         SharedObject.__init__(self)
         return self
 
     def new_version(self, new_version=None):
-        ''' Also flatten object with a new version '''
+        """ Override SharedObject. """
         clone = SharedObject.new_version(self, new_version)
         clone.flatten()
         return clone
 
     def add_recipient_signature(self, signature):
-        ''' Update the recipient signature '''
+        """ Update the recipient signature.
+
+        Args:
+            signature (str): The recipient's signature.
+        """
         self.update({
             'recipient_signature': signature
         })
 
     def get_json_data_dict(self, flag, update_dict=None):
-        ''' Get a data dictionary compatible with
-            JSON serilization (json.dumps) '''
+        ''' Override SharedObject. '''
         json_data = {}
         json_data = SharedObject.get_json_data_dict(self, flag, json_data)
         json_data['data'] = self.get_full_diff_record()
@@ -188,8 +258,7 @@ class PaymentObject(SharedObject, StructureChecker, JSONSerializable):
 
     @classmethod
     def from_json_data_dict(cls, data, flag, self=None):
-        ''' Construct the object from a serlialized
-            JSON data dictionary (from json.loads). '''
+        ''' Override SharedObject. '''
         self = PaymentObject.from_full_record(data['data'])
         SharedObject.from_json_data_dict(data, flag, self)
         return self

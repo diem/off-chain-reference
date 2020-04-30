@@ -118,6 +118,14 @@ class PaymentProcessor(CommandProcessor):
             seq (int): The sequence number of the payment command.
         """
 
+        # If there is no registered obligation to process there is no
+        # need to process this command. We log here an error, which
+        # might be due to a bug.
+        if not self.obligation_exists(other_address_str, seq):
+            self.logger.error(f'Process command called without obligation '
+                              f'{other_address_str}.#{seq}')
+            return
+
         self.logger.debug(f'Process Command {other_address_str}.#{seq}')
 
         try:
