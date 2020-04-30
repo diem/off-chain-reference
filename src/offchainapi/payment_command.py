@@ -24,6 +24,9 @@ class PaymentCommand(ProtocolCommand):
         self.creates_versions = [payment.get_version()]
         self.command = payment.get_full_diff_record()
 
+        # Either init this payment here, or when parsed.
+        self.payment = payment
+
     def __eq__(self, other):
         return ProtocolCommand.__eq__(self, other) \
             and self.dependencies == other.dependencies \
@@ -45,6 +48,8 @@ class PaymentCommand(ProtocolCommand):
         if len(self.dependencies) == 0:
             payment = PaymentObject.create_from_record(self.command)
             payment.set_version(new_version)
+
+            self.payment = payment
             return payment
 
         # This command updates a previous payment.
@@ -59,9 +64,16 @@ class PaymentCommand(ProtocolCommand):
             updated_payment = dep_object.new_version(new_version)
             PaymentObject.from_full_record(
                 self.command, base_instance=updated_payment)
+
+            self.payment = updated_payment
             return updated_payment
 
         raise PaymentLogicError("Can depdend on no or one other payemnt")
+
+    def get_payment(self):
+        if self.payment is None:
+            raise PaymentLogicError('No payment yet parsed for this command.')
+        return self.payment
 
     def get_json_data_dict(self, flag):
         ''' Get a data dictionary compatible with JSON serilization
@@ -78,6 +90,7 @@ class PaymentCommand(ProtocolCommand):
         # Thus super() is magic, but do not worry we get the right type:
         assert isinstance(self, PaymentCommand)
         self.command = data['diff']
+        self.payment = None
 
         if len(self.dependencies) > 1:
             raise PaymentLogicError(

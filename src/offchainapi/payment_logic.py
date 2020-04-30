@@ -112,9 +112,7 @@ class PaymentProcessor(CommandProcessor):
             if status_success:
                 # Only respond to commands by other side.
                 if command.origin != channel.myself:
-                    dependencies = executor.object_store
-                    new_version = command.get_new_version()
-                    payment = command.get_object(new_version, dependencies)
+                    payment = command.get_payment()
                     new_payment = await self.payment_process_async(payment)
 
                     if new_payment is not None and new_payment.has_changed():
@@ -175,7 +173,6 @@ class PaymentProcessor(CommandProcessor):
         '''
 
         dependencies = executor.object_store
-
         new_version = command.get_new_version()
         new_payment = command.get_object(new_version, dependencies)
 
@@ -227,9 +224,7 @@ class PaymentProcessor(CommandProcessor):
 
         # Update the payment object index to support retieval by payment index
         if status_success:
-            dependencies_objects = executor.object_store
-            new_version = command.get_new_version()
-            payment = command.get_object(new_version, dependencies_objects)
+            payment = command.get_payment()
 
             # Update the Index of Reference ID -> Payment
             ref_id = payment.reference_id

@@ -4,8 +4,10 @@ from ..business import BusinessForceAbort, BusinessValidationFailure
 
 from ..payment import PaymentObject
 from ..libra_address import LibraAddress
+from ..asyncnet import Aionet
 
 from unittest.mock import MagicMock
+from mock import AsyncMock
 import pytest
 
 
@@ -220,3 +222,8 @@ def test_payment_process_get_extended_kyc(payment, processor, kyc_data):
     assert new_payment.receiver.kyc_data == kyc_data
     assert new_payment.receiver.kyc_signature == 'sig'
     assert new_payment.receiver.kyc_certificate == 'cert'
+
+
+def test_process_command(processor):
+    net = AsyncMock(Aionet)
+    processor.set_network(net)
