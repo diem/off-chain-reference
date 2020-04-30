@@ -243,13 +243,13 @@ class JSONSerializable:
     def get_json_data_dict(self, flag, update_dict=None):
         ''' Get a data dictionary compatible with JSON
             serilization (json.dumps) '''
-        raise NotImplementedError()
+        raise NotImplementedError()  # pragma: no cover
 
     @classmethod
     def from_json_data_dict(cls, data, flag, self=None):
         ''' Construct the object from a serlialized JSON data
             dictionary (from json.loads). '''
-        raise NotImplementedError()
+        raise NotImplementedError()  # pragma: no cover
 
     @classmethod
     def json_type(cls):

@@ -29,18 +29,6 @@ class SimpleVASPInfo(VASPInfo):
         self.other_configs = other_configs
         self.port = port
 
-    def get_TLS_certificate_path(self):
-        raise NotImplementedError()
-
-    def get_TLS_key_path(self):
-        raise NotImplementedError()
-
-    def get_peer_TLS_certificate_path(self, other_addr):
-        raise NotImplementedError()
-
-    def get_all_peers_TLS_certificate_path(self):
-        raise NotImplementedError()
-
     def get_peer_base_url(self, other_addr):
         protocol = 'https://' if self.port == 443 else 'http://'
         base_url = self.other_configs['base_url']

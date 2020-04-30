@@ -92,7 +92,7 @@ class BasicBusinessContext(BusinessContext):
             )
 
     async def get_stable_id(self, payment):
-        raise NotImplementedError()
+        raise NotImplementedError()  # pragma: no cover
 
     # ----- Settlement -----
 

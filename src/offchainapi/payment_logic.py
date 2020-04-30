@@ -112,27 +112,28 @@ class PaymentProcessor(CommandProcessor):
         self.logger.info(f'Re-scheduling {len(pending_commands)} commands for'
                          f' processing ...')
         for (other_address_str, command, seq) in pending_commands:
+            other_address = LibraAddress(other_address_str)
             self.loop.create_task(self.process_command_success_async(
-                other_address_str, command, seq))
+                other_address, command, seq))
 
     # ------ Machinery for supporting async Business context ------
 
     async def process_command_failure_async(
-            self, other_address_str, command, seq, error):
+            self, other_address, command, seq, error):
         ''' Process any command failures from either ends of a channel.'''
-        self.logger.error(f'Command with {other_address_str}.#{seq}'
+        self.logger.error(f'Command with {other_address.as_str()}.#{seq}'
                           f' Failure: {error}')
         return
 
     async def process_command_success_async(
-            self, other_address_str, command, seq):
+            self, other_address, command, seq):
         """ The asyncronous command processing logic.
 
         Checks all incomming commands from the other VASP, and determines if
         any new commands need to be issued from this VASP in response.
 
         Args:
-            other_address_str (string):  The other VASP address in the
+            other_address (LibraAddress):  The other VASP address in the
                 channel that received this command..
             command (PaymentCommand): The current payment command.
             seq (int): The sequence number of the payment command.
@@ -141,6 +142,7 @@ class PaymentProcessor(CommandProcessor):
         # If there is no registered obligation to process there is no
         # need to process this command. We log here an error, which
         # might be due to a bug.
+        other_address_str = other_address.as_str()
         if not self.obligation_exists(other_address_str, seq):
             self.logger.error(f'Process command called without obligation '
                               f'{other_address_str}.#{seq}')
@@ -150,7 +152,7 @@ class PaymentProcessor(CommandProcessor):
 
         try:
             # Only respond to commands by other side.
-            if command.origin == other_address_str:
+            if command.origin.as_str() == other_address_str:
 
                 # Determine if we should inject a new command
                 payment = command.get_payment(self.object_store)
@@ -164,7 +166,7 @@ class PaymentProcessor(CommandProcessor):
                     # Or none of the two.
                     with self.storage_factory.atomic_writes():
                         request = self.net.sequence_command(
-                            other_address_str, new_cmd
+                            other_address, new_cmd
                         )
 
                         # Crash-recovery: Once a request is ordered to
@@ -176,7 +178,7 @@ class PaymentProcessor(CommandProcessor):
 
                     # Attempt to send it to the other VASP.
                     if self.net is not None:
-                        await self.net.send_request(other_address_str, request)
+                        await self.net.send_request(other_address, request)
 
 
             # If we are here we are done with this obligation
@@ -245,11 +247,12 @@ class PaymentProcessor(CommandProcessor):
             seq, status_success, error=None):
         ''' Overrides CommandProcessor. '''
 
-        other_str = channel.get_other_address().as_str()
+        other_addr = channel.get_other_address()
+        other_str = other_addr.as_str()
 
         if not status_success:
             fut = self.loop.create_task(self.process_command_failure_async(
-                other_str, command, seq, error))
+                other_addr, command, seq, error))
             if __debug__:
                 self.futs += [fut]
             return fut
@@ -290,7 +293,7 @@ class PaymentProcessor(CommandProcessor):
         # Spin further command processing in its own task
         self.logger.debug(f'Schedule cmd {seq}')
         fut = self.loop.create_task(self.process_command_success_async(
-            other_str, command, seq))
+            other_addr, command, seq))
 
         # Log the futures here to execute them inidividually
         # when testing.

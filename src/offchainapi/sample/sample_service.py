@@ -40,18 +40,6 @@ class sample_vasp_info(VASPInfo):
         self.each_peer_base_url = each_peer_base_url
         pass
 
-    def get_TLS_certificate_path(self):
-        raise NotImplementedError()
-
-    def get_TLS_key_path(self):
-        raise NotImplementedError()
-
-    def get_peer_TLS_certificate_path(self, other_addr):
-        raise NotImplementedError()
-
-    def get_all_peers_TLS_certificate_path(self):
-        raise NotImplementedError()
-
     def get_peer_base_url(self, other_addr):
         assert other_addr.as_str() in self.each_peer_base_url
         return self.each_peer_base_url[other_addr.as_str()]

@@ -55,7 +55,7 @@ class ProtocolCommand(JSONSerializable):
         Raises:
             SharedObject: The actual shared object with this version number.
         """
-        raise NotImplementedError
+        raise NotImplementedError()  # pragma: no cover
 
     def get_json_data_dict(self, flag):
         """ Get a data dictionary compatible with

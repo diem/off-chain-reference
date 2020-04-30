@@ -7,7 +7,7 @@ class CommandProcessor:
                 The business context of the VASP
                 implementing the BusinessContext interface.
         '''
-        raise NotImplementedError()
+        raise NotImplementedError()  # pragma: no cover
 
     def check_command(self, channel, command):
         ''' Called when receiving a new payment command to validate it.
@@ -21,7 +21,7 @@ class CommandProcessor:
                 channel (VASPPairChannel):  A VASP channel.
                 command (PaymentCommand): The current payment.
         '''
-        raise NotImplementedError()
+        raise NotImplementedError()  # pragma: no cover
 
     def process_command(self, vasp, channel, executor,
                         command, seq, status, error=None):
@@ -41,4 +41,4 @@ class CommandProcessor:
             Returns:
                 Future: A task that will be executed later.
         """
-        raise NotImplementedError()
+        raise NotImplementedError()  # pragma: no cover

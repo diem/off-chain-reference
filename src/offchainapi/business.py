@@ -36,7 +36,7 @@ class BusinessContext:
             BusinessNotAuthorized: If the current VASP is not authorised
                     to connect with the other VASP.
         """
-        raise NotImplementedError()
+        raise NotImplementedError()  # pragma: no cover
 
     # ----- Actors -----
 
@@ -49,7 +49,7 @@ class BusinessContext:
         Returns:
             bool: Whether the VASP is the sender of the payment.
         """
-        raise NotImplementedError()
+        raise NotImplementedError()  # pragma: no cover
 
     def is_recipient(self, payment):
         """ Returns true if the VASP is the recipient of a payment.
@@ -74,7 +74,7 @@ class BusinessContext:
         Raises:
             BusinessValidationFailure: If the account does not exist.
         """
-        raise NotImplementedError()
+        raise NotImplementedError()  # pragma: no cover
 
 # ----- VASP Signature -----
 
@@ -91,7 +91,7 @@ class BusinessContext:
             BusinessValidationFailure: If the signature is invalid
                     or not present.
         """
-        raise NotImplementedError()
+        raise NotImplementedError()  # pragma: no cover
 
     async def get_recipient_signature(self, payment):
         """ Gets a recipient signature on the payment ID.
@@ -99,7 +99,7 @@ class BusinessContext:
         Args:
             payment (PaymentCommand): The payment to sign.
         """
-        raise NotImplementedError()
+        raise NotImplementedError()  # pragma: no cover
 
 # ----- KYC/Compliance checks -----
 
@@ -122,7 +122,7 @@ class BusinessContext:
             Raises:
                 BusinessForceAbort : To abort the payment.
         '''
-        raise NotImplementedError()
+        raise NotImplementedError()  # pragma: no cover
 
     async def next_kyc_level_to_request(self, payment):
         ''' Returns the next level of KYC to request from the other VASP. Must
@@ -141,7 +141,7 @@ class BusinessContext:
             Raises:
                 BusinessForceAbort : To abort the payment.
         '''
-        raise NotImplementedError()
+        raise NotImplementedError()  # pragma: no cover
 
     def validate_kyc_signature(self, payment):
         ''' Validates the kyc signature is correct. If the signature is valid
@@ -154,7 +154,7 @@ class BusinessContext:
                 BusinessValidationFailure: If the signature is invalid
                     or not present.
         '''
-        raise NotImplementedError()
+        raise NotImplementedError()  # pragma: no cover
 
     async def get_extended_kyc(self, payment):
         ''' Provides the extended KYC information for this payment.
@@ -171,7 +171,7 @@ class BusinessContext:
                 this payment, in the format:
                 (`kyc_data`, `kyc_signature`, `kyc_certificate`)
         '''
-        raise NotImplementedError()
+        raise NotImplementedError()  # pragma: no cover
 
     async def get_stable_id(self, payment):
         ''' Provides a stable ID for the payment.
@@ -186,7 +186,7 @@ class BusinessContext:
             Returns:
                 str: A stable ID for the VASP user.
         '''
-        raise NotImplementedError()
+        raise NotImplementedError()  # pragma: no cover
 
 # ----- Settlement -----
 
@@ -219,7 +219,7 @@ class BusinessContext:
             Returns:
                 bool: Whether the VASP is ready to settle the payment.
             '''
-        raise NotImplementedError()
+        raise NotImplementedError()  # pragma: no cover
 
     async def has_settled(self, payment):
         ''' Returns whether the payment was settled on chain. If the payment can
@@ -238,7 +238,7 @@ class BusinessContext:
             Returns:
                 bool: Whether the payment was settled on chain.
         '''
-        raise NotImplementedError()
+        raise NotImplementedError()  # pragma: no cover
 
 
 class VASPInfo:
@@ -251,7 +251,7 @@ class VASPInfo:
                 str: The base url of the VASP.
 
         """
-        raise NotImplementedError()
+        raise NotImplementedError()  # pragma: no cover
 
     def get_peer_base_url(self, other_addr):
         """ Get the base URL that manages off-chain communications of the other
@@ -263,7 +263,7 @@ class VASPInfo:
             Returns:
                 str: The base url of the other VASP.
         """
-        raise NotImplementedError()
+        raise NotImplementedError()  # pragma: no cover
 
     def is_authorised_VASP(self, certificate, other_addr):
         """ Check whether an incoming network request is authorised or not.
@@ -278,7 +278,7 @@ class VASPInfo:
             Returns:
                 bool: Whether the request of the other VASP is authorized.
         """
-        raise NotImplementedError()
+        raise NotImplementedError()  # pragma: no cover
 
     # --- The functions below are currently unused ---
 
@@ -289,7 +289,7 @@ class VASPInfo:
                 LibraAddress: The Libra address.
 
         """
-        raise NotImplementedError()
+        raise NotImplementedError()  # pragma: no cover
 
     def get_parent_address(self):
         """ The VASP Parent address for this channel. High level logic is common
@@ -300,7 +300,7 @@ class VASPInfo:
             LibraAddress: The Libra address of the parent VASP.
 
         """
-        raise NotImplementedError()
+        raise NotImplementedError()  # pragma: no cover
 
     def is_unhosted(self, other_addr):
         """ Returns True if the other party is an unhosted wallet.
@@ -312,4 +312,4 @@ class VASPInfo:
                 bool: Whether the other VASP is an unhosted wallet.
 
         """
-        raise NotImplementedError()
+        raise NotImplementedError()  # pragma: no cover
