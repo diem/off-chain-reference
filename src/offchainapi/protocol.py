@@ -742,7 +742,6 @@ class VASPPairChannel:
         # Add the next command to the common sequence.
         if response.command_seq == self.next_final_sequence():
             try:
-                print('HERE')
                 self.executor.sequence_next_command(
                     request.command,
                     do_not_sequence_errors=False
