@@ -5,10 +5,10 @@ from ..libra_address import LibraAddress
 from ..utils import JSONFlag
 from ..protocol_messages import CommandRequestObject, CommandResponseObject, \
     OffChainError
+from ..asyncnet import Aionet
 
-from pathlib import Path
+from mock import AsyncMock
 import json
-from unittest.mock import MagicMock, patch
 import pytest
 import asyncio
 
@@ -198,25 +198,20 @@ def simple_response_json_error(request):
 
 def test_vasp_simple(simple_request_json, vasp, other_addr, loop):
     vasp.pp.loop = loop
+    net = AsyncMock(Aionet)
+    vasp.pp.set_network(net)
 
-    try:
-        vasp.process_request(other_addr, simple_request_json)
-        requests = vasp.collect_messages()
-        assert len(requests) == 1
-        assert requests[0].type is CommandResponseObject
+    vasp.process_request(other_addr, simple_request_json)
+    requests = vasp.collect_messages()
+    assert len(requests) == 1
+    assert requests[0].type is CommandResponseObject
 
-        assert len(vasp.pp.futs) == 1
-        for fut in vasp.pp.futs:
-            vasp.pp.loop.run_until_complete(fut)
-            fut.result()
+    assert len(vasp.pp.futs) == 1
+    for fut in vasp.pp.futs:
+        vasp.pp.loop.run_until_complete(fut)
+        fut.result()
 
-
-        #requests = vasp.collect_messages()
-        #assert len(requests) == 1
-        #assert requests[0].type is CommandRequestObject
-    finally:
-        # vasp.pp.stop_processor()
-        pass
+    assert len(net.method_calls) == 2
 
 
 def test_vasp_simple_wrong_VASP(simple_request_json, other_addr, loop):
