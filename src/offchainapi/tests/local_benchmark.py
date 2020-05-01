@@ -123,6 +123,12 @@ async def main_perf():
     for payment in payments:
         ref = payment.reference_id
         _ = VASPa.get_payment_by_ref(ref)
+        hist = VASPa.get_payment_history_by_ref(ref)
+        #if len(hist) > 1:
+        #    print('--'*40)
+        #    for p in hist:
+        #        print(p.pretty())
+
 
     # Print some statistics
     success_number = sum([1 for r in res if r])

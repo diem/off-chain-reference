@@ -161,6 +161,27 @@ class Vasp:
         payment = self.pp.get_latest_payment_by_ref_id(reference_id)
         return payment
 
+    def get_payment_history_by_ref(self, reference_id):
+        """ Returns a list of versions of the PaymentObjects
+            with the given reference ID.
+
+            Parameters:
+                reference_id (str): The reference ID of a payment.
+
+            Returns:
+                List of PaymentObject: A list of PaymentObject versions
+                in reverse causal order (newest first) with the same
+                reference ID given.
+
+            Raises:
+                KeyError: In case a payment with the given reference
+                    does not exist.
+        """
+        payment = list(self.pp.get_payment_history_by_ref_id(reference_id))
+        return payment
+
+
+
     async def close_async(self):
         ''' Await this to cleanly close the network
            and any pending commands being processed. '''

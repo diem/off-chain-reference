@@ -1,5 +1,6 @@
-from .utils import get_unique_string, JSONSerializable
+from .utils import get_unique_string, JSONSerializable, JSONFlag
 from copy import deepcopy
+import json
 
 
 # Generic interface to a shared object
@@ -77,3 +78,9 @@ class SharedObject(JSONSerializable):
         self.version = data['version']
         self.previous_versions = data['previous_versions']
         return self
+
+    def pretty(self):
+        ''' Returns a string ready for pretty printing.'''
+        parsed = self.get_json_data_dict(JSONFlag.STORE)
+        s_pretty = json.dumps(parsed, indent=4, sort_keys=True)
+        return s_pretty

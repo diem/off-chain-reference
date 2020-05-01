@@ -256,6 +256,7 @@ class PaymentProcessor(CommandProcessor):
         other_addr = channel.get_other_address()
         other_str = other_addr.as_str()
 
+        # Call the failure handler and exit.
         if not status_success:
             fut = self.loop.create_task(self.process_command_failure_async(
                 other_addr, command, seq, error))
@@ -269,28 +270,8 @@ class PaymentProcessor(CommandProcessor):
             obj = command.get_object(version, self.object_store)
             self.object_store[version] = obj
 
-        payment = command.get_payment(self.object_store)
-
         # Update the Index of Reference ID -> Payment
-        ref_id = payment.reference_id
-
-        # NOTE: This is all called by the executor within a write lock
-        # all the way from the protocol code, so no need for an extra:
-        # with self.storage_factory.atomic_writes():
-
-        # Write the new payment to the index of payments by
-        # reference ID to support they GetPaymentAPI.
-        if ref_id in self.reference_id_index:
-            # We get the dependencies of the old payment
-            old_version = self.reference_id_index[ref_id].get_version()
-
-            # We check that the previous version is present.
-            # If so we update it with the new one.
-            dependencies_versions = command.get_dependencies()
-            if old_version in dependencies_versions:
-                self.reference_id_index[ref_id] = payment
-        else:
-            self.reference_id_index[ref_id] = payment
+        self.store_latest_payment_by_ref_id(command)
 
         # We record an obligation to process this command, even
         # after crash recovery.
@@ -308,6 +289,8 @@ class PaymentProcessor(CommandProcessor):
 
         return fut
 
+    # -------- Get Payment API commands --------
+
     def get_latest_payment_by_ref_id(self, ref_id):
         ''' Returns the latest payment version with
             the reference ID provided.'''
@@ -315,6 +298,39 @@ class PaymentProcessor(CommandProcessor):
             return self.reference_id_index[ref_id]
         else:
             raise KeyError(ref_id)
+
+    def get_payment_history_by_ref_id(self, ref_id):
+        ''' Generator that returns all versions of a
+            payment with a given reference ID
+            in reverse causal order (newest first). '''
+        payment = self.get_latest_payment_by_ref_id(ref_id)
+        yield payment
+
+        while len(payment.previous_versions) > 0:
+            p_version = payment.previous_versions[0]
+            payment = self.object_store[p_version]
+            yield payment
+
+    def store_latest_payment_by_ref_id(self, command):
+        ''' Internal command to update the payment index '''
+        payment = command.get_payment(self.object_store)
+
+        # Update the Index of Reference ID -> Payment
+        ref_id = payment.reference_id
+
+        # Write the new payment to the index of payments by
+        # reference ID to support they GetPaymentAPI.
+        if ref_id in self.reference_id_index:
+            # We get the dependencies of the old payment
+            old_version = self.reference_id_index[ref_id].get_version()
+
+            # We check that the previous version is present.
+            # If so we update it with the new one.
+            dependencies_versions = command.get_dependencies()
+            if old_version in dependencies_versions:
+                self.reference_id_index[ref_id] = payment
+        else:
+            self.reference_id_index[ref_id] = payment
 
     # ----------- END of CommandProcessor interface ---------
 
