@@ -130,7 +130,7 @@ class Aionet:
             return web.Response(text='Hello, world')
 
     async def handle_request(self, request):
-        """Main Http server handler for incomming OffChainAPI requests.
+        """ Main Http server handler for incomming OffChainAPI requests.
 
         Args:
             request (CommandRequestObject): The request from the other VASP.
@@ -172,7 +172,8 @@ class Aionet:
             # TODO: Handle timeout errors here.
             self.logger.debug(f'Data Received from {other_addr.as_str()}.')
             response = await channel.parse_handle_request_to_future(
-                request_json, encoded=False)
+                request_json, encoded=False
+            )
 
         except json.decoder.JSONDecodeError as e:
             # Raised if the request does not contain valid json.

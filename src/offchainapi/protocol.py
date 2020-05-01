@@ -18,19 +18,28 @@ NetMessage = namedtuple('NetMessage', ['src', 'dst', 'type', 'content'])
 
 
 class OffChainVASP:
-    """Manages the off-chain protocol on behalf of one VASP. """
+    """ Manages the off-chain protocol on behalf of one VASP.
+
+    Args:
+        vasp_addr (LibraAddress): The address of the VASP.
+        processor (CommandProcessor): The command processor.
+        storage_factory (StorableFactory): The storage factory.
+        info_context (VASPInfo): The information context for the VASP
+                                 implementing the VASPInfo interface.
+    """
+
     def __init__(self, vasp_addr, processor, storage_factory, info_context):
         logging.debug(f'Creating VASP {vasp_addr.as_str()}')
 
         assert isinstance(processor, CommandProcessor)
         assert isinstance(vasp_addr, LibraAddress)
 
-        # The LibraAddress of the VASP
+        # The LibraAddress of the VASP.
         self.vasp_addr = vasp_addr
-        # The business context provided by the processor
+        # The business context provided by the processor.
         self.business_context = processor.business_context()
 
-        # The command processor that checks and processes commands
+        # The command processor that checks and processes commands.
         # We attach the notify member to this class to trigger
         # processing of resumed commands.
         self.processor = processor
@@ -42,21 +51,25 @@ class OffChainVASP:
         # The dict of channels we already have.
         self.channel_store = {}
 
-        # Manage storage
+        # Manage storage.
         self.storage_factory = storage_factory
 
     def get_vasp_address(self):
-        ''' Return our own VASP Libra Address. '''
+        """Return our own VASP Libra Address.
+
+        Returns:
+            LibraAddress: The VASP's address.
+        """
         return self.vasp_addr
 
     def get_channel(self, other_vasp_addr):
         ''' Returns a VASPPairChannel with the other VASP.
 
         Parameters:
-            other_vasp_addr : is a LibraAddress.
+            other_vasp_addr (LibraAddress): The address of the other VASP.
 
         Returns:
-            A VASPPairChannel.
+            VASPPairChannel: A channel with the other VASP.
 
         '''
         self.business_context.open_channel_to(other_vasp_addr)
@@ -76,76 +89,86 @@ class OffChainVASP:
         return self.channel_store[store_key]
 
     def get_storage_factory(self):
-        ''' Returns a storage factory for this system. '''
+        """Returns a storage factory for this system.
+
+        Returns:
+            StorableFactory: The storage factory of the VASP.
+        """
         return self.storage_factory
 
 
 class VASPPairChannel:
     """ Represents the state of an off-chain bi-directional
-        channel bewteen two VASPs"""
+        channel bewteen two VASPs.
+
+    Args:
+        myself (LibraAddress): The address of the current VASP.
+        other (LibraAddress): The address of the other VASP.
+        vasp (OffChainVASP): The OffChainVASP to which this channel is attached.
+        storage (StorageFactory): The storage factory.
+        processor (CommandProcessor): A command processor.
+
+    Raises:
+        OffChainException: If the channel is not talking to another VASP.
+    """
 
     def __init__(self, myself, other, vasp, storage, processor):
-        """ Initialize the channel between two VASPs.
 
-        * Myself is own LibraAddress.
-        * Other is the other VASP LibraAddress.
-        * Vasp is the OffChainVASP object this channel belongs to.
-        * Storage is a StorableFactory instance.
-        * Processor is a command processor for this channel.
+        assert isinstance(myself, LibraAddress)
+        assert isinstance(other, LibraAddress)
+        assert isinstance(processor, CommandProcessor)
+        assert isinstance(vasp, OffChainVASP)
 
-        """
-
-        if __debug__:
-            assert isinstance(myself, LibraAddress)
-            assert isinstance(other, LibraAddress)
-            assert isinstance(processor, CommandProcessor)
-            assert isinstance(vasp, OffChainVASP)
-
-        # State that is given by constructor
+        # State that is given by constructor.
         self.myself = myself
         self.other = other
         self.processor = processor
         self.vasp = vasp
         self.storage = storage
 
-        # Check we are not making a channel with ourselves
+        # Check we are not making a channel with ourselves.
         if self.myself.as_str() == self.other.as_str():
             raise OffChainException(
                 'Must talk to another VASP:',
                 self.myself.as_str(),
-                self.other.as_str())
+                self.other.as_str()
+            )
 
         # A reentrant lock to manage access.
         self.rlock = RLock()
         self.logger = logging.getLogger(name=f'channel.{self.other.as_str()}')
 
-        # State that is persisted
+        # State that is persisted.
 
         root = self.storage.make_value(self.myself.as_str(), None)
         other_vasp = self.storage.make_value(
-            self.other.as_str(), None, root=root)
+            self.other.as_str(), None, root=root
+        )
 
         with self.storage.atomic_writes() as _:
 
-            # The list of requests I have initiated
+            # The list of requests I have initiated.
             self.my_requests = self.storage.make_list(
-                'my_requests', CommandRequestObject, root=other_vasp)
+                'my_requests', CommandRequestObject, root=other_vasp
+            )
 
-            # The list of requests the other side has initiated
+            # The list of requests the other side has initiated.
             self.other_requests = self.storage.make_list(
-                'other_requests', CommandRequestObject, root=other_vasp)
+                'other_requests', CommandRequestObject, root=other_vasp
+            )
 
             # The index of the next request from my sequence that I should
-            # retransmit (ie. for which I have not got a response yet.)
+            # retransmit (ie. for which I have not got a response yet.).
             self.next_retransmit = self.storage.make_value(
-                'next_retransmit', int, root=other_vasp, default=0)
+                'next_retransmit', int, root=other_vasp, default=0
+            )
 
             # The final sequence
             self.executor = ProtocolExecutor(self, self.processor)
 
-        # Ephemeral state that can be forgotten upon a crash
+        # Ephemeral state that can be forgotten upon a crash.
 
-        # Request / response cache to allow reordering
+        # Request / response cache to allow reordering.
         self.waiting_requests = defaultdict(list)
         self.request_window = 1000
         self.waiting_response = defaultdict(list)
@@ -155,26 +178,41 @@ class VASPPairChannel:
         self.net_queue = []
 
         oth_addr = other.as_str()
-        self.logger.debug(f'Created VASP channel to {oth_addr}')
+        self.logger.debug(f'Created VASP channel to {oth_addr}.')
 
     def my_next_seq(self):
-        ''' Returns the next request sequence number for this VASP. '''
+        """
+        Returns:
+            int: The next request sequence number for this VASP.
+        """
         return len(self.my_requests)
 
     def other_next_seq(self):
-        ''' Returns the next request sequence number for the other VASP. '''
+        """
+        Returns:
+            int: The next request sequence number for the other VASP.
+        """
         return len(self.other_requests)
 
     def get_my_address(self):
-        ''' Returns own VASP LibraAddress. '''
+        """
+        Returns:
+            LibraAddress: The address of this VASP.
+        """
         return self.myself
 
     def get_other_address(self):
-        ''' Returns other VASP LibraAddress. '''
+        """
+        Returns:
+            LibraAddress: The address of the other VASP.
+        """
         return self.other
 
     def get_vasp(self):
-        ''' Get the OffChainVASP to which this channel is attached. '''
+        """
+        Returns:
+            OffChainVASP: The OffChainVASP to which this channel is attached.
+        """
         return self.vasp
 
     # Define a stub here to make the linter happy
@@ -183,23 +221,37 @@ class VASPPairChannel:
             return []
 
     def next_final_sequence(self):
-        """ Returns the next sequence number in the common sequence."""
+        """
+        Returns:
+            int: The next sequence number in the common sequence.
+        """
         return self.executor.next_seq()
 
     def get_final_sequence(self):
-        """ Returns a list of commands in the common sequence. """
+        """
+        Returns:
+            list: The list of commands in the common sequence.
+        """
         return self.executor.command_sequence
 
     def send_request(self, request):
-        """ A hook to send a request to other VASP"""
+        """ A hook to send a request to other VASP.
+
+        Args:
+            request (CommandRequestObject): The request object.
+
+        Returns:
+            NetMessage: The message to be sent on a network.
+        """
         json_string = request.get_json_data_dict(JSONFlag.NET)
         net_message = NetMessage(
             self.myself,
             self.other,
             CommandRequestObject,
-            json_string)
+            json_string
+        )
 
-        # Only used in unit tests
+        # Only used in unit tests.
         if __debug__:
             self.net_queue += [net_message]
 
@@ -207,7 +259,15 @@ class VASPPairChannel:
         return net_message
 
     def send_response(self, response, encoded=True):
-        """ A hook to send a response to other VASP"""
+        """ A hook to send a response to other VASP.
+
+        Args:
+            response (CommandResponseObject): The request object.
+            encoded (bool): Whether the response is json enconded.
+
+        Returns:
+            NetMessage: The message to be sent on a network.
+        """
         struct = response.get_json_data_dict(JSONFlag.NET)
         if encoded:
             struct = json.dumps(struct)
@@ -219,7 +279,10 @@ class VASPPairChannel:
         return net_message
 
     def is_client(self):
-        """ Is the local VASP a client for this pair?"""
+        """
+        Returns:
+            bool: Whether the local VASP the client for this pair.
+        """
         myself_address = self.myself
         other_address = self.other
 
@@ -232,22 +295,40 @@ class VASPPairChannel:
         assert False  # Never reach this code
 
     def role(self):
-        """ The role of the VASP as a string. For debug output."""
+        """ The role of the VASP as a string. For debug output.
+
+        Returns:
+            str: The role of the VASP.
+        """
         return ['Server', 'Client'][self.is_client()]
 
     def is_server(self):
-        """ Is the local VASP a server for this pair?"""
+        """
+         Returns:
+             bool: Whether the local VASP the server for this pair.
+         """
         return not self.is_client()
 
     def num_pending_responses(self):
-        """ Counts the number of responses this VASP is waiting for """
+        """
+        Returns:
+            int: The number of responses this VASP is waiting for.
+        """
         return len([1 for req in self.my_requests if not req.has_response()])
 
     def has_pending_responses(self):
+        """
+        Returns:
+            bool: Whether this VASP has pending responses to retransmit.
+        """
         return self.would_retransmit()
 
     def apply_response_to_executor(self, request):
-        """Signals to the executor the success or failure of a command."""
+        """Signals to the executor the success or failure of a command.
+
+        Args:
+            request (CommandRequestObject): The request object.
+        """
         assert request.response is not None
         response = request.response
         if request.is_success():
@@ -256,7 +337,14 @@ class VASPPairChannel:
             self.executor.set_fail(response.command_seq, response.error)
 
     def sequence_command_local(self, off_chain_command):
-        """ The local VASP attempts to sequence a new off-chain command."""
+        """The local VASP attempts to sequence a new off-chain command.
+
+        Args:
+            off_chain_command (PaymentCommand): The command to sequence.
+
+        Returns:
+            NetMessage: The message to be sent on a network.
+        """
 
         off_chain_command.set_origin(self.get_my_address())
         request = CommandRequestObject(off_chain_command)
@@ -268,10 +356,11 @@ class VASPPairChannel:
 
                 if self.is_server():
                     request.command_seq = self.next_final_sequence()
-                    # Raises and exits on error -- does not sequence
+                    # Raises and exits on error -- does not sequence.
                     self.executor.sequence_next_command(
                         off_chain_command,
-                        do_not_sequence_errors=True)
+                        do_not_sequence_errors=True
+                    )
 
                 self.my_requests += [request]
 
@@ -280,13 +369,24 @@ class VASPPairChannel:
         return self.send_request(request)
 
     def parse_handle_request(self, json_command, encoded=False):
-        ''' Handles a request provided as a json_string '''
+        """ Handles a request provided either as a json_string (if encoded is
+        True) or as a json dictrionary (if encoded is False).
+
+        Args:
+            json_command (str or dict): The json request.
+            encoded (bool, optional): Whether the request is json encoded
+                or not. Defaults to False.
+
+        Returns:
+            NetMessage: The response to the request.
+        """
         loop = asyncio.new_event_loop()
         fut = self.parse_handle_request_to_future(
             json_command,
             encoded,
             nowait=True,
-            loop=loop)
+            loop=loop
+        )
         return fut.result()
 
     def process_waiting_messages(self):
@@ -296,22 +396,24 @@ class VASPPairChannel:
         self.logger.debug(f'''Activate:
             Remote Seq {self.other_next_seq()}
             Command Seq #{self.next_final_sequence()}
-            Last Confirmed: {self.executor.last_confirmed}''')
+            Last Confirmed: {self.executor.last_confirmed}'''
+                          )
 
         while self.executor.last_confirmed in self.waiting_response:
             next_cmd_seq = self.executor.last_confirmed
             self.logger.debug(f'Activate: Response for #{next_cmd_seq}')
 
-            # Take a copy of the pending responses
+            # Take a copy of the pending responses.
             list_of_responses = self.waiting_response[next_cmd_seq]
             del self.waiting_response[next_cmd_seq]
 
             for resp_record in list_of_responses:
                 (json_command, encoded, fut) = resp_record
                 _ = self.parse_handle_response_to_future(
-                    json_command, encoded, fut)
+                    json_command, encoded, fut
+                )
 
-            # Break if we made no progress
+            # Break if we made no progress.
             if next_cmd_seq == self.executor.last_confirmed:
                 break
 
@@ -319,7 +421,7 @@ class VASPPairChannel:
             next_seq = self.other_next_seq()
             self.logger.debug(f'Activate: Request for #{next_seq}')
 
-            # Take a copy of the pending requests
+            # Take a copy of the pending requests.
             list_of_requests = self.waiting_requests[next_seq]
             del self.waiting_requests[next_seq]
 
@@ -331,60 +433,64 @@ class VASPPairChannel:
                 _ = self.parse_handle_request_to_future(
                     json_command, encoded, fut)
 
-            # Break if no progress is made
+            # Break if no progress is made.
             if next_seq == self.other_next_seq():
                 break
 
     def parse_handle_request_to_future(
-            self, json_command, encoded=False,
-            fut=None, nowait=False, loop=None):
-        ''' Handles a request provided as a json_string and returns
+        self, json_command, encoded=False, fut=None, nowait=False, loop=None
+    ):
+        """Handles a request provided as a json_string and returns
             a future that triggers when the command is processed.
 
-            Parameters:
-                * json_command : the json CommandRequest serialized object
-                * encoded : True if json_command is a string or False if it is
-                  a dict.
-                * loop : the event loop to use
-                * nowait : feed requests commands even out of order without
-                  waiting.
+        Args:
+            json_command (str or dict): The json request.
+            encoded (bool, optional): Whether the request is json encoded
+                or not. Defaults to False.
+            fut (asyncio.Future, optional): The future. Defaults to None.
+            nowait (bool, optional): Whether to feed requests commands even
+                  out of order without waiting. Defaults to False.
+            loop (asyncio.AbstractEventLoopPolicy, optional): The event loop
+                  to use. Defaults to None.
 
-            Returns:
-                * A (NetMessage) instance containing the response to the
-                  request.
-
-            '''
+        Returns:
+            asyncio.Future: A future to A NetMessage instance containing the
+                  response to the request.
+        """
 
         if fut is None:
             fut = asyncio.Future(loop=loop)
 
         self.logger.debug(f'Request Received -> {self.myself.as_str()}')
         try:
-            # Parse the request whoever necessary
+            # Parse the request whoever necessary.
             req_dict = json.loads(json_command) if encoded else json_command
             request = CommandRequestObject.from_json_data_dict(
-                req_dict, JSONFlag.NET)
+                req_dict, JSONFlag.NET
+            )
             with self.rlock:
-                # Going ahead to process the request
+                # Going ahead to process the request.
                 self.logger.debug(f'Processing Req Seq #{request.seq}')
                 response = self.handle_request(request, raise_on_wait=True)
 
         except OffChainOutOfOrder as e:
             if nowait:
-
                 # No waiting -- so bubble up the error response.
                 response = e.args[0]
                 fut.set_result(response)
                 return fut
 
             else:
-                # We were told to wait for this requests turn
-                self.logger.debug(f'Except. Waiting Req Seq #{request.seq} \
-                    Len: {len(self.waiting_requests)}')
+                # We were told to wait for this requests turn.
+                self.logger.debug(
+                    f'Except. Waiting Req Seq #{request.seq}'
+                    f'Len: {len(self.waiting_requests)}'
+                )
                 self.waiting_requests[request.seq] += [(
                     json_command,
                     encoded,
-                    fut, time.time())]
+                    fut, time.time()
+                    )]
             return fut
 
         except JSONParsingError:
@@ -610,8 +716,8 @@ class VASPPairChannel:
         if response.command_seq == self.next_final_sequence():
             try:
                 self.executor.sequence_next_command(
-                     request.command,
-                     do_not_sequence_errors=False)
+                    request.command,
+                    do_not_sequence_errors=False)
             except ExecutorException as e:
                 # If a error is raised, but the response is a success, then
                 # raise a serious error and stop the channel. If not all is
