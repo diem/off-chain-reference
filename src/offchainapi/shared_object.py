@@ -17,9 +17,9 @@ class SharedObject(JSONSerializable):
     """
 
     def __init__(self):
-        ''' All objects have a version number and their commit status '''
+        ''' All objects have a version number and their commit status. '''
         self.version = get_unique_string()
-        self.previous_versions = []  # Stores previous version of the object
+        self.previous_versions = []  # Stores previous version of the object.
 
     def new_version(self, new_version=None):
         """ Make a deep copy of an object with a new version number.
