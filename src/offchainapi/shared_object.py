@@ -63,8 +63,8 @@ class SharedObject(JSONSerializable):
             update_dict = {}
 
         update_dict.update({
-            'version': self.version,
-            'previous_versions': self.previous_versions,
+            '_version': self.version,
+            '_previous_versions': self.previous_versions,
         })
 
         self.add_object_type(update_dict)
@@ -75,8 +75,8 @@ class SharedObject(JSONSerializable):
         ''' Override JSONSerializable. '''
         if self is None:
             self = cls.__new__(cls)
-        self.version = data['version']
-        self.previous_versions = data['previous_versions']
+        self.version = data['_version']
+        self.previous_versions = data['_previous_versions']
         return self
 
     def pretty(self):

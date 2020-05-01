@@ -67,10 +67,11 @@ class StructureChecker:
             }
         return parse_map
 
-    def get_full_diff_record(self):
+    def get_full_diff_record(self, diff=None):
         ''' Returns a hierarchy of diffs applied to this object and children'''
         parse = self.parse_map()
-        diff = {}
+        if diff is None:
+            diff = {}
         for field in self.data:
             xtype, parse_more = parse[field]
             if parse_more:
@@ -265,22 +266,22 @@ class JSONSerializable:
     @classmethod
     def add_object_type(cls, value_dict):
         """ Registers the object type to the JSON dictionary. """
-        assert 'ObjectType' not in value_dict
-        value_dict['ObjectType'] = cls.json_type()
+        assert '_ObjectType' not in value_dict
+        value_dict['_ObjectType'] = cls.json_type()
         return value_dict
 
     @classmethod
     def parse(cls, data, flag):
         """Parse a data dictionary and return a JSON serializable instance. """
-        if 'ObjectType' not in data:
+        if '_ObjectType' not in data:
             print(data)
             raise JSONParsingError('No object type information')
 
-        if data['ObjectType'] not in cls.json_type_map:
+        if data['_ObjectType'] not in cls.json_type_map:
             raise JSONParsingError(
-                f'Unknown object type: {data["ObjectType"]}')
+                f'Unknown object type: {data["_ObjectType"]}')
 
-        new_cls = cls.json_type_map[data['ObjectType']]
+        new_cls = cls.json_type_map[data['_ObjectType']]
         return new_cls.from_json_data_dict(data, flag)
 
 
