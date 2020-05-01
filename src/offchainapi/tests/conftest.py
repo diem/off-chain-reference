@@ -1,11 +1,13 @@
 from ..payment import PaymentActor, PaymentAction, PaymentObject, KYCData
 from ..business import BusinessContext, VASPInfo
 from ..storage import StorableFactory
-from ..payment_logic import Status, PaymentProcessor
+from ..payment_logic import Status, PaymentProcessor, PaymentCommand
 from ..protocol import OffChainVASP, VASPPairChannel
 from ..executor import ProtocolExecutor
 from ..command_processor import CommandProcessor
 from ..libra_address import LibraAddress
+from ..protocol_messages import CommandRequestObject
+from ..utils import JSONFlag
 
 import types
 import dbm
@@ -84,6 +86,11 @@ def vasp(three_addresses, store):
     info_context = MagicMock(spec=VASPInfo)
     return OffChainVASP(a0, command_processor, store, info_context)
 
+@pytest.fixture
+def channel(three_addresses, vasp, store):
+    a0, a1, _ = three_addresses
+    command_processor = MagicMock(spec=CommandProcessor)
+    return VASPPairChannel(a1, a0, vasp, store, command_processor)
 
 @pytest.fixture
 def two_channels(three_addresses, vasp, store):
@@ -122,3 +129,27 @@ def db(tmp_path):
     db_path = tmp_path / 'db.dat'
     with dbm.open(str(db_path), 'c') as xdb:
         yield xdb
+
+
+@pytest.fixture
+def command(three_addresses, payment_action):
+    a0, _, b0 = three_addresses
+    sender = PaymentActor(b0.as_str(), 'C', Status.none, [])
+    receiver = PaymentActor(a0.as_str(), '1', Status.none, [])
+    payment = PaymentObject(
+        sender, receiver, 'ref', 'orig_ref', 'desc', payment_action
+    )
+    return PaymentCommand(payment)
+
+
+@pytest.fixture
+def json_request(command):
+    request = CommandRequestObject(command)
+    request.seq = 0
+    request.command_seq = 0
+    return request.get_json_data_dict(JSONFlag.NET)
+
+
+@pytest.fixture
+def json_response():
+    return {"seq": 0, "command_seq": 0, "status": "success"}

@@ -1,4 +1,4 @@
-# The main storage interface
+# The main storage interface.
 
 import json
 from threading import RLock
@@ -13,9 +13,10 @@ def key_join(strs):
 
 
 class Storable:
-    """ Base class for objects that can be stored
+    """Base class for objects that can be stored.
 
-    Specify the type (or base type) of the objects to be stored
+    Args:
+        xtype (*): the type (or base type) of the objects to be stored.
     """
 
     def __init__(self, xtype):
@@ -36,7 +37,8 @@ class Storable:
     def post_proc(self, val):
         """ Post-processing to convert a json parsed structure into a Python
             object. It uses parse on JSONSerializable objects, and otherwise
-            the type constructor. """
+            the type constructor.
+        """
         if issubclass(self.xtype, JSONSerializable):
             return self.xtype.parse(val, JSONFlag.STORE)
         else:

@@ -269,8 +269,7 @@ class VASPPairChannel:
             NetMessage: The message to be sent on a network.
         """
         struct = response.get_json_data_dict(JSONFlag.NET)
-        if encoded:
-            struct = json.dumps(struct)
+        struct = json.dumps(struct) if encoded else struct
         net_message = NetMessage(
             self.myself, self.other, CommandResponseObject, struct)
         if __debug__:
@@ -369,8 +368,7 @@ class VASPPairChannel:
         return self.send_request(request)
 
     def parse_handle_request(self, json_command, encoded=False):
-        """ Handles a request provided either as a json_string (if encoded is
-        True) or as a json dictrionary (if encoded is False).
+        """ Handles a request provided as a json string or dict.
 
         Args:
             json_command (str or dict): The json request.
@@ -378,7 +376,7 @@ class VASPPairChannel:
                 or not. Defaults to False.
 
         Returns:
-            NetMessage: The response to the request.
+            NetMessage: The message to be sent on a network.
         """
         loop = asyncio.new_event_loop()
         fut = self.parse_handle_request_to_future(
@@ -393,11 +391,12 @@ class VASPPairChannel:
         ''' Executes any requets that are now capable of executing, and were
             not before due to being received out of order. '''
 
-        self.logger.debug(f'''Activate:
-            Remote Seq {self.other_next_seq()}
-            Command Seq #{self.next_final_sequence()}
-            Last Confirmed: {self.executor.last_confirmed}'''
-                          )
+        self.logger.debug(
+            f'Activate:'
+            f' Remote Seq {self.other_next_seq()}'
+            f' Command Seq #{self.next_final_sequence()}'
+            f' Last Confirmed: {self.executor.last_confirmed}'
+        )
 
         while self.executor.last_confirmed in self.waiting_response:
             next_cmd_seq = self.executor.last_confirmed
@@ -431,7 +430,8 @@ class VASPPairChannel:
                 # Call, and this will update the future and unblocks
                 # any processes waiting on it.
                 _ = self.parse_handle_request_to_future(
-                    json_command, encoded, fut)
+                    json_command, encoded, fut
+                )
 
             # Break if no progress is made.
             if next_seq == self.other_next_seq():
@@ -440,7 +440,7 @@ class VASPPairChannel:
     def parse_handle_request_to_future(
         self, json_command, encoded=False, fut=None, nowait=False, loop=None
     ):
-        """Handles a request provided as a json_string and returns
+        """ Handles a request provided as a json string or dict and returns
             a future that triggers when the command is processed.
 
         Args:
@@ -490,9 +490,8 @@ class VASPPairChannel:
                     json_command,
                     encoded,
                     fut, time.time()
-                    )]
+                )]
             return fut
-
         except JSONParsingError:
             response = make_parsing_error()
             full_response = self.send_response(response, encoded=False)
@@ -506,28 +505,39 @@ class VASPPairChannel:
         return fut
 
     def handle_request(self, request, raise_on_wait=False):
+        """ Handles a request provided as a dictionary. (see `_handle_request`)
+        """
         with self.storage.atomic_writes() as _:
             return self._handle_request(request, raise_on_wait)
 
     def _handle_request(self, request, raise_on_wait):
-        """ Handles a request received by this VASP.
+        """ Handles a request provided as a dictionary.
 
-            Returns a network record of the response to the request.
+        Args:
+            request (CommandRequestObject): The request.
+            raise_on_wait (bool, optional): Whether to raise OffChainOutOfOrder
+                when we cannot generate a response before sequencing previous
+                commands. Defaults to False.
+
+        Raises:
+            OffChainOutOfOrder: In case the response is out of order
+                (due to nowait=True).
+
+        Returns:
+            CommandResponseObject: The response to the VASP's request.
         """
         request.command.set_origin(self.other)
 
-        # Always answer old requests
+        # Always answer old requests.
         if request.seq < self.other_next_seq():
             previous_request = self.other_requests[request.seq]
             if previous_request.is_same_command(request):
-                # Re-send the response
-                response = previous_request.response
-                return response
-
+                # Re-send the response.
+                return previous_request.response
             else:
                 # There is a conflict, and it will have to be resolved
-                #  TODO[issue 8]: How are conflicts meant to be resolved?
-                #  With only two participants we cannot tolerate errors.
+                # TODO[issue 8]: How are conflicts meant to be resolved?
+                # With only two participants we cannot tolerate errors.
                 response = make_protocol_error(request, code='conflict')
                 response.previous_command = previous_request.command
                 self.logger.error('Conflicting requests for seq {request.seq}')
@@ -541,7 +551,7 @@ class VASPPairChannel:
         # As a server we first wait for the status of all server
         # requests to sequence any new client requests.
         # We also wait to acknowledge previous requests before
-        # acknowledging the next ones
+        # acknowledging the next ones.
         if self.is_server() and self.has_pending_responses() \
                 or request.seq > self.other_next_seq():
             response = make_protocol_error(request, code='wait')
@@ -549,7 +559,7 @@ class VASPPairChannel:
                 raise OffChainOutOfOrder(response)
             return response
 
-        # Sequence newer requests
+        # Sequence newer requests.
         assert request.seq == self.other_next_seq()
         assert (self.is_server() and request.command_seq is None) \
             or (self.is_client() and request.command_seq is not None)
@@ -566,13 +576,14 @@ class VASPPairChannel:
         # What is the sequence of this request.
         # Either given by the server to the client, or made by the server.
         # Due to the guard conditions above this will always
-        # be self.next_final_sequence()
+        # be self.next_final_sequence().
         seq = self.next_final_sequence()
 
         try:
             self.executor.sequence_next_command(
                 request.command,
-                do_not_sequence_errors=False)
+                do_not_sequence_errors=False
+            )
             response = make_success_response(request)
         except ExecutorException as e:
             response = make_command_error(request, str(e))
@@ -585,8 +596,16 @@ class VASPPairChannel:
         return request.response
 
     def parse_handle_response(self, json_response, encoded=False):
-        ''' Calls `parse_handle_response_to_future` but respoves
-            the future and returns the result. '''
+        """ Handles a response as json string or dict.
+
+        Args:
+            json_response (str or dict): The json response.
+            encoded (bool, optional): Whether the request is json encoded
+                or not. Defaults to False.
+
+        Returns:
+            NetMessage: The message to be sent on a network.
+        """
         loop = asyncio.new_event_loop()
         fut = self.parse_handle_response_to_future(
             json_response,
@@ -596,32 +615,26 @@ class VASPPairChannel:
         return fut.result()
 
     def parse_handle_response_to_future(
-            self, json_response, encoded=False,
-            fut=None, nowait=False, loop=None):
-        ''' Handles a response provided as a json string. Returns a future
+        self, json_response, encoded=False, fut=None, nowait=False, loop=None
+    ):
+        """ Handles a response provided as a json string. Returns a future
             that fires when the response is processed. You may `await` this
             future from an asyncio coroutine.
 
-            Parameters:
-                * json_response : the response received
-                * encoded : True if the json_response is a json string,
-                  or False if it is a dictionary.
-                * nowait : do not wait for the reponse to be in order,
-                  and feed it directly to the protocol state machine.
-                * loop : the event loop in which this should be executed.
+        Args:
+            json_response (dict or str): The json response.
+            encoded (bool, optional): Whether the request is json encoded
+                or not. Defaults to False.
+            fut (asyncio.Future, optional): The future. Defaults to None.
+            nowait (bool, optional): Whether to wait for the reponse to be in
+                order to feed it directly to the protocol state machine.
+                Defaults to False.
+            loop (asyncio.AbstractEventLoopPolicy, optional): the event loop
+                in which this is executed. Defaults to None.
 
-            Response:
-                * Returns True if the command was a success or
-                  False if it was not a success (Command error).
-
-            Raises:
-                * On protocol error it throws an exception
-                  (OffChainProtocolError).
-                * On an unrecoverabe error it throws an (OffChainException).
-                * In case the response is out of order (due to nowait=True)
-                  then an (OffChainOutOfOrder) is raised.
-
-            '''
+        Returns:
+            bool: Whether the command was a success  or not (Command error).
+        """
         self.logger.debug(f'Response Received -> {self.myself.as_str()}')
 
         if fut is None:
@@ -630,7 +643,8 @@ class VASPPairChannel:
         try:
             resp_dict = json.loads(json_response) if encoded else json_response
             response = CommandResponseObject.from_json_data_dict(
-                resp_dict, JSONFlag.NET)
+                resp_dict, JSONFlag.NET
+            )
             command_seq = response.command_seq
 
             with self.rlock:
@@ -647,24 +661,32 @@ class VASPPairChannel:
             else:
                 # Otherwise wait for longer.
                 self.waiting_response[command_seq] += [(
-                    json_response, encoded, fut)]
+                    json_response, encoded, fut
+                )]
+
+        except OffChainException or OffChainProtocolError as e:
+            fut.set_exception(e)
 
         return fut
 
     def handle_response(self, response):
+        """ Handles a response provided as a dictionary. See `_handle_response`
+        """
         with self.storage.atomic_writes() as _:
             return self._handle_response(response)
 
     def _handle_response(self, response):
-        """ Handles a response to a request by this VASP.
+        """ Handles a response provided as a dictionary.
 
-        If protocol error occurs raises a OffChainProtocolError.
-        Otherwise returns True if the command is successfully sequenced,
-        and False if it is sequenced but not successful.
+        Args:
+            response (CommandResponseObject): The response.
 
-        On serious unrecoverable errors it also raises OffChainException.
+        Raises:
+            OffChainProtocolError: On protocol error.
+            OffChainException: On an unrecoverabe error.
 
-        It raises
+        Returns:
+            bool: Whether the response is successfully sequenced.
         """
         assert isinstance(response, CommandResponseObject)
 
@@ -673,24 +695,28 @@ class VASPPairChannel:
             raise OffChainProtocolError.make(response.error)
 
         if type(response.seq) is not int:
-            raise OffChainException(f'''Response seq must be int not \
-                {response.seq} ({type(response.seq)})''')
+            raise OffChainException(
+                f'Response seq must be int not '
+                f'{response.seq} ({type(response.seq)})'
+            )
 
         request_seq = response.seq
 
-        # Check this is the next expected response
+        # Check this is the next expected response.
         if not request_seq < len(self.my_requests):
-            raise OffChainException(f'''Response for seq {request_seq} \
-                received, but has requests only up to seq < \
-                    {len(self.my_requests)}''')
+            raise OffChainException(
+                f'Response for seq {request_seq} received, '
+                f'but has requests only up to seq < {len(self.my_requests)}'
+            )
 
-        # Idenpotent: We have already processed the response
+        # Idenpotent: We have already processed the response.
         if self.my_requests[request_seq].has_response():
 
             # Check the reponse is the same and log warning otherwise.
             if self.my_requests[request_seq].response != response:
                 excp = OffChainException(
-                    'Got duplicate but different responses.')
+                    'Got duplicate but different responses.'
+                )
                 excp.reponse1 = self.my_requests[request_seq].response
                 excp.response2 = response
                 raise excp
@@ -701,10 +727,11 @@ class VASPPairChannel:
                 or not (response.command_seq == self.executor.last_confirmed):
             next_cmd_seq = self.next_final_sequence()
             actual_cmd_seq = response.command_seq
-            msg = f'Expect command seq {next_cmd_seq} but got {actual_cmd_seq}'
-            raise OffChainOutOfOrder(msg)
+            raise OffChainOutOfOrder(
+                f'Expect command seq {next_cmd_seq} but got {actual_cmd_seq}'
+            )
 
-        # Read and write back response into request
+        # Read and write back response into request.
         request = self.my_requests[request_seq]
         request.response = response
         self.my_requests[request_seq] = request
@@ -717,12 +744,13 @@ class VASPPairChannel:
             try:
                 self.executor.sequence_next_command(
                     request.command,
-                    do_not_sequence_errors=False)
+                    do_not_sequence_errors=False
+                )
             except ExecutorException as e:
-                # If a error is raised, but the response is a success, then
-                # raise a serious error and stop the channel. If not all is
+                # If an error is raised, but the response is a success, then
+                # raise a serious error and stop the channel. If not, all is
                 # good -- we expected an error and this is why the command
-                # failed possibly.
+                # possibly failed.
                 if request.is_success():
                     self.logger.exception(e)
                     raise e
@@ -740,7 +768,8 @@ class VASPPairChannel:
 
     def would_retransmit(self, do_retransmit=False):
         """ Returns true if there are any pending re-transmits, namely
-            requests for which the response has not yet been received. """
+            requests for which the response has not yet been received.
+        """
 
         request_to_send = None
 
@@ -767,8 +796,11 @@ class VASPPairChannel:
                 else None
 
     def pending_retransmit_number(self):
-        ''' Returns the number of requets that are waiting to be
-            retransmitted on this channel. '''
+        '''
+        Returns:
+            Returns the number of requets that are waiting to be
+            retransmitted on this channel.
+        '''
         if not self.would_retransmit():
             return 0
 

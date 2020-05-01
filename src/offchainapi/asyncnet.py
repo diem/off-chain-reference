@@ -224,7 +224,8 @@ class Aionet:
 
                     # Wait in case the requests are sent out of order.
                     res = await channel.parse_handle_response_to_future(
-                        json_response, encoded=False)
+                        json_response, encoded=False
+                    )
                     self.logger.debug(f'Response parsed with status: {res}')
 
                     self.logger.debug(f'Process Waiting messages')
