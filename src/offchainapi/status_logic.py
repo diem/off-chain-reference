@@ -6,14 +6,12 @@ V0 States
 ---------
 
     * None  -- denotes the status of an object that does not exist
-    * needs_stable_id -- requests the other VASP for a stable identifier
       for the payment recipient.
     * needs_kyc_data -- requires the other VASP to provide KYC data.
     * ready_for_settlement -- signals that the party is ready to settle
       the transaction.
     * needs_recipient_signature -- requests the recipient VASP to sign the
       identifier for this transaction to put it on chain.
-    * signed -- The recipient signed the transaction to settle
     * settled -- a Libra transaction settles this transaction
     * abort - signals that the transactions is to be aborted.
 
@@ -25,12 +23,10 @@ from enum import Enum
 
 class Status(Enum):
     none = 'none',
-    needs_stable_id = 'needs_stable_id',
     needs_kyc_data = 'needs_kyc_data',
     # Sender only
     needs_recipient_signature = 'needs_recipient_signature',
     # Receiver only: this is a virtual flag
-    signed = 'signed',
     ready_for_settlement = 'ready_for_settlement',
     settled = 'settled',
     abort = 'abort'
@@ -65,10 +61,8 @@ receiver_payment_valid_lattice = \
 
 status_heights_MUST = {
     Status.none: 100,
-    Status.needs_stable_id: 200,
     Status.needs_kyc_data: 200,
     Status.needs_recipient_signature: 200,
-    Status.signed: 400,
     Status.ready_for_settlement: 400,
     Status.settled: 800,
     Status.abort: 1000
@@ -76,10 +70,8 @@ status_heights_MUST = {
 
 status_heights_SHOULD = {
     Status.none: 100,
-    Status.needs_stable_id: 300,
     Status.needs_kyc_data: 400,
     Status.needs_recipient_signature: 500,
-    Status.signed: 600,
     Status.ready_for_settlement: 700,
     Status.settled: 800,
     Status.abort: 1000

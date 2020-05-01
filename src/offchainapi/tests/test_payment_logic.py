@@ -178,15 +178,6 @@ def test_payment_process_abort_from_sender(payment, processor):
     assert new_payment.receiver.status == Status.abort
 
 
-def test_payment_process_get_stable_id(payment, processor):
-    bcm = processor.business_context()
-    bcm.is_recipient.side_effect = [True]
-    bcm.next_kyc_to_provide.side_effect = [set([Status.needs_stable_id])]
-    bcm.get_stable_id.side_effect = ['stable_id']
-    new_payment = processor.payment_process(payment)
-    assert new_payment.receiver.stable_id == 'stable_id'
-
-
 def test_payment_process_get_extended_kyc(payment, processor, kyc_data):
     bcm = processor.business_context()
     bcm.is_recipient.side_effect = [True]

@@ -13,7 +13,6 @@ import json
 business_config = """[
     {
         "account": "1",
-        "stable_id": "A",
         "balance": 10.0,
         "entity": false,
         "kyc_data" : "{ 'name' : 'Alice' }",
@@ -21,7 +20,6 @@ business_config = """[
     },
     {
         "account": "2",
-        "stable_id": "B",
         "balance": 100.0,
         "entity": true,
         "kyc_data" : "{ 'name' : 'Bob' }",
@@ -130,11 +128,8 @@ class sample_business(BusinessContext):
             return { Status.needs_kyc_data }
 
         to_provide = set()
-        if payment.data[other_role].status == Status.needs_stable_id:
-                to_provide.add(Status.needs_stable_id)
 
         if payment.data[other_role].status == Status.needs_kyc_data:
-                to_provide.add(Status.needs_stable_id)
                 to_provide.add(Status.needs_kyc_data)
 
         if payment.data[other_role].status == Status.needs_recipient_signature:
@@ -179,14 +174,6 @@ class sample_business(BusinessContext):
         subaddress = payment.data[my_role].subaddress
         account = self.get_account(subaddress)
         return (account["kyc_data"], 'KYC_SIG', 'KYC_CERT')
-
-
-    async def get_stable_id(self, payment):
-        my_role = self.get_my_role(payment)
-        subaddress = payment.data[my_role].subaddress
-        account = self.get_account(subaddress)
-        return account["stable_id"]
-
 
     async def ready_for_settlement(self, payment):
         my_role = self.get_my_role(payment)

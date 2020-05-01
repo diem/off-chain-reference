@@ -113,7 +113,6 @@ class BusinessContext:
             Returns:
                 Status: A set of status indicating to level of kyc to provide,
                 that can include:
-                    - `status_logic.Status.needs_stable_id`
                     - `status_logic.Status.needs_kyc_data`
                     - `status_logic.Status.needs_recipient_signature`
 
@@ -134,7 +133,6 @@ class BusinessContext:
             Returns:
                 Status: The current status if no new information is required,
                 otherwise a status code from:
-                    - `status_logic.Status.needs_stable_id`
                     - `status_logic.Status.needs_kyc_data`
                     - `status_logic.Status.needs_recipient_signature`
 
@@ -170,21 +168,6 @@ class BusinessContext:
                 (str, str, str): Returns the extended KYC information for
                 this payment, in the format:
                 (`kyc_data`, `kyc_signature`, `kyc_certificate`)
-        '''
-        raise NotImplementedError()  # pragma: no cover
-
-    async def get_stable_id(self, payment):
-        ''' Provides a stable ID for the payment.
-
-            Args:
-                payment (PaymentCommand): The concerned payment.
-
-            Raises:
-                BusinessNotAuthorized: If the other VASP is not authorized to
-                    receive a stable ID for this payment.
-
-            Returns:
-                str: A stable ID for the VASP user.
         '''
         raise NotImplementedError()  # pragma: no cover
 

@@ -85,19 +85,6 @@ def test_payment_actor_creation():
         _ = PaymentActor('ABCD', 'XYZ', Status.none, 0)
 
 
-def test_payment_actor_update_stable_id(sender_actor):
-    sender_actor.add_stable_id('AAAA')
-    assert sender_actor.stable_id == 'AAAA'
-
-    with pytest.raises(StructureException):
-        # Cannot add a new stable id
-        sender_actor.add_stable_id('BBBB')
-
-    with pytest.raises(StructureException):
-        # Wrong type of stable ID
-        sender_actor.add_stable_id(0)
-
-
 def test_payment_actor_update_status(sender_actor):
     sender_actor.change_status(Status.needs_kyc_data)
     sender_actor.change_status(Status.ready_for_settlement)

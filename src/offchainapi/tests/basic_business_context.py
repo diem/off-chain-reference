@@ -92,9 +92,6 @@ class BasicBusinessContext(BusinessContext):
                 f'{myself}.{ref_id}.KYC_CERT',
             )
 
-    async def get_stable_id(self, payment):
-        raise NotImplementedError()  # pragma: no cover
-
     # ----- Settlement -----
 
     async def ready_for_settlement(self, payment):

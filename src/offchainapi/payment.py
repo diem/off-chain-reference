@@ -64,7 +64,6 @@ class PaymentActor(StructureChecker):
     fields = [
         ('address', str, REQUIRED, WRITE_ONCE),
         ('subaddress', str, REQUIRED, WRITE_ONCE),
-        ('stable_id', str, OPTIONAL, WRITE_ONCE),
         ('kyc_data', KYCData, OPTIONAL, WRITE_ONCE),
         ('kyc_signature', str, OPTIONAL, WRITE_ONCE),
         ('kyc_certificate', str, OPTIONAL, WRITE_ONCE),
@@ -136,16 +135,6 @@ class PaymentActor(StructureChecker):
         """
         self.update({
             'status': status
-        })
-
-    def add_stable_id(self, stable_id):
-        """ Add a stable id for this actor.
-
-        Args:
-            stable_id (str): The stable id to add to the payment for this actor.
-        """
-        self.update({
-            'stable_id': stable_id
         })
 
 

@@ -488,7 +488,6 @@ class PaymentProcessor(CommandProcessor):
                 await business.check_account_existence(new_payment)
 
             if current_status in {Status.none,
-                                  Status.needs_stable_id,
                                   Status.needs_kyc_data,
                                   Status.needs_recipient_signature}:
 
@@ -505,9 +504,6 @@ class PaymentProcessor(CommandProcessor):
                     new_payment)
 
                 myself_new_actor = new_payment.data[role]
-                if Status.needs_stable_id in kyc_to_provide:
-                    stable_id = await business.get_stable_id(new_payment)
-                    myself_new_actor.add_stable_id(stable_id)
 
                 if Status.needs_kyc_data in kyc_to_provide:
                     extended_kyc = await business.get_extended_kyc(new_payment)
