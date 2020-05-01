@@ -79,7 +79,7 @@ def make_new_VASP(Peer_addr, port):
     return (VASPx, loop, t)
 
 
-async def main_perf(messages_num=100, wait_num=0, verbose=False):
+async def main_perf(messages_num=10, wait_num=0, verbose=False):
     VASPa, loopA, tA = make_new_VASP(PeerA_addr, port=8091)
     VASPb, loopB, tB = make_new_VASP(PeerB_addr, port=8092)
 
