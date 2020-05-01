@@ -1,9 +1,5 @@
 from ..asyncnet import Aionet
-from ..payment import PaymentActor, PaymentObject
-from ..payment_logic import PaymentCommand
-from ..protocol_messages import CommandRequestObject, OffChainException
-from ..utils import JSONFlag
-from ..payment_logic import Status
+from ..protocol_messages import OffChainException
 from ..business import BusinessNotAuthorized
 
 import pytest
@@ -20,31 +16,6 @@ def tester_addr(three_addresses):
 def testee_addr(three_addresses):
     a0, _, _ = three_addresses
     return a0
-
-
-@pytest.fixture
-def command(three_addresses, payment_action):
-    a0, _, b0 = three_addresses
-    sender = PaymentActor(b0.as_str(), 'C', Status.none, [])
-    receiver = PaymentActor(a0.as_str(), '1', Status.none, [])
-    payment = PaymentObject(
-        sender, receiver, 'ref', 'orig_ref', 'desc', payment_action
-    )
-    return PaymentCommand(payment)
-
-
-@pytest.fixture
-def json_request(command):
-    request = CommandRequestObject(command)
-    request.seq = 0
-    request.command_seq = 0
-    return request.get_json_data_dict(JSONFlag.NET)
-
-
-@pytest.fixture
-def response_json():
-    return {"seq": 0, "command_seq": 0, "status": "success"}
-
 
 @pytest.fixture
 def net_handler(vasp):
@@ -64,9 +35,9 @@ async def client(net_handler, aiohttp_client):
 
 
 @pytest.fixture
-async def server(net_handler, tester_addr, aiohttp_server, response_json):
+async def server(net_handler, tester_addr, aiohttp_server, json_response):
     async def handler(request):
-        return aiohttp.web.json_response(response_json)
+        return aiohttp.web.json_response(json_response)
 
     app = aiohttp.web.Application()
     url = net_handler.get_url('/', tester_addr.as_str(), other_is_server=True)

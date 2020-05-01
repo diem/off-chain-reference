@@ -1,4 +1,4 @@
-from ..protocol import VASPPairChannel, make_protocol_error
+from ..protocol import VASPPairChannel, make_protocol_error, NetMessage
 from ..executor import ExecutorException
 from ..protocol_messages import CommandRequestObject, \
     CommandResponseObject, OffChainProtocolError, OffChainException, OffChainOutOfOrder
@@ -11,6 +11,7 @@ from copy import deepcopy
 import random
 from unittest.mock import MagicMock
 import pytest
+import asyncio
 
 
 def monkey_tap_to_list(pair, requests_sent, replies_sent):
@@ -164,6 +165,14 @@ class RandomRun(object):
         assert set(server_seq) == set(server_exec_seq)
 
 
+def test_create_channel_to_myself(three_addresses, vasp):
+    a0, _, _ = three_addresses
+    command_processor = MagicMock(spec=CommandProcessor)
+    store = MagicMock()
+    with pytest.raises(OffChainException):
+        channel = VASPPairChannel(a0, a0, vasp, store, command_processor)
+
+
 def test_client_server_role_definition(three_addresses, vasp):
     a0, a1, a2 = three_addresses
     command_processor = MagicMock(spec=CommandProcessor)
@@ -313,8 +322,10 @@ def test_protocol_server_client_interleaved_benign(two_channels):
     assert len(server.other_requests) == 1
     assert len(client.get_final_sequence()) == 2
     assert len(server.get_final_sequence()) == 2
-    assert [c.item() for c in client.get_final_sequence()] == ['World', 'Hello']
-    assert [c.item() for c in server.get_final_sequence()] == ['World', 'Hello']
+    assert [c.item() for c in client.get_final_sequence()] == [
+        'World', 'Hello']
+    assert [c.item() for c in server.get_final_sequence()] == [
+        'World', 'Hello']
 
 
 def test_protocol_server_client_interleaved_swapped_request(two_channels):
@@ -338,8 +349,10 @@ def test_protocol_server_client_interleaved_swapped_request(two_channels):
     assert len(server.other_requests) == 1
     assert len(client.get_final_sequence()) == 2
     assert len(server.get_final_sequence()) == 2
-    assert [c.item() for c in client.get_final_sequence()] == ['World', 'Hello']
-    assert [c.item() for c in server.get_final_sequence()] == ['World', 'Hello']
+    assert [c.item() for c in client.get_final_sequence()] == [
+        'World', 'Hello']
+    assert [c.item() for c in server.get_final_sequence()] == [
+        'World', 'Hello']
 
 
 def test_protocol_server_client_interleaved_swapped_reply(two_channels):
@@ -366,8 +379,10 @@ def test_protocol_server_client_interleaved_swapped_reply(two_channels):
     assert len(server.other_requests) == 1
     assert len(client.get_final_sequence()) == 2
     assert len(server.get_final_sequence()) == 2
-    assert [c.item() for c in client.get_final_sequence()] == ['World', 'Hello']
-    assert [c.item() for c in server.get_final_sequence()] == ['World', 'Hello']
+    assert [c.item() for c in client.get_final_sequence()] == [
+        'World', 'Hello']
+    assert [c.item() for c in server.get_final_sequence()] == [
+        'World', 'Hello']
 
 
 def test_random_interleave_no_drop(two_channels):
@@ -473,7 +488,8 @@ def test_dependencies(two_channels):
     client = R.client
     server = R.server
 
-    mapcmd = { c.item():client.executor.command_status_sequence[i] for i, c in  enumerate(client.get_final_sequence())}
+    mapcmd = {c.item(): client.executor.command_status_sequence[i] for i, c in enumerate(
+        client.get_final_sequence())}
     # Only one of the items with common dependency commits
     assert sum([mapcmd[1], mapcmd[4]]) == 1
     assert sum([mapcmd[8], mapcmd[9]]) == 1
@@ -506,7 +522,8 @@ def test_json_serlialize():
     data_err = req0.get_json_data_dict(JSONFlag.STORE)
     assert data_err is not None
     assert data_err['response'] is not None
-    req_err = CommandRequestObject.from_json_data_dict(data_err, JSONFlag.STORE)
+    req_err = CommandRequestObject.from_json_data_dict(
+        data_err, JSONFlag.STORE)
     assert req0 == req_err
 
 
@@ -559,3 +576,105 @@ def test_sample_command():
     obj2 = JSONSerializable.parse(data, JSONFlag.STORE)
     assert obj2.version == obj.version
     assert obj2.previous_versions == obj.previous_versions
+
+
+def test_parse_handle_request_to_future(json_request, channel):
+    loop = asyncio.new_event_loop()
+    fut = channel.parse_handle_request_to_future(json_request, loop=loop)
+    res = fut.result()
+    assert isinstance(res, NetMessage)
+
+
+def test_parse_handle_request_to_future_out_of_order(json_request, channel):
+    json_request['seq'] = 100
+    loop = asyncio.new_event_loop()
+    fut = channel.parse_handle_request_to_future(
+        json_request, loop=loop, nowait=True
+    )
+    res = fut.result().get_json_data_dict(JSONFlag.NET)
+    print(res['error']['code'] == 'wait')
+
+
+def test_parse_handle_request_to_future_parsing_error(json_request, channel):
+    json_request['seq'] = '"'  # Trigger a parsing error.
+    loop = asyncio.new_event_loop()
+    fut = channel.parse_handle_request_to_future(json_request, loop=loop)
+    res = fut.result().content
+    assert res['error']['code'] == 'parsing'
+
+
+def test_parse_handle_request_to_future_exception(json_request, channel):
+    loop = asyncio.new_event_loop()
+    fut = channel.parse_handle_request_to_future(
+        json_request, loop=loop, encoded=True # json_request is not encoded.
+    )
+    assert fut.exception() is not None
+
+def test_handle_request_malformed(json_request, two_channels):
+    channel, _ = two_channels
+    request = CommandRequestObject.from_json_data_dict(
+        json_request, JSONFlag.NET
+    )
+    request.command_seq = 1 # Trigger error.
+    res = channel.handle_request(request)
+    json_response = res.get_json_data_dict(JSONFlag.NET)
+    assert json_response['error']['code'] == 'malformed'
+
+
+def test_parse_handle_response_to_future(json_response, channel, command):
+    _ = channel.sequence_command_local(command)
+    loop = asyncio.new_event_loop()
+    fut = channel.parse_handle_response_to_future(json_response, loop=loop)
+    res = fut.result()
+    assert res
+
+
+def test_parse_handle_response_to_future_parsing_error(json_response,
+                                                        channel, command):
+    _ = channel.sequence_command_local(command)
+    loop = asyncio.new_event_loop()
+    json_response['seq'] = '"' # Trigger a parsing error.
+    fut = channel.parse_handle_response_to_future(json_response, loop=loop)
+    assert fut.exception() is not None
+
+
+def test_parse_handle_response_to_future_out_of_order(json_response,
+                                                      channel,
+                                                      command):
+    _ = channel.sequence_command_local(command)
+    loop = asyncio.new_event_loop()
+    json_response['command_seq'] = 100 # Trigger OffChainOutOfOrder.
+    fut = channel.parse_handle_response_to_future(json_response, loop=loop)
+    assert not fut.done()
+
+
+def test_parse_handle_response_to_future_out_of_order_with_nowait(json_response,
+                                                                  channel,
+                                                                  command):
+    _ = channel.sequence_command_local(command)
+    loop = asyncio.new_event_loop()
+    json_response['command_seq'] = 100 # Trigger OffChainOutOfOrder.
+    fut = channel.parse_handle_response_to_future(
+        json_response, loop=loop, nowait=True
+    )
+    assert fut.exception() is not None
+
+
+def test_parse_handle_response_wrong_type(json_response, channel):
+    response = CommandResponseObject.from_json_data_dict(
+        json_response, JSONFlag.NET
+    )
+    response.seq = 'A' # Raises OffChainException because it is not an int.
+    with pytest.raises(OffChainException):
+        channel.handle_response(response)
+
+
+def test_parse_handle_response_bad_duplicate(json_response, channel, command):
+    _ = channel.sequence_command_local(command)
+    response = CommandResponseObject.from_json_data_dict(
+        json_response, JSONFlag.NET
+    )
+    channel.handle_response(response)
+    response.status = '1234'
+    with pytest.raises(OffChainException):
+        channel.handle_response(response)

@@ -269,8 +269,7 @@ class VASPPairChannel:
             NetMessage: The message to be sent on a network.
         """
         struct = response.get_json_data_dict(JSONFlag.NET)
-        if encoded:
-            struct = json.dumps(struct)
+        struct = json.dumps(struct) if encoded else struct
         net_message = NetMessage(
             self.myself, self.other, CommandResponseObject, struct)
         if __debug__:
@@ -431,7 +430,8 @@ class VASPPairChannel:
                 # Call, and this will update the future and unblocks
                 # any processes waiting on it.
                 _ = self.parse_handle_request_to_future(
-                    json_command, encoded, fut)
+                    json_command, encoded, fut
+                )
 
             # Break if no progress is made.
             if next_seq == self.other_next_seq():
@@ -492,7 +492,6 @@ class VASPPairChannel:
                     fut, time.time()
                 )]
             return fut
-
         except JSONParsingError:
             response = make_parsing_error()
             full_response = self.send_response(response, encoded=False)
@@ -506,16 +505,7 @@ class VASPPairChannel:
         return fut
 
     def handle_request(self, request, raise_on_wait=False):
-        """ Handles a request provided as a dictionary.
-
-        Args:
-            request (dict): The request.
-            raise_on_wait (bool, optional): Whether to raise OffChainOutOfOrder
-                when we cannot generate a response before sequencing previous
-                commands. Defaults to False.
-
-        Returns:
-            NetMessage: The message to be sent on a network.
+        """ Handles a request provided as a dictionary. (see `_handle_request`)
         """
         with self.storage.atomic_writes() as _:
             return self._handle_request(request, raise_on_wait)
@@ -524,7 +514,7 @@ class VASPPairChannel:
         """ Handles a request provided as a dictionary.
 
         Args:
-            request (dict): The request.
+            request (CommandRequestObject): The request.
             raise_on_wait (bool, optional): Whether to raise OffChainOutOfOrder
                 when we cannot generate a response before sequencing previous
                 commands. Defaults to False.
@@ -534,7 +524,7 @@ class VASPPairChannel:
                 (due to nowait=True).
 
         Returns:
-            NetMessage: The message to be sent on a network.
+            CommandResponseObject: The response to the VASP's request.
         """
         request.command.set_origin(self.other)
 
@@ -546,8 +536,8 @@ class VASPPairChannel:
                 return previous_request.response
             else:
                 # There is a conflict, and it will have to be resolved
-                #  TODO[issue 8]: How are conflicts meant to be resolved?
-                #  With only two participants we cannot tolerate errors.
+                # TODO[issue 8]: How are conflicts meant to be resolved?
+                # With only two participants we cannot tolerate errors.
                 response = make_protocol_error(request, code='conflict')
                 response.previous_command = previous_request.command
                 self.logger.error('Conflicting requests for seq {request.seq}')
@@ -642,12 +632,6 @@ class VASPPairChannel:
             loop (asyncio.AbstractEventLoopPolicy, optional): the event loop
                 in which this is executed. Defaults to None.
 
-        Raises:
-            OffChainProtocolError: On protocol error.
-            OffChainException: On an unrecoverabe error.
-            OffChainOutOfOrder: In case the response is out of order
-                (due to nowait=True).
-
         Returns:
             bool: Whether the command was a success  or not (Command error).
         """
@@ -680,16 +664,13 @@ class VASPPairChannel:
                     json_response, encoded, fut
                 )]
 
+        except OffChainException or OffChainProtocolError as e:
+            fut.set_exception(e)
+
         return fut
 
     def handle_response(self, response):
-        """ Handles a response provided as a dictionary.
-
-        Args:
-            response (dict): The response.
-
-        Returns:
-            bool: Whether the response is successfully sequenced.
+        """ Handles a response provided as a dictionary. See `_handle_response`
         """
         with self.storage.atomic_writes() as _:
             return self._handle_response(response)
@@ -698,7 +679,7 @@ class VASPPairChannel:
         """ Handles a response provided as a dictionary.
 
         Args:
-            response (dict): The response.
+            response (CommandResponseObject): The response.
 
         Raises:
             OffChainProtocolError: On protocol error.
@@ -721,7 +702,7 @@ class VASPPairChannel:
 
         request_seq = response.seq
 
-        # Check this is the next expected response
+        # Check this is the next expected response.
         if not request_seq < len(self.my_requests):
             raise OffChainException(
                 f'Response for seq {request_seq} received, '
@@ -761,15 +742,16 @@ class VASPPairChannel:
         # Add the next command to the common sequence.
         if response.command_seq == self.next_final_sequence():
             try:
+                print('HERE')
                 self.executor.sequence_next_command(
                     request.command,
                     do_not_sequence_errors=False
                 )
             except ExecutorException as e:
-                # If a error is raised, but the response is a success, then
-                # raise a serious error and stop the channel. If not all is
+                # If an error is raised, but the response is a success, then
+                # raise a serious error and stop the channel. If not, all is
                 # good -- we expected an error and this is why the command
-                # failed possibly.
+                # possibly failed.
                 if request.is_success():
                     self.logger.exception(e)
                     raise e

@@ -248,7 +248,8 @@ class ProtocolExecutor:
             all_good = all(
                 version in self.object_liveness
                 and self.object_liveness[version]
-                for version in dependencies)
+                for version in dependencies
+            )
 
             if not all_good:
                 raise ExecutorException('Required objects do not exist')
