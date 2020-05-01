@@ -5,7 +5,12 @@ from ..business import BusinessForceAbort, BusinessValidationFailure
 from ..payment import PaymentObject
 from ..libra_address import LibraAddress
 from ..asyncnet import Aionet
+from ..storage import StorableFactory
+from ..payment_logic import PaymentProcessor
 
+from .basic_business_context import BasicBusinessContext
+
+import asyncio
 from unittest.mock import MagicMock
 from mock import AsyncMock
 import pytest
@@ -224,6 +229,112 @@ def test_payment_process_get_extended_kyc(payment, processor, kyc_data):
     assert new_payment.receiver.kyc_certificate == 'cert'
 
 
-def test_process_command(processor):
+def test_persist(payment):
+    store = StorableFactory({})
+
+    my_addr = LibraAddress(b'A'*32)
+    my_addr_str = my_addr.as_str()
+    bcm = BasicBusinessContext(my_addr)
+    processor = PaymentProcessor(bcm, store)
+
     net = AsyncMock(Aionet)
     processor.set_network(net)
+
+    cmd = PaymentCommand(payment)
+
+    assert len(processor.list_command_obligations()) == 0
+
+    # Check that a  atomic write context must be in place.
+    with pytest.raises(RuntimeError):
+        processor.persist_command_obligation(my_addr_str, seq=10, command=cmd)
+
+    # Create 1 oblogation
+    with processor.storage_factory.atomic_writes():
+        processor.persist_command_obligation(my_addr_str, seq=10, command=cmd)
+
+    assert processor.obligation_exists(my_addr_str, seq=10)
+    assert len(processor.list_command_obligations()) == 1
+
+    # Check for something that does not exist
+    assert not processor.obligation_exists(my_addr_str, seq=11)
+
+    # delete obligation
+    with processor.storage_factory.atomic_writes():
+        processor.release_command_obligation(my_addr_str, seq=10)
+
+    assert len(processor.list_command_obligations()) == 0
+
+
+def test_reprocess(payment,  loop):
+    store = StorableFactory({})
+
+    my_addr = LibraAddress(b'A'*32)
+    my_addr_str = my_addr.as_str()
+    bcm = BasicBusinessContext(my_addr)
+    processor = PaymentProcessor(bcm, store, loop)
+
+    net = AsyncMock(Aionet)
+    processor.set_network(net)
+
+    cmd = PaymentCommand(payment)
+
+    # Create 1 oblogation
+    with processor.storage_factory.atomic_writes():
+        processor.persist_command_obligation(my_addr_str, seq=10, command=cmd)
+
+    assert len(processor.list_command_obligations()) == 1
+
+    # Ensure is is recheduled
+    coro = processor.retry_process_commands()
+    tasks = loop.run_until_complete(coro)
+    assert len(tasks) == 1
+    assert tasks[0].done() == 1
+
+    assert tasks[0].result() is None
+
+    # Ensure that the obligation is cleared
+    assert len(processor.list_command_obligations()) == 0
+
+
+def test_process_command_success_no_proc(payment, loop):
+    store = StorableFactory({})
+
+    my_addr = LibraAddress(b'B'*32)
+    other_addr = LibraAddress('AAAA')
+    bcm = BasicBusinessContext(my_addr)
+    processor = PaymentProcessor(bcm, store, loop)
+
+    net = AsyncMock(Aionet)
+    processor.set_network(net)
+
+    cmd = PaymentCommand(payment)
+    cmd.set_origin(my_addr)
+
+    # No obligation means no processing
+    coro = processor.process_command_success_async(other_addr, cmd, seq=10)
+    _ = loop.run_until_complete(coro)
+
+def test_process_command_success_vanilla(payment, loop):
+    store = StorableFactory({})
+
+    my_addr = LibraAddress(b'B'*32)
+    other_addr = LibraAddress('AAAA')
+    bcm = BasicBusinessContext(my_addr)
+    processor = PaymentProcessor(bcm, store, loop)
+
+    net = AsyncMock(Aionet)
+    processor.set_network(net)
+
+    cmd = PaymentCommand(payment)
+    cmd.set_origin(other_addr)
+
+    # Create an obligation first
+    with processor.storage_factory.atomic_writes():
+        processor.persist_command_obligation(other_addr.as_str(), seq=10, command=cmd)
+
+    # No obligation means no processing
+    coro = processor.process_command_success_async(other_addr, cmd, seq=10)
+    _ = loop.run_until_complete(coro)
+
+    assert [call[0] for call in net.method_calls] == [
+        'sequence_command', 'send_request']

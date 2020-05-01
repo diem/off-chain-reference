@@ -5,6 +5,7 @@ from .status_logic import status_heights_MUST
 from .payment_command import PaymentCommand, PaymentLogicError
 from .asyncnet import NetworkException
 from .shared_object import SharedObject
+from .libra_address import LibraAddress
 
 import asyncio
 import logging
@@ -34,7 +35,7 @@ class PaymentProcessor(CommandProcessor):
         self.business = business
 
         # Asyncio support
-        self.loop = None
+        self.loop = loop
         self.net = None
         self.logger = logging.getLogger(name='Processor')
 
@@ -111,10 +112,14 @@ class PaymentProcessor(CommandProcessor):
         pending_commands = self.list_command_obligations()
         self.logger.info(f'Re-scheduling {len(pending_commands)} commands for'
                          f' processing ...')
+        new_tasks = []
         for (other_address_str, command, seq) in pending_commands:
             other_address = LibraAddress(other_address_str)
-            self.loop.create_task(self.process_command_success_async(
+            task = self.loop.create_task(self.process_command_success_async(
                 other_address, command, seq))
+            new_tasks += [task]
+
+        return new_tasks
 
     # ------ Machinery for supporting async Business context ------
 
@@ -138,6 +143,9 @@ class PaymentProcessor(CommandProcessor):
             command (PaymentCommand): The current payment command.
             seq (int): The sequence number of the payment command.
         """
+        # To process commands we should have set a network
+        if self.net is None:
+            raise PaymentLogicError('Setup a processor network to process commands.')
 
         # If there is no registered obligation to process there is no
         # need to process this command. We log here an error, which
@@ -152,7 +160,7 @@ class PaymentProcessor(CommandProcessor):
 
         try:
             # Only respond to commands by other side.
-            if command.origin.as_str() == other_address_str:
+            if command.origin == other_address:
 
                 # Determine if we should inject a new command
                 payment = command.get_payment(self.object_store)
@@ -177,8 +185,7 @@ class PaymentProcessor(CommandProcessor):
                                 other_address_str, seq)
 
                     # Attempt to send it to the other VASP.
-                    if self.net is not None:
-                        await self.net.send_request(other_address, request)
+                    await self.net.send_request(other_address, request)
 
             # If we are here we are done with this obligation
             with self.storage_factory.atomic_writes():
