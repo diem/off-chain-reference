@@ -79,7 +79,7 @@ def make_new_VASP(Peer_addr, port):
     return (VASPx, loop, t)
 
 
-async def main_perf():
+async def main_perf(messages_num=100, wait_num=0, verbose=False):
     VASPa, loopA, tA = make_new_VASP(PeerA_addr, port=8091)
     VASPb, loopB, tB = make_new_VASP(PeerB_addr, port=8092)
 
@@ -95,8 +95,8 @@ async def main_perf():
     # Define a payment command
     commands = []
     payments = []
-    for cid in range(100):
-        sender = PaymentActor(PeerA_addr.as_str(), 'aaaa', Status.none, [])
+    for cid in range(messages_num):
+        sender = PaymentActor(PeerA_addr.as_str(), 'aaaa', Status.needs_kyc_data, [])
         receiver = PaymentActor(PeerB_addr.as_str(), 'bbbb', Status.none, [])
         action = PaymentAction(10, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
         payment = PaymentObject(
@@ -119,17 +119,6 @@ async def main_perf():
     res = res.result()
     elapsed = (time.perf_counter() - s)
 
-    # Check that all the payments have been processed and stored.
-    for payment in payments:
-        ref = payment.reference_id
-        _ = VASPa.get_payment_by_ref(ref)
-        hist = VASPa.get_payment_history_by_ref(ref)
-        #if len(hist) > 1:
-        #    print('--'*40)
-        #    for p in hist:
-        #        print(p.pretty())
-
-
     # Print some statistics
     success_number = sum([1 for r in res if r])
     print(f'Commands executed in {elapsed:0.2f} seconds.')
@@ -137,10 +126,21 @@ async def main_perf():
 
     # In case you want to wait for other responses to settle
     #
-    wait_for = 0
+    wait_for = wait_num
     for t in range(wait_for):
         print('waiting', t)
         await asyncio.sleep(1.0)
+
+    # Check that all the payments have been processed and stored.
+    for payment in payments:
+        ref = payment.reference_id
+        _ = VASPa.get_payment_by_ref(ref)
+        hist = VASPa.get_payment_history_by_ref(ref)
+        if verbose:
+            if len(hist) > 1:
+                print('--'*40)
+                for p in hist:
+                    print(p.pretty())
 
     # Esure they were register as successes on both sides.
     Asucc = len([x for x in channelAB.executor.command_status_sequence if x])

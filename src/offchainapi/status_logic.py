@@ -35,12 +35,17 @@ class Status(Enum):
     settled = 'settled',
     abort = 'abort'
 
+    def __str__(self):
+        return self.name
+
+    def __repr__(self):
+        return self.name
+
 
 # Sequence of status for sender
 sender_payment_valid_lattice = \
     [
-      (Status.none, Status.needs_stable_id),
-      (Status.needs_stable_id, Status.needs_kyc_data),
+      (Status.none, Status.needs_kyc_data),
       (Status.needs_kyc_data, Status.needs_recipient_signature),
       (Status.needs_recipient_signature, Status.abort),  # Branch &Terminal
       (Status.needs_recipient_signature, Status.ready_for_settlement),
@@ -50,12 +55,10 @@ sender_payment_valid_lattice = \
 # Sequence of status for receiver
 receiver_payment_valid_lattice = \
     [
-      (Status.none, Status.needs_stable_id),
-      (Status.needs_stable_id, Status.needs_kyc_data),
-      (Status.needs_kyc_data, Status.signed),
+      (Status.none, Status.needs_kyc_data),
       # Branch & terminal
-      (Status.signed, Status.abort),
-      (Status.signed, Status.ready_for_settlement),
+      (Status.needs_kyc_data, Status.abort),
+      (Status.needs_kyc_data, Status.ready_for_settlement),
       # Terminal
       (Status.ready_for_settlement, Status.settled)
     ]
@@ -84,11 +87,16 @@ status_heights_SHOULD = {
 
 
 # Express cross party status dependencies & the starting states for process
-dependencies = [(
-        Status.ready_for_settlement,
-        {Status.ready_for_settlement, Status.signed}
+dependencies = [
+    (
+        Status.settled, {Status.ready_for_settlement, Status.settled}
     )]
-starting_states = [(Status.none, Status.none)]
+
+starting_states = [
+    (Status.none, Status.none),
+    (Status.needs_kyc_data, Status.none),
+    (Status.none, Status.needs_kyc_data)
+    ]
 
 
 # Generic functions to create and compose processes
@@ -196,6 +204,40 @@ def make_payment_status_lattice():
 
 '''A global variable describing the payment protocol status process '''
 payment_status_process = make_payment_status_lattice()
+
+
+def is_valid_status_transition(
+        start_sender, start_reciever,
+        end_sender, end_receiver,
+        is_sender):
+
+    # Check that party has not changed the other side.
+    if is_sender and (start_reciever != end_receiver):
+        return False
+    if not is_sender and (start_sender != end_sender):
+        return False
+
+    if is_sender:
+        process = filter_one_sided_progress(payment_status_process, 1)
+    else:
+        process = filter_one_sided_progress(payment_status_process, 0)
+    process = filter_by_heights(process, status_heights_MUST)
+
+    all_states = filter_for_starting_states(process, [(start_sender, start_reciever)])
+    terminals = extract_end_states(all_states)
+    return (end_sender, end_receiver) in terminals
+
+def is_valid_initial(start_sender, start_reciever, is_sender):
+    if is_sender:
+        process = filter_one_sided_progress(payment_status_process, 1)
+    else:
+        process = filter_one_sided_progress(payment_status_process, 0)
+    process = filter_by_heights(process, status_heights_MUST)
+
+    all_states = filter_for_starting_states(process, [(Status.none, Status.none)])
+    terminals = extract_end_states(all_states)
+    return (start_sender, start_reciever) in terminals
+
 
 # These function just pretty print the status hierarchy
 # =====================================================

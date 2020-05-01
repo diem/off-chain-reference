@@ -44,36 +44,6 @@ def test_check_new_payment_receiver_set_sender_state_fail(payment, processor):
         processor.check_new_payment(payment)
 
 
-def test_check_status_bad_state_fail(processor):
-    with pytest.raises(PaymentLogicError):
-        processor.check_status(
-            'receiver',
-            Status.none,
-            Status.needs_recipient_signature,
-            Status.none
-        )
-
-
-def test_check_status_invalid_transition_fail(processor):
-    with pytest.raises(PaymentLogicError):
-        processor.check_status(
-            'receiver',
-            Status.ready_for_settlement,
-            Status.none,
-            Status.none
-        )
-
-
-def test_check_status_break_finality_barrier_fail(processor):
-    with pytest.raises(PaymentLogicError):
-        processor.check_status(
-            'receiver',
-            Status.ready_for_settlement,
-            Status.abort,
-            Status.none
-        )
-
-
 def test_check_signatures_invalid_signature_fail(kyc_data, payment, processor):
     bcm = processor.business_context()
     bcm.is_recipient.side_effect = [False] * 4
@@ -107,7 +77,7 @@ def test_payment_update_from_sender(payment, processor):
 
 def test_check_new_update_sender_modify_receiver_state_fail(payment, processor):
     bcm = processor.business_context()
-    bcm.is_recipient.side_effect = [True]
+    bcm.is_recipient.side_effect = [True]*5
     diff = {'receiver': {'status': "settled"}}
     new_obj = payment.new_version()
     new_obj = PaymentObject.from_full_record(diff, base_instance=new_obj)
@@ -118,7 +88,7 @@ def test_check_new_update_sender_modify_receiver_state_fail(payment, processor):
 
 def test_check_new_update_receiver_modify_sender_state_fail(payment, processor):
     bcm = processor.business_context()
-    bcm.is_recipient.side_effect = [False]
+    bcm.is_recipient.side_effect = [False]*5
     diff = {'sender': {'status': "settled"}}
     new_obj = payment.new_version()
     new_obj = PaymentObject.from_full_record(diff, base_instance=new_obj)
@@ -187,7 +157,7 @@ def test_payment_process_receiver_new_payment(payment, processor):
     bcm.ready_for_settlement.side_effect = [ True ]
     bcm.has_settled.side_effect = [True]
     new_payment3 = processor.payment_process(new_payment2)
-    assert new_payment3.receiver.status == Status.settled
+    assert new_payment3.receiver.status == Status.ready_for_settlement
 
 
 def test_payment_process_abort_from_receiver(payment, processor):

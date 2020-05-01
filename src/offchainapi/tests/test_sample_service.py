@@ -162,21 +162,6 @@ def test_business_is_kyc_provided_sender(business_and_processor, kyc_payment_as_
     assert bc.get_account('1')['balance'] == 5.0
 
 
-def test_business_settled(business_and_processor, settled_payment_as_receiver):
-    bc, proc = business_and_processor
-    payment = settled_payment_as_receiver
-
-    ret_payment = proc.payment_process(payment)
-    assert ret_payment.has_changed()
-
-    ready = proc.loop.run_until_complete(bc.ready_for_settlement(ret_payment))
-    assert ready
-    assert ret_payment.data['receiver'].status == Status.settled
-
-    assert bc.get_account('1')['pending_transactions']['ref']['settled']
-    assert bc.get_account('1')['balance'] == 15.0
-
-
 @pytest.fixture(params=[
     (None, None, 'failure', True, 'parsing'),
     (0, 0, 'success', None, None),

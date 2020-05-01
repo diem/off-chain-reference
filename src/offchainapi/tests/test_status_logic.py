@@ -35,11 +35,7 @@ def test_receiver_cannot_settle_alone():
 def test_process_is_live():
     process = payment_status_process
     terminals = filter_for_starting_states(
-        process, [(Status.none, Status.none)]
+        process, [(Status.needs_kyc_data, Status.needs_kyc_data)]
     )
     assert (Status.settled, Status.settled) in extract_end_states(terminals)
     assert (Status.abort, Status.abort) in extract_end_states(terminals)
-
-
-if __name__ == '__main__':
-    print_status_transmition_updates(status_heights_SHOULD)
