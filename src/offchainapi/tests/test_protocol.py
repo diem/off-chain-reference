@@ -211,12 +211,18 @@ def test_protocol_server_client_benign(two_channels):
     assert isinstance(request, CommandRequestObject)
     assert server.my_next_seq() == 1
 
+    print()
+    print(request.pretty(JSONFlag.NET))
+
     # Pass the request to the client
     assert client.other_next_seq() == 0
     reply = client.handle_request(request)
     assert isinstance(reply, CommandResponseObject)
     assert client.other_next_seq() == 1
     assert reply.status == 'success'
+
+    print()
+    print(reply.pretty(JSONFlag.NET))
 
     # Pass the reply back to the server
     assert len(server.executor.command_status_sequence) == 0
@@ -252,6 +258,9 @@ def test_protocol_server_conflicting_sequence(two_channels):
     # The response to the second command is a failure
     assert reply_conflict.status == 'failure'
     assert reply_conflict.error.code == 'conflict'
+
+    print()
+    print(reply_conflict.pretty(JSONFlag.NET))
 
     # Pass the reply back to the server
     assert len(server.executor.command_status_sequence) == 0

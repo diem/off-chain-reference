@@ -1,6 +1,7 @@
 from enum import Enum
 from os import urandom
 from binascii import hexlify
+import json
 
 REQUIRED = True
 OPTIONAL = False
@@ -283,6 +284,12 @@ class JSONSerializable:
 
         new_cls = cls.json_type_map[data['_ObjectType']]
         return new_cls.from_json_data_dict(data, flag)
+
+    def pretty(self, typex=JSONFlag.STORE):
+        ''' Returns a string ready for pretty printing.'''
+        parsed = self.get_json_data_dict(typex)
+        s_pretty = json.dumps(parsed, indent=4, sort_keys=True)
+        return s_pretty
 
 
 # Utilities

@@ -51,16 +51,145 @@ We describe a number of additional lower-level requirements throughout the remai
 ## Interface to Libra
 
 * `LibraAddress`: VASP account and parent VASP.
-* Authentication data.
+* VASP Authentication information.
 * Settlement Confirmation.
 * Recipient VASP signatures.
 
 ## Command Sequencing Protocol
 
-* `CommandRequestObject` messages.
-* `CommandResponseObject` messages.
-* `SharedObject` structures.
-* The sequencing protocol & state machine.
+The low-level Off-Chain protocol allows two VASPs to sequence commands originating
+from either VASP and responses to those commands, in order to maintain a
+consistent database of shared objects. Specifically, the commands sequenced are PaymentCommands, each defining or updating a PaymentObject. Sequencing a command requires both VAPSs to confirm it is valid, as well as its sequence in relation to other commands.
+
+### VASP State
+
+Each VASP state consists of the following information:
+
+* An ordered list of **local requests** it has sent (of type `CommandRequestObject`) to the other VASP.
+* An ordered list of **local request responses** (of type `CommandResponseObject`) it has received from the other VASP.
+* An ordered list of **remote requests** (`CommandRequestObject`) it has received from the other VASP, along with the **remote request responses** (of type `CommandResponseObject`) it has sent to the other VASP.
+* A **joint sequence of commands** (including all fields of `ProtocolCommand`) representing commands that have been sequenced by both VASPs, a `success` flag for each denoting whether they were successful of not.
+* A set of **available shared object version** representing the objects that are jointly available and can have future commands applied to them.
+
+### Server and Client role
+
+ In each channel one VASP takes the role of a `server` and the other the role of a `client` for the purposes of sequencing commands into a joint command sequence. Who is the server and who is the client VASP is determined by comparing their binary LibraAddress.
+
+By convention the server always determines the sequence of a request in the joint command sequence. When the server creates a CommandRequestObject it already assigns it a `command_seq` in the joint sequence of commands. When it responds to requests from the client its `CommandResponseObject` contains a `command_seq` for the request into the joint command sequence.
+
+### `CommandRequestObject` messages.
+
+An example `CommandRequestObject` serialized message from a server role VASP to a client role VASP is:
+
+    {
+        "_ObjectType": "CommandRequestObject",
+        "command_type": "PaymentCommand",
+        "seq": 0
+        "command": { ... },
+        "command_seq": 0,
+    }
+
+Such a `CommandRequestObject` contains the following fields.
+
+| Field 	| Type 	| Required? 	| Description 	|
+|-------	|------	|-----------	|-------------	|
+| _ObjectType| str| Y | Fixed value: `CommandRequestObject`|
+|command_type | str| Y |A string representing the type of command contained in the request. |
+|seq | int  | Y | The sequence of this request in the sender local sequence. |
+| command | `ProtocolCommand` sub-structure | Y | The command to sequence. |
+|command_seq    | int | Server   | The sequence of this command in the joint command sequence, only set if the server is the sender. |
+
+### `CommandResponseObject` messages.
+
+    {
+        "_ObjectType": "CommandResponseObject",
+        "seq": 0,
+        "command_seq": 0,
+        "status": "success"
+    }
+
+| Field 	    | Type 	| Required? 	| Description 	|
+|-------	    |------	|-----------	|-------------	|
+|_ObjectType    | str   | Y             |The fixed string `CommandResponseObject`. |
+|seq            |int    | Y             | The sequence number of the request responded to in the local sender request sequence. |
+| command_seq   | int or str=`null`   | Y             | The sequence of the command responded to in the joint command sequence |
+|status         | str   | Y             | Either `success` or `failure`. |
+
+When the `CommandRequestObject` status field is `failure`, the `error` field is included in the response to indicate the nature of the failure. The `error` field (type `OffChainError`) is an object with at least two fields. For example:
+
+    {
+        "_ObjectType": "CommandResponseObject",
+        "command_seq": null,
+        "error": {
+            "code": "conflict",
+            "protocol_error": true
+        },
+        "seq": 0,
+        "status": "failure"
+    }
+
+The `OffChainError` fields are:
+
+| Field 	    | Type 	| Required? 	| Description 	|
+|-------	    |------	|-----------	|-------------	|
+| protocol_error| bool  | Y             | Set 'true' for protocol error, and 'false' for command errors |
+| code | str |  Y | A code giving more information about the nature of the error |
+
+Protocol errors may result in the command not being sequenced or not being immediately sequenced. Command errors on the other hand indicate that the command was sequenced but an error occurred at a higher abstraction level preventing its successful completion.
+
+Specific protocol errors include by `code`:
+
+- `wait` indicates that the VASP is not
+    ready to process the request yet. The `command_seq` may be `null` since no sequencing took place.
+- `missing` indicates that the request has arrived out of order and a previous request from the sender has not yet been received or processed. The `command_seq` may be `null` since no sequencing took place.
+- `conflict` indicates that a request from the sender has already been received and processed, and that the previous request was different than the one re-submitted. This indicates a bug usually at the sender.
+
+### The `ProtocolCommand` basic information
+
+All commands contained in a `CommandRequestObject` need to contain the following fields at the very least:
+
+    {
+        "_ObjectType": "PaymentCommand",
+        "_creates_versions": [ "VHHAGGEKKDSHH" ],
+        "_dependencies":     [ "JJKEIIBBBFSJJ" ],
+        ...
+    }
+
+| Field 	    | Type 	| Required? 	| Description 	|
+|-------	    |------	|-----------	|-------------	|
+| _ObjectType   | str  | Y             | A string representing the type of command. Set to `PaymentCommand` for payment commands. |
+| _creates_versions | list of str |  Y | A list of strings denoting the versions of all new objects created by this command. For `PaymentCommand` this list only includes a single item which is the version of the new payment or updated payment. |
+| _dependencies | list of str | Y | A list of past object versions (can be empty, i.e. `[]`) that are required for this command to succeed. |
+| ... | various | Y | Any other fields defined by this command type.
+
+### The sequencing protocol & state machine
+
+Each VASP receives `CommandRequestObjects` on an open server port, in the body of HTTP POST commands, and responds to them through `CommandResponseObjects` in the body of HTTP responses.
+
+A `CommandRequestObjects` can be processed immediately if:
+
+* At a server VASP all local requests have already received a response from the client VASP. (If not a protocol error response with code `wait` may be generated and sent back.)
+* The Request is the next request in the remote request sequence. All previous remote requests have already been assigned success or failure responses. (If not a protocol error with code `missing` may be generated and sent back.)
+* The Request has the same sequence number and contents with a previous one. In this case the same response must be sent back. (If the sequence number matches but the command is different a `conflict` protocol error must be sent back.)
+
+Once a `CommandRequestObjects` can be processed its sequence number in the joint command sequence can be determined. In case the server is processing a client request it should assign it the next sequence number in the command sequence, and include it in the `command_seq` field of the response. In case the client is processing a server request it will find its sequence number in the `command_seq` field included in the request.
+
+If a protocol error is not generated then the request is sequenced into the joint command sequence, and the VASP needs to determine if it is a success or a command failure. This is done by processing commands in order, and applying checks to
+determine the success or failure of a command:
+
+* If any object versions in the `_dependencies` list of the command are not available the command is a failure. If they are all available they become unavailable (successful commands consume the version of the objects on which they depend) and the object versions in the list of `_creates_versions` become available.
+* Any custom checks specific to the command type may be applied at this point. We discuss specific checks that should be applied for the `PaymentCommand` type in the next sections. However, those checks are synchronous and delay the execution of subsequent commands, and therefore should be efficient.
+
+Once the success or failure of a request has been established the VASP constructs a CommandResponseObject with the remote sequence number, the joint sequence number and the outcome of the command and sends it back to the other VASP in the body of the HTTP response.
+
+Depending on the nature of the HTTP request, responses may be received out of order by a VASP. They should however be processed in a strict order:
+
+* Protocol failures can be processed in any order. Those indicate either the need for a delay or a conflict.
+* Success or Command failure responses must be processed strictly in the order of the included `command_seq` in the final joint sequence. This is indicated in the response.
+
+**Implementation Note:** Both requests and responses need to be processed in a specific order to ensure that the joint objects remain consistent. However, an implementation may chose to buffer out-of-order requests and responses, for later when they become eligible for processing, rather than immediately responding with a protocol error of type `wait` or `missing`. This limits the need for retransmissions saving on bandwidth costs and reducing latency -- and in practice limits the use of the `wait` or `missing` protocol errors to cases when message caches are full.
+
+However, to ensure compatibility with simple implementation as well as crash recovery all implementations should be capable of re-transmitting requests that that returned a `wait` or `missing` protocol error, and also re-issue commands from the local sequence that have received no response after some timeout or upon reconnection with another VASP.
 
 ## PaymentCommand Data Structures and Protocol
 
