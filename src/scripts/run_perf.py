@@ -23,6 +23,9 @@ if __name__ == '__main__':
     parser.add_argument(
         '-w', '--wait', metavar='WAIT_SEC', type=int, default=0,
         help='number of seconds to wait', dest='wait')
+    parser.add_argument(
+        '-v', '--verbose', metavar='VERBOSE', type=bool, default=False,
+        help='Print all payments', dest='verb')
 
     logging.basicConfig(level=logging.ERROR)
 
@@ -30,4 +33,4 @@ if __name__ == '__main__':
     asyncio.run(local_benchmark.main_perf(
         messages_num=args.paym,
         wait_num=args.wait,
-        verbose=False))
+        verbose=args.verb))

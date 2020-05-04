@@ -41,19 +41,27 @@ We describe a number of additional lower-level requirements throughout the remai
 
 ## Basic Building Blocks
 
-* Networking: TCP, tolerate OOO Delivery
-* HTTP end-points.
+* **HTTP end-points**: Each VASP exposes an HTTP POST end point at
+`https://hostname:port\localVASPAddress\RemoteVASPAddress\process`. It receives `CommandRequestObject`s in the POST body, and responds with `CommandResponseObjects`s in the HTTP response. Single command requests-responses are supported (HTTP1.0) but also pipelined request-responses are supported (HTTP1.1).
+* **Serialization to JSON**: All transmitted structures, nested within `CommandRequestObject` and `CommandResponseObject` are valid JSON serialized objects and can be parsed and serialized using standard JSON libraries.
+* **Random strings**: We assume that payment reference IDs and object versions are generated as cryptographically strong random strings. These should be at least 16 bytes long and encoded to string in hexadecimal notation using characters in the range[A-Za-z0-9].
+
+TODO Determine after discussion with partners:
+
 * Transport security: authentication and encryption.
 * Signatures
-* Random strings
-* Serialization to JSON
 
 ## Interface to Libra
 
-* `LibraAddress`: VASP account and parent VASP.
-* VASP Authentication information.
-* Settlement Confirmation.
-* Recipient VASP signatures.
+The Off-chain protocol interacts with the Libra Blockchain in a narrow and very specific set of ways:
+
+* **Address Format**. It uses `LibraAddress`: The Hex encoded address of the VASP. Note this may be a sub-address, since a VASP may operate from many addresses on-chain. Using multiple addresses allows two VASPs to open multiple channels between each other, possible from multiple hosts, allowing for higher throughputs. However, care should be taken to either shard customer accounts per on-chain address or carefully synchronize operations on accounts to prevent them becoming inconsistent due to multiple concurrent accesses and unsynchronized updates.
+* **VASP End-point discovery & Authentication information**. The Libra Blockchain is used to exchange authentication and addressing information in such a way that a VASP may open a channel to any other VASP and initiate an authenticated and encrypted HTTPs connection. This involves discovering the URLs for the all other VASPs.
+* **Settlement Confirmation**. Given a `PaymentObject` that is ready for settlement, a VASP is able to create a payment within the Libra Blockchain to settle the payment, or observe the Libra Blockchain and confirm whether the payment has been settled. The on-chain payment settling an off-chain payment will contain a signed variant of the Reference ID of the off-chain payment.
+* **Payment reference ID & Recipient VASP signatures**. The Libra Blockchain value transfer contact is able to verify that a signature on the reference ID of an on-chain payment is valid (and that signature is provided through the off-chain protocol.)
+
+The Off-chain protocol could be adapted to be used with other Blockchains as long as address format, authentication and network endpoint discovery, and settlement confirmation can be done for these other chains. The inclusion of a signed reference identifier is a Libra specific feature, and other chains may or may not use it depending on their own compliance strategy.
+
 
 ## Command Sequencing Protocol
 
@@ -216,6 +224,43 @@ The meaning of those fields for a `PaymentCommand` is as follows:
 - `diff` contains a `PaymentObject` that either creates a new payment or updates an existing payment. Note that strict validity check apply when updating payments, that are listed in the section below describing these objects. An invalid update or initial payment object results in a command error.
 
 ### The `PaymentObject` Structure.
+
+The `diff` field of a `PaymentCommand` contains a number of fields that define or update a `PaymentObject`. An example `PaymentObject` with all fields understood by the Off-Chain protocol (besides KYC) is illustrated here:
+
+    {
+        "action": {
+            "action": "charge",
+            "amount": 10,
+            "currency": "TIK",
+            "timestamp": "2020-01-02 18:00:00 UTC"
+        },
+        "description": "Custom payment description ...",
+        "original_payment_reference_id": "Original Payment reference identifier ...",
+        "receiver": {
+            "address": "42424242424242424242424242424242",
+            "kyc_certificate": "42424242424242424242424242424242.ref 9.KYC_CERT",
+            "kyc_data": {
+                "blob": "{\n  \"payment_reference_id\": \"42424242424242424242424242424242.ref 9.KYC\",\n  \"type\": \"person\"\n}\n"
+            },
+            "kyc_signature": "42424242424242424242424242424242.ref 9.KYC_SIGN",
+            "metadata": [],
+            "status": "ready_for_settlement",
+            "subaddress": "BobsSubaddress"
+        },
+        "recipient_signature": "42424242424242424242424242424242.ref 9.SIGNED",
+        "reference_id": "HHAYJKDKSUUUSGGH",
+        "sender": {
+            "address": "41414141414141414141414141414141",
+            "kyc_certificate": "41414141414141414141414141414141.ref 9.KYC_CERT",
+            "kyc_data": {
+                "blob": "{\n  \"payment_reference_id\": \"41414141414141414141414141414141.ref 9.KYC\",\n  \"type\": \"person\"\n}\n"
+            },
+            "kyc_signature": "41414141414141414141414141414141.ref 9.KYC_SIGN",
+            "metadata": [],
+            "status": "ready_for_settlement",
+            "subaddress": "AlicesSubaddress"
+        }
+    }
 
 **Allowed state transitions:**
 
