@@ -262,11 +262,229 @@ The `diff` field of a `PaymentCommand` contains a number of fields that define o
         }
     }
 
-**Allowed state transitions:**
+In the next sections we discuss each part of the PaymentObject structure, including what checks are necessary when creating new PaymentObjects or updating existing ones.
+
+## Object Definition: Top-level `PaymentObject`
+
+The top-level `PaymentObject` is the root structure defining a payment and consists of the following fields:
+
+    {
+        "sender": payment_actor_object(),
+        "receiver": payment_actor_object(),
+        "reference_id": "123456abcd_12345",
+        "original_payment_reference_id": "1234",
+        "recipient_signature": "123445667",
+        "action": payment_action_object(),
+        "description": "",
+    }
+
+The `sender`, `receiver`, `reference_id`, and `action` are mandatory. The other fields are optional.
+
+* **sender/receiver (PaymentActorObject)** Information about the sender/receiver in this payment.
+
+* **reference_id (str)** Unique reference ID of this payment on the original coordinator VASP (the VASP which originally created this payment object).  This is used as a unique ID on the coordinator VASP side to identify the payment. Populated by the coordinator VASP upon object creation.  This value should be formatted as “<creator_vasp_address>_<unique_id>”.  For example, ”123456abcd_12345“.  This value is should be unique per-payment.
+
+* **original_payment_reference_id (str)**
+Used for updates to a payment after it has been committed on chain. For example, used for refunds. The reference ID of the original payment will be placed into this field.
+
+* (TODO) **recipient_signature (str)**
+Signature of the recipient of this transaction. The signature is over the `reference_id` and is signed with a key that chains up to its VASP CA. This key need not be the actual account key.  This is the base64 encoded string of the signature.
+
+* **description (str)** Description of the payment. To be displayed to the user. Unicode utf-8 encoded max length of 255 characters.
+
+* **action (PaymentAction)** Number of Libra + currency type (LibraUSD, LibraEUR, etc.).
+
+### Object Definition: `PaymentActorObject`
+
+Represents a participant in a payment - either sender or receiver. It also includes the status of the actor, that indicates missing information or willingness to settle or abort the payment, and the Know-your-customer information of the customer involved in the payment:
+
+    {
+        "address": "abcd1278",
+        "subaddress": "1234567",
+        "stable_id": "777",
+        "kyc_data": kyc_data_object(),
+        "kyc_signature": "abcd",
+        "kyc_certificate": "deadbeef",
+        "status": "ready_for_settlement",
+        "metadata": [],
+    }
+
+* **address (str)**
+Address of the VASP which is sending/receiving the payment. This is the Hex encoded LibraAddress of the VASP.
+
+* **subaddress (str)** Subaddress of the sender/receiver account. Subaddresses may be single use or valid for a limited time, and therefore VASPs should not rely on them remaining stable across time or different VASP addresses.
+
+* (TODO) **kyc_signature: string**
+Standard base64 encoded signature over the KYC data (plus the ref_id).  Signed by the party who provides the KYC data. Note that the KYC JSON object already includes a field about the payload type and version which can be used for domain separation purposes, so no prefix/salt is required during signing.
+**kyc_certificate: string**
+Standard base64 encoded bytes of the X509 certificate for the VASP’s KYC public key, along with a signature chaining to the VASP’s CA.  This certificate is a standard X509 certificate, and will include the algorithm of the key.  The consumer of this message should verify that the kyc_certificate chains up to the root Association CA by way of the VASP CA (already have this from mTLS connection), and if successful use the public key and algorithm specified in the certificate to verify the KYC signature.
+**kyc_data: KycDataObject**
+The KYC data for this account.
+
+* **status (str enum)**
+Status of the payment from the perspective of this actor. This field can only be set by the respective sender/receiver VASP and represents the status on the sender/receiver VASP side. Includes:
+    * `none` - No status is yet set from this actor.
+    * `needs_kyc_data` - KYC data is required by the VASP associated with this account
+    * `needs_recipient_signature` - Can only be associated with the sender actor.  Means that the sender still requires that the recipient side provide the signature so that the transaction can be put on-chain.
+    * `ready_for_settlement` - Transaction is ready for settlement according to the VASP associated with this account (i.e. the required signatures/KYC data have been passed)
+    * `settled` - Payment has been settled on chain and funds delivered to the subaddress
+    * `abort` - Indicates the VASP wishes to abort this payment, instead of not settling it.
+
+* **metadata: list of str**
+Array of string:string objects.  Can be specified by the respective VASP to hold metadata that the sender/receiver VASP wishes to associate with this payment.
+
+### Object Definition: `KYCDataObject`
+
+Represents the KYC data for a single subaddress. This should be in canonical JSON format to ensure repeatable hashes of JSON-encoded data.
+
+    {
+        "payment_reference_id": "ID",
+        "payload_type": "KYC_DATA",
+        "payload_version": 1,
+        "type": "individual",
+        "given_name": "ben",
+        "surname": "mauer",
+        "address": {
+            "city": "Sunnyvale",
+            "country": "US",
+            "line1": "1234 Maple Street",
+            "line2": "Apartment 123",
+            "postal_code": "12345",
+            "state": "California",
+        },
+        "dob": "1920-03-20",
+        "place_of_birth": {
+            "city": "Sunnyvale",
+            "country": "US",
+            "postal_code": "12345",
+            "state": "California",
+        }
+        "national_id": {
+        },
+        "legal_entity_name": "Superstore",
+    }
+
+
+* **payment_reference_id (string)**
+Reference_id of this payment. Used to prevent signature replays.
+
+* **payload_type (string)**
+Used to help determine what type of data this will deserialize into.  Always set to KYC_DATA.
+
+* **payload_version (string)**
+Version identifier to allow modifications to KYC data object without needing to bump version of entire API set
+
+* **type (string)**
+Required field, must be either “individual” or “entity”
+
+* **given_name (string)**
+Legal given name of the user for which this KYC data object applies.
+
+* **surname (string)**
+Legal surname of the user for which this KYC data object applies.
+
+* **address (Object)**.
+Address data for this account
+
+* **dob: string** Date of birth for the holder of this account.  Specified as an ISO 8601 calendar date format: https://en.wikipedia.org/wiki/ISO_8601
+
+* **place_of_birth (object)**
+Place of birth for this user.  line1 and line2 fields should not be populated for this usage of the address object.
+
+* **national_id (object)**
+National ID information for the holder of this account
+
+* **legal_entity_name (string)**
+Name of the legal entity
+
+### Object Definition: `NationalIDObject`
+
+Represents a national ID
+
+    {
+        "id_value": "123-45-6789",
+        "country": "US",
+        "type": "SSN",
+    }
+
+* **id_value (string)**
+Required field, indicates the national ID value.  For example, a social security number
+
+* **country (string)**
+Optional field for two-letter country code (https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2)
+
+**type (string)**
+Optional field to indicate the type of ID
+
+### Object Definition: `AddressObject`
+
+Represents an address
+
+    {
+        "city": "Sunnyvale",
+        "country": "US",
+        "line1": "1234 Maple Street",
+        "line2": "Apartment 123",
+        "postal_code": "12345",
+        "state": "California",
+    },
+
+* **city (string)**
+Optional field for the city, district, suburb, town, or village
+
+* **country (string)**
+Optional field for two-letter country code (https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2)
+
+* **line1 (string)**
+Optional field for address line 1
+
+* **line2 (string)**
+Optional field for address line 2 - apartment, unit, etc.
+
+* **postal_code (string)**
+Optional field for ZIP or postal code
+
+* **state (string)**
+Optional field for state, county, province, region.
+
+### Object Definition: `PaymentActionObject`
+
+Represents a payment action.
+
+    {
+        "amount": 100,
+        "currency": "LibraUSD",
+        "action": "charge",
+        "timestamp": 72322,
+    }
+
+* **amount (uint)**
+Amount of the transfer.  Base units are the same as for on-chain transactions for this currency.  For example, if LibraUSD is represented on-chain where “1” equals 1e-6 dollars, then “1” equals the same amount here.  For any currency, the on-chain mapping must be used for amounts.
+
+* **currency (enum)**
+One of the supported on-chain currency types - ex. LibraUSD, LibraEUR, etc.
+
+* **action (enum)**
+Populated in the request.  This value indicates the requested action to perform
+
+* TODO: **timestamp (unix timestamp)**
+Unix timestamp indicating the time that the action was completed.  This value is populated by the target of the POST request and filled in the response to the request.
+
+## Allowed state transitions
+
+The creator VASP for a PaymentObject must always set the status of the other side to `none`. In the most common case when a VASP creates a payment with one of its customers as a sender it must set the status of the receiver actor to `none`. Its own initial sender state may be `need_kyc_data` or `ready_for_settlement`.
+
+Commands updating the payment on either side can change their own status but not the status of the other VASP. For example if the receiver VASP for a payment proposes a command it should only modify the status of the receiver actor, but not the sender. Attempting to mutate the status of the other actor will result in a command error. Status updates must proceed in the order `none`, `needs_kyc_data`, `needs_receipient_signature`, and `ready_for_settlement` - although some may be skipped if the information is already provided or not required.
+
+Once a VASP has set its own status as `ready_for_settlement` it may not attempt to move the status of the payment to `abort`. As a result once both VASPs consider that the status of the payment is `ready_for_settlement` the payment is ready to settle on chain, and is considered technically finalized on the off-chain channel. After this 'finality barrier' has been reached the only allowed transition is to `settled` on either or both sides to indicate that an on-chain payment settling the off-chain payment has been executed.
 
 ## Example Protocol Flows
 
+    ...
+
 # Programing & Integration Interface
+
+    ...
 
 # References
 
