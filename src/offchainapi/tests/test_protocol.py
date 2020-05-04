@@ -1,15 +1,17 @@
 from ..protocol import VASPPairChannel, make_protocol_error, NetMessage
-from ..executor import ExecutorException
+from ..executor import ExecutorException, ProtocolExecutor
 from ..protocol_messages import CommandRequestObject, \
     CommandResponseObject, OffChainProtocolError, OffChainException, OffChainOutOfOrder
 from ..sample.sample_command import SampleCommand
 from ..command_processor import CommandProcessor
 from ..utils import JSONSerializable, JSONFlag
+from ..storage import StorableFactory
 
 import types
 from copy import deepcopy
 import random
 from unittest.mock import MagicMock
+from mock import PropertyMock
 import pytest
 import asyncio
 
@@ -277,9 +279,9 @@ def test_protocol_client_server_benign(two_channels):
     # Send to server
     assert server.other_next_seq() == 0
     reply = server.handle_request(request)
-    #msg_list = server.tap()
-    #assert len(msg_list) == 1
-    #reply = msg_list.pop()
+    # msg_list = server.tap()
+    # assert len(msg_list) == 1
+    # reply = msg_list.pop()
     assert isinstance(reply, CommandResponseObject)
     assert server.other_next_seq() == 1
     assert server.next_final_sequence() == 1
@@ -606,16 +608,17 @@ def test_parse_handle_request_to_future_parsing_error(json_request, channel):
 def test_parse_handle_request_to_future_exception(json_request, channel):
     loop = asyncio.new_event_loop()
     fut = channel.parse_handle_request_to_future(
-        json_request, loop=loop, encoded=True # json_request is not encoded.
+        json_request, loop=loop, encoded=True  # json_request is not encoded.
     )
     assert fut.exception() is not None
+
 
 def test_handle_request_malformed(json_request, two_channels):
     channel, _ = two_channels
     request = CommandRequestObject.from_json_data_dict(
         json_request, JSONFlag.NET
     )
-    request.command_seq = 1 # Trigger error.
+    request.command_seq = 1  # Trigger error.
     res = channel.handle_request(request)
     json_response = res.get_json_data_dict(JSONFlag.NET)
     assert json_response['error']['code'] == 'malformed'
@@ -630,10 +633,10 @@ def test_parse_handle_response_to_future(json_response, channel, command):
 
 
 def test_parse_handle_response_to_future_parsing_error(json_response,
-                                                        channel, command):
+                                                       channel, command):
     _ = channel.sequence_command_local(command)
     loop = asyncio.new_event_loop()
-    json_response['seq'] = '"' # Trigger a parsing error.
+    json_response['seq'] = '"'  # Trigger a parsing error.
     fut = channel.parse_handle_response_to_future(json_response, loop=loop)
     assert fut.exception() is not None
 
@@ -643,7 +646,7 @@ def test_parse_handle_response_to_future_out_of_order(json_response,
                                                       command):
     _ = channel.sequence_command_local(command)
     loop = asyncio.new_event_loop()
-    json_response['command_seq'] = 100 # Trigger OffChainOutOfOrder.
+    json_response['command_seq'] = 100  # Trigger OffChainOutOfOrder.
     fut = channel.parse_handle_response_to_future(json_response, loop=loop)
     assert not fut.done()
 
@@ -653,7 +656,7 @@ def test_parse_handle_response_to_future_out_of_order_with_nowait(json_response,
                                                                   command):
     _ = channel.sequence_command_local(command)
     loop = asyncio.new_event_loop()
-    json_response['command_seq'] = 100 # Trigger OffChainOutOfOrder.
+    json_response['command_seq'] = 100  # Trigger OffChainOutOfOrder.
     fut = channel.parse_handle_response_to_future(
         json_response, loop=loop, nowait=True
     )
@@ -664,7 +667,7 @@ def test_parse_handle_response_wrong_type(json_response, channel):
     response = CommandResponseObject.from_json_data_dict(
         json_response, JSONFlag.NET
     )
-    response.seq = 'A' # Raises OffChainException because it is not an int.
+    response.seq = 'A'  # Raises OffChainException because it is not an int.
     with pytest.raises(OffChainException):
         channel.handle_response(response)
 
@@ -678,3 +681,46 @@ def test_parse_handle_response_bad_duplicate(json_response, channel, command):
     response.status = '1234'
     with pytest.raises(OffChainException):
         channel.handle_response(response)
+
+
+def test_process_waiting_messages(channel, json_response, command):
+    # Add command to the waiting queue.
+    _ = channel.sequence_command_local(command)
+    loop = asyncio.new_event_loop()
+    json_response['command_seq'] = 100
+    fut = channel.parse_handle_response_to_future(json_response, loop=loop)
+    assert not fut.done()
+
+    # Clear the waiting queue.
+    channel.executor = MagicMock(spec=ProtocolExecutor)
+    channel.executor.next_seq.return_value = 100
+    type(channel.executor).last_confirmed = PropertyMock(return_value=100)
+    channel.process_waiting_messages()
+    assert not channel.waiting_response
+
+
+def test_handle_response_executor_exception(channel, json_response, command):
+    _ = channel.sequence_command_local(command)
+    channel.executor = MagicMock(spec=ProtocolExecutor)
+    channel.executor.sequence_next_command.side_effect = ExecutorException
+    channel.executor.next_seq.return_value = 0
+    type(channel.executor).last_confirmed = PropertyMock(return_value=0)
+    loop = asyncio.new_event_loop()
+    fut = channel.parse_handle_response_to_future(json_response, loop=loop)
+    assert fut.exception() is not None
+
+
+def test_get_storage_factory(vasp):
+    assert isinstance(vasp.get_storage_factory(), StorableFactory)
+
+
+def test_role(channel):
+    assert channel.role() == 'Client'
+
+
+def test_num_pending_responses(channel):
+    assert channel.num_pending_responses() == 0
+
+
+def test_pending_retransmit_number(channel):
+    assert channel.pending_retransmit_number() == 0

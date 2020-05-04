@@ -667,6 +667,9 @@ class VASPPairChannel:
         except OffChainException or OffChainProtocolError as e:
             fut.set_exception(e)
 
+        except ExecutorException as e:
+            fut.set_exception(e)
+
         return fut
 
     def handle_response(self, response):
@@ -684,6 +687,7 @@ class VASPPairChannel:
         Raises:
             OffChainProtocolError: On protocol error.
             OffChainException: On an unrecoverabe error.
+            ExecutorException: Can happy if the other VASP is buggy.
 
         Returns:
             bool: Whether the response is successfully sequenced.
