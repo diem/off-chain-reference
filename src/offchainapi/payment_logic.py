@@ -23,7 +23,7 @@ class PaymentProcessor(CommandProcessor):
     lead to that failure.
 
     Crash-recovery strategy: The processor must only process each
-    command once. Foor this purpose the Executor passes commands
+    command once. For this purpose the Executor passes commands
     in the order they have been sequenced by the lower-level
     protocol on each channel, and does so only once for each command
     in the sequence for each channel.
@@ -49,7 +49,7 @@ class PaymentProcessor(CommandProcessor):
                 'reference_id_index', PaymentObject, root)
 
             # This is the primary store of shared objects.
-            # It maps version numbers -> objects
+            # It maps version numbers -> objects.
             self.object_store = storage_factory.make_dict(
                 'object_store', SharedObject, root=root)
 
@@ -127,8 +127,10 @@ class PaymentProcessor(CommandProcessor):
     async def process_command_failure_async(
             self, other_address, command, seq, error):
         ''' Process any command failures from either ends of a channel.'''
-        self.logger.error(f'Command with {other_address.as_str()}.#{seq}'
-                          f' Failure: {error}')
+        self.logger.error(
+            f'Command with {other_address.as_str()}.#{seq}'
+            f' Failure: {error}'
+        )
         return
 
     async def process_command_success_async(
@@ -140,21 +142,25 @@ class PaymentProcessor(CommandProcessor):
 
         Args:
             other_address (LibraAddress):  The other VASP address in the
-                channel that received this command..
+                channel that received this command.
             command (PaymentCommand): The current payment command.
             seq (int): The sequence number of the payment command.
         """
         # To process commands we should have set a network
         if self.net is None:
-            raise PaymentLogicError('Setup a processor network to process commands.')
+            raise PaymentLogicError(
+                'Setup a processor network to process commands.'
+            )
 
         # If there is no registered obligation to process there is no
         # need to process this command. We log here an error, which
         # might be due to a bug.
         other_address_str = other_address.as_str()
         if not self.obligation_exists(other_address_str, seq):
-            self.logger.error(f'Process command called without obligation '
-                              f'{other_address_str}.#{seq}')
+            self.logger.error(
+                f'Process command called without obligation '
+                f'{other_address_str}.#{seq}'
+            )
             return
 
         self.logger.debug(f'Process Command {other_address_str}.#{seq}')
@@ -163,7 +169,7 @@ class PaymentProcessor(CommandProcessor):
             # Only respond to commands by other side.
             if command.origin == other_address:
 
-                # Determine if we should inject a new command
+                # Determine if we should inject a new command.
                 payment = command.get_payment(self.object_store)
                 new_payment = await self.payment_process_async(payment)
 
@@ -188,7 +194,7 @@ class PaymentProcessor(CommandProcessor):
                     # Attempt to send it to the other VASP.
                     await self.net.send_request(other_address, request)
 
-            # If we are here we are done with this obligation
+            # If we are here we are done with this obligation.
             with self.storage_factory.atomic_writes():
                 if self.obligation_exists(other_address_str, seq):
                     self.release_command_obligation(other_address_str, seq)
@@ -202,7 +208,8 @@ class PaymentProcessor(CommandProcessor):
 
         except Exception as e:
             self.logger.error(
-                f'Payment processing error: seq #{seq}: {str(e)}')
+                f'Payment processing error: seq #{seq}: {str(e)}'
+            )
             self.logger.exception(e)
 
     # -------- Implements CommandProcessor interface ---------
@@ -230,12 +237,14 @@ class PaymentProcessor(CommandProcessor):
         ])
 
         if parties != needed_parties:
-            raise PaymentLogicError(f'Wrong Parties: expected {needed_parties} \
-                but got {str(parties)}')
+            raise PaymentLogicError(
+                f'Wrong Parties: expected {needed_parties} '
+                f'but got {str(parties)}'
+            )
 
         other_addr = channel.get_other_address().as_str()
 
-        # Ensure the originator is one of the VASPs in the channel
+        # Ensure the originator is one of the VASPs in the channel.
         origin = command.get_origin().as_str()
         if origin not in parties:
             raise PaymentLogicError('Command originates from wrong party')
@@ -249,9 +258,8 @@ class PaymentProcessor(CommandProcessor):
                 old_payment = dependencies[old_version]
                 self.check_new_update(old_payment, new_payment)
 
-    def process_command(
-            self, vasp, channel, executor, command,
-            seq, status_success, error=None):
+    def process_command(self, vasp, channel, executor, command,
+                        seq, status_success, error=None):
         ''' Overrides CommandProcessor. '''
 
         other_addr = channel.get_other_address()
@@ -265,20 +273,20 @@ class PaymentProcessor(CommandProcessor):
                 self.futs += [fut]
             return fut
 
-        # Creates new objects
+        # Creates new objects.
         new_versions = command.new_object_versions()
         for version in new_versions:
             obj = command.get_object(version, self.object_store)
             self.object_store[version] = obj
 
-        # Update the Index of Reference ID -> Payment
+        # Update the Index of Reference ID -> Payment.
         self.store_latest_payment_by_ref_id(command)
 
         # We record an obligation to process this command, even
         # after crash recovery.
         self.persist_command_obligation(other_str, seq, command)
 
-        # Spin further command processing in its own task
+        # Spin further command processing in its own task.
         self.logger.debug(f'Schedule cmd {seq}')
         fut = self.loop.create_task(self.process_command_success_async(
             other_addr, command, seq))
@@ -316,13 +324,13 @@ class PaymentProcessor(CommandProcessor):
         ''' Internal command to update the payment index '''
         payment = command.get_payment(self.object_store)
 
-        # Update the Index of Reference ID -> Payment
+        # Update the Index of Reference ID -> Payment.
         ref_id = payment.reference_id
 
         # Write the new payment to the index of payments by
         # reference ID to support they GetPaymentAPI.
         if ref_id in self.reference_id_index:
-            # We get the dependencies of the old payment
+            # We get the dependencies of the old payment.
             old_version = self.reference_id_index[ref_id].get_version()
 
             # We check that the previous version is present.
@@ -336,7 +344,7 @@ class PaymentProcessor(CommandProcessor):
     # ----------- END of CommandProcessor interface ---------
 
     def check_signatures(self, payment):
-        ''' Utility function that checks all signatures present for validity'''
+        ''' Utility function that checks all signatures present for validity. '''
         business = self.business
         is_sender = business.is_sender(payment)
         other_actor = payment.receiver if is_sender else payment.sender
