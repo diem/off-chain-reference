@@ -102,6 +102,9 @@ async def main_perf(messages_num=10, wait_num=0, verbose=False):
         payment = PaymentObject(
             sender, receiver, f'ref {cid}', 'orig_ref', 'desc', action
         )
+        kyc_data = asyncio.run_coroutine_threadsafe(VASPa.bc.get_extended_kyc(payment), loopA)
+        kyc_data = kyc_data.result()
+        payment.sender.add_kyc_data(*kyc_data)
         payments += [payment]
         cmd = PaymentCommand(payment)
         commands += [cmd]

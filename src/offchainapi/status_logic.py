@@ -199,12 +199,12 @@ payment_status_process = make_payment_status_lattice()
 
 
 def is_valid_status_transition(
-        start_sender, start_reciever,
+        start_sender, start_receiver,
         end_sender, end_receiver,
         is_sender):
 
     # Check that party has not changed the other side.
-    if is_sender and (start_reciever != end_receiver):
+    if is_sender and (start_receiver != end_receiver):
         return False
     if not is_sender and (start_sender != end_sender):
         return False
@@ -213,21 +213,25 @@ def is_valid_status_transition(
         process = filter_one_sided_progress(payment_status_process, 1)
     else:
         process = filter_one_sided_progress(payment_status_process, 0)
+
+    process = filter_for_starting_states(process, [(
+        start_sender,
+        start_receiver)])
     process = filter_by_heights(process, status_heights_MUST)
 
-    all_states = filter_for_starting_states(process, [(start_sender, start_reciever)])
-    terminals = extract_end_states(all_states)
+    terminals = extract_end_states(process)
     return (end_sender, end_receiver) in terminals
+
 
 def is_valid_initial(start_sender, start_reciever, is_sender):
     if is_sender:
         process = filter_one_sided_progress(payment_status_process, 1)
     else:
         process = filter_one_sided_progress(payment_status_process, 0)
-    process = filter_by_heights(process, status_heights_MUST)
 
-    all_states = filter_for_starting_states(process, [(Status.none, Status.none)])
-    terminals = extract_end_states(all_states)
+    process = filter_for_starting_states(process, [(Status.none, Status.none)])
+    process = filter_by_heights(process, status_heights_MUST)
+    terminals = extract_end_states(process)
     return (start_sender, start_reciever) in terminals
 
 

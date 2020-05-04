@@ -1,6 +1,7 @@
 from ..status_logic import Status, filter_for_starting_states, \
     filter_one_sided_progress, extract_end_states, \
-    print_status_transmition_updates, payment_status_process
+    print_status_transmition_updates, payment_status_process, \
+    is_valid_status_transition
 
 
 def test_lattice_finality_barrier_works():
@@ -39,3 +40,9 @@ def test_process_is_live():
     )
     assert (Status.settled, Status.settled) in extract_end_states(terminals)
     assert (Status.abort, Status.abort) in extract_end_states(terminals)
+
+def test_basic_transitions():
+    assert is_valid_status_transition(
+        Status.needs_kyc_data, Status.ready_for_settlement,
+        Status.ready_for_settlement, Status.ready_for_settlement,
+        is_sender = True)
