@@ -193,9 +193,31 @@ However, to ensure compatibility with simple implementation as well as crash rec
 
 ## PaymentCommand Data Structures and Protocol
 
-* `PaymentObject` Structure.
-* The `PaymentCommand` structure.
-* Allowed state transitions.
+### The `PaymentCommand` structure
+
+The `PaymentCommand` structure represents the only type of command available in the initial version of the Off-chain protocol, and allows VASPs to create new, as well as modify existing shared `PaymentObject`s. As any `ProtocolCommand` it includes the `_ObjectType`, `_creates_versions`, `_dependencies` fields, and also a `diff` field containing a `PaymentObject` structure.
+
+    {
+        "_ObjectType": "PaymentCommand",
+        "_creates_versions": [
+            "08697804e12212fa1c979283963d5c71"
+        ],
+        "_dependencies": [],
+        "diff": {
+            ...
+        }
+    }
+
+The meaning of those fields for a `PaymentCommand` is as follows:
+
+- `_ObjectType` is the fixed string `PaymentCommand`.
+- `_dependencies` can be an empty list or a list containing a single previous version. If the list is empty this payment command defines a new payment. If the list contains one item, then this command updates the shared `PaymentObject` with the given version. It is an error to include more versions, and it results in a command error response.
+- `_creates_versions` must be a list containing a single str representing the version of the new or updated `PaymentObject` resulting from the success of this payment command. A list with any other number of items results in a command error.
+- `diff` contains a `PaymentObject` that either creates a new payment or updates an existing payment. Note that strict validity check apply when updating payments, that are listed in the section below describing these objects. An invalid update or initial payment object results in a command error.
+
+### The `PaymentObject` Structure.
+
+**Allowed state transitions:**
 
 ## Example Protocol Flows
 

@@ -7,6 +7,7 @@ from ..libra_address import LibraAddress
 from ..asyncnet import Aionet
 from ..storage import StorableFactory
 from ..payment_logic import PaymentProcessor
+from ..utils import JSONFlag
 
 from .basic_business_context import BasicBusinessContext
 
@@ -202,6 +203,8 @@ def test_persist(payment):
     processor.set_network(net)
 
     cmd = PaymentCommand(payment)
+    print()
+    print(cmd.pretty(JSONFlag.NET))
 
     assert len(processor.list_command_obligations()) == 0
 
