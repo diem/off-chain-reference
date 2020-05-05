@@ -59,7 +59,6 @@ class PaymentProcessor(CommandProcessor):
             self.command_cache = storage_factory.make_dict(
                 'command_cache', ProtocolCommand, root)
 
-
         # Storage for debug futures list
         self.futs = []
 
@@ -133,8 +132,7 @@ class PaymentProcessor(CommandProcessor):
         )
         return
 
-    async def process_command_success_async(
-            self, other_address, command, seq):
+    async def process_command_success_async(self, other_address, command, seq):
         """ The asyncronous command processing logic.
 
         Checks all incomming commands from the other VASP, and determines if
@@ -280,7 +278,8 @@ class PaymentProcessor(CommandProcessor):
         # Call the failure handler and exit.
         if not status_success:
             fut = self.loop.create_task(self.process_command_failure_async(
-                other_addr, command, seq, error))
+                other_addr, command, seq, error)
+            )
             if __debug__:
                 self.futs += [fut]
             return fut
@@ -395,8 +394,7 @@ class PaymentProcessor(CommandProcessor):
             )
 
         if not self.good_initial_status(new_payment, not is_sender):
-            raise PaymentLogicError(
-                'Invalid status transition.')
+            raise PaymentLogicError('Invalid status transition.')
 
         self.check_signatures(new_payment)
 
@@ -476,7 +474,6 @@ class PaymentProcessor(CommandProcessor):
         receiver_st = payment.receiver.status
         return is_valid_initial(sender_st, receiver_st, actor_is_sender)
 
-
     async def payment_process_async(self, payment):
         ''' Processes a payment that was just updated, and returns a
             new payment with potential updates. This function may be
@@ -499,7 +496,6 @@ class PaymentProcessor(CommandProcessor):
         new_payment = payment.new_version()
 
         try:
-
             # We set our status as abort.
             if other_status == Status.abort:
                 current_status = Status.abort
@@ -544,8 +540,7 @@ class PaymentProcessor(CommandProcessor):
 
             # Ensure both sides are past the finality barrier
             if current_status == Status.ready_for_settlement \
-                    and self.can_change_status(
-                        payment, Status.settled, is_sender):
+                    and self.can_change_status(payment, Status.settled, is_sender):
                 if await business.has_settled(new_payment):
                     current_status = Status.settled
 
