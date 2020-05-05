@@ -105,10 +105,11 @@ def simple_response_json_error(request):
 
 @pytest.fixture
 def simple_request_json(payment_action, my_addr, other_addr):
+    sender_str = other_addr.as_str()
     sender = PaymentActor(other_addr.as_str(), 'C', Status.none, [])
     receiver = PaymentActor(my_addr.as_str(), '1', Status.none, [])
     payment = PaymentObject(
-        sender, receiver, 'ref', 'orig_ref', 'desc', payment_action
+        sender, receiver, f'{sender_str}_ref', 'orig_ref', 'desc', payment_action
     )
     command = PaymentCommand(payment)
     request = CommandRequestObject(command)
@@ -180,6 +181,7 @@ def simple_response_json_error(request):
         resp.error = OffChainError(protoerr, errcode)
     json_obj = json.dumps(resp.get_json_data_dict(JSONFlag.NET))
     return json_obj
+
 
 def test_vasp_simple(simple_request_json, vasp, other_addr, loop):
     vasp.pp.loop = loop

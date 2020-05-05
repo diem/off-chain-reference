@@ -96,11 +96,12 @@ async def main_perf(messages_num=10, wait_num=0, verbose=False):
     commands = []
     payments = []
     for cid in range(messages_num):
-        sender = PaymentActor(PeerA_addr.as_str(), 'aaaa', Status.needs_kyc_data, [])
+        peerA_addr = PeerA_addr.as_str()
+        sender = PaymentActor(peerA_addr, 'aaaa', Status.needs_kyc_data, [])
         receiver = PaymentActor(PeerB_addr.as_str(), 'bbbb', Status.none, [])
         action = PaymentAction(10, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
         payment = PaymentObject(
-            sender, receiver, f'ref {cid}', 'orig_ref', 'desc', action
+            sender, receiver, f'{peerA_addr}_ref_{cid}', 'orig_ref', 'desc', action
         )
         kyc_data = asyncio.run_coroutine_threadsafe(VASPa.bc.get_extended_kyc(payment), loopA)
         kyc_data = kyc_data.result()

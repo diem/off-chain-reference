@@ -122,8 +122,10 @@ def test_check_command(payment, processor, executor):
         channel.get_my_address.return_value = a0
         channel.get_other_address.return_value = a1
 
+        payment.data['reference_id'] = f'{origin_addr}_XYZ'
         command = PaymentCommand(payment)
         command.set_origin(origin)
+
         if res:
             processor.check_command(channel, command)
         else:

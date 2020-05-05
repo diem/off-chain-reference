@@ -42,8 +42,9 @@ def payment_action():
 
 @pytest.fixture
 def payment(sender_actor, receiver_actor, payment_action):
+
     return PaymentObject(
-        sender_actor, receiver_actor, 'ref', 'orig_ref', 'desc', payment_action
+        sender_actor, receiver_actor, '_ref', 'orig_ref', 'desc', payment_action
     )
 
 

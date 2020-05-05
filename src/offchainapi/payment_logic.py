@@ -252,6 +252,15 @@ class PaymentProcessor(CommandProcessor):
         # Only check the commands we get from others.
         if origin == other_addr:
             if command.dependencies == []:
+
+                # Check that the reference_id is correct
+                # Only do this for the definition of new payments, aafter that
+                # the ref id stays the same.
+
+                ref_id_structure = new_payment.reference_id.split('_')
+                if not (len(ref_id_structure) > 1 and ref_id_structure[0] == origin):
+                    raise PaymentLogicError(f'Expected reference_id of the form {origin}_XYZ, got: {new_payment.reference_id}')
+
                 self.check_new_payment(new_payment)
             else:
                 old_version = command.get_previous_version()
