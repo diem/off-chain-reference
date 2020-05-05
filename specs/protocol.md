@@ -31,7 +31,7 @@ The Off-chain protocol immediately supports a number of use-cases:
 
 The Off-Chain protocol has been architected to allow two further use-cases in the near future:
 
-**Scalability**. The initial version of the Off-chain protocol only defines off-chain PaymentObjects that are eventually settled individually (gross) through a Libra Blockchain transaction. However, the architecture of the Off-chain protocol allows the future introduction of netting batches of payments, and settling all them all through a single Libra Blockchain transaction. This allows costs associated with multiple on-chain transactions to be kept low for VASPs, and allows for a number of user transactions or payment between VASPs that exceed the capacity of the Libra Blockchain.
+**Scalability**. In the initial version of the Off-chain protocol all off-chain PaymentObjects that are ready for settlement, are then settled individually (gross) through a separate Libra Blockchain transaction. However, the architecture of the Off-chain protocol allows in the future the introduction of netting batches of transactions, and settling all of them through a single Libra Blockchain transaction. This allows costs associated with multiple on-chain transactions to be kept low for VASPs, and allows for a number of user transactions or payment between VASPs that exceed the capacity of the Libra Blockchain.
 
 **Extensibility**. The current Off-Chain protocols accommodate simple payments where a customer of a VASP sends funds to the customer of another VASP over a limit, requiring some additional compliance-related information. However, in the future the Libra eco-system will support more complex flows of funds between customers of VASPs as well as merchants. The Off-chain protocol can be augmented to support the transfer of rich meta-data relating to those flows between VASPs in a compliant, secure, private, scalable and extensible manner.
 
@@ -44,8 +44,8 @@ We describe a number of additional lower-level requirements throughout the remai
 ## Basic Building Blocks
 
 * **HTTP end-points**: Each VASP exposes an HTTP POST end point at
-`https://hostname:port/localVASPAddress/RemoteVASPAddress/process/`. It receives `CommandRequestObject`s in the POST body, and responds with `CommandResponseObjects`s in the HTTP response. The content type for requests and responses is set to `Content-type: application/json; charset=utf-8` indicating all content is JSON encoded. Single command requests-responses per connection are supported (HTTP 1.0) but pipelined request-responses are also supported (HTTP 1.1).
-* **Serialization to JSON**: All transmitted structures, nested within `CommandRequestObject` and `CommandResponseObject` are valid JSON serialized objects and can be parsed and serialized using standard JSON libraries.
+`https://hostname:port/localVASPAddress/RemoteVASPAddress/process`. It receives `CommandRequestObject`s in the POST body, and responds with `CommandResponseObjects`s in the HTTP response. Single command requests-responses are supported (HTTP1.0) but also pipelined request-responses are supported (HTTP1.1).
+* **Serialization to JSON**: All transmitted structures, nested within `CommandRequestObject` and `CommandResponseObject` are valid JSON serialized objects and can be parsed and serialized using standard JSON libraries. The content type for requests and responses is set to `Content-type: application/json; charset=utf-8` indicating all content is JSON encoded.
 * **Random strings**: We assume that object versions are generated as cryptographically strong random strings. These should be at least 16 bytes long and encoded to string in hexadecimal notation using characters in the range[A-Za-z0-9]. Payment `reference_id` are special in that they are structured to encode the creator of the payment.
 
 TODO Determine after discussion with partners:
@@ -205,7 +205,7 @@ A `CommandRequestObjects` can be processed if:
 
 * At a server VASP all local requests have already received a response from the client VASP. (If not a protocol error response with code `wait` may be generated and sent back.). Otherwise the protocol server waits for all responses to be received first.
 * The Request is the next request in the remote request sequence. All previous remote requests have already been assigned success or failure responses. (If not a protocol error with code `missing` may be generated and sent back.)
-* The Request has the same sequence number and contents with a previous one. In this case the same response must be sent back. (If the sequence number matches but the command is different a `conflict` protocol error must be sent back.)
+* The Request has the same sequence number and contents as a previous one. In this case the same response must be sent back. (If the sequence number matches but the command is different a `conflict` protocol error must be sent back.)
 
 Once a `CommandRequestObjects` can be processed its sequence number in the joint command sequence can be determined. In case the protocol server is processing a client request it should assign it the next sequence number in the command sequence, and include it in the `command_seq` field of the response. In case the protocol client is processing a server request it will find its sequence number in the `command_seq` field included in the request.
 
@@ -225,7 +225,7 @@ Depending on the nature of the HTTP request, responses may be received out of or
 
 **Implementation Note:** Both requests and responses need to be processed in a specific order to ensure that the joint objects remain consistent. However, an implementation may chose to buffer out-of-order requests and responses. It can then process them later when they become eligible, rather than immediately responding with a protocol error of type `wait` or `missing`. This limits the need for retransmissions saving on bandwidth costs and reducing latency -- and in practice limits the use of the `wait` or `missing` protocol errors to cases when message caches are full.
 
-However, to ensure compatibility with simple implementation as well as crash recovery all implementations should be capable of re-transmitting requests that that returned a `wait` or `missing` protocol error, and also re-issue commands from the local sequence that have received no response after some timeout or upon reconnection with another VASP.
+However, to ensure compatibility with simple implementation as well as crash recovery all implementations should be capable of re-transmitting requests that returned a `wait` or `missing` protocol error, and also re-issue commands from the local sequence that have received no response after some timeout or upon reconnection with another VASP.
 
 ## PaymentCommand Data Structures and Protocol
 
@@ -322,7 +322,7 @@ The `sender`, `receiver`, `reference_id`, and `action` are mandatory. The other 
 Used for updates to a payment after it has been committed on chain. For example, used for refunds. The reference ID of the original payment will be placed into this field. This value is optional on payment creation and can only be written once after that.
 
 * (TODO) **recipient_signature (str)**
-Signature of the recipient of this transaction. The signature is over the `reference_id` and is signed with a key that chains up to its VASP CA. This key need not be the actual account key.  This is the base64 encoded string of the signature. This field is optional, can be updated after payment definition, but is only writable once.
+Signature of the recipient of this transaction. The signature is over the `reference_id` and is signed with a key that chains up to its VASP CA. This key does not need to be the actual account key.  This is the base64 encoded string of the signature.
 
 * **description (str)** Description of the payment. To be displayed to the user. Unicode utf-8 encoded max length of 255 characters. This field is optional but can only be written once.
 
