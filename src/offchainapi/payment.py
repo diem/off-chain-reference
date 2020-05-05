@@ -47,8 +47,13 @@ class KYCData(StructureChecker):
 
             if 'payment_reference_id' not in data:
                 raise StructureException('Missing: field payment_reference_id')
+
+            types = ['individual', 'entity']
             if 'type' not in data:
                 raise StructureException('Missing: field type')
+            if data['type'] not in types:
+                raise StructureException(f'Wrong KYC "type": {data["type"]}')
+
 
 
 class PaymentActor(StructureChecker):
@@ -188,7 +193,7 @@ class PaymentObject(SharedObject, StructureChecker, JSONSerializable):
         ('sender', PaymentActor, REQUIRED, WRITE_ONCE),
         ('receiver', PaymentActor, REQUIRED, WRITE_ONCE),
         ('reference_id', str, REQUIRED, WRITE_ONCE),
-        ('original_payment_reference_id', str, REQUIRED, WRITE_ONCE),
+        ('original_payment_reference_id', str, OPTIONAL, WRITE_ONCE),
         ('description', str, OPTIONAL, WRITE_ONCE),
         ('action', PaymentAction, REQUIRED, WRITE_ONCE),
         ('recipient_signature', str, OPTIONAL, WRITE_ONCE)

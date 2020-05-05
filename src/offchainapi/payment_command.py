@@ -96,7 +96,7 @@ class PaymentCommand(ProtocolCommand):
                 dict: A data dictionary compatible with JSON serilization.
         '''
         data_dict = ProtocolCommand.get_json_data_dict(self, flag)
-        data_dict['diff'] = self.command
+        data_dict['payment'] = self.command
         return data_dict
 
     @classmethod
@@ -119,7 +119,7 @@ class PaymentCommand(ProtocolCommand):
         self = super().from_json_data_dict(data, flag)
         # Thus super() is magic, but do not worry we get the right type:
         assert isinstance(self, PaymentCommand)
-        self.command = data['diff']
+        self.command = data['payment']
 
         if len(self.dependencies) > 1:
             raise PaymentLogicError(

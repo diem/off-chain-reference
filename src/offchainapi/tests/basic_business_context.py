@@ -86,7 +86,7 @@ class BasicBusinessContext(BusinessContext):
                 KYCData(
                     f'{{\n'
                     f'  "payment_reference_id": "{myself}.{ref_id}.KYC",\n'
-                    f'  "type": "person"\n'
+                    f'  "type": "individual"\n'
                     f'}}\n'),
                 f'{myself}.{ref_id}.KYC_SIGN',
                 f'{myself}.{ref_id}.KYC_CERT',
