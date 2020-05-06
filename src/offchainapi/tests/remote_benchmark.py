@@ -8,6 +8,7 @@ from ..payment import PaymentAction, PaymentActor, PaymentObject
 from ..asyncnet import Aionet
 from ..core import Vasp
 
+import logging
 import json
 from mock import AsyncMock
 from unittest.mock import MagicMock
