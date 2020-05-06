@@ -344,9 +344,9 @@ A `PaymentActorObject` represents a participant in a payment - either sender or 
     }
 
 * **address (str)**
-Address of the VASP which is sending/receiving the payment. This is the Hex encoded LibraAddress of the VASP. Mandatory and immutable.
+Address of the VASP which is sending/receiving the payment. This is the bech32 encoded LibraAddress for the VASP (with human readable part set to "m" for main chain). Mandatory and immutable.
 
-* **subaddress (str)** Subaddress of the sender/receiver account. Subaddresses may be single use or valid for a limited time, and therefore VASPs should not rely on them remaining stable across time or different VASP addresses. Mandatory and immutable.
+* **subaddress (str)** Subaddress of the sender/receiver account. Subaddresses may be single use or valid for a limited time, and therefore VASPs should not rely on them remaining stable across time or different VASP addresses. The subaddresses are encoded using bech32 with a human readable part set to "s" (for subaddress). They should be no longer than 40 characters. Mandatory and immutable.
 
 * (TODO) **kyc_signature: string**
 Standard base64 encoded signature over the KYC data (plus the ref_id).  Signed by the party who provides the KYC data. Note that the KYC JSON object already includes a field about the payload type and version which can be used for domain separation purposes, so no prefix/salt is required during signing.
