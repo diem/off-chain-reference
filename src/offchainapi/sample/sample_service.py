@@ -30,7 +30,7 @@ business_config = """[
 
 class sample_vasp_info(VASPInfo):
     def __init__(self):
-        peerA_addr = LibraAddress.encode_to_Libra_address(b'A'*16).as_str()
+        peerA_addr = LibraAddress.encode(b'A'*16).as_str()
         each_peer_base_url = {
             peerA_addr: 'https://peerA.com',
         }

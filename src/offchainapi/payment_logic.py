@@ -6,7 +6,7 @@ from .status_logic import status_heights_MUST, \
 from .payment_command import PaymentCommand, PaymentLogicError
 from .asyncnet import NetworkException
 from .shared_object import SharedObject
-from .libra_address import LibraAddress
+from .libra_address import LibraAddress, LibraSubAddress
 
 import asyncio
 import logging
@@ -395,6 +395,10 @@ class PaymentProcessor(CommandProcessor):
 
         if not self.good_initial_status(new_payment, not is_sender):
             raise PaymentLogicError('Invalid status transition.')
+
+        # Check that the subaddreses are valid
+        sub_sender = LibraSubAddress(new_payment.sender.subaddress)
+        sub_receiver = LibraSubAddress(new_payment.receiver.subaddress)
 
         self.check_signatures(new_payment)
 

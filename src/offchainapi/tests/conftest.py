@@ -5,7 +5,7 @@ from ..payment_logic import Status, PaymentProcessor, PaymentCommand
 from ..protocol import OffChainVASP, VASPPairChannel
 from ..executor import ProtocolExecutor
 from ..command_processor import CommandProcessor
-from ..libra_address import LibraAddress
+from ..libra_address import LibraAddress, LibraSubAddress
 from ..protocol_messages import CommandRequestObject
 from ..utils import JSONFlag
 
@@ -19,20 +19,24 @@ import pytest
 
 @pytest.fixture
 def three_addresses():
-    a0 = LibraAddress.encode_to_Libra_address(b'A'*16)
-    a1 = LibraAddress.encode_to_Libra_address(b'B' + b'A'*15)
-    a2 = LibraAddress.encode_to_Libra_address(b'B'*16)
+    a0 = LibraAddress.encode(b'A'*16)
+    a1 = LibraAddress.encode(b'B' + b'A'*15)
+    a2 = LibraAddress.encode(b'B'*16)
     return (a0, a1, a2)
 
 
 @pytest.fixture
 def sender_actor():
-    return PaymentActor('AAAA', 'aaaa', Status.none, [])
+    m_addr = LibraAddress.encode(b'AAAA').as_str()
+    s_addr = LibraSubAddress.encode(b'aaaa').as_str()
+    return PaymentActor(m_addr, s_addr, Status.none, [])
 
 
 @pytest.fixture
 def receiver_actor():
-    return PaymentActor('BBBB', 'bbbb', Status.none, [])
+    m_addr = LibraAddress.encode(b'BBBB').as_str()
+    s_addr = LibraSubAddress.encode(b'bbbb').as_str()
+    return PaymentActor(m_addr, s_addr, Status.none, [])
 
 
 @pytest.fixture

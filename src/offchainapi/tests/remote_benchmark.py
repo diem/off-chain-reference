@@ -49,7 +49,7 @@ def load_configs(configs_path):
     assert 'port' in configs
 
     bytes_addr = configs['addr'].encode()
-    configs['addr'] = LibraAddress.encode_to_Libra_address(bytes_addr)
+    configs['addr'] = LibraAddress.encode(bytes_addr)
     configs['port'] = int(configs['port'])
     return configs
 

@@ -4,7 +4,7 @@
 # $ python -m cProfile -s tottime src/scripts/run_perf.py > report.txt
 #
 from ..business import VASPInfo
-from ..libra_address import LibraAddress
+from ..libra_address import LibraAddress, LibraSubAddress
 from ..payment_logic import PaymentCommand
 from ..status_logic import Status
 from ..payment import PaymentAction, PaymentActor, PaymentObject
@@ -17,8 +17,8 @@ import asyncio
 
 # A stand alone performance test.
 
-PeerA_addr = LibraAddress.encode_to_Libra_address(b'A'*16)
-PeerB_addr = LibraAddress.encode_to_Libra_address(b'B'*16)
+PeerA_addr = LibraAddress.encode(b'A'*16)
+PeerB_addr = LibraAddress.encode(b'B'*16)
 peer_address = {
     PeerA_addr.as_str(): 'http://localhost:8091',
     PeerB_addr.as_str(): 'http://localhost:8092',
@@ -97,8 +97,10 @@ async def main_perf(messages_num=10, wait_num=0, verbose=False):
     payments = []
     for cid in range(messages_num):
         peerA_addr = PeerA_addr.as_str()
-        sender = PaymentActor(peerA_addr, 'aaaa', Status.needs_kyc_data, [])
-        receiver = PaymentActor(PeerB_addr.as_str(), 'bbbb', Status.none, [])
+        sub_a = LibraSubAddress.encode(b'aaaa').as_str()
+        sub_b = LibraSubAddress.encode(b'bbbb').as_str()
+        sender = PaymentActor(peerA_addr, sub_a, Status.needs_kyc_data, [])
+        receiver = PaymentActor(PeerB_addr.as_str(), sub_b, Status.none, [])
         action = PaymentAction(10, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
         payment = PaymentObject(
             sender, receiver, f'{peerA_addr}_ref_{cid}', 'orig_ref', 'desc', action

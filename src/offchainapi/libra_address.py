@@ -1,5 +1,5 @@
 from binascii import unhexlify, hexlify
-
+from bech32 import encode, decode
 
 # Helper classes
 class LibraAddressError(Exception):
@@ -9,27 +9,27 @@ class LibraAddressError(Exception):
 
 class LibraAddress:
 
+    hrp = 'm'
+    version = 1
+
     def __init__(self, encoded_address):
         """ An interface that abstracts a Libra Address
             and bit manipulations on it.
 
         Args:
-            encoded_address (str or bytes): String or byte representation of
-                                            a Libra Address.
+            encoded_address (str or bytes): Representation of a Libra Address in bech32.
 
         Raises:
             LibraAddressError: If the provided encoded address cannot be parsed
                                to a Libra Address.
         """
-        try:
-            if type(encoded_address) == str:
-                self.encoded_address = encoded_address
-            else:
-                assert type(encoded_address) == bytes
-                self.encoded_address = encoded_address.decode('ascii')
-            self.decoded_address = unhexlify(self.encoded_address)
-        except Exception:
-            raise LibraAddressError()
+
+        self.encoded_address = encoded_address
+        ver, self.decoded_address = decode(self.hrp, self.encoded_address)
+        if self.decoded_address is None or ver != self.version:
+            raise LibraAddressError(
+                f'Incorrect bech32 encoding: "{encoded_address}"')
+        self.decoded_address = bytes(self.decoded_address)
 
     def as_str(self):
         ''' Returns a string representation of the LibraAddress.
@@ -37,10 +37,10 @@ class LibraAddress:
             Returns:
                 str: String representation of the LibraAddress.
         '''
-        return self.encoded_address
+        return str(self.encoded_address)
 
     @classmethod
-    def encode_to_Libra_address(cls, raw_bytes):
+    def encode(cls, raw_bytes):
         """ Make a Libra address from bytes.
 
         Args:
@@ -49,7 +49,12 @@ class LibraAddress:
         Returns:
             LibraAddress: The Libra address.
         """
-        return LibraAddress(hexlify(raw_bytes))
+        enc = encode(cls.hrp, cls.version, raw_bytes)
+        if enc is None:
+            raise LibraAddressError(
+                f'Cannot convert to LibraAddress: "{raw_bytes}"')
+        addr = cls(enc)
+        return addr
 
     def last_bit(self):
         """ Get the last bit of the Libra address.
@@ -87,3 +92,9 @@ class LibraAddress:
 
     def __hash__(self):
         return self.decoded_address.__hash__()
+
+
+class LibraSubAddress(LibraAddress):
+    ''' Represents a Libra subaddress. '''
+    hrp = 's'
+    version = 1

@@ -20,6 +20,7 @@ setuptools.setup(
     python_requires='>=3.7',
     install_requires=[
         'aiohttp',
+        'bech32',
     ],
     version="0.0.1.dev1",
 )

@@ -1,7 +1,7 @@
 from ..sample.sample_service import sample_business, sample_vasp
 from ..payment_logic import Status, PaymentProcessor, PaymentCommand
 from ..payment import PaymentActor, PaymentObject
-from ..libra_address import LibraAddress
+from ..libra_address import LibraAddress, LibraSubAddress
 from ..utils import JSONFlag
 from ..protocol_messages import CommandRequestObject, CommandResponseObject, \
     OffChainError
@@ -106,8 +106,10 @@ def simple_response_json_error(request):
 @pytest.fixture
 def simple_request_json(payment_action, my_addr, other_addr):
     sender_str = other_addr.as_str()
-    sender = PaymentActor(other_addr.as_str(), 'C', Status.none, [])
-    receiver = PaymentActor(my_addr.as_str(), '1', Status.none, [])
+    sub_1 = LibraSubAddress.encode(b'CC').as_str()
+    sub_2 = LibraSubAddress.encode(b'22').as_str()
+    sender = PaymentActor(other_addr.as_str(), sub_1, Status.none, [])
+    receiver = PaymentActor(my_addr.as_str(), sub_2, Status.none, [])
     payment = PaymentObject(
         sender, receiver, f'{sender_str}_ref', 'orig_ref', 'desc', payment_action
     )
@@ -171,8 +173,8 @@ def test_business_is_kyc_provided_sender(business_and_processor, kyc_payment_as_
     ])
 def simple_response_json_error(request):
     seq, cmd_seq, status, protoerr, errcode =  request.param
-    sender_addr = LibraAddress.encode_to_Libra_address(b'A'*16).encoded_address
-    receiver_addr   = LibraAddress.encode_to_Libra_address(b'B'*16).encoded_address
+    sender_addr = LibraAddress.encode(b'A'*16).encoded_address
+    receiver_addr   = LibraAddress.encode(b'B'*16).encoded_address
     resp = CommandResponseObject()
     resp.status = status
     resp.seq = seq
@@ -202,7 +204,7 @@ def test_vasp_simple(simple_request_json, vasp, other_addr, loop):
 
 
 def test_vasp_simple_wrong_VASP(simple_request_json, other_addr, loop):
-    my_addr = LibraAddress.encode_to_Libra_address(b'X'*16)
+    my_addr = LibraAddress.encode(b'X'*16)
     vasp = sample_vasp(my_addr)
     vasp.pp.loop = loop
 
@@ -222,7 +224,7 @@ def test_vasp_response(simple_response_json_error, vasp, other_addr):
     vasp.process_response(other_addr, simple_response_json_error)
 
 def test_sample_vasp_info_is_authorised(request):
-    my_addr   = LibraAddress.encode_to_Libra_address(b'B'*16)
-    other_addr = LibraAddress.encode_to_Libra_address(b'A'*16)
+    my_addr   = LibraAddress.encode(b'B'*16)
+    other_addr = LibraAddress.encode(b'A'*16)
     vc = sample_vasp(my_addr)
     assert vc.info_context.is_authorised_VASP('anything', other_addr)
