@@ -195,9 +195,9 @@ def nginx(ctx):
         command += f'-subj "/C=GB/ST=Test/L=Test/O=Test/OU=Test/CN={host}"'
         c.sudo(command)
 
-        # Download server certificate
-        if host == ctx.hosts[-1]:
-            c.get(f'{cert_name}', f'./{cert_name}')
+        # Download certificates
+        c.get(f'{cert_name}', f'./{cert_name}')
+        c.local(f'mv {cert_name} {host}-{cert_name}')
 
         # NGINX Config.
         c.put(nginx_conf, '.')
@@ -207,6 +207,13 @@ def nginx(ctx):
         command += ' || true'
         c.sudo(command)
         c.sudo('service nginx restart')
+
+    # Upload certificates to all machines
+    files = [f'{host}-{cert_name}' for host in ctx.hosts]
+    for host in ctx.hosts:
+        c = Connection(host, user=ctx.user, connect_kwargs=ctx.connect_kwargs)
+        for f in files:
+            c.put(f, '.')
 
 
 @task

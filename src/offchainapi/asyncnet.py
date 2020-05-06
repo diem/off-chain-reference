@@ -215,17 +215,12 @@ class Aionet:
 
         # Try to load certificates
         server_cert_path = self.vasp.info_context.get_TLS_cert_path(other_addr)
-        print('HERE ', server_cert_path)
         try:
-            if server_cert_path != None:
-                sslcontext = ssl.create_default_context(
-                    purpose=ssl.Purpose.SERVER_AUTH, cafile=server_cert_path
-                )
-            else:
-                sslcontext = None
-        except Exception as e:
-            # TODO: Be precise with this exception.
-            self.logger.debug(f'Exception {type(e)}: {str(e)}')
+            sslcontext = ssl.create_default_context(
+                purpose=ssl.Purpose.SERVER_AUTH, cafile=server_cert_path
+            )
+        except FileNotFoundError as e:
+            self.logger.debug(f'FileNotFoundError {type(e)}: {str(e)}')
             sslcontext = None
 
         base_url = self.vasp.info_context.get_peer_base_url(other_addr)

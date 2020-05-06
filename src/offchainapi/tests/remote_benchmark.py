@@ -39,7 +39,7 @@ class SimpleVASPInfo(VASPInfo):
         return True
 
     def get_TLS_cert_path(self, other_addr):
-        return 'aws/nginx-selfsigned.crt'
+        return f'../{other_addr.as_str()}-nginx-selfsigned.crt'
 
 
 def load_configs(configs_path):
