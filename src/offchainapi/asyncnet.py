@@ -215,12 +215,13 @@ class Aionet:
         base_url = self.vasp.info_context.get_peer_base_url(other_addr)
         url = self.get_url(base_url, other_addr.as_str(), other_is_server=True)
         self.logger.debug(f'Sending post request to {url}')
-
+        print('SENDING REQUEST')
         try:
             async with self.session.post(url, json=json_request) as response:
                 try:
                     json_response = await response.json()
                     self.logger.debug(f'Json response: {json_response}')
+                    print(f'RESPONSE: {json_response}')
 
                     # Wait in case the requests are sent out of order.
                     res = await channel.parse_handle_response_to_future(
