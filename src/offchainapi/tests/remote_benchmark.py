@@ -78,6 +78,7 @@ def run_server(my_configs_path, other_configs_path):
         info_context=SimpleVASPInfo(my_configs, other_configs),
         database={}
     )
+    vasp.logger.setLevel(logging.DEBUG)
     vasp.logger.info(f'Created VASP {my_addr.as_str()}.')
 
     # Run VASP services.
@@ -126,6 +127,7 @@ def run_client(my_configs_path, other_configs_path, num_of_commands=10, port=0):
         info_context=SimpleVASPInfo(my_configs, other_configs, port),
         database={}
     )
+    vasp.logger.setLevel(logging.DEBUG)
     vasp.logger.info(f'Created VASP {my_addr.as_str()}.')
 
     # Run VASP services.
