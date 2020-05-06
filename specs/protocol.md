@@ -1,8 +1,8 @@
-# Calibra Off-Chain Protocol & Specification
+# Libra Off-Chain Protocol & Specification
 
 ## Introduction
 
-The Calibra Off-Chain protocol supports compliance, privacy and scalability in the Libra eco-system.
+The Libra Off-Chain protocol supports compliance, privacy and scalability in the Libra eco-system.
 It is executed between pairs of _Virtual Asset Service Providers_ (VASPs),
 such as wallets, exchanges or designated dealers and allows them to privately exchange information
 about a payment
