@@ -212,11 +212,22 @@ class Aionet:
         # Try to get a channel with the other VASP.
         channel = self.vasp.get_channel(other_addr)
 
+        # Try to load certificates
+        server_cert = self.vasp.info_context.get_TLS_cert_path(other_addr)
+
         base_url = self.vasp.info_context.get_peer_base_url(other_addr)
         url = self.get_url(base_url, other_addr.as_str(), other_is_server=True)
         self.logger.debug(f'Sending post request to {url}')
         try:
-            async with self.session.post(url, json=json_request) as response:
+            if server_cert != None:
+                sslcontext = ssl.create_default_context(
+                    purpose=ssl.Purpose.SERVER_AUTH, cafile=server_cert
+                )
+            else:
+                sslcontext = None
+            async with self.session.post(
+                url, json=json_request, ssl=sslcontext
+                ) as response:
                 try:
                     json_response = await response.json()
                     self.logger.debug(f'Json response: {json_response}')

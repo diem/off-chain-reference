@@ -263,6 +263,19 @@ class VASPInfo:
         """
         raise NotImplementedError()  # pragma: no cover
 
+    def get_TLS_cert_path(self, other_addr):
+        """ Provides the path of the TLS certificate for the specified peer
+            if any; otherwise returns None.
+
+        Args:
+            other_addr (LibraAddress): The address of the peer.
+
+        Returns:
+            None or str: The path of the TLS certificate for the specified peer
+            if any; otherwise returns None.
+        """
+        return None
+
     # --- The functions below are currently unused ---
 
     def get_libra_address(self):
