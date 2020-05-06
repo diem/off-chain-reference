@@ -214,18 +214,24 @@ class Aionet:
         channel = self.vasp.get_channel(other_addr)
 
         # Try to load certificates
-        server_cert = self.vasp.info_context.get_TLS_cert_path(other_addr)
+        server_cert_path = self.vasp.info_context.get_TLS_cert_path(other_addr)
+        print('HERE ', server_cert_path)
+        try:
+            if server_cert_path != None:
+                sslcontext = ssl.create_default_context(
+                    purpose=ssl.Purpose.SERVER_AUTH, cafile=server_cert_path
+                )
+            else:
+                sslcontext = None
+        except Exception as e:
+            # TODO: Be precise with this exception.
+            self.logger.debug(f'Exception {type(e)}: {str(e)}')
+            sslcontext = None
 
         base_url = self.vasp.info_context.get_peer_base_url(other_addr)
         url = self.get_url(base_url, other_addr.as_str(), other_is_server=True)
         self.logger.debug(f'Sending post request to {url}')
         try:
-            if server_cert != None:
-                sslcontext = ssl.create_default_context(
-                    purpose=ssl.Purpose.SERVER_AUTH, cafile=server_cert
-                )
-            else:
-                sslcontext = None
             async with self.session.post(
                 url, json=json_request, ssl=sslcontext
                 ) as response:
@@ -256,10 +262,6 @@ class Aionet:
 
         except aiohttp.ClientSSLError as e:
             self.logger.debug(f'ClientSSLError {type(e)}: {str(e)}')
-            raise NetworkException(e)
-
-        except Exception as e:
-            self.logger.debug(f'Exception {type(e)}: {str(e)}')
             raise NetworkException(e)
 
     def sequence_command(self, other_addr, command):
