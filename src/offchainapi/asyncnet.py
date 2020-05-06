@@ -220,7 +220,6 @@ class Aionet:
         url = self.get_url(base_url, other_addr.as_str(), other_is_server=True)
         self.logger.debug(f'Sending post request to {url}')
         try:
-            print('HERE ', server_cert)
             if server_cert != None:
                 sslcontext = ssl.create_default_context(
                     purpose=ssl.Purpose.SERVER_AUTH, cafile=server_cert
@@ -254,6 +253,8 @@ class Aionet:
         except ClientError as e:
             self.logger.debug(f'NetworkException {type(e)}: {str(e)}')
             raise NetworkException(e)
+
+        # TODO: Catch errors due to SSL
 
     def sequence_command(self, other_addr, command):
         ''' Sequences a new command to the local queue, ready to be

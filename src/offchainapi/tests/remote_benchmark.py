@@ -38,6 +38,9 @@ class SimpleVASPInfo(VASPInfo):
     def is_authorised_VASP(self, certificate, other_addr):
         return True
 
+    def get_TLS_cert_path(self, other_addr):
+        return 'aws/nginx-selfsigned.crt'
+
 
 def load_configs(configs_path):
     ''' Loads VASP configs from file. '''

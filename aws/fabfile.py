@@ -195,6 +195,10 @@ def nginx(ctx):
         command += f'-subj "/C=GB/ST=Test/L=Test/O=Test/OU=Test/CN={host}"'
         c.sudo(command)
 
+        # Download server certificate
+        if host == ctx.hosts[-1]:
+            c.get(f'{cert_name}', f'./{cert_name}')
+
         # NGINX Config.
         c.put(nginx_conf, '.')
         c.sudo(f'mv {nginx_conf} /etc/nginx/sites-available || true')
