@@ -32,6 +32,7 @@ class SimpleVASPInfo(VASPInfo):
     def get_peer_base_url(self, other_addr):
         base_url = self.other_configs['base_url']
         if self.port == 443:
+            print('HERE')
             return f'https://{base_url}'
         else:
             port = self.port if self.port != 0 else self.other_configs['port']
