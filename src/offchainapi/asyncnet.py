@@ -221,6 +221,7 @@ class Aionet:
             )
         except FileNotFoundError as e:
             self.logger.debug(f'FileNotFoundError {type(e)}: {str(e)}')
+            self.logger.debug(f'Path {server_cert_path} is invalid.')
             sslcontext = None
 
         base_url = self.vasp.info_context.get_peer_base_url(other_addr)
