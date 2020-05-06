@@ -254,7 +254,19 @@ class Aionet:
             self.logger.debug(f'NetworkException {type(e)}: {str(e)}')
             raise NetworkException(e)
 
-        # TODO: Catch errors due to SSL
+        '''
+        except aiohttp.ClientConnectorSSLError as e:
+            self.logger.debug(f'ClientConnectorSSLError {type(e)}: {str(e)}')
+            raise NetworkException(e)
+
+        except aiohttp.ClientConnectorCertificateError as e:
+            self.logger.debug(f'ClientConnectorCertificateError {type(e)}: {str(e)}')
+            raise NetworkException(e)
+        '''
+
+        except aiohttp.ClientSSLError as e:
+            self.logger.debug(f'ClientSSLError {type(e)}: {str(e)}')
+            raise NetworkException(e)
 
     def sequence_command(self, other_addr, command):
         ''' Sequences a new command to the local queue, ready to be
