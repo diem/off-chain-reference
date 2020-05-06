@@ -153,8 +153,9 @@ def run_client(my_configs_path, other_configs_path, num_of_commands=10, port=0):
         sender = PaymentActor(my_addr.as_str(), 'aaaa', Status.none, [])
         receiver = PaymentActor(other_addr.as_str(), 'bbbb', Status.none, [])
         action = PaymentAction(10, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
+        reference = f'{my_addr.as_str()}_{cid}'
         payment = PaymentObject(
-            sender, receiver, f'ref {cid}', 'orig_ref', 'desc', action
+            sender, receiver, reference, 'orig_ref', 'desc', action
         )
         cmd = PaymentCommand(payment)
         commands += [cmd]
