@@ -8,6 +8,7 @@ import asyncio
 import logging
 from urllib.parse import urljoin
 import json
+import ssl
 
 
 class NetworkException(Exception):
@@ -219,6 +220,7 @@ class Aionet:
         url = self.get_url(base_url, other_addr.as_str(), other_is_server=True)
         self.logger.debug(f'Sending post request to {url}')
         try:
+            print('HERE ', server_cert)
             if server_cert != None:
                 sslcontext = ssl.create_default_context(
                     purpose=ssl.Purpose.SERVER_AUTH, cafile=server_cert
