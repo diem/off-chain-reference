@@ -180,17 +180,20 @@ def nginx(ctx):
     COMMANDS:   fab config
     '''
     nginx_conf = 'offchainapi-nginx.conf'
-    # tls_material = ['server_cert.pem', 'server_key.pem']
+
+    # NOTE: `nginx_conf` needs to be updated with the right cert and key names.
+    cert_name = 'nginx-selfsigned.crt'
+    key_name = 'nginx-selfsigned.key'
 
     set_hosts(ctx)
     for host in ctx.hosts:
         c = Connection(host, user=ctx.user, connect_kwargs=ctx.connect_kwargs)
 
-        # TLS certificates and keys.
-        c.put('server_cert.pem', '.')
-        c.put('server_key.pem', '.')
-        c.sudo('cp server_cert.pem /etc/ssl/certs')
-        c.sudo('update-ca-certificates')
+        # Create certificate and key
+        command = 'openssl req -x509 -nodes -days 365 -newkey rsa:2048 '
+        command += f'-keyout {key_name} -out {cert_name} '
+        command += f'-subj "/C=GB/ST=Test/L=Test/O=Test/OU=Test/CN={host}"'
+        c.sudo(command)
 
         # NGINX Config.
         c.put(nginx_conf, '.')
