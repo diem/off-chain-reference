@@ -239,6 +239,7 @@ class Aionet:
                     self.logger.debug(f'Exception {type(e)}: {str(e)}')
                     raise e
         except ClientError as e:
+            self.logger.debug(f'NetworkException {type(e)}: {str(e)}')
             raise NetworkException(e)
 
     def sequence_command(self, other_addr, command):
