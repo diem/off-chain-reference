@@ -30,10 +30,18 @@ class SimpleVASPInfo(VASPInfo):
         self.port = port
 
     def get_peer_base_url(self, other_addr):
+        base_url = self.other_configs['base_url']
+        if self.port == 443:
+            return f'https://{base_url}'
+        else:
+            port = self.port if self.port != 0 else self.other_configs['port']
+            return f'{protocol}{base_url}:{port}'
+        '''
         protocol = 'https://' if self.port == 443 else 'http://'
         base_url = self.other_configs['base_url']
         port = self.port if self.port != 0 else self.other_configs['port']
         return f'{protocol}{base_url}:{port}'
+        '''
 
     def is_authorised_VASP(self, certificate, other_addr):
         return True
