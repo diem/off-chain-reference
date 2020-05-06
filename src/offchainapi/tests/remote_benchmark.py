@@ -40,6 +40,7 @@ class SimpleVASPInfo(VASPInfo):
 
     def get_TLS_cert_path(self, other_addr):
         host = self.other_configs['base_url']
+        print('HERE, ', host)
         return f'/home/ubuntu/{host}-nginx-selfsigned.crt'
 
 
