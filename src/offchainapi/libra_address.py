@@ -28,7 +28,7 @@ class LibraAddress:
         ver, self.decoded_address = decode(self.hrp, self.encoded_address)
         if self.decoded_address is None or ver != self.version:
             raise LibraAddressError(
-                f'Incorrect bech32 encoding: "{encoded_address}"')
+                f'Incorrect version or bech32 encoding: "{encoded_address}"')
         self.decoded_address = bytes(self.decoded_address)
 
     def as_str(self):
