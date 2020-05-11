@@ -397,7 +397,7 @@ class PaymentProcessor(CommandProcessor):
             raise PaymentLogicError('Invalid status transition.')
 
         # Check that the subaddreses are valid
-        sub_sender = LibraSubAddress(new_payment.sender.subaddress)
+        _ = LibraSubAddress(new_payment.sender.subaddress)
         sub_receiver = LibraSubAddress(new_payment.receiver.subaddress)
 
         self.check_signatures(new_payment)
