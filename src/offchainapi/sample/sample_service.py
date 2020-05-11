@@ -1,20 +1,18 @@
-from .business import BusinessContext, BusinessForceAbort, \
-BusinessValidationFailure, VASPInfo
-from .protocol import OffChainVASP
-from .libra_address import LibraAddress
-from .protocol_messages import CommandRequestObject
-from .payment_logic import PaymentCommand, PaymentProcessor
-from .status_logic import Status
-from .storage import StorableFactory
-from .auth_networking import AuthNetworkServer, NetworkFactory
+from ..business import BusinessContext, BusinessForceAbort, \
+    BusinessValidationFailure, VASPInfo
+from ..protocol import OffChainVASP
+from ..libra_address import LibraAddress
+from ..protocol_messages import CommandRequestObject, OffChainProtocolError, \
+    OffChainException, OffChainOutOfOrder
+from ..payment_logic import PaymentCommand, PaymentProcessor
+from ..status_logic import Status
+from ..storage import StorableFactory
 
 import json
-import OpenSSL.crypto
 
 business_config = """[
     {
         "account": "1",
-        "stable_id": "A",
         "balance": 10.0,
         "entity": false,
         "kyc_data" : "{ 'name' : 'Alice' }",
@@ -22,7 +20,6 @@ business_config = """[
     },
     {
         "account": "2",
-        "stable_id": "B",
         "balance": 100.0,
         "entity": true,
         "kyc_data" : "{ 'name' : 'Bob' }",
@@ -32,59 +29,21 @@ business_config = """[
 
 
 class sample_vasp_info(VASPInfo):
-    def __init__(self, assets_path):
-
-        # assets_path = '../test_vectors/'
-
-        tls_cert = assets_path / 'server_cert.pem'
-        tls_key = assets_path / 'server_key.pem'
-        all_peers_tls_cert = assets_path / 'client_cert.pem'
-
+    def __init__(self):
         peerA_addr = LibraAddress.encode_to_Libra_address(b'A'*16).as_str()
-        each_peer_tls_cert = {
-            peerA_addr: str(assets_path / 'client_cert.pem'),
-        }
         each_peer_base_url = {
             peerA_addr: 'https://peerA.com',
         }
 
-        self.tls_cert = str(tls_cert)
-        self.tls_key = str(tls_key)
-        self.all_peers_tls_cert = str(all_peers_tls_cert)
-        self.each_peer_tls_cert = each_peer_tls_cert
         self.each_peer_base_url = each_peer_base_url
-
-    def get_TLS_certificate_path(self):
-        return self.tls_cert
-
-    def get_TLS_key_path(self):
-        return self.tls_key
-
-    def get_peer_TLS_certificate_path(self, other_addr):
-        assert other_addr.as_str() in self.each_peer_tls_cert
-        return self.each_peer_tls_cert[other_addr.as_str()]
-
-    def get_all_peers_TLS_certificate_path(self):
-        return self.all_peers_tls_cert
+        pass
 
     def get_peer_base_url(self, other_addr):
         assert other_addr.as_str() in self.each_peer_base_url
         return self.each_peer_base_url[other_addr.as_str()]
 
     def is_authorised_VASP(self, certificate, other_addr):
-        # The check below should always pass: if we managed to open a channel
-        # with another VASP, we should have already loaded its certificate.
-        assert other_addr.as_str() in self.each_peer_tls_cert
-
-        # Check that the certificate provided with the request matches the
-        # certificate we have in store for the given address.
-        cert_file = self.each_peer_tls_cert[other_addr.as_str()]
-        with open(cert_file, 'rt') as f:
-            cert_str = f.read()
-        local_cert = OpenSSL.crypto.load_certificate(
-            OpenSSL.crypto.FILETYPE_PEM, cert_str
-        )
-        return local_cert.get_serial_number() == certificate.get_serial_number()
+        return True
 
 
 class sample_business(BusinessContext):
@@ -144,7 +103,8 @@ class sample_business(BusinessContext):
         if 'recipient_signature' in payment.data:
             if payment.recipient_signature == 'VALID':
                 return
-            raise BusinessValidationFailure('Invalid signature: %s' % payment.data.get('recipient_signature', 'Not present'))
+            sig = payment.data.get('recipient_signature', 'Not present')
+            raise BusinessValidationFailure(f'Invalid signature: {sig}')
 
     async def get_recipient_signature(self, payment):
         return 'VALID'
@@ -168,11 +128,8 @@ class sample_business(BusinessContext):
             return { Status.needs_kyc_data }
 
         to_provide = set()
-        if payment.data[other_role].status == Status.needs_stable_id:
-                to_provide.add(Status.needs_stable_id)
 
         if payment.data[other_role].status == Status.needs_kyc_data:
-                to_provide.add(Status.needs_stable_id)
                 to_provide.add(Status.needs_kyc_data)
 
         if payment.data[other_role].status == Status.needs_recipient_signature:
@@ -218,14 +175,6 @@ class sample_business(BusinessContext):
         account = self.get_account(subaddress)
         return (account["kyc_data"], 'KYC_SIG', 'KYC_CERT')
 
-
-    async def get_stable_id(self, payment):
-        my_role = self.get_my_role(payment)
-        subaddress = payment.data[my_role].subaddress
-        account = self.get_account(subaddress)
-        return account["stable_id"]
-
-
     async def ready_for_settlement(self, payment):
         my_role = self.get_my_role(payment)
         other_role = self.get_other_role(payment)
@@ -268,9 +217,6 @@ class sample_business(BusinessContext):
         # We are not ready to settle yet!
         return False
 
-    async def want_single_payment_settlement(self, payment):
-        return True
-
     async def has_settled(self, payment):
         if payment.sender.status == Status.settled:
             # In this VASP we consider we are ready to settle when the sender
@@ -295,24 +241,15 @@ class sample_business(BusinessContext):
 
 class sample_vasp:
 
-    def __init__(self, my_addr, assets_path):
+    def __init__(self, my_addr):
         self.my_addr = my_addr
         self.bc = sample_business(self.my_addr)
         self.store        = StorableFactory({})
-        self.info_context = sample_vasp_info(assets_path)
-        self.network_factory = NetworkFactory()
+        self.info_context = sample_vasp_info()
 
         self.pp = PaymentProcessor(self.bc, self.store)
         self.vasp = OffChainVASP(
-            self.my_addr, self.pp, self.store, self.info_context, self.network_factory
-        )
-
-        # The network server
-        self.network_server = AuthNetworkServer(
-            self.vasp,
-            self.info_context.get_TLS_key_path(),
-            self.info_context.get_TLS_certificate_path(),
-            self.info_context.get_all_peers_TLS_certificate_path()
+            self.my_addr, self.pp, self.store, self.info_context
         )
 
     def collect_messages(self):
@@ -340,7 +277,11 @@ class sample_vasp:
 
     def process_response(self, other_vasp, request_json):
         channel = self.get_channel(other_vasp)
-        channel.parse_handle_response(request_json)
-
-    def run_server(self):
-        self.network_server.run()
+        try:
+            channel.parse_handle_response(request_json, encoded=True)
+        except OffChainProtocolError:
+            pass
+        except OffChainException:
+            pass
+        except OffChainOutOfOrder:
+            pass

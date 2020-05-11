@@ -1,16 +1,16 @@
-from ..sample_service import sample_business, sample_vasp
+from ..sample.sample_service import sample_business, sample_vasp
 from ..payment_logic import Status, PaymentProcessor, PaymentCommand
 from ..payment import PaymentActor, PaymentObject
 from ..libra_address import LibraAddress
 from ..utils import JSONFlag
 from ..protocol_messages import CommandRequestObject, CommandResponseObject, \
     OffChainError
+from ..asyncnet import Aionet
 
-from pathlib import Path
-import OpenSSL.crypto
+from mock import AsyncMock
 import json
-from unittest.mock import MagicMock, patch
 import pytest
+import asyncio
 
 
 @pytest.fixture
@@ -18,6 +18,7 @@ def business_and_processor(three_addresses, store):
     _, _, a0 = three_addresses
     bc = sample_business(a0)
     proc = PaymentProcessor(bc, store)
+    proc.loop = asyncio.new_event_loop()
     return (bc, proc)
 
 
@@ -80,15 +81,8 @@ def other_addr(three_addresses):
 
 
 @pytest.fixture
-def asset_path(request):
-    asset_path = Path(request.fspath).resolve()
-    asset_path = asset_path.parents[3] / 'test_vectors'
-    return asset_path
-
-
-@pytest.fixture
-def vasp(my_addr, asset_path):
-    return sample_vasp(my_addr, asset_path)
+def vasp(my_addr):
+    return sample_vasp(my_addr)
 
 
 @pytest.fixture(params=[
@@ -105,21 +99,22 @@ def simple_response_json_error(request):
     resp.command_seq = cmd_seq
     if status == 'failure':
         resp.error = OffChainError(protoerr, errcode)
-    json_obj = json.dumps(resp.get_json_data_dict(JSONFlag.NET))
+    json_obj = resp.get_json_data_dict(JSONFlag.NET)
     return json_obj
 
 
 @pytest.fixture
 def simple_request_json(payment_action, my_addr, other_addr):
+    sender_str = other_addr.as_str()
     sender = PaymentActor(other_addr.as_str(), 'C', Status.none, [])
     receiver = PaymentActor(my_addr.as_str(), '1', Status.none, [])
     payment = PaymentObject(
-        sender, receiver, 'ref', 'orig_ref', 'desc', payment_action
+        sender, receiver, f'{sender_str}_ref', 'orig_ref', 'desc', payment_action
     )
     command = PaymentCommand(payment)
     request = CommandRequestObject(command)
     request.seq = 0
-    return json.dumps(request.get_json_data_dict(JSONFlag.NET))
+    return request.get_json_data_dict(JSONFlag.NET)
 
 
 def test_business_simple(my_addr):
@@ -168,21 +163,6 @@ def test_business_is_kyc_provided_sender(business_and_processor, kyc_payment_as_
     assert bc.get_account('1')['balance'] == 5.0
 
 
-def test_business_settled(business_and_processor, settled_payment_as_receiver):
-    bc, proc = business_and_processor
-    payment = settled_payment_as_receiver
-
-    ret_payment = proc.payment_process(payment)
-    assert ret_payment.has_changed()
-
-    ready = proc.loop.run_until_complete(bc.ready_for_settlement(ret_payment))
-    assert ready
-    assert ret_payment.data['receiver'].status == Status.settled
-
-    assert bc.get_account('1')['pending_transactions']['ref']['settled']
-    assert bc.get_account('1')['balance'] == 15.0
-
-
 @pytest.fixture(params=[
     (None, None, 'failure', True, 'parsing'),
     (0, 0, 'success', None, None),
@@ -202,52 +182,47 @@ def simple_response_json_error(request):
     json_obj = json.dumps(resp.get_json_data_dict(JSONFlag.NET))
     return json_obj
 
-def test_vasp_simple(simple_request_json, vasp, other_addr):
+
+def test_vasp_simple(simple_request_json, vasp, other_addr, loop):
+    vasp.pp.loop = loop
+    net = AsyncMock(Aionet)
+    vasp.pp.set_network(net)
+
     vasp.process_request(other_addr, simple_request_json)
-    try:
-        requests = vasp.collect_messages()
-        assert len(requests) == 1
-        assert requests[0].type is CommandResponseObject
+    requests = vasp.collect_messages()
+    assert len(requests) == 1
+    assert requests[0].type is CommandResponseObject
 
-        vasp.pp.start_processor()
-        for fut in vasp.pp.futs:
-            fut.result()
-        requests = vasp.collect_messages()
-        assert len(requests) == 1
-        assert requests[0].type is CommandRequestObject
-    finally:
-        vasp.pp.stop_processor()
+    assert len(vasp.pp.futs) == 1
+    for fut in vasp.pp.futs:
+        vasp.pp.loop.run_until_complete(fut)
+        fut.result()
+
+    assert len(net.method_calls) == 2
 
 
-def test_vasp_simple_wrong_VASP(simple_request_json, asset_path, other_addr):
+def test_vasp_simple_wrong_VASP(simple_request_json, other_addr, loop):
     my_addr = LibraAddress.encode_to_Libra_address(b'X'*16)
-    vasp = sample_vasp(my_addr, asset_path)
+    vasp = sample_vasp(my_addr)
+    vasp.pp.loop = loop
 
     try:
-        vasp.pp.start_processor()
+        # vasp.pp.start_processor()
         vasp.process_request(other_addr, simple_request_json)
         responses = vasp.collect_messages()
         assert len(responses) == 1
         assert responses[0].type is CommandResponseObject
-        assert 'failure' in responses[0].content
+        assert 'failure' == responses[0].content['status']
     finally:
-        vasp.pp.stop_processor()
-
+        # vasp.pp.stop_processor()
+        pass
 
 
 def test_vasp_response(simple_response_json_error, vasp, other_addr):
     vasp.process_response(other_addr, simple_response_json_error)
 
-def test_sample_vasp_info_is_authorised(request, asset_path):
-    cert_file = Path(request.fspath).resolve()
-    cert_file = cert_file.parents[3] / 'test_vectors' / 'client_cert.pem'
-    cert_file = cert_file.resolve()
-    with open(cert_file, 'rt') as f:
-        cert_str = f.read()
-    cert = OpenSSL.crypto.load_certificate(
-        OpenSSL.crypto.FILETYPE_PEM, cert_str
-    )
+def test_sample_vasp_info_is_authorised(request):
     my_addr   = LibraAddress.encode_to_Libra_address(b'B'*16)
     other_addr = LibraAddress.encode_to_Libra_address(b'A'*16)
-    vc = sample_vasp(my_addr, asset_path)
-    assert vc.info_context.is_authorised_VASP(cert, other_addr)
+    vc = sample_vasp(my_addr)
+    assert vc.info_context.is_authorised_VASP('anything', other_addr)

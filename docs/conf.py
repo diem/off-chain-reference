@@ -5,7 +5,7 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 
 ### Command to construct the API docs
-# $ sphinx-apidoc -o source/ ../src/offchainapi
+# $ sphinx-apidoc -o _source/ ../src/offchainapi ../src/offchainapi/tests ../src/offchainapi/sample --separate
 
 
 # -- Path setup --------------------------------------------------------------
@@ -34,7 +34,11 @@ author = 'Calibra'
 extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.napoleon',
+    'sphinx.ext.viewcode',
 ]
+
+# custom commands
+autodoc_member_order = 'bysource'
 
 # Check out napoleon docs: https://www.sphinx-doc.org/en/master/usage/extensions/napoleon.html
 # check out autodoc docs: https://www.sphinx-doc.org/en/master/usage/extensions/autodoc.html
@@ -53,7 +57,7 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = 'alabaster'
+html_theme = 'pyramid'
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,

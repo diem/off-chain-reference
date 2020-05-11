@@ -85,19 +85,6 @@ def test_payment_actor_creation():
         _ = PaymentActor('ABCD', 'XYZ', Status.none, 0)
 
 
-def test_payment_actor_update_stable_id(sender_actor):
-    sender_actor.add_stable_id('AAAA')
-    assert sender_actor.data['stable_id'] == 'AAAA'
-
-    with pytest.raises(StructureException):
-        # Cannot add a new stable id
-        sender_actor.add_stable_id('BBBB')
-
-    with pytest.raises(StructureException):
-        # Wrong type of stable ID
-        sender_actor.add_stable_id(0)
-
-
 def test_payment_actor_update_status(sender_actor):
     sender_actor.change_status(Status.needs_kyc_data)
     sender_actor.change_status(Status.ready_for_settlement)
@@ -144,6 +131,17 @@ def test_payment_object_update(payment):
     payment.add_recipient_signature('SIG')
     with pytest.raises(StructureException):
         payment.add_recipient_signature('SIG2')
+
+
+def test_specific():
+    json_struct = {'sender': {'address': 'QUFBQUFBQUFBQUFBQUFBQQ==', 'subaddress': 'aaaa', 'status': 'settled', 'metadata': [], 'kyc_data': {'blob': '{\n                    "payment_reference_id": "QUFBQUFBQUFBQUFBQUFBQQ==.ref 0.KYC",\n                    "type": "individual"\n                    }'}, 'kyc_signature': 'QUFBQUFBQUFBQUFBQUFBQQ==.ref 0.KYC_SIGN', 'kyc_certificate': 'QUFBQUFBQUFBQUFBQUFBQQ==.ref 0.KYC_CERT'}, 'receiver': {'address': 'QkJCQkJCQkJCQkJCQkJCQg==', 'subaddress': 'bbbb', 'status': 'needs_kyc_data', 'metadata': [], 'kyc_data': {'blob': '{\n                    "payment_reference_id": "QkJCQkJCQkJCQkJCQkJCQg==.ref 0.KYC",\n                    "type": "individual"\n                    }'}, 'kyc_signature': 'QkJCQkJCQkJCQkJCQkJCQg==.ref 0.KYC_SIGN', 'kyc_certificate': 'QkJCQkJCQkJCQkJCQkJCQg==.ref 0.KYC_CERT'}, 'reference_id': 'ref 0', 'original_payment_reference_id': 'orig_ref', 'description': 'desc', 'action': {'amount': 10, 'currency': 'TIK', 'action': 'charge', 'timestamp': '2020-01-02 18:00:00 UTC'}, 'recipient_signature': 'QkJCQkJCQkJCQkJCQkJCQg==.ref 0.SIGNED'}
+    PaymentObject.from_full_record(json_struct)
+
+
+def test_update_with_same(payment):
+    json_struct = payment.get_full_diff_record()
+    payment2 = PaymentObject.from_full_record(json_struct, base_instance = payment)
+    assert payment == payment2
 
 
 def test_payment_to_diff(payment, sender_actor, receiver_actor, payment_action):
@@ -197,4 +195,4 @@ def test_payment_actor_update_bad_metadata_fails(sender_actor):
 
 def test_payment_actor_add_metadata(sender_actor):
     sender_actor.add_metadata('abcd')
-    assert sender_actor.data['metadata'] == ['abcd']
+    assert sender_actor.metadata == ['abcd']

@@ -1,23 +1,44 @@
 class CommandProcessor:
 
     def business_context(self):
-        ''' Provides the business context associated with this processor. '''
-        pass
+        ''' Provides the business context associated with this processor.
 
-    def check_command(self, vasp, channel, executor, command):
-        ''' Checks a command in the full context to see if it is acceptable or not. '''
-        pass
+            Returns:
+                The business context of the VASP
+                implementing the BusinessContext interface.
+        '''
+        raise NotImplementedError()  # pragma: no cover
 
-    def process_command(self, vasp, channel, executor, command, status, error=None):
-        ''' Processes a command. '''
-        pass
+    def check_command(self, channel, command):
+        ''' Called when receiving a new payment command to validate it.
 
-    def process_command_backlog(self, vasp):
-        ''' Sends commands that have been resumed after being interrupted to other
-            VASPs.'''
-        pass
+            All checks here are blocking subsequent comments, and therefore they
+            must be quick to ensure performance. As a result we only do local
+            syntactic checks hat require no lookup into the VASP potentially
+            remote stores or accounts.
 
-    def notify(self):
-        '''Call this function to notify that a new command is available,
-           after an interruption'''
-        pass
+            Args:
+                channel (VASPPairChannel):  A VASP channel.
+                command (PaymentCommand): The current payment.
+        '''
+        raise NotImplementedError()  # pragma: no cover
+
+    def process_command(self, vasp, channel, executor,
+                        command, seq, status, error=None):
+        """Processes a command to generate more subsequent commands.
+            This schedules a task that will be executed later.
+
+            Args:
+                vasp (OffChainVASP): The current VASP.
+                channel (VASPPairChannel):  A VASP channel.
+                executor (ProtocolExecutor): The protocol executor.
+                command (PaymentCommand): The current payment command.
+                seq (int): The sequence number of the payment command.
+                status (bool): Whether the command is a success or failure.
+                error (Exception, optional): The exception, if the command is a
+                        failure. Defaults to None.
+
+            Returns:
+                Future: A task that will be executed later.
+        """
+        raise NotImplementedError()  # pragma: no cover

@@ -6,7 +6,6 @@ from ..protocol_messages import make_success_response, CommandRequestObject, \
 
 import pytest
 
-
 def test_dict(db):
     D = StorableDict(db, 'mary', int)
     D['x'] = 10
@@ -48,6 +47,15 @@ def test_dict_dict():
     assert set(D.keys()) == {'y', 'z', 'a'}
 
     assert set(D.values()) == {20, 30, 40}
+
+def test_dict_dict_del_to_empty():
+    db = {}
+    D = StorableDict(db, 'to_del', bool)
+    D['x'] = True
+    del D['x']
+    D['y'] = True
+    del D['y']
+    assert len(D) == 0
 
 
 def test_dict_index():
@@ -255,17 +263,17 @@ def test_dict_trans():
 
     with store as _:
         eg = store.make_dict('eg', int, None)
-        
+
     with store as _:
         eg['x'] = 10
         eg['x'] = 20
         eg['y'] = 20
         eg['x'] = 30
-    
+
     with store as _:
         x = eg['x']
         l = len(eg)
         eg['z'] = 20
-    
+
     assert len(eg) == 3
     assert set(eg.keys()) == set(['x', 'y', 'z'])
