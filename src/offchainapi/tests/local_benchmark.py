@@ -10,6 +10,7 @@ from ..status_logic import Status
 from ..payment import PaymentAction, PaymentActor, PaymentObject
 from ..core import Vasp
 from .basic_business_context import BasicBusinessContext
+from ..crypto import ComplianceKey
 
 from threading import Thread
 import time
@@ -24,18 +25,26 @@ peer_address = {
     PeerB_addr.as_str(): 'http://localhost:8092',
 }
 
+peer_keys = {
+    PeerA_addr.as_str(): ComplianceKey.generate(),
+    PeerB_addr.as_str(): ComplianceKey.generate(),
+}
+
 
 class SimpleVASPInfo(VASPInfo):
 
-    def __init__(self):
-        return
+    def __init__(self, my_addr):
+        self.my_addr = my_addr
 
     def get_peer_base_url(self, other_addr):
         assert other_addr.as_str() in peer_address
         return peer_address[other_addr.as_str()]
 
-    def get_peer_compliance_key(self, other_addr):
-        pass
+    def get_peer_compliance_verification_key(self, other_addr):
+        return peer_keys[other_addr]
+
+    def get_peer_compliance_signature_key(self, my_addr):
+        return peer_keys[my_addr]
 
     def is_authorised_VASP(self, certificate, other_addr):
         return True
@@ -72,7 +81,7 @@ def make_new_VASP(Peer_addr, port):
         host='localhost',
         port=port,
         business_context=BasicBusinessContext(Peer_addr),
-        info_context=SimpleVASPInfo(),
+        info_context=SimpleVASPInfo(Peer_addr),
         database={})
 
     loop = asyncio.new_event_loop()

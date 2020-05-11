@@ -58,8 +58,18 @@ async def test_handle_request_debug(client):
     assert 'Hello, world' in text
 
 
-async def test_handle_request(url, client, json_request):
-    response = await client.post(url, json=json_request)
+async def test_handle_request(url, net_handler, aiohttp_client, json_request):
+    from ..crypto import ComplianceKey
+    from json import dumps
+
+    key = ComplianceKey.generate()
+    new_request = {'_signed': key.sign_message(dumps(json_request))}
+    net_handler.vasp.info_context.get_peer_compliance_signature_key.return_value = key
+    net_handler.vasp.info_context.get_peer_compliance_verification_key.return_value = key
+
+    client = await aiohttp_client(net_handler.app)
+
+    response = await client.post(url, json=new_request)
     assert response.status == 200
     content = await response.json()
     assert content['status'] == 'success'
@@ -89,8 +99,13 @@ async def test_handle_request_bad_payload(client, url):
 
 
 async def test_send_request(net_handler, tester_addr, server, json_request):
+    from ..crypto import ComplianceKey
+    key = ComplianceKey.generate()
     base_url = f'http://{server.host}:{server.port}'
     net_handler.vasp.info_context.get_peer_base_url.return_value = base_url
+    net_handler.vasp.info_context.get_peer_compliance_signature_key.return_value = key
+    net_handler.vasp.info_context.get_peer_compliance_verification_key.return_value = key
+
     with pytest.raises(OffChainException):
         _ = await net_handler.send_request(tester_addr, json_request)
     # Raises since the vasp did not emit the command; so it does
@@ -98,8 +113,12 @@ async def test_send_request(net_handler, tester_addr, server, json_request):
 
 
 async def test_send_command(net_handler, tester_addr, server, command):
+    from ..crypto import ComplianceKey
+    key = ComplianceKey.generate()
     base_url = f'http://{server.host}:{server.port}'
     net_handler.vasp.info_context.get_peer_base_url.return_value = base_url
+    net_handler.vasp.info_context.get_peer_compliance_signature_key.return_value = key
+    net_handler.vasp.info_context.get_peer_compliance_verification_key.return_value = key
     req = net_handler.sequence_command(tester_addr, command)
     ret = await net_handler.send_request(tester_addr, req)
     assert ret

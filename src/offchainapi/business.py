@@ -296,3 +296,9 @@ class VASPInfo:
 
         """
         raise NotImplementedError()  # pragma: no cover
+
+    def get_peer_compliance_verification_key(self, other_addr):
+        raise NotImplementedError()  # pragma: no cover
+
+    def get_peer_compliance_signature_key(self, my_addr):
+        raise NotImplementedError()  # pragma: no cover
