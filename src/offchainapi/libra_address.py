@@ -17,7 +17,7 @@ class LibraAddress:
             and bit manipulations on it.
 
         Args:
-            encoded_address (str or bytes): Representation of a Libra Address in bech32.
+            encoded_address (str or bytes): Representation of a Libra address in bech32.
 
         Raises:
             LibraAddressError: If the provided encoded address cannot be parsed
@@ -28,7 +28,7 @@ class LibraAddress:
         ver, self.decoded_address = decode(self.hrp, self.encoded_address)
         if self.decoded_address is None or ver != self.version:
             raise LibraAddressError(
-                f'Incorrect bech32 encoding: "{encoded_address}"')
+                f'Incorrect version or bech32 encoding: "{encoded_address}"')
         self.decoded_address = bytes(self.decoded_address)
 
     def as_str(self):
