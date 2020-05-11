@@ -398,7 +398,7 @@ class PaymentProcessor(CommandProcessor):
 
         # Check that the subaddreses are valid
         _ = LibraSubAddress(new_payment.sender.subaddress)
-        sub_receiver = LibraSubAddress(new_payment.receiver.subaddress)
+        _ = LibraSubAddress(new_payment.receiver.subaddress)
 
         self.check_signatures(new_payment)
 
