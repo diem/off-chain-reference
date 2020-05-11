@@ -17,7 +17,7 @@ class LibraAddress:
             and bit manipulations on it.
 
         Args:
-            encoded_address (str or bytes): Representation of a Libra Address in bech32.
+            encoded_address (str or bytes): Representation of a Libra address in bech32.
 
         Raises:
             LibraAddressError: If the provided encoded address cannot be parsed
