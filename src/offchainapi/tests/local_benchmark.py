@@ -34,6 +34,9 @@ class SimpleVASPInfo(VASPInfo):
         assert other_addr.as_str() in peer_address
         return peer_address[other_addr.as_str()]
 
+    def get_peer_compliance_key(self, other_addr):
+        pass
+
     def is_authorised_VASP(self, certificate, other_addr):
         return True
 

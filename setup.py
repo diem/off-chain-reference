@@ -21,6 +21,7 @@ setuptools.setup(
     install_requires=[
         'aiohttp',
         'bech32',
+        'jwcrypto',
     ],
     version="0.0.1.dev1",
 )
