@@ -106,8 +106,8 @@ def simple_response_json_error(request):
 @pytest.fixture
 def simple_request_json(payment_action, my_addr, other_addr):
     sender_str = other_addr.as_str()
-    sub_1 = LibraSubAddress.encode(b'CC').as_str()
-    sub_2 = LibraSubAddress.encode(b'22').as_str()
+    sub_1 = LibraSubAddress.encode(b'C'*16).as_str()
+    sub_2 = LibraSubAddress.encode(b'2'*16).as_str()
     sender = PaymentActor(other_addr.as_str(), sub_1, Status.none, [])
     receiver = PaymentActor(my_addr.as_str(), sub_2, Status.none, [])
     payment = PaymentObject(

@@ -27,15 +27,15 @@ def three_addresses():
 
 @pytest.fixture
 def sender_actor():
-    m_addr = LibraAddress.encode(b'AAAA').as_str()
-    s_addr = LibraSubAddress.encode(b'aaaa').as_str()
+    m_addr = LibraAddress.encode(b'A'*16).as_str()
+    s_addr = LibraSubAddress.encode(b'A'*16, b'a'*8).as_str()
     return PaymentActor(m_addr, s_addr, Status.none, [])
 
 
 @pytest.fixture
 def receiver_actor():
-    m_addr = LibraAddress.encode(b'BBBB').as_str()
-    s_addr = LibraSubAddress.encode(b'bbbb').as_str()
+    m_addr = LibraAddress.encode(b'B'*16).as_str()
+    s_addr = LibraSubAddress.encode(b'B'*16, b'b'*8).as_str()
     return PaymentActor(m_addr, s_addr, Status.none, [])
 
 
