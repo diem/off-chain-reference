@@ -90,6 +90,18 @@ class Vasp:
         # Reschedule commands to be processed, when the loop starts.
         self.loop.create_task(self.pp.retry_process_commands())
 
+    async def wait_for_payment_outcome_async(self, payment_reference_id):
+        payment = await self.pp.wait_for_payment_outcome(payment_reference_id)
+        return payment
+
+    def wait_for_payment_outcome(self, payment_reference_id):
+        if self.loop is not None:
+            res = asyncio.run_coroutine_threadsafe(
+                self.wait_for_payment_outcome_async(payment_reference_id), self.loop)
+            return res
+        else:
+            raise RuntimeError('Event loop is None.')
+
     async def new_command_async(self, addr, cmd):
         ''' Sends a new command to the other VASP and returns a
             boolean indicating success or failure of the command,

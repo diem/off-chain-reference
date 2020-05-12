@@ -59,6 +59,14 @@ class PaymentProcessor(CommandProcessor):
             self.command_cache = storage_factory.make_dict(
                 'command_cache', ProtocolCommand, root)
 
+        # Allow mapping a set of future to payment reference_id outcomes
+        # Once a payment has an outcode (settled, abort, or command exception)
+        # nootify the appropriate futures of the result. These do not persist
+        # crashes sine they are run-time objects.
+
+        # Mapping: payment reference_id -> List of futures.
+        self.outcome_futures = {}
+
         # Storage for debug futures list
         self.futs = []
 
@@ -163,12 +171,15 @@ class PaymentProcessor(CommandProcessor):
 
         self.logger.debug(f'Process Command {other_address_str}.#{seq}')
 
+        # Update the outcome of the payment
+        payment = command.get_payment(self.object_store)
+        self.set_payment_outcome(payment)
+
         try:
             # Only respond to commands by other side.
             if command.origin == other_address:
 
                 # Determine if we should inject a new command.
-                payment = command.get_payment(self.object_store)
                 new_payment = await self.payment_process_async(payment)
 
                 if new_payment.has_changed():
@@ -209,6 +220,57 @@ class PaymentProcessor(CommandProcessor):
                 f'Payment processing error: seq #{seq}: {str(e)}'
             )
             self.logger.exception(e)
+
+    # -------- Machinery for notification for outcomes -------
+
+    async def wait_for_payment_outcome(self, payment_id):
+        ''' Returns the payment object with the given a reference_id once the
+        object has the sender or receiver status set to either 'settled' or
+        'abort'.
+        '''
+        fut = self.loop.create_future()
+
+        if payment_id not in self.outcome_futures:
+            self.outcome_futures[payment_id] = []
+
+        # Register this future to call later.
+        self.outcome_futures[payment_id] += [fut]
+
+        # Check to see if the payment is already resolved.
+        if payment_id in self.reference_id_index:
+            payment = self.get_latest_payment_by_ref_id(payment_id)
+            self.set_payment_outcome(payment)
+
+        return (await fut)
+
+    def set_payment_outcome(self, payment):
+        ''' Updates the list of futures waiting for payment outcomes
+            based on the new payment object provided. If sender or receiver
+            of the payment object are in settled or abort states, then
+            the result is passed on to any waiting futures.
+        '''
+
+        # Check if payment is in a final state
+        if not (payment.sender.status == Status.settled or \
+                payment.receiver.status == Status.settled or \
+                payment.sender.status == Status.abort or \
+                payment.receiver.status == Status.abort):
+            return
+
+        # Check if anyone is waiting for this payment.
+        if payment.reference_id not in self.outcome_futures:
+            return
+
+        # Get the futures waiting for an outcome, and delete them
+        # from the list of pending futures.
+        outcome_futures = self.outcome_futures[payment.reference_id]
+        del self.outcome_futures[payment.reference_id]
+
+        # Update the outcome for each of the futures.
+        for fut in outcome_futures:
+            fut.set_result(payment)
+        return
+
 
     # -------- Implements CommandProcessor interface ---------
 

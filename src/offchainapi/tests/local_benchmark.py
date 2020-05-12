@@ -130,12 +130,26 @@ async def main_perf(messages_num=10, wait_num=0, verbose=False):
             return_exceptions=False)
         return res
 
+    async def wait_for_all_payment_outcome(nodeA, payments):
+        res = await asyncio.gather(
+            *[nodeA.wait_for_payment_outcome_async(p.reference_id) for p in payments],
+            return_exceptions=False)
+        return res
+
     # Execute 100 requests
     print('Inject commands')
     s = time.perf_counter()
     res = asyncio.run_coroutine_threadsafe(send100(VASPa, commands), loopA)
     res = res.result()
     elapsed = (time.perf_counter() - s)
+
+    print('Wait for all payments too have an outcome')
+    outcomes = asyncio.run_coroutine_threadsafe(
+        wait_for_all_payment_outcome(VASPa, payments), loopA)
+    outcomes = outcomes.result()
+    for out in outcomes:
+        print(out.sender.status, out.receiver.status)
+    print('All payments done.')
 
     # Print some statistics
     success_number = sum([1 for r in res if r])
