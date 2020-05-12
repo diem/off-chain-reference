@@ -248,21 +248,6 @@ class VASPInfo:
         """
         raise NotImplementedError()  # pragma: no cover
 
-    def is_authorised_VASP(self, certificate, other_addr):
-        """ Check whether an incoming network request is authorised or not.
-            This function checks that the certificate belongs to the sender
-            of the request (ie. the network client); it ensures that a
-            VASP is not impersonating one of the other authorised VASPs.
-
-            Args:
-                other_addr (LibraAddress): The address of the other VASP.
-                certificate (?): TODO
-
-            Returns:
-                bool: Whether the request of the other VASP is authorized.
-        """
-        raise NotImplementedError()  # pragma: no cover
-
     # --- The functions below are currently unused ---
 
     def get_libra_address(self):

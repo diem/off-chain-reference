@@ -4,7 +4,7 @@ from ..business import BusinessNotAuthorized
 
 import pytest
 import aiohttp
-
+from ..crypto import ComplianceKey
 
 @pytest.fixture
 def tester_addr(three_addresses):
@@ -18,9 +18,14 @@ def testee_addr(three_addresses):
     return a0
 
 @pytest.fixture
-def net_handler(vasp):
-    vasp.info_context.is_authorised_VASP.return_value = True
+def key():
+    return ComplianceKey.generate()
+
+@pytest.fixture
+def net_handler(vasp, key):
     vasp.info_context.get_base_url.return_value = '/'
+    vasp.info_context.get_peer_compliance_signature_key.return_value = key
+    vasp.info_context.get_peer_compliance_verification_key.return_value = key
     return Aionet(vasp)
 
 
@@ -58,14 +63,9 @@ async def test_handle_request_debug(client):
     assert 'Hello, world' in text
 
 
-async def test_handle_request(url, net_handler, aiohttp_client, json_request):
-    from ..crypto import ComplianceKey
+async def test_handle_request(url, net_handler, key, aiohttp_client, json_request):
     from json import dumps
-
-    key = ComplianceKey.generate()
     new_request = {'_signed': key.sign_message(dumps(json_request))}
-    net_handler.vasp.info_context.get_peer_compliance_signature_key.return_value = key
-    net_handler.vasp.info_context.get_peer_compliance_verification_key.return_value = key
 
     client = await aiohttp_client(net_handler.app)
 
@@ -77,20 +77,11 @@ async def test_handle_request(url, net_handler, aiohttp_client, json_request):
 
 async def test_handle_request_business_not_authorised(vasp, url, json_request,
                                                       aiohttp_client):
-    vasp.info_context.is_authorised_VASP.return_value = True
     vasp.business_context.open_channel_to.side_effect = BusinessNotAuthorized
     net_handler = Aionet(vasp)
     client = await aiohttp_client(net_handler.app)
     response = await client.post(url, json=json_request)
     assert response.status == 401
-
-
-async def test_handle_request_forbidden(vasp, url, json_request, aiohttp_client):
-    vasp.info_context.is_authorised_VASP.return_value = False
-    net_handler = Aionet(vasp)
-    client = await aiohttp_client(net_handler.app)
-    response = await client.post(url, json=json_request)
-    assert response.status == 403
 
 
 async def test_handle_request_bad_payload(client, url):
