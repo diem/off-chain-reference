@@ -91,10 +91,24 @@ class Vasp:
         self.loop.create_task(self.pp.retry_process_commands())
 
     async def wait_for_payment_outcome_async(self, payment_reference_id):
+        ''' Awaits until the payment with the given reference_id is either
+        settled or aborted and returns the payment object at that version.
+
+        Parameters:
+            payment_reference_id (str): the reference_id of the payment
+                of interest.
+
+        Returns a PaymentObject with the given reference_id that is ether
+        settled or aborted by one of the parties.
+
+        '''
         payment = await self.pp.wait_for_payment_outcome(payment_reference_id)
         return payment
 
     def wait_for_payment_outcome(self, payment_reference_id):
+        ''' A non-async variant of wait_for_payment_outcome_async that returns
+        a concurrent.futures Future with the result. You may call `.result()`
+        on it to block or register a call-back. '''
         if self.loop is not None:
             res = asyncio.run_coroutine_threadsafe(
                 self.wait_for_payment_outcome_async(payment_reference_id), self.loop)
