@@ -27,9 +27,14 @@ if __name__ == '__main__':
         '-v', '--verbose', metavar='VERBOSE', type=bool, default=False,
         help='Print all payments', dest='verb')
 
-    logging.basicConfig(level=logging.ERROR)
-
     args = parser.parse_args()
+
+    # When verbose print all information
+    if args.verb:
+        logging.basicConfig(level=logging.DEBUG)
+    else:
+        logging.basicConfig(level=logging.ERROR)
+
     asyncio.run(local_benchmark.main_perf(
         messages_num=args.paym,
         wait_num=args.wait,
