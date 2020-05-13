@@ -93,7 +93,7 @@ Each VASP state consists of the following information:
 
 In each channel one VASP takes the role of a _protocol server_ and the other the role of a _protocol client_ for the purposes of sequencing commands into a joint command sequence. Note that these roles are distinct to the HTTP client/server -- and both VASPs act as an HTTP server and client to listen and respond to requests.
 
-Who is the protcol server and who is the client VASP is determined by comparing their binary LibraAddress. The following rules are used to determine which entity serves as which party: The last bit of VASP A’s parent address in binary _w_ is XOR’d with the last bit in VASP B’s parent address in binary _x_.  This results in either 0 or 1.
+Who is the protocol server and who is the client VASP is determined by comparing their binary LibraAddress. The following rules are used to determine which entity serves as which party: The last bit of VASP A’s parent address in binary _w_ is XOR’d with the last bit in VASP B’s parent address in binary _x_.  This results in either 0 or 1.
 If the result is 0, the lower parent address is used as the server side.
 If the result is 1, the higher parent address is used as the server side.
 
@@ -137,15 +137,14 @@ For example, a successful request may yield the following `CommandResponseObject
         "_ObjectType": "CommandResponseObject",
         "seq": 0,
         "command_seq": 0,
-        "status": "success"
     }
 
-| Field 	    | Type 	| Required? 	| Description 	|
-|-------	    |------	|-----------	|-------------	|
-|_ObjectType    | str   | Y             |The fixed string `CommandResponseObject`. |
-|seq            |int    | Y             | The sequence number of the request responded to in the local sender request sequence. |
-| command_seq   | int or str=`null`   | Y             | The sequence of the command responded to in the joint command sequence |
-|status         | str   | Y             | Either `success` or `failure`. |
+| Field 	     | Type 	| Required? 	| Description 	|
+|-------	     |------	|-----------	|-------------	|
+| _ObjectType    | str      | Y             | The fixed string `CommandResponseObject`. |
+| seq            |int       | Y             | The sequence number of the request responded to in the local sender request sequence. |
+| command_seq    | int or str=`null` | Y    | The sequence of the command responded to in the joint command sequence |
+| status         | str      | Y             | Either `success` or `failure`. |
 
 When the `CommandRequestObject` status field is `failure`, the `error` field is included in the response to indicate the nature of the failure. The `error` field (type `OffChainError`) is an object with at least two fields. For example:
 
@@ -281,13 +280,13 @@ An example `PaymentObject` with all fields understood by the Off-Chain protocol 
             "status": "ready_for_settlement",
             "subaddress": "BobsSubaddress"
         },
-        "recipient_signature": "42424242424242424242424242424242.ref 9.SIGNED",
+        "recipient_signature": "42424242424242424242424242424242_ref9.SIGNED",
         "reference_id": "41414141414141414141414141414141_HHAYJKDKSUUUSGGH",
         "sender": {
-            "address": "41414141414141414141414141414141",
+            "address": "lbr1qg9q5zs2pg9q5zs2pg9q5zs2pgy7gvd9u",
             "kyc_certificate": "41414141414141414141414141414141.ref 9.KYC_CERT",
             "kyc_data": {
-                "blob": "{\n  \"payment_reference_id\": \"41414141414141414141414141414141.ref 9.KYC\",\n  \"type\": \"individual\"\n ... }\n"
+                "blob": "{\n  \"payment_reference_id\": \"lbr1qg9q5zs2pg9q5zs2pg9q5zs2pgy7gvd9u_ref9.KYC\",\n  \"type\": \"individual\"\n ... }\n"
             },
             "kyc_signature": "41414141414141414141414141414141.ref 9.KYC_SIGN",
             "metadata": [],
@@ -305,11 +304,11 @@ The top-level `PaymentObject` is the root structure defining a payment and consi
     {
         "sender": payment_actor_object(),
         "receiver": payment_actor_object(),
-        "reference_id": "123456abcd_12345",
-        "original_payment_reference_id": "1234",
-        "recipient_signature": "123445667",
+        "reference_id": "lbr1qg9q5zs2pg9q5zs2pg9q5zs2pgy7gvd9u_ref1001",
+        "original_payment_reference_id": "lbr1qg9q5zs2pg9q5zs2pg9q5zs2pgy7gvd9u_ref0987",
+        "recipient_signature": "TODO",
         "action": payment_action_object(),
-        "description": "",
+        "description": "A free form or structured description of the payment.",
     }
 
 The `sender`, `receiver`, `reference_id`, and `action` are mandatory. The other fields are optional.
@@ -333,20 +332,17 @@ Signature of the recipient of this transaction. The signature is over the `refer
 A `PaymentActorObject` represents a participant in a payment - either sender or receiver. It also includes the status of the actor, that indicates missing information or willingness to settle or abort the payment, and the Know-Your-Customer information of the customer involved in the payment:
 
     {
-        "address": "abcd1278",
-        "subaddress": "1234567",
-        "stable_id": "777",
+        "address": "lbr1qgfpyysjzgfpyysjzgfpyysjzgg8cfqvy",
+        "subaddress": "lbr1pgfpyysjzgfpyysjzgfpyysjzgf3xycnzvf3xycsm957ne",
         "kyc_data": kyc_data_object(),
-        "kyc_signature": "abcd",
-        "kyc_certificate": "deadbeef",
         "status": "ready_for_settlement",
         "metadata": [],
     }
 
 * **address (str)**
-Address of the VASP which is sending/receiving the payment. This is the bech32 encoded LibraAddress for the VASP (with human readable part set to "m" for main chain). Mandatory and immutable.
+Address of the VASP which is sending/receiving the payment. This is the bech32 encoded LibraAddress for the VASP on-chain address only (with human readable part set to "lbr" for main chain, and version set to zero). Mandatory and immutable.
 
-* **subaddress (str)** Subaddress of the sender/receiver account. Subaddresses may be single use or valid for a limited time, and therefore VASPs should not rely on them remaining stable across time or different VASP addresses. The subaddresses are encoded using bech32 with a human readable part set to "s" (for subaddress). They should be no longer than 40 characters. Mandatory and immutable.
+* **subaddress (str)** Subaddress of the sender/receiver account. Subaddresses may be single use or valid for a limited time, and therefore VASPs should not rely on them remaining stable across time or different VASP addresses. The subaddresses are encoded using bech32 with a human readable part set to "lbr" (and version set to one). The bech32 subaddress also encodes the address of the VASP, replicating the information in `address'. They should be no longer than 40 characters. Mandatory and immutable.
 
 * (TODO) **kyc_signature: string**
 Standard base64 encoded signature over the KYC data (plus the ref_id).  Signed by the party who provides the KYC data. Note that the KYC JSON object already includes a field about the payload type and version which can be used for domain separation purposes, so no prefix/salt is required during signing.
@@ -373,7 +369,7 @@ The `KYCDataObject` is serialized as a string and contained in the `blob` attrib
 (TODO) A `KYCDataObject` represents the KYC data for a single subaddress. This should be in canonical JSON format to ensure repeatable hashes of JSON-encoded data.
 
     {
-        "payment_reference_id": "ID",
+        "payment_reference_id": "lbr1qg9q5zs2pg9q5zs2pg9q5zs2pgy7gvd9u_ref_0",
         "payload_type": "KYC_DATA",
         "payload_version": 1,
         "type": "individual",
