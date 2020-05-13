@@ -70,13 +70,13 @@ def kyc_payment_as_sender(payment_as_sender, kyc_data):
 
 @pytest.fixture
 def my_addr(three_addresses):
-    _, _, a0 = three_addresses
+    a0, _, _ = three_addresses
     return a0
 
 
 @pytest.fixture
 def other_addr(three_addresses):
-    a0, _, _ = three_addresses
+    _, _, a0 = three_addresses
     return a0
 
 
@@ -85,13 +85,30 @@ def vasp(my_addr):
     return sample_vasp(my_addr)
 
 
+@pytest.fixture
+def json_request(my_addr, other_addr, payment_action):
+    sender = PaymentActor(my_addr.as_str(), my_addr.as_str(), Status.none, [])
+    receiver = PaymentActor(
+        other_addr.as_str(), other_addr.as_str(), Status.none, []
+    )
+    ref = f'{other_addr.as_str()}_XYZ'
+    payment = PaymentObject(
+        sender, receiver, ref, 'orig_ref', 'desc', payment_action
+    )
+    command = PaymentCommand(payment)
+    request = CommandRequestObject(command)
+    request.seq = 0
+    request.command_seq = 0
+    return request.get_json_data_dict(JSONFlag.NET)
+
+
 @pytest.fixture(params=[
     (None, None, 'failure', True, 'parsing'),
     (0, 0, 'success', None, None),
     (0, 0, 'success', None, None),
     (10, 10, 'success', None, None),
 ])
-def simple_response_json_error(request):
+def simple_response_json_error(request, key):
     seq, cmd_seq, status, protoerr, errcode = request.param
     resp = CommandResponseObject()
     resp.status = status
@@ -100,23 +117,9 @@ def simple_response_json_error(request):
     if status == 'failure':
         resp.error = OffChainError(protoerr, errcode)
     json_obj = resp.get_json_data_dict(JSONFlag.NET)
-    return json_obj
-
-
-@pytest.fixture
-def simple_request_json(payment_action, my_addr, other_addr):
-    sender_str = other_addr.as_str()
-    sub_1 = LibraSubAddress.encode(b'C'*16).as_str()
-    sub_2 = LibraSubAddress.encode(b'2'*16).as_str()
-    sender = PaymentActor(other_addr.as_str(), sub_1, Status.none, [])
-    receiver = PaymentActor(my_addr.as_str(), sub_2, Status.none, [])
-    payment = PaymentObject(
-        sender, receiver, f'{sender_str}_ref', 'orig_ref', 'desc', payment_action
-    )
-    command = PaymentCommand(payment)
-    request = CommandRequestObject(command)
-    request.seq = 0
-    return request.get_json_data_dict(JSONFlag.NET)
+    signed_json = key.sign_message(json.dumps(json_obj))
+    print(f'HERE -2: {signed_json}')
+    return signed_json
 
 
 def test_business_simple(my_addr):
@@ -127,7 +130,8 @@ def test_business_is_related(business_and_processor, payment_as_receiver):
     bc, proc = business_and_processor
     payment = payment_as_receiver
 
-    kyc_level = proc.loop.run_until_complete(bc.next_kyc_level_to_request(payment))
+    kyc_level = proc.loop.run_until_complete(
+        bc.next_kyc_level_to_request(payment))
     assert kyc_level == Status.needs_kyc_data
 
     ret_payment = proc.payment_process(payment)
@@ -139,7 +143,8 @@ def test_business_is_kyc_provided(business_and_processor, kyc_payment_as_receive
     bc, proc = business_and_processor
     payment = kyc_payment_as_receiver
 
-    kyc_level = proc.loop.run_until_complete(bc.next_kyc_level_to_request(payment))
+    kyc_level = proc.loop.run_until_complete(
+        bc.next_kyc_level_to_request(payment))
     assert kyc_level == Status.none
 
     ret_payment = proc.payment_process(payment)
@@ -149,11 +154,13 @@ def test_business_is_kyc_provided(business_and_processor, kyc_payment_as_receive
     assert ready
     assert ret_payment.receiver.status == Status.ready_for_settlement
 
+
 def test_business_is_kyc_provided_sender(business_and_processor, kyc_payment_as_sender):
     bc, proc = business_and_processor
     payment = kyc_payment_as_sender
     assert bc.is_sender(payment)
-    kyc_level = proc.loop.run_until_complete(bc.next_kyc_level_to_request(payment))
+    kyc_level = proc.loop.run_until_complete(
+        bc.next_kyc_level_to_request(payment))
     assert kyc_level == Status.needs_recipient_signature
 
     ret_payment = proc.payment_process(payment)
@@ -165,32 +172,14 @@ def test_business_is_kyc_provided_sender(business_and_processor, kyc_payment_as_
     assert bc.get_account('1')['balance'] == 5.0
 
 
-@pytest.fixture(params=[
-    (None, None, 'failure', True, 'parsing'),
-    (0, 0, 'success', None, None),
-    (0, 0, 'success', None, None),
-    (10, 10, 'success', None, None),
-    ])
-def simple_response_json_error(request):
-    seq, cmd_seq, status, protoerr, errcode =  request.param
-    sender_addr = LibraAddress.encode(b'A'*16).encoded_address
-    receiver_addr   = LibraAddress.encode(b'B'*16).encoded_address
-    resp = CommandResponseObject()
-    resp.status = status
-    resp.seq = seq
-    resp.command_seq = cmd_seq
-    if status == 'failure':
-        resp.error = OffChainError(protoerr, errcode)
-    json_obj = json.dumps(resp.get_json_data_dict(JSONFlag.NET))
-    return json_obj
-
-
-def test_vasp_simple(simple_request_json, vasp, other_addr, loop):
+def test_vasp_simple(json_request, vasp, other_addr, loop):
     vasp.pp.loop = loop
     net = AsyncMock(Aionet)
     vasp.pp.set_network(net)
 
-    vasp.process_request(other_addr, simple_request_json)
+    key = vasp.info_context.get_peer_compliance_verification_key(other_addr)
+    signed_json_request = key.sign_message(json.dumps(json_request))
+    vasp.process_request(other_addr, signed_json_request)
     requests = vasp.collect_messages()
     assert len(requests) == 1
     assert requests[0].type is CommandResponseObject
@@ -203,28 +192,27 @@ def test_vasp_simple(simple_request_json, vasp, other_addr, loop):
     assert len(net.method_calls) == 2
 
 
-def test_vasp_simple_wrong_VASP(simple_request_json, other_addr, loop):
+def test_vasp_simple_wrong_VASP(json_request, other_addr, loop, key):
     my_addr = LibraAddress.encode(b'X'*16)
     vasp = sample_vasp(my_addr)
     vasp.pp.loop = loop
 
+    key = vasp.info_context.get_peer_compliance_verification_key(other_addr)
+    signed_json_request = key.sign_message(json.dumps(json_request))
+
     try:
         # vasp.pp.start_processor()
-        vasp.process_request(other_addr, simple_request_json)
+        vasp.process_request(other_addr, signed_json_request)
         responses = vasp.collect_messages()
         assert len(responses) == 1
         assert responses[0].type is CommandResponseObject
-        assert 'failure' == responses[0].content['status']
+        content = json.loads(key.verify_message(responses[0].content))
+        assert 'failure' == content['status']
     finally:
         # vasp.pp.stop_processor()
         pass
 
 
 def test_vasp_response(simple_response_json_error, vasp, other_addr):
+    print(f'here -1: {simple_response_json_error}')
     vasp.process_response(other_addr, simple_response_json_error)
-
-def test_sample_vasp_info_is_authorised(request):
-    my_addr   = LibraAddress.encode(b'B'*16)
-    other_addr = LibraAddress.encode(b'A'*16)
-    vc = sample_vasp(my_addr)
-    assert vc.info_context.is_authorised_VASP('anything', other_addr)

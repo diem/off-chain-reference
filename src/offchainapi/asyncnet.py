@@ -148,9 +148,9 @@ class Aionet:
         other_addr = LibraAddress(request.match_info['other_addr'])
         self.logger.debug(f'Request Received from {other_addr.as_str()}')
 
-        other_key = self.vasp.info_context.get_peer_compliance_verification_key(
-            other_addr.as_str()
-        )
+        #other_key = self.vasp.info_context.get_peer_compliance_verification_key(
+        #    other_addr.as_str()
+        #)
 
         # Try to get a channel with the other VASP.
         try:
@@ -163,16 +163,11 @@ class Aionet:
         # Perform the request, send back the reponse.
         try:
             request_json = await request.json()
-            assert '_signed' in request_json
-
-            # Verify and decode the message
-            json_string = other_key.verify_message(request_json['_signed'])
-            request_json = json.loads(json_string)
 
             # TODO: Handle timeout errors here.
             self.logger.debug(f'Data Received from {other_addr.as_str()}.')
             response = await channel.parse_handle_request_to_future(
-                request_json, encoded=False
+                request_json
             )
 
         except json.decoder.JSONDecodeError as e:
@@ -217,18 +212,11 @@ class Aionet:
         my_key = self.vasp.info_context.get_peer_compliance_signature_key(
             my_addr.as_str()
         )
-        other_key = self.vasp.info_context.get_peer_compliance_verification_key(
-            other_addr.as_str()
-        )
 
         # Get the URLs
         base_url = self.vasp.info_context.get_peer_base_url(other_addr)
         url = self.get_url(base_url, other_addr.as_str(), other_is_server=True)
         self.logger.debug(f'Sending post request to {url}')
-
-        # Add a signed version of the message
-        signed_request = my_key.sign_message(json.dumps(json_request))
-        json_request = {'_signed': signed_request}
 
         try:
             async with self.session.post(url, json=json_request) as response:
@@ -238,7 +226,7 @@ class Aionet:
 
                     # Wait in case the requests are sent out of order.
                     res = await channel.parse_handle_response_to_future(
-                        json_response, encoded=False
+                        json_response
                     )
                     self.logger.debug(f'Response parsed with status: {res}')
 
