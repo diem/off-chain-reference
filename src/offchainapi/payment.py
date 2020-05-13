@@ -70,8 +70,6 @@ class PaymentActor(StructureChecker):
         ('address', str, REQUIRED, WRITE_ONCE),
         ('subaddress', str, REQUIRED, WRITE_ONCE),
         ('kyc_data', KYCData, OPTIONAL, WRITE_ONCE),
-        ('kyc_signature', str, OPTIONAL, WRITE_ONCE),
-        ('kyc_certificate', str, OPTIONAL, WRITE_ONCE),
         ('status', Status, REQUIRED, UPDATABLE),
         ('metadata', list, REQUIRED, UPDATABLE)
     ]
@@ -87,15 +85,6 @@ class PaymentActor(StructureChecker):
 
     def custom_update_checks(self, diff):
         """ Override StructureChecker. """
-        # If any of kyc data, signature or certificate is provided, we expect
-        # all the other fields as well
-        missing = set([
-            "kyc_data",
-            "kyc_signature",
-            "kyc_certificate"
-        ]) - set(diff.keys())
-        if len(missing) != 0 and len(missing) != 3:
-            raise StructureException('Missing: field %s' % (str(missing),))
 
         if 'status' in diff and not isinstance(diff['status'], Status):
             raise StructureException('Wrong status: %s' % diff['status'])
@@ -108,7 +97,7 @@ class PaymentActor(StructureChecker):
                         'Wrong type: metadata item type expected str, got %s' %
                         type(item))
 
-    def add_kyc_data(self, kyc_data, kyc_signature, kyc_certificate):
+    def add_kyc_data(self, kyc_data):
         """ Add extended KYC information and kyc signature.
 
         Args:
@@ -118,8 +107,6 @@ class PaymentActor(StructureChecker):
         """
         self.update({
             'kyc_data': kyc_data,
-            'kyc_signature': kyc_signature,
-            'kyc_certificate': kyc_certificate
         })
 
     def add_metadata(self, item):

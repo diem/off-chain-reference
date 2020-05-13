@@ -94,31 +94,15 @@ def test_payment_actor_update_status(sender_actor):
 
 
 def test_payment_actor_update_kyc(sender_actor, kyc_data):
-    sender_actor.add_kyc_data(kyc_data, 'sigXXXX', 'certXXX')
+    sender_actor.add_kyc_data(kyc_data)
 
     # We tolerate writing again strictly the same record
-    sender_actor.add_kyc_data(kyc_data, 'sigXXXX', 'certXXX')
-
-
-def test_payment_actor_change_kyc(sender_actor, kyc_data):
-    sender_actor.add_kyc_data(kyc_data, 'sigXXXX', 'certXXX')
-    with pytest.raises(StructureException):
-        sender_actor.add_kyc_data(kyc_data, 'sigYYYY', 'certYYYY')
+    sender_actor.add_kyc_data(kyc_data)
 
 
 def test_payment_actor_wronte_kyc_type(sender_actor, kyc_data):
     with pytest.raises(StructureException):
-        sender_actor.add_kyc_data(0, 'sigXXXX', 'certXXX')
-
-
-def test_payment_actor_wrong_kyc_sig_type(sender_actor, kyc_data):
-    with pytest.raises(StructureException):
-        sender_actor.add_kyc_data(kyc_data, 0, 'certXXX')
-
-
-def test_payment_actor_wrong_kyc_cert_type(sender_actor, kyc_data):
-    with pytest.raises(StructureException):
-        sender_actor.add_kyc_data(kyc_data, 'sigXXXX', 0)
+        sender_actor.add_kyc_data(0)
 
 
 def test_payment_object_creation(sender_actor, receiver_actor, payment_action):
@@ -156,8 +140,8 @@ def test_payment_to_diff(payment, sender_actor, receiver_actor, payment_action):
 
 
 def test_to_json(kyc_data, sender_actor, receiver_actor, payment_action):
-    sender_actor.add_kyc_data(kyc_data, "sigSENDER", 'certSENDER')
-    receiver_actor.add_kyc_data(kyc_data, "sigSENDER", 'certSENDER')
+    sender_actor.add_kyc_data(kyc_data)
+    receiver_actor.add_kyc_data(kyc_data)
     payment = PaymentObject(
         sender_actor, receiver_actor, 'ref2', 'orig_ref', 'desc', payment_action
     )
@@ -165,20 +149,6 @@ def test_to_json(kyc_data, sender_actor, receiver_actor, payment_action):
     json_payment = json.dumps(payment.get_full_diff_record())
     new_payment = PaymentObject.create_from_record(json.loads(json_payment))
     assert payment == new_payment
-
-
-def test_payment_actor_update_bad_kyc_fails(sender_actor):
-    diff = {'kyc_data': '1234'}
-    with pytest.raises(StructureException):
-        sender_actor.custom_update_checks(diff)
-
-    diff = {'kyc_data': '1234', 'kyc_signature': '1234'}
-    with pytest.raises(StructureException):
-        sender_actor.custom_update_checks(diff)
-
-    diff = {'kyc_certificate': '1234', 'kyc_signature': '1234'}
-    with pytest.raises(StructureException):
-        sender_actor.custom_update_checks(diff)
 
 
 def test_payment_actor_update_bad_status_fails(sender_actor):

@@ -44,18 +44,6 @@ def test_check_new_payment_receiver_set_sender_state_fail(payment, processor):
     with pytest.raises(PaymentLogicError):
         processor.check_new_payment(payment)
 
-
-def test_check_signatures_invalid_signature_fail(kyc_data, payment, processor):
-    bcm = processor.business_context()
-    bcm.is_recipient.side_effect = [False] * 4
-    payment.receiver.add_kyc_data(kyc_data, 'kyc_sig', 'kyc_cert')
-    bcm.validate_kyc_signature.side_effect = [
-        BusinessValidationFailure('Sig fails')
-    ]
-    with pytest.raises(BusinessValidationFailure):
-        processor.check_signatures(payment)
-
-
 def test_check_signatures_bad_fail(payment, processor):
     bcm = processor.business_context()
     bcm.is_recipient.side_effect = [False] * 4
@@ -182,12 +170,10 @@ def test_payment_process_get_extended_kyc(payment, processor, kyc_data):
     bcm = processor.business_context()
     bcm.is_recipient.side_effect = [True]
     bcm.next_kyc_to_provide.side_effect = [set([Status.needs_kyc_data])]
-    bcm.get_extended_kyc.side_effect = [(kyc_data, 'sig', 'cert')]
+    bcm.get_extended_kyc.side_effect = [kyc_data]
     bcm.ready_for_settlement.side_effect = [Status.ready_for_settlement]
     new_payment = processor.payment_process(payment)
     assert new_payment.receiver.kyc_data == kyc_data
-    assert new_payment.receiver.kyc_signature == 'sig'
-    assert new_payment.receiver.kyc_certificate == 'cert'
 
 
 def test_persist(payment):

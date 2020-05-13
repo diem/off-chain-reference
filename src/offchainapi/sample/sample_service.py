@@ -157,13 +157,6 @@ class sample_business(BusinessContext):
 
         return payment.data[my_role].status
 
-
-    def validate_kyc_signature(self, payment):
-        other_role = ['sender', 'receiver'][self.is_sender(payment)]
-        if 'kyc_signature' in payment.data[other_role].data:
-            if not payment.data[other_role].kyc_signature == 'KYC_SIG':
-                raise BusinessValidationFailure()
-
     async def get_extended_kyc(self, payment):
         ''' Gets the extended KYC information for this payment.
 
@@ -173,7 +166,7 @@ class sample_business(BusinessContext):
         my_role = self.get_my_role(payment)
         subaddress = payment.data[my_role].subaddress
         account = self.get_account(subaddress)
-        return (account["kyc_data"], 'KYC_SIG', 'KYC_CERT')
+        return account["kyc_data"]
 
     async def ready_for_settlement(self, payment):
         my_role = self.get_my_role(payment)

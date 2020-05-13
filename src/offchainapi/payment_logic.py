@@ -360,9 +360,6 @@ class PaymentProcessor(CommandProcessor):
         is_sender = business.is_sender(payment)
         other_actor = payment.receiver if is_sender else payment.sender
 
-        if 'kyc_signature' in other_actor:
-            business.validate_kyc_signature(payment)
-
         if is_sender and 'recipient_signature' in payment:
             business.validate_recipient_signature(payment)
 
@@ -527,7 +524,7 @@ class PaymentProcessor(CommandProcessor):
 
                 if Status.needs_kyc_data in kyc_to_provide:
                     extended_kyc = await business.get_extended_kyc(new_payment)
-                    myself_new_actor.add_kyc_data(*extended_kyc)
+                    myself_new_actor.add_kyc_data(extended_kyc)
 
                 if Status.needs_recipient_signature in kyc_to_provide:
                     signature = await business.get_recipient_signature(

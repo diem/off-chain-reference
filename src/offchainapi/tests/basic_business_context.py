@@ -66,11 +66,6 @@ class BasicBusinessContext(BusinessContext):
 
         return None
 
-    def validate_kyc_signature(self, payment):
-        other_role = ['sender', 'receiver'][self.is_sender(payment)]
-        other_actor = payment.data[other_role]
-        assert 'kyc_data' in other_actor
-        return True
 
     async def get_extended_kyc(self, payment):
         ''' Returns the extended KYC information for this payment.
@@ -82,15 +77,11 @@ class BasicBusinessContext(BusinessContext):
         '''
         myself = self.my_addr.as_str()
         ref_id = payment.reference_id
-        return (
-                KYCData(
+        return KYCData(
                     f'{{\n'
                     f'  "payment_reference_id": "{myself}.{ref_id}.KYC",\n'
                     f'  "type": "individual"\n'
-                    f'}}\n'),
-                f'{myself}.{ref_id}.KYC_SIGN',
-                f'{myself}.{ref_id}.KYC_CERT',
-            )
+                    f'}}\n')
 
     # ----- Settlement -----
 

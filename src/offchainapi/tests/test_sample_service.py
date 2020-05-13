@@ -34,8 +34,8 @@ def payment_as_receiver(three_addresses, sender_actor, payment_action):
 @pytest.fixture
 def kyc_payment_as_receiver(payment_as_receiver, kyc_data):
     payment = payment_as_receiver
-    payment.sender.add_kyc_data(kyc_data, 'KYC_SIG', 'CERT')
-    payment.receiver.add_kyc_data(kyc_data, 'KYC_SIG', 'CERT')
+    payment.sender.add_kyc_data(kyc_data)
+    payment.receiver.add_kyc_data(kyc_data)
     payment.sender.change_status(Status.needs_recipient_signature)
     return payment
 
@@ -60,8 +60,8 @@ def payment_as_sender(three_addresses, receiver_actor, payment_action):
 @pytest.fixture
 def kyc_payment_as_sender(payment_as_sender, kyc_data):
     payment = payment_as_sender
-    payment.sender.add_kyc_data(kyc_data, 'KYC_SIG', 'CERT')
-    payment.receiver.add_kyc_data(kyc_data, 'KYC_SIG', 'CERT')
+    payment.sender.add_kyc_data(kyc_data)
+    payment.receiver.add_kyc_data(kyc_data)
     payment.sender.change_status(Status.needs_recipient_signature)
     payment.add_recipient_signature('SIG')
     assert payment.sender is not None
