@@ -96,7 +96,7 @@ def json_request(my_addr, other_addr, payment_action):
     )
     ref = f'{other_addr.as_str()}_XYZ'
     payment = PaymentObject(
-        sender, receiver, ref, 'orig_ref', 'desc', payment_action
+        sender, receiver, ref, 'Original Reference', 'A description...', payment_action
     )
     command = PaymentCommand(payment)
     request = CommandRequestObject(command)

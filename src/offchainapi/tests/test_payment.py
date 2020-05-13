@@ -107,8 +107,8 @@ def test_full_kyc_info():
             "payload_type": "KYC_DATA",
             "payload_version": 1,
             "type": "individual",
-            "given_name": "ben",
-            "surname": "mauer",
+            "given_name": "Alice",
+            "surname": "Alison",
             "address": {
                 "city": "Sunnyvale",
                 "country": "US",
