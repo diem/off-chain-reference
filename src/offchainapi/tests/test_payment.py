@@ -29,12 +29,13 @@ def test_json_payment_flags(payment):
 
 def test_kyc_data_missing_payment_reference_fail():
     with pytest.raises(StructureException):
-        kyc_data = KYCData('{"type": "A"}')
+        kyc_data = KYCData({"type": "A"})
 
 
 def test_kyc_data_missing_type_fail():
     with pytest.raises(StructureException):
-        kyc_data = KYCData('{"payment_reference_id": "1234"}')
+        kyc_dict = {"payment_reference_id": "1234"}
+        kyc_data = KYCData(kyc_dict)
 
 
 def test_payment_action_creation():
@@ -100,6 +101,41 @@ def test_payment_actor_update_kyc(sender_actor, kyc_data):
     sender_actor.add_kyc_data(kyc_data)
 
 
+def test_full_kyc_info():
+    full_kyc = {
+            "payment_reference_id": "ID",
+            "payload_type": "KYC_DATA",
+            "payload_version": 1,
+            "type": "individual",
+            "given_name": "ben",
+            "surname": "mauer",
+            "address": {
+                "city": "Sunnyvale",
+                "country": "US",
+                "line1": "1234 Maple Street",
+                "line2": "Apartment 123",
+                "postal_code": "12345",
+                "state": "California",
+            },
+            "dob": "1920-03-20",
+            "place_of_birth": {
+                "city": "Sunnyvale",
+                "country": "US",
+                "postal_code": "12345",
+                "state": "California",
+            },
+            "national_id": {
+            },
+            "legal_entity_name": "Superstore",
+        }
+    kyc = KYCData(full_kyc)
+    assert kyc.data == full_kyc
+
+    # Test serialization / deserialization
+    kyc_json = kyc.get_full_diff_record()
+    kyc2 = KYCData.from_full_record(kyc_json)
+    assert kyc2 == kyc
+
 def test_payment_actor_wronte_kyc_type(sender_actor, kyc_data):
     with pytest.raises(StructureException):
         sender_actor.add_kyc_data(0)
@@ -118,7 +154,37 @@ def test_payment_object_update(payment):
 
 
 def test_specific():
-    json_struct = {'sender': {'address': 'QUFBQUFBQUFBQUFBQUFBQQ==', 'subaddress': 'aaaa', 'status': 'settled', 'metadata': [], 'kyc_data': {'blob': '{\n                    "payment_reference_id": "QUFBQUFBQUFBQUFBQUFBQQ==.ref 0.KYC",\n                    "type": "individual"\n                    }'}, 'kyc_signature': 'QUFBQUFBQUFBQUFBQUFBQQ==.ref 0.KYC_SIGN', 'kyc_certificate': 'QUFBQUFBQUFBQUFBQUFBQQ==.ref 0.KYC_CERT'}, 'receiver': {'address': 'QkJCQkJCQkJCQkJCQkJCQg==', 'subaddress': 'bbbb', 'status': 'needs_kyc_data', 'metadata': [], 'kyc_data': {'blob': '{\n                    "payment_reference_id": "QkJCQkJCQkJCQkJCQkJCQg==.ref 0.KYC",\n                    "type": "individual"\n                    }'}, 'kyc_signature': 'QkJCQkJCQkJCQkJCQkJCQg==.ref 0.KYC_SIGN', 'kyc_certificate': 'QkJCQkJCQkJCQkJCQkJCQg==.ref 0.KYC_CERT'}, 'reference_id': 'ref 0', 'original_payment_reference_id': 'orig_ref', 'description': 'desc', 'action': {'amount': 10, 'currency': 'TIK', 'action': 'charge', 'timestamp': '2020-01-02 18:00:00 UTC'}, 'recipient_signature': 'QkJCQkJCQkJCQkJCQkJCQg==.ref 0.SIGNED'}
+    json_struct = {
+                    'sender': {
+                        'address': 'QUFBQUFBQUFBQUFBQUFBQQ==',
+                        'subaddress': 'aaaa',
+                        'status': 'settled',
+                        'metadata': [],
+                        'kyc_data': {
+                            "payment_reference_id": "QUFBQUFBQUFBQUFBQUFBQQ==.ref 0.KYC",
+                            "type": "individual"}
+                        },
+                    'receiver': {
+                        'address': 'QkJCQkJCQkJCQkJCQkJCQg==',
+                        'subaddress': 'bbbb',
+                        'status': 'needs_kyc_data',
+                        'metadata': [],
+                        'kyc_data': {
+                            "payment_reference_id": "QkJCQkJCQkJCQkJCQkJCQg==.ref 0.KYC",
+                            "type": "individual"
+                            }
+                    },
+                    'reference_id': 'ref 0',
+                    'original_payment_reference_id': 'orig_ref',
+                    'description': 'desc',
+                    'action': {
+                        'amount': 10,
+                        'currency': 'TIK',
+                        'action': 'charge',
+                        'timestamp': '2020-01-02 18:00:00 UTC'
+                    },
+                    'recipient_signature': 'QkJCQkJCQkJCQkJCQkJCQg==.ref 0.SIGNED'
+                    }
     PaymentObject.from_full_record(json_struct)
 
 

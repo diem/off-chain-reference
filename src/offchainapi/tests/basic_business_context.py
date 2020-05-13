@@ -77,11 +77,10 @@ class BasicBusinessContext(BusinessContext):
         '''
         myself = self.my_addr.as_str()
         ref_id = payment.reference_id
-        return KYCData(
-                    f'{{\n'
-                    f'  "payment_reference_id": "{myself}.{ref_id}.KYC",\n'
-                    f'  "type": "individual"\n'
-                    f'}}\n')
+        return KYCData({
+                    "payment_reference_id": f"{myself}.{ref_id}.KYC",
+                    "type": "individual"
+                })
 
     # ----- Settlement -----
 
