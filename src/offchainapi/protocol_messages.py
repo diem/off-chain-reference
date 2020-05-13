@@ -87,6 +87,7 @@ class CommandRequestObject(JSONSerializable):
     def __init__(self, command):
         self.seq = None          # The sequence in the local queue
         self.command_seq = None  # Only server sets this
+        self.signature = None
         self.command = command
         self.command_type = command.json_type()
 
@@ -138,16 +139,20 @@ class CommandRequestObject(JSONSerializable):
             "seq": self.seq,
             "command": self.command.get_json_data_dict(flag),
             "command_type": self.command_type
-            }
+        }
 
         self.add_object_type(data_dict)
 
         if self.command_seq is not None:
             data_dict["command_seq"] = self.command_seq
 
+        if self.signature is not None:
+            data_dict["signature"] = self.signature
+
         if flag == JSONFlag.STORE and self.response is not None:
             data_dict["response"] = self.response.get_json_data_dict(
-                JSONFlag.STORE)
+                JSONFlag.STORE
+            )
 
         if __debug__:
             import json
@@ -165,9 +170,12 @@ class CommandRequestObject(JSONSerializable):
             self.seq = int(data["seq"])
             if 'command_seq' in data:
                 self.command_seq = int(data['command_seq'])
+            if 'signature' in data:
+                self.signature = data["signature"]
             if flag == JSONFlag.STORE and 'response' in data:
                 self.response = CommandResponseObject.from_json_data_dict(
-                    data['response'], flag)
+                    data['response'], flag
+                )
             return self
         except Exception as e:
             raise JSONParsingError(*e.args)

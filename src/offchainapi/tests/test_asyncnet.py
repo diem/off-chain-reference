@@ -4,7 +4,7 @@ from ..business import BusinessNotAuthorized
 
 import pytest
 import aiohttp
-
+from ..crypto import ComplianceKey
 
 @pytest.fixture
 def tester_addr(three_addresses):
@@ -18,9 +18,13 @@ def testee_addr(three_addresses):
     return a0
 
 @pytest.fixture
-def net_handler(vasp):
-    vasp.info_context.is_authorised_VASP.return_value = True
-    vasp.info_context.get_base_url.return_value = '/'
+def key():
+    return ComplianceKey.generate()
+
+@pytest.fixture
+def net_handler(vasp, key):
+    vasp.info_context.get_peer_compliance_signature_key.return_value = key
+    vasp.info_context.get_peer_compliance_verification_key.return_value = key
     return Aionet(vasp)
 
 
@@ -47,7 +51,6 @@ async def server(net_handler, tester_addr, aiohttp_server, json_response):
 
 
 def test_init(vasp):
-    vasp.info_context.get_base_url.return_value = '/'
     Aionet(vasp)
 
 
@@ -58,17 +61,9 @@ async def test_handle_request_debug(client):
     assert 'Hello, world' in text
 
 
-async def test_handle_request(url, net_handler, aiohttp_client, json_request):
-    from ..crypto import ComplianceKey
+async def test_handle_request(url, net_handler, key, client, json_request):
     from json import dumps
-
-    key = ComplianceKey.generate()
     new_request = {'_signed': key.sign_message(dumps(json_request))}
-    net_handler.vasp.info_context.get_peer_compliance_signature_key.return_value = key
-    net_handler.vasp.info_context.get_peer_compliance_verification_key.return_value = key
-
-    client = await aiohttp_client(net_handler.app)
-
     response = await client.post(url, json=new_request)
     assert response.status == 200
     content = await response.json()
@@ -76,21 +71,10 @@ async def test_handle_request(url, net_handler, aiohttp_client, json_request):
 
 
 async def test_handle_request_business_not_authorised(vasp, url, json_request,
-                                                      aiohttp_client):
-    vasp.info_context.is_authorised_VASP.return_value = True
+                                                      client):
     vasp.business_context.open_channel_to.side_effect = BusinessNotAuthorized
-    net_handler = Aionet(vasp)
-    client = await aiohttp_client(net_handler.app)
     response = await client.post(url, json=json_request)
     assert response.status == 401
-
-
-async def test_handle_request_forbidden(vasp, url, json_request, aiohttp_client):
-    vasp.info_context.is_authorised_VASP.return_value = False
-    net_handler = Aionet(vasp)
-    client = await aiohttp_client(net_handler.app)
-    response = await client.post(url, json=json_request)
-    assert response.status == 403
 
 
 async def test_handle_request_bad_payload(client, url):
@@ -99,13 +83,8 @@ async def test_handle_request_bad_payload(client, url):
 
 
 async def test_send_request(net_handler, tester_addr, server, json_request):
-    from ..crypto import ComplianceKey
-    key = ComplianceKey.generate()
     base_url = f'http://{server.host}:{server.port}'
     net_handler.vasp.info_context.get_peer_base_url.return_value = base_url
-    net_handler.vasp.info_context.get_peer_compliance_signature_key.return_value = key
-    net_handler.vasp.info_context.get_peer_compliance_verification_key.return_value = key
-
     with pytest.raises(OffChainException):
         _ = await net_handler.send_request(tester_addr, json_request)
     # Raises since the vasp did not emit the command; so it does
@@ -113,12 +92,8 @@ async def test_send_request(net_handler, tester_addr, server, json_request):
 
 
 async def test_send_command(net_handler, tester_addr, server, command):
-    from ..crypto import ComplianceKey
-    key = ComplianceKey.generate()
     base_url = f'http://{server.host}:{server.port}'
     net_handler.vasp.info_context.get_peer_base_url.return_value = base_url
-    net_handler.vasp.info_context.get_peer_compliance_signature_key.return_value = key
-    net_handler.vasp.info_context.get_peer_compliance_verification_key.return_value = key
     req = net_handler.sequence_command(tester_addr, command)
     ret = await net_handler.send_request(tester_addr, req)
     assert ret

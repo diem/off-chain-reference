@@ -148,9 +148,9 @@ class Aionet:
         other_addr = LibraAddress(request.match_info['other_addr'])
         self.logger.debug(f'Request Received from {other_addr.as_str()}')
 
-        my_addr_str = self.vasp.get_vasp_address().as_str()
-        my_key = self.vasp.info_context.get_peer_compliance_signature_key(my_addr_str)
-        other_key = self.vasp.info_context.get_peer_compliance_verification_key(other_addr.as_str())
+        other_key = self.vasp.info_context.get_peer_compliance_verification_key(
+            other_addr.as_str()
+        )
 
         # Try to get a channel with the other VASP.
         try:
@@ -159,15 +159,6 @@ class Aionet:
             # Raised if the other VASP is not an authorised business.
             self.logger.debug(f'Not Authorized {e}')
             raise web.HTTPUnauthorized
-
-        # Verify that the other VASP is authorised to submit the request;
-        # ie. that 'other_addr' matches the certificate.
-        client_certificate = None
-        if not self.vasp.info_context.is_authorised_VASP(
-            client_certificate, other_addr
-        ):
-            self.logger.debug(f'Not Authorized')
-            raise web.HTTPForbidden
 
         # Perform the request, send back the reponse.
         try:
@@ -222,9 +213,13 @@ class Aionet:
         channel = self.vasp.get_channel(other_addr)
 
         # Get the crypto keys
-        my_addr_str = self.vasp.get_vasp_address().as_str()
-        my_key = self.vasp.info_context.get_peer_compliance_signature_key(my_addr_str)
-        other_key = self.vasp.info_context.get_peer_compliance_verification_key(other_addr.as_str())
+        my_addr = self.vasp.get_vasp_address()
+        my_key = self.vasp.info_context.get_peer_compliance_signature_key(
+            my_addr.as_str()
+        )
+        other_key = self.vasp.info_context.get_peer_compliance_verification_key(
+            other_addr.as_str()
+        )
 
         # Get the URLs
         base_url = self.vasp.info_context.get_peer_base_url(other_addr)
