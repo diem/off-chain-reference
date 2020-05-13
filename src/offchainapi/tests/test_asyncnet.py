@@ -4,7 +4,7 @@ from ..business import BusinessNotAuthorized
 
 import pytest
 import aiohttp
-from ..crypto import ComplianceKey
+import json
 
 @pytest.fixture
 def tester_addr(three_addresses):
@@ -17,9 +17,6 @@ def testee_addr(three_addresses):
     a0, _, _ = three_addresses
     return a0
 
-@pytest.fixture
-def key():
-    return ComplianceKey.generate()
 
 @pytest.fixture
 def net_handler(vasp, key):
@@ -39,9 +36,9 @@ async def client(net_handler, aiohttp_client):
 
 
 @pytest.fixture
-async def server(net_handler, tester_addr, aiohttp_server, json_response):
+async def server(net_handler, tester_addr, aiohttp_server, signed_json_response):
     async def handler(request):
-        return aiohttp.web.json_response(json_response)
+        return aiohttp.web.json_response(signed_json_response)
 
     app = aiohttp.web.Application()
     url = net_handler.get_url('/', tester_addr.as_str(), other_is_server=True)
@@ -61,17 +58,16 @@ async def test_handle_request_debug(client):
     assert 'Hello, world' in text
 
 
-async def test_handle_request(url, net_handler, key, client, json_request):
-    from json import dumps
-    new_request = {'_signed': key.sign_message(dumps(json_request))}
-    response = await client.post(url, json=new_request)
+async def test_handle_request(url, net_handler, key, client, signed_json_request):
+    #from json import dumps
+    response = await client.post(url, json=signed_json_request)
     assert response.status == 200
     content = await response.json()
+    content = json.loads(key.verify_message(content))
     assert content['status'] == 'success'
 
 
-async def test_handle_request_business_not_authorised(vasp, url, json_request,
-                                                      client):
+async def test_handle_request_not_authorised(vasp, url, json_request, client):
     vasp.business_context.open_channel_to.side_effect = BusinessNotAuthorized
     response = await client.post(url, json=json_request)
     assert response.status == 401
@@ -82,11 +78,11 @@ async def test_handle_request_bad_payload(client, url):
     assert response.status == 400
 
 
-async def test_send_request(net_handler, tester_addr, server, json_request):
+async def test_send_request(net_handler, tester_addr, server, signed_json_request):
     base_url = f'http://{server.host}:{server.port}'
     net_handler.vasp.info_context.get_peer_base_url.return_value = base_url
     with pytest.raises(OffChainException):
-        _ = await net_handler.send_request(tester_addr, json_request)
+        _ = await net_handler.send_request(tester_addr, signed_json_request)
     # Raises since the vasp did not emit the command; so it does
     # not expect a response.
 

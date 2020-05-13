@@ -7,6 +7,7 @@ from ..protocol_messages import CommandRequestObject, OffChainProtocolError, \
 from ..payment_logic import PaymentCommand, PaymentProcessor
 from ..status_logic import Status
 from ..storage import StorableFactory
+from ..crypto import ComplianceKey
 
 import json
 
@@ -34,16 +35,18 @@ class sample_vasp_info(VASPInfo):
         each_peer_base_url = {
             peerA_addr: 'https://peerA.com',
         }
-
         self.each_peer_base_url = each_peer_base_url
-        pass
+        self.key = ComplianceKey.generate()
 
     def get_peer_base_url(self, other_addr):
         assert other_addr.as_str() in self.each_peer_base_url
         return self.each_peer_base_url[other_addr.as_str()]
 
-    def is_authorised_VASP(self, certificate, other_addr):
-        return True
+    def get_peer_compliance_verification_key(self, other_addr):
+        return self.key
+
+    def get_peer_compliance_signature_key(self, my_addr):
+        return self.key
 
 
 class sample_business(BusinessContext):
@@ -60,7 +63,7 @@ class sample_business(BusinessContext):
         for acc in self.accounts_db:
             if acc['account'] ==  subaddress:
                 return acc
-        raise BusinessValidationFailure('Account %s does not exist' % subaddress)
+        raise BusinessValidationFailure(f'Account {subaddress} does not exist')
 
     def assert_payment_for_vasp(self, payment):
         sender = payment.sender
@@ -268,10 +271,10 @@ class sample_vasp:
             assert len(channel.executor.object_store) > 0
         channel.sequence_command_local(command)
 
-    def process_response(self, other_vasp, request_json):
+    def process_response(self, other_vasp, response_json):
         channel = self.get_channel(other_vasp)
         try:
-            channel.parse_handle_response(request_json, encoded=True)
+            channel.parse_handle_response(response_json)
         except OffChainProtocolError:
             pass
         except OffChainException:
