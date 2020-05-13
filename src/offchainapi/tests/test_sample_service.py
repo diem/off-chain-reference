@@ -87,9 +87,12 @@ def vasp(my_addr):
 
 @pytest.fixture
 def json_request(my_addr, other_addr, payment_action):
-    sender = PaymentActor(my_addr.as_str(), my_addr.as_str(), Status.none, [])
+    sub_sender = LibraSubAddress.encode(my_addr.decoded_address, b'a'*8)
+    sub_receiver = LibraSubAddress.encode(other_addr.decoded_address, b'b'*8)
+
+    sender = PaymentActor(my_addr.as_str(), sub_sender.as_str(), Status.none, [])
     receiver = PaymentActor(
-        other_addr.as_str(), other_addr.as_str(), Status.none, []
+        other_addr.as_str(), sub_receiver.as_str(), Status.none, []
     )
     ref = f'{other_addr.as_str()}_XYZ'
     payment = PaymentObject(
