@@ -148,10 +148,6 @@ class Aionet:
         other_addr = LibraAddress(request.match_info['other_addr'])
         self.logger.debug(f'Request Received from {other_addr.as_str()}')
 
-        #other_key = self.vasp.info_context.get_peer_compliance_verification_key(
-        #    other_addr.as_str()
-        #)
-
         # Try to get a channel with the other VASP.
         try:
             channel = self.vasp.get_channel(other_addr)
@@ -206,12 +202,6 @@ class Aionet:
 
         # Try to get a channel with the other VASP.
         channel = self.vasp.get_channel(other_addr)
-
-        # Get the crypto keys
-        my_addr = self.vasp.get_vasp_address()
-        my_key = self.vasp.info_context.get_peer_compliance_signature_key(
-            my_addr.as_str()
-        )
 
         # Get the URLs
         base_url = self.vasp.info_context.get_peer_base_url(other_addr)
