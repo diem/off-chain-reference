@@ -41,7 +41,9 @@ class SimpleVASPInfo(VASPInfo):
         return peer_address[other_addr.as_str()]
 
     def get_peer_compliance_verification_key(self, other_addr):
-        return peer_keys[other_addr]
+        key = ComplianceKey.from_str(peer_keys[other_addr].export_pub())
+        assert not key._key.has_private
+        return key
 
     def get_peer_compliance_signature_key(self, my_addr):
         return peer_keys[my_addr]

@@ -36,17 +36,19 @@ class sample_vasp_info(VASPInfo):
             peerA_addr: 'https://peerA.com',
         }
         self.each_peer_base_url = each_peer_base_url
-        self.key = ComplianceKey.generate()
+        self.my_key = ComplianceKey.generate()
+        self.other_key = ComplianceKey.from_str(self.my_key.export_pub())
 
     def get_peer_base_url(self, other_addr):
         assert other_addr.as_str() in self.each_peer_base_url
         return self.each_peer_base_url[other_addr.as_str()]
 
     def get_peer_compliance_verification_key(self, other_addr):
-        return self.key
+        assert not self.other_key._key.has_private
+        return self.other_key
 
     def get_peer_compliance_signature_key(self, my_addr):
-        return self.key
+        return self.my_key
 
 
 class sample_business(BusinessContext):
