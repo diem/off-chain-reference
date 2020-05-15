@@ -75,12 +75,12 @@ def start_thread_main(vasp, loop):
     print('VASP loop exit...')
 
 
-def make_new_VASP(Peer_addr, port):
+def make_new_VASP(Peer_addr, port, reliable=True):
     VASPx = Vasp(
         Peer_addr,
         host='localhost',
         port=port,
-        business_context=BasicBusinessContext(Peer_addr),
+        business_context=BasicBusinessContext(Peer_addr, reliable=reliable),
         info_context=SimpleVASPInfo(Peer_addr),
         database={})
 
@@ -93,7 +93,7 @@ def make_new_VASP(Peer_addr, port):
 
 async def main_perf(messages_num=10, wait_num=0, verbose=False):
     VASPa, loopA, tA = make_new_VASP(PeerA_addr, port=8091)
-    VASPb, loopB, tB = make_new_VASP(PeerB_addr, port=8092)
+    VASPb, loopB, tB = make_new_VASP(PeerB_addr, port=8092, reliable=False)
 
     await asyncio.sleep(2.0)
     while len(global_dir) != 2:
@@ -130,35 +130,35 @@ async def main_perf(messages_num=10, wait_num=0, verbose=False):
             return_exceptions=True)
         return res
 
-    async def wait_for_all_payment_outcome(nodeA, payments):
+    async def wait_for_all_payment_outcome(nodeA, payments, results):
         res = await asyncio.gather(
-            *[nodeA.wait_for_payment_outcome_async(p.reference_id) for p in payments],
+            *[nodeA.wait_for_payment_outcome_async(p.reference_id) for p,r in zip(payments,results)],
             return_exceptions=True)
         return res
 
     # Execute 100 requests
     print('Inject commands')
     s = time.perf_counter()
-    res = asyncio.run_coroutine_threadsafe(send100(VASPa, commands), loopA)
-    res = res.result()
-    for results in res:
-        print('RES:', results)
+    results = asyncio.run_coroutine_threadsafe(send100(VASPa, commands), loopA)
+    results = results.result()
+    for res in results:
+        print('RES:', res)
     elapsed = (time.perf_counter() - s)
 
     print('Wait for all payments too have an outcome')
     outcomes = asyncio.run_coroutine_threadsafe(
-        wait_for_all_payment_outcome(VASPa, payments), loopA)
+        wait_for_all_payment_outcome(VASPa, payments, results), loopA)
     outcomes = outcomes.result()
-    for out in outcomes:
-        try:
+    for out, res in zip(outcomes, results):
+        if not isinstance(out, Exception):
             print('OUT OK:', out.sender.status, out.receiver.status)
-        except Exception as e:
-            print('OUT NOTOK:', out, e)
+        else:
+            print('OUT NOTOK:', str(out))
 
     print('All payments done.')
 
     # Print some statistics
-    success_number = sum([1 for r in res if r])
+    success_number = sum([1 for r in results if type(r) == bool and r])
     print(f'Commands executed in {elapsed:0.2f} seconds.')
     print(f'Success #: {success_number}/{len(commands)}')
 

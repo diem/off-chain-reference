@@ -41,6 +41,10 @@ class BasicBusinessContext(BusinessContext):
         recepient = payment.receiver.address
         ref_id = payment.reference_id
         expected_signature = f'{recepient}.{ref_id}.SIGNED'
+
+        if not self.reliable:
+            self.cause_error()
+
         return payment.recipient_signature == expected_signature
 
     async def get_recipient_signature(self, payment):

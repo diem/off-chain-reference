@@ -149,11 +149,22 @@ class PaymentProcessor(CommandProcessor):
 
         # If this is our own command, that just failed, we should update
         # the outcome:
-        if command.origin != other_address:
-            assert False
-            self.set_payment_outcome_exception(
-                            command.reference_id,
-                            PaymentProcessorRemoteError())
+        try:
+            if command.origin != other_address:
+                self.logger.error(
+                f'Command with {other_address.as_str()}.#{seq}'
+                f' Trigger outcome.')
+
+                # try to constuct a payment.
+                payment = command.get_payment(self.object_store)
+                self.set_payment_outcome_exception(
+                                payment.reference_id,
+                                PaymentProcessorRemoteError(error))
+        except Exception:
+            self.logger.error(
+                f'Command with {other_address.as_str()}.#{seq}'
+                f' Cannot recover payment or reference_id'
+            )
 
         return
 
