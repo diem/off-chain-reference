@@ -13,6 +13,14 @@ import logging
 import json
 
 
+class PaymentProcessorNoProgress(Exception):
+    pass
+
+
+class PaymentProcessorRemoteError(Exception):
+    pass
+
+
 class PaymentProcessor(CommandProcessor):
     ''' The logic to process a payment from either side.
 
@@ -138,6 +146,15 @@ class PaymentProcessor(CommandProcessor):
             f'Command with {other_address.as_str()}.#{seq}'
             f' Failure: {error}'
         )
+
+        # If this is our own command, that just failed, we should update
+        # the outcome:
+        if command.origin != other_address:
+            assert False
+            self.set_payment_outcome_exception(
+                            command.reference_id,
+                            PaymentProcessorRemoteError())
+
         return
 
     async def process_command_success_async(self, other_address, command, seq):
@@ -202,6 +219,16 @@ class PaymentProcessor(CommandProcessor):
 
                     # Attempt to send it to the other VASP.
                     await self.net.send_request(other_address, request)
+                else:
+                    # Signal to anyone waiting that progress was not made
+                    # despite being our turn to make progress. As a result
+                    # some extra processing should be done until progress
+                    # can be made. Note that if the payment is already done
+                    # (as in settled/abort) we have set an outcome for it,
+                    # and this will be a no-op.
+                    self.set_payment_outcome_exception(
+                        payment.reference_id,
+                        PaymentProcessorNoProgress())
 
             # If we are here we are done with this obligation.
             with self.storage_factory.atomic_writes():
@@ -271,6 +298,20 @@ class PaymentProcessor(CommandProcessor):
             fut.set_result(payment)
         return
 
+    def set_payment_outcome_exception(self, reference_id, payment_exception):
+        # Check if anyone is waiting for this payment.
+        if reference_id not in self.outcome_futures:
+            return
+
+        # Get the futures waiting for an outcome, and delete them
+        # from the list of pending futures.
+        outcome_futures = self.outcome_futures[reference_id]
+        del self.outcome_futures[reference_id]
+
+        # Update the outcome for each of the futures.
+        for fut in outcome_futures:
+            fut.set_exception(payment_exception)
+        return
 
     # -------- Implements CommandProcessor interface ---------
 
@@ -615,8 +656,14 @@ class PaymentProcessor(CommandProcessor):
             # We cannot abort once we said we are ready_for_settlement
             # or beyond. However we will catch a wrong change in the
             # check when we change status.
+            new_payment = payment.new_version()
             if self.can_change_status(payment, Status.abort, is_sender):
                 current_status = Status.abort
+
+        except Exception as e:
+            new_payment = payment.new_version()
+            new_payment.data[role].add_metadata(f'Error ({role}): {str(e)}')
+            current_status = payment.data[role].status
 
         # Do an internal consistency check:
         if not self.can_change_status(payment, current_status, is_sender):

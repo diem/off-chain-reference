@@ -127,13 +127,13 @@ async def main_perf(messages_num=10, wait_num=0, verbose=False):
     async def send100(nodeA, commands):
         res = await asyncio.gather(
             *[nodeA.new_command_async(VASPb.my_addr, cmd) for cmd in commands],
-            return_exceptions=False)
+            return_exceptions=True)
         return res
 
     async def wait_for_all_payment_outcome(nodeA, payments):
         res = await asyncio.gather(
             *[nodeA.wait_for_payment_outcome_async(p.reference_id) for p in payments],
-            return_exceptions=False)
+            return_exceptions=True)
         return res
 
     # Execute 100 requests
@@ -141,6 +141,8 @@ async def main_perf(messages_num=10, wait_num=0, verbose=False):
     s = time.perf_counter()
     res = asyncio.run_coroutine_threadsafe(send100(VASPa, commands), loopA)
     res = res.result()
+    for results in res:
+        print('RES:', results)
     elapsed = (time.perf_counter() - s)
 
     print('Wait for all payments too have an outcome')
@@ -148,7 +150,11 @@ async def main_perf(messages_num=10, wait_num=0, verbose=False):
         wait_for_all_payment_outcome(VASPa, payments), loopA)
     outcomes = outcomes.result()
     for out in outcomes:
-        print(out.sender.status, out.receiver.status)
+        try:
+            print('OUT OK:', out.sender.status, out.receiver.status)
+        except Exception as e:
+            print('OUT NOTOK:', out, e)
+
     print('All payments done.')
 
     # Print some statistics

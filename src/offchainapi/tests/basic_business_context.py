@@ -1,12 +1,23 @@
-from ..business import BusinessContext
+from ..business import BusinessContext, BusinessValidationFailure
 from ..payment import KYCData
 from ..status_logic import Status
 
 
 class BasicBusinessContext(BusinessContext):
 
-    def __init__(self, my_addr):
+    def __init__(self, my_addr, reliable=True):
         self.my_addr = my_addr
+
+        # Option to make the contect unreliable to
+        # help test error handling.
+        self.reliable = reliable
+        self.reliable_count = 0
+
+    def cause_error(self):
+        self.reliable_count += 1
+        fail = (self.reliable_count % 5 == 0)
+        if fail:
+            raise BusinessValidationFailure()
 
     def open_channel_to(self, other_vasp_info):
         return True
@@ -95,6 +106,9 @@ class BasicBusinessContext(BusinessContext):
     # ----- Settlement -----
 
     async def ready_for_settlement(self, payment):
+        if not self.reliable:
+            self.cause_error()
+
         return (await self.next_kyc_level_to_request(payment)) is None
 
     async def has_settled(self, payment):
