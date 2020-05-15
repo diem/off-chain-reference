@@ -225,7 +225,7 @@ class PaymentProcessor(CommandProcessor):
 
         # Ensure that the two parties involved are in the VASP channel
         parties = set([
-            new_payment.sender.address,
+            new_payment.sender.address, # get_address().as_str(),
             new_payment.receiver.address
         ])
 
@@ -381,6 +381,18 @@ class PaymentProcessor(CommandProcessor):
         business = self.business
         is_receipient = business.is_recipient(new_payment)
         is_sender = not is_receipient
+
+        # Ensure address and subaddress are consistent
+        sender_addr = LibraAddress(new_payment.sender.address)
+        sender_subaddr = LibraAddress(new_payment.sender.subaddress)
+        recv_addr = LibraAddress(new_payment.receiver.address)
+        recv_subaddr = LibraAddress(new_payment.receiver.subaddress)
+
+        if sender_subaddr.onchain() != sender_addr or \
+                recv_subaddr.onchain() != recv_addr:
+            raise PaymentLogicError(
+                'Address and subaddress mismatch.'
+            )
 
         role = ['sender', 'receiver'][is_receipient]
         other_role = ['sender', 'receiver'][is_sender]

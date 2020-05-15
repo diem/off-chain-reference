@@ -13,7 +13,7 @@ import json
 
 business_config = """[
     {
-        "account": "1",
+        "account": "xxxxxxxx",
         "balance": 10.0,
         "entity": false,
         "kyc_data" : "{ 'name' : 'Alice' }",
@@ -61,7 +61,7 @@ class sample_business(BusinessContext):
 
     def get_account(self, subaddress):
         for acc in self.accounts_db:
-            if acc['account'] ==  subaddress:
+            if acc['account'] == subaddress:
                 return acc
         raise BusinessValidationFailure(f'Account {subaddress} does not exist')
 
@@ -69,8 +69,8 @@ class sample_business(BusinessContext):
         sender = payment.sender
         receiver = payment.receiver
 
-        if sender.address == self.get_address() or \
-            receiver.address == self.get_address():
+        if sender.get_address().as_str() == self.get_address() or \
+            receiver.get_address().as_str() == self.get_address():
             return
         raise BusinessValidationFailure()
 
@@ -89,11 +89,14 @@ class sample_business(BusinessContext):
     async def check_account_existence(self, payment):
         self.assert_payment_for_vasp(payment)
         accounts = {acc['account'] for acc in self.accounts_db}
+
         if self.is_sender(payment):
-            if payment.sender.subaddress in accounts:
+            sub = LibraAddress(payment.sender.subaddress).get_subaddress_bytes().decode('ascii')
+            if sub in accounts:
                 return
         else:
-            if payment.receiver.subaddress in accounts:
+            sub = LibraAddress(payment.receiver.subaddress).get_subaddress_bytes().decode('ascii')
+            if sub in accounts:
                 return
         raise BusinessForceAbort('Subaccount does not exist.')
 
@@ -125,7 +128,9 @@ class sample_business(BusinessContext):
         other_role = self.get_other_role(payment)
 
         subaddress = payment.data[my_role].subaddress
-        account = self.get_account(subaddress)
+
+        sub = LibraAddress(subaddress).get_subaddress_bytes().decode('ascii')
+        account = self.get_account(sub)
 
         if account['entity']:
             return { Status.needs_kyc_data }
@@ -146,7 +151,9 @@ class sample_business(BusinessContext):
         my_role = self.get_my_role(payment)
         other_role = self.get_other_role(payment)
         subaddress = payment.data[my_role].subaddress
-        account = self.get_account(subaddress)
+
+        sub = LibraAddress(subaddress).get_subaddress_bytes().decode('ascii')
+        account = self.get_account(sub)
 
         if account['entity']:
             # Put the money aside for this payment ...
@@ -168,14 +175,18 @@ class sample_business(BusinessContext):
         '''
         my_role = self.get_my_role(payment)
         subaddress = payment.data[my_role].subaddress
-        account = self.get_account(subaddress)
+
+        sub = LibraAddress(subaddress).get_subaddress_bytes().decode('ascii')
+        account = self.get_account(sub)
         return account["kyc_data"]
 
     async def ready_for_settlement(self, payment):
         my_role = self.get_my_role(payment)
         other_role = self.get_other_role(payment)
         subaddress = payment.data[my_role].subaddress
-        account = self.get_account(subaddress)
+
+        sub = LibraAddress(subaddress).get_subaddress_bytes().decode('ascii')
+        account = self.get_account(sub)
 
         if my_role == 'sender':
             reference = payment.reference_id
@@ -220,7 +231,8 @@ class sample_business(BusinessContext):
             my_role = self.get_my_role(payment)
             subaddress = payment.data[my_role].subaddress
 
-            account = self.get_account(subaddress)
+            sub = LibraAddress(subaddress).get_subaddress_bytes().decode('ascii')
+            account = self.get_account(sub)
             reference = payment.reference_id
 
             if reference not in account['pending_transactions']:

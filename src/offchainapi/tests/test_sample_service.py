@@ -25,7 +25,8 @@ def business_and_processor(three_addresses, store):
 @pytest.fixture
 def payment_as_receiver(three_addresses, sender_actor, payment_action):
     _, _, a0 = three_addresses
-    receiver = PaymentActor(a0.as_str(), '1', Status.none, [])
+    subaddr = LibraAddress.encode(a0.decoded_address, b'x'*8)
+    receiver = PaymentActor(a0.as_str(), subaddr.as_str(), Status.none, [])
     return PaymentObject(
         sender_actor, receiver, 'ref', 'orig_ref', 'desc', payment_action
     )
@@ -51,7 +52,8 @@ def settled_payment_as_receiver(kyc_payment_as_receiver):
 @pytest.fixture
 def payment_as_sender(three_addresses, receiver_actor, payment_action):
     _, _, a0 = three_addresses
-    sender = PaymentActor(a0.as_str(), '1', Status.none, [])
+    subaddr = LibraAddress.encode(a0.decoded_address, b'x'*8)
+    sender = PaymentActor(a0.as_str(), subaddr.as_str(), Status.none, [])
     return PaymentObject(
         sender, receiver_actor, 'ref', 'orig_ref', 'desc', payment_action
     )
@@ -172,7 +174,7 @@ def test_business_is_kyc_provided_sender(business_and_processor, kyc_payment_as_
     ready = proc.loop.run_until_complete(bc.ready_for_settlement(ret_payment))
     assert ready
     assert ret_payment.data['sender'].data['status'] == Status.ready_for_settlement
-    assert bc.get_account('1')['balance'] == 5.0
+    assert bc.get_account('x'*8)['balance'] == 5.0
 
 
 def test_vasp_simple(json_request, vasp, other_addr, loop):

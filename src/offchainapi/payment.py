@@ -3,6 +3,7 @@ from .utils import StructureException, StructureChecker, \
     JSONSerializable
 from .shared_object import SharedObject
 from .status_logic import Status
+from .libra_address import LibraAddress
 
 import json
 
@@ -81,6 +82,9 @@ class PaymentActor(StructureChecker):
             'status': status,
             'metadata': metadata
         })
+
+    def get_address(self):
+        return LibraAddress(self.subaddress).onchain()
 
     def custom_update_checks(self, diff):
         """ Override StructureChecker. """
