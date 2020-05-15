@@ -395,10 +395,6 @@ The `KYCDataObject` is serialized as a string and contained in the `blob` attrib
         "legal_entity_name": "Superstore",
     }
 
-
-* **payment_reference_id (string)**
-Reference_id of this payment. Used to prevent signature replays.
-
 * **payload_type (string)**
 Used to help determine what type of data this will deserialize into.  Always set to KYC_DATA.
 

@@ -34,7 +34,7 @@ def test_kyc_data_missing_payment_reference_fail():
 
 def test_kyc_data_missing_type_fail():
     with pytest.raises(StructureException):
-        kyc_dict = {"payment_reference_id": "1234"}
+        kyc_dict = {"some_random_field": "1234"}
         kyc_data = KYCData(kyc_dict)
 
 
@@ -103,7 +103,6 @@ def test_payment_actor_update_kyc(sender_actor, kyc_data):
 
 def test_full_kyc_info():
     full_kyc = {
-            "payment_reference_id": "ID",
             "payload_type": "KYC_DATA",
             "payload_version": 1,
             "type": "individual",
@@ -161,7 +160,6 @@ def test_specific():
                         'status': 'settled',
                         'metadata': [],
                         'kyc_data': {
-                            "payment_reference_id": "QUFBQUFBQUFBQUFBQUFBQQ==.ref 0.KYC",
                             "type": "individual"}
                         },
                     'receiver': {
@@ -170,7 +168,6 @@ def test_specific():
                         'status': 'needs_kyc_data',
                         'metadata': [],
                         'kyc_data': {
-                            "payment_reference_id": "QkJCQkJCQkJCQkJCQkJCQg==.ref 0.KYC",
                             "type": "individual"
                             }
                     },

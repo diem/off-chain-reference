@@ -15,7 +15,6 @@ class KYCData(StructureChecker):
     """
 
     fields = [
-        ("payment_reference_id", str, OPTIONAL, WRITE_ONCE),
         ("payload_type", str, OPTIONAL, WRITE_ONCE),
         ("payload_version", int, OPTIONAL, WRITE_ONCE),
         ("type", str, OPTIONAL, WRITE_ONCE),
@@ -47,9 +46,6 @@ class KYCData(StructureChecker):
 
         # Check all data is JSON serializable
         json.dumps(diff)
-
-        if 'payment_reference_id' not in diff:
-            raise StructureException('Missing: field payment_reference_id')
 
         types = ['individual', 'entity']
         if 'type' not in diff:
