@@ -99,9 +99,12 @@ If the result is 1, the higher parent address is used as the server side.
 
 By convention the _server_ always determines the sequence of a request in the joint command sequence. When the server creates a `CommandRequestObject` it already assigns it a `command_seq` in the joint sequence of commands. When it responds to requests from the client, its `CommandResponseObject` contains a `command_seq` for the request into the joint command sequence. The protocol client never assigns a `command_seq`, but includes one provided by the protocol server in its responses.
 
+### Message signatures.
+ All `CommandRequestObject` and `CommandResponseObject` messages are signed with the VASP's compliance key. Signatures are EdDSA (curve Ed25519) based on the [JWCrypto Library](https://jwcrypto.readthedocs.io/en/latest/index.html). 
+
 ### `CommandRequestObject` messages.
 
-VASPs define and operate on shared objects, and specifically PaymentObjects, through commands. Those commands are sequenced through the request-response protocol. A VASP that initiates a command packages it within a `CommandRequestObject`, sends it to the other VASP, and expects a response.
+VASPs define and operate on shared objects, and specifically PaymentObjects, through commands. Those commands are sequenced through the request-response protocol. A VASP that initiates a command packages it within a `CommandRequestObject`, signs and sends it to the other VASP, and expects a response (signed by the other VASP).
 
 Multiple requests can be in-flight and pipelined, without the need to wait for previous ones to get a response. However, both requests and responses will be processed by VASPs in a specific order to ensure consistency (see the end of this section for details).
 
