@@ -148,10 +148,6 @@ class Aionet:
         other_addr = LibraAddress(request.match_info['other_addr'])
         self.logger.debug(f'Request Received from {other_addr.as_str()}')
 
-        #other_key = self.vasp.info_context.get_peer_compliance_verification_key(
-        #    other_addr.as_str()
-        #)
-
         # Try to get a channel with the other VASP.
         try:
             channel = self.vasp.get_channel(other_addr)
@@ -207,17 +203,10 @@ class Aionet:
         # Try to get a channel with the other VASP.
         channel = self.vasp.get_channel(other_addr)
 
-        # Get the crypto keys
-        my_addr = self.vasp.get_vasp_address()
-        my_key = self.vasp.info_context.get_peer_compliance_signature_key(
-            my_addr.as_str()
-        )
-
         # Get the URLs
         base_url = self.vasp.info_context.get_peer_base_url(other_addr)
         url = self.get_url(base_url, other_addr.as_str(), other_is_server=True)
         self.logger.debug(f'Sending post request to {url}')
-
         try:
             async with self.session.post(url, json=json_request) as response:
                 try:
@@ -242,6 +231,11 @@ class Aionet:
                     self.logger.debug(f'Exception {type(e)}: {str(e)}')
                     raise e
         except ClientError as e:
+            self.logger.debug(f'ClientError {type(e)}: {str(e)}')
+            raise NetworkException(e)
+
+        except aiohttp.ClientSSLError as e:
+            self.logger.debug(f'ClientSSLError {type(e)}: {str(e)}')
             raise NetworkException(e)
 
     def sequence_command(self, other_addr, command):

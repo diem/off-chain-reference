@@ -121,7 +121,6 @@ def simple_response_json_error(request, key):
         resp.error = OffChainError(protoerr, errcode)
     json_obj = resp.get_json_data_dict(JSONFlag.NET)
     signed_json = key.sign_message(json.dumps(json_obj))
-    print(f'HERE -2: {signed_json}')
     return signed_json
 
 
@@ -180,7 +179,7 @@ def test_vasp_simple(json_request, vasp, other_addr, loop):
     net = AsyncMock(Aionet)
     vasp.pp.set_network(net)
 
-    key = vasp.info_context.get_peer_compliance_verification_key(other_addr)
+    key = vasp.info_context.get_peer_compliance_signature_key(other_addr)
     signed_json_request = key.sign_message(json.dumps(json_request))
     vasp.process_request(other_addr, signed_json_request)
     requests = vasp.collect_messages()
@@ -200,7 +199,7 @@ def test_vasp_simple_wrong_VASP(json_request, other_addr, loop, key):
     vasp = sample_vasp(my_addr)
     vasp.pp.loop = loop
 
-    key = vasp.info_context.get_peer_compliance_verification_key(other_addr)
+    key = vasp.info_context.get_peer_compliance_signature_key(other_addr)
     signed_json_request = key.sign_message(json.dumps(json_request))
 
     try:
@@ -217,5 +216,4 @@ def test_vasp_simple_wrong_VASP(json_request, other_addr, loop, key):
 
 
 def test_vasp_response(simple_response_json_error, vasp, other_addr):
-    print(f'here -1: {simple_response_json_error}')
     vasp.process_response(other_addr, simple_response_json_error)

@@ -270,7 +270,23 @@ class VASPInfo:
         raise NotImplementedError()  # pragma: no cover
 
     def get_peer_compliance_verification_key(self, other_addr):
+        """ Returns the compliance verfication key of the other VASP.
+
+        Args:
+            other_addr (LibraAddress): The address of the other VASP.
+
+        Returns:
+            ComplianceKey: The compliance verification key of the other VASP.
+        """
         raise NotImplementedError()  # pragma: no cover
 
     def get_peer_compliance_signature_key(self, my_addr):
+        """ Returns the compliance signature (secret) key of the VASP.
+
+        Args:
+            my_addr (LibraAddress): The Libra address of the VASP.
+
+        Returns:
+            ComplianceKey: The compliance key of the VASP.
+        """
         raise NotImplementedError()  # pragma: no cover

@@ -1,13 +1,21 @@
 from jwcrypto import jwk, jws
 import json
 
+
 class OffChainInvalidSignature(Exception):
     pass
+
 
 class ComplianceKey:
 
     def __init__(self, key):
         self._key = key
+
+    def get_public(self):
+        return self._key.get_op_key('verify')
+
+    def get_private(self):
+        return self._key.get_op_key('sign')
 
     @staticmethod
     def generate():
@@ -19,6 +27,19 @@ class ComplianceKey:
     def from_str(data):
         key = jwk.JWK(**json.loads(data))
         return ComplianceKey(key)
+
+    @staticmethod
+    def from_pem(filename, password=None):
+        raise NotImplementedError
+        #with open(filename, 'rb') as pemfile:
+        #    return jwk.JWK.from_pem(pemfile.read(), password=password)
+
+    def to_pem(self, filename, private_key=False, password=None):
+        data = self._key.export_to_pem(
+            private_key=private_key, password=password
+        )
+        with open(filename, 'wb') as pemfile:
+            pemfile.write(data)
 
     def export_pub(self):
         return self._key.export_public()
