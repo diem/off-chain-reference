@@ -207,7 +207,6 @@ class Aionet:
         base_url = self.vasp.info_context.get_peer_base_url(other_addr)
         url = self.get_url(base_url, other_addr.as_str(), other_is_server=True)
         self.logger.debug(f'Sending post request to {url}')
-
         try:
             async with self.session.post(url, json=json_request) as response:
                 try:
@@ -232,6 +231,11 @@ class Aionet:
                     self.logger.debug(f'Exception {type(e)}: {str(e)}')
                     raise e
         except ClientError as e:
+            self.logger.debug(f'ClientError {type(e)}: {str(e)}')
+            raise NetworkException(e)
+
+        except aiohttp.ClientSSLError as e:
+            self.logger.debug(f'ClientSSLError {type(e)}: {str(e)}')
             raise NetworkException(e)
 
     def sequence_command(self, other_addr, command):
