@@ -8,6 +8,7 @@ from ..payment import PaymentAction, PaymentActor, PaymentObject
 from ..asyncnet import Aionet
 from ..core import Vasp
 from ..crypto import ComplianceKey
+from .basic_business_context import BasicBusinessContext
 
 import logging
 import json
@@ -64,7 +65,7 @@ def load_configs(configs_path):
     return configs
 
 
-def run_server(my_configs_path, other_configs_path):
+def run_server(my_configs_path, other_configs_path, num_of_commands=10, loop=None):
     ''' Run the VASP as server (do not send commands).
 
     The arguments <my_configs_path> and <other_configs_path> are paths to
@@ -79,6 +80,7 @@ def run_server(my_configs_path, other_configs_path):
     my_configs = load_configs(my_configs_path)
     other_configs = load_configs(other_configs_path)
     my_addr = my_configs['addr']
+    other_addr = other_configs['addr']
 
     # Create VASP.
     vasp = Vasp(
@@ -95,12 +97,22 @@ def run_server(my_configs_path, other_configs_path):
 
     # Run VASP services.
     vasp.logger.info(f'Running VASP {my_addr.as_str()}.')
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_event_loop() if loop is None else loop
     vasp.start_services(loop)
     vasp.logger.info(f'VASP services are running on port {vasp.port}.')
 
+    def stop_server(vasp):
+        channel = vasp.vasp.get_channel(other_addr)
+        requests = len(channel.other_requests)
+        while requests < num_of_commands:
+            requests = len(channel.other_requests)
+            time.sleep(0.1)
+        vasp.close()
+    Thread(target=stop_server, args=(vasp,)).start()
+
     try:
         loop.run_forever()
+
     finally:
         loop.run_until_complete(loop.shutdown_asyncgens())
         loop.close()
@@ -135,7 +147,7 @@ def run_client(my_configs_path, other_configs_path, num_of_commands=10, port=0):
         my_addr,
         host='0.0.0.0',
         port=my_configs['port'],
-        business_context=AsyncMock(spec=BusinessContext),
+        business_context=BasicBusinessContext(my_addr),
         info_context=SimpleVASPInfo(my_configs, other_configs, port),
         database={}
     )
