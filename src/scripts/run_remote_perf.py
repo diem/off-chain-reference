@@ -20,8 +20,6 @@ if __name__ == '__main__':
         other_configs_path = 'test_config_B.json'
         num_of_commands = 10
         loop = asyncio.get_event_loop()
-        #remote_benchmark.run_server(my_configs_path, other_configs_path)
-        #remote_benchmark.run_client(my_configs_path, other_configs_path)
         server = Thread(
             target=remote_benchmark.run_server,
             args=(my_configs_path, other_configs_path, num_of_commands, loop)
