@@ -67,17 +67,15 @@ class PaymentActor(StructureChecker):
     """
 
     fields = [
-        ('address', str, REQUIRED, WRITE_ONCE),
         ('subaddress', str, REQUIRED, WRITE_ONCE),
         ('kyc_data', KYCData, OPTIONAL, WRITE_ONCE),
         ('status', Status, REQUIRED, UPDATABLE),
         ('metadata', list, REQUIRED, UPDATABLE)
     ]
 
-    def __init__(self, address, subaddress, status, metadata):
+    def __init__(self, subaddress, status, metadata):
         StructureChecker.__init__(self)
         self.update({
-            'address': address,
             'subaddress': subaddress,
             'status': status,
             'metadata': metadata

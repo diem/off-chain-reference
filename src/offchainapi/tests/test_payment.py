@@ -67,23 +67,19 @@ def test_payment_action_creation():
 
 
 def test_payment_actor_creation():
-    actor = PaymentActor('ABCD', 'XYZ', Status.none, [])
-
-    with pytest.raises(StructureException):
-        # Bad address type
-        _ = PaymentActor(0, 'XYZ', Status.none, [])
+    actor = PaymentActor('XYZ', Status.none, [])
 
     with pytest.raises(StructureException):
         # Bad subaddress type
-        _ = PaymentActor('ABCD', 0, Status.none, [])
+        _ = PaymentActor(0, Status.none, [])
 
     with pytest.raises(StructureException):
         # Bad status type
-        _ = PaymentActor('ABCD', 'XYZ', 0, [])
+        _ = PaymentActor('XYZ', 0, [])
 
     with pytest.raises(StructureException):
         # Bad metadata type
-        _ = PaymentActor('ABCD', 'XYZ', Status.none, 0)
+        _ = PaymentActor('XYZ', Status.none, 0)
 
 
 def test_payment_actor_update_status(sender_actor):
@@ -155,7 +151,6 @@ def test_payment_object_update(payment):
 def test_specific():
     json_struct = {
                     'sender': {
-                        'address': 'QUFBQUFBQUFBQUFBQUFBQQ==',
                         'subaddress': 'aaaa',
                         'status': 'settled',
                         'metadata': [],
@@ -163,7 +158,6 @@ def test_specific():
                             "type": "individual"}
                         },
                     'receiver': {
-                        'address': 'QkJCQkJCQkJCQkJCQkJCQg==',
                         'subaddress': 'bbbb',
                         'status': 'needs_kyc_data',
                         'metadata': [],

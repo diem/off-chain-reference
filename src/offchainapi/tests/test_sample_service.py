@@ -26,7 +26,7 @@ def business_and_processor(three_addresses, store):
 def payment_as_receiver(three_addresses, sender_actor, payment_action):
     _, _, a0 = three_addresses
     subaddr = LibraAddress.encode(a0.decoded_address, b'x'*8)
-    receiver = PaymentActor(a0.as_str(), subaddr.as_str(), Status.none, [])
+    receiver = PaymentActor(subaddr.as_str(), Status.none, [])
     return PaymentObject(
         sender_actor, receiver, 'ref', 'orig_ref', 'desc', payment_action
     )
@@ -53,7 +53,7 @@ def settled_payment_as_receiver(kyc_payment_as_receiver):
 def payment_as_sender(three_addresses, receiver_actor, payment_action):
     _, _, a0 = three_addresses
     subaddr = LibraAddress.encode(a0.decoded_address, b'x'*8)
-    sender = PaymentActor(a0.as_str(), subaddr.as_str(), Status.none, [])
+    sender = PaymentActor(subaddr.as_str(), Status.none, [])
     return PaymentObject(
         sender, receiver_actor, 'ref', 'orig_ref', 'desc', payment_action
     )
@@ -92,10 +92,8 @@ def json_request(my_addr, other_addr, payment_action):
     sub_sender = LibraSubAddress.encode(my_addr.decoded_address, b'a'*8)
     sub_receiver = LibraSubAddress.encode(other_addr.decoded_address, b'b'*8)
 
-    sender = PaymentActor(my_addr.as_str(), sub_sender.as_str(), Status.none, [])
-    receiver = PaymentActor(
-        other_addr.as_str(), sub_receiver.as_str(), Status.none, []
-    )
+    sender = PaymentActor(sub_sender.as_str(), Status.none, [])
+    receiver = PaymentActor(sub_receiver.as_str(), Status.none, [])
     ref = f'{other_addr.as_str()}_XYZ'
     payment = PaymentObject(
         sender, receiver, ref, 'Original Reference', 'A description...', payment_action

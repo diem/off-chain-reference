@@ -464,6 +464,11 @@ class VASPPairChannel:
 
         if fut is None:
             fut = asyncio.Future(loop=loop)
+        else:
+            # If we are passed a future that is done, when we just return it
+            # since there is nothing more to do.
+            if fut.done():
+                return fut
 
         self.logger.debug(f'Request Received -> {self.myself.as_str()}')
         try:
@@ -485,15 +490,14 @@ class VASPPairChannel:
                 response = self.handle_request(request, raise_on_wait=True)
 
         except OffChainInvalidSignature:
+            # TODO: Package proper exception
             fut.set_result('Signature verification failed.')
             return fut
+
         except OffChainOutOfOrder as e:
             if nowait:
-                # No waiting -- so bubble up the error response.
+                # No waiting -- so bubble up the potocol error response.
                 response = e.args[0]
-                fut.set_result(response)
-                return fut
-
             else:
                 # We were told to wait for this requests turn.
                 self.logger.debug(
@@ -503,10 +507,11 @@ class VASPPairChannel:
                 self.waiting_requests[request.seq] += [(
                     json_command, fut, time.time()
                 )]
-            return fut
+                return fut
+
         except JSONParsingError:
             response = make_parsing_error()
-            full_response = self.send_response(response)
+
         except Exception as e:
             fut.set_exception(e)
             return fut
@@ -662,6 +667,7 @@ class VASPPairChannel:
             fut.set_result(result)
 
         except OffChainInvalidSignature:
+            # TODO: Package proper exception
             fut.set_result('Signature verification failed.')
         except JSONParsingError as e:
             fut.set_exception(e)

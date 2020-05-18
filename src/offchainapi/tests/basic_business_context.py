@@ -15,7 +15,7 @@ class BasicBusinessContext(BusinessContext):
 
     def is_sender(self, payment):
         myself = self.my_addr.as_str()
-        return myself == payment.sender.address
+        return myself == payment.sender.get_address().as_str()
 
     def is_recipient(self, payment):
         return not self.is_sender(payment)
@@ -27,7 +27,7 @@ class BasicBusinessContext(BusinessContext):
 
     def validate_recipient_signature(self, payment):
         assert 'recipient_signature' in payment
-        recepient = payment.receiver.address
+        recepient = payment.receiver.get_address().as_str()
         ref_id = payment.reference_id
         expected_signature = f'{recepient}.{ref_id}.SIGNED'
         return payment.recipient_signature == expected_signature

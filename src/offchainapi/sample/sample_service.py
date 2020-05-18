@@ -102,7 +102,7 @@ class sample_business(BusinessContext):
 
     def is_sender(self, payment):
         self.assert_payment_for_vasp(payment)
-        return payment.sender.address == self.get_address()
+        return payment.sender.get_address().as_str() == self.get_address()
 
 
     def validate_recipient_signature(self, payment):

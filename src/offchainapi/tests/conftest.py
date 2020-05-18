@@ -29,16 +29,14 @@ def three_addresses():
 
 @pytest.fixture
 def sender_actor():
-    m_addr = LibraAddress.encode(b'A'*16).as_str()
     s_addr = LibraSubAddress.encode(b'A'*16, b'a'*8).as_str()
-    return PaymentActor(m_addr, s_addr, Status.none, [])
+    return PaymentActor(s_addr, Status.none, [])
 
 
 @pytest.fixture
 def receiver_actor():
-    m_addr = LibraAddress.encode(b'B'*16).as_str()
     s_addr = LibraSubAddress.encode(b'B'*16, b'b'*8).as_str()
-    return PaymentActor(m_addr, s_addr, Status.none, [])
+    return PaymentActor(s_addr, Status.none, [])
 
 
 @pytest.fixture
@@ -149,8 +147,8 @@ def db(tmp_path):
 @pytest.fixture
 def command(three_addresses, payment_action):
     a0, _, b0 = three_addresses
-    sender = PaymentActor(b0.as_str(), 'C', Status.none, [])
-    receiver = PaymentActor(a0.as_str(), '1', Status.none, [])
+    sender = PaymentActor('C', Status.none, [])
+    receiver = PaymentActor('1', Status.none, [])
     payment = PaymentObject(
         sender, receiver, 'XYZ_ABC', 'orig_ref', 'desc', payment_action
     )

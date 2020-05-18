@@ -270,7 +270,6 @@ An example `PaymentObject` with all fields understood by the Off-Chain protocol 
         "description": "Custom payment description ...",
         "original_payment_reference_id": "Original Payment reference identifier ...",
         "receiver": {
-            "address": "42424242424242424242424242424242",
             "kyc_certificate": "42424242424242424242424242424242.ref 9.KYC_CERT",
             "kyc_data": {
                 "blob": "{\n  \"payment_reference_id\": \"42424242424242424242424242424242.ref 9.KYC\",\n  \"type\": \"individual\"\n ... }\n"
