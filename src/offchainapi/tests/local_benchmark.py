@@ -141,19 +141,26 @@ async def main_perf(messages_num=10, wait_num=0, verbose=False):
     s = time.perf_counter()
     results = asyncio.run_coroutine_threadsafe(send100(VASPa, commands), loopA)
     results = results.result()
-    for res in results:
-        print('RES:', res)
+
+    # Print the result for all initial commands
+    if True: # verbose:
+        for res in results:
+            print('RES:', res)
+
     elapsed = (time.perf_counter() - s)
 
-    print('Wait for all payments too have an outcome')
+    print('Wait for all payments to have an outcome')
     outcomes = asyncio.run_coroutine_threadsafe(
         wait_for_all_payment_outcome(VASPa, payments, results), loopA)
     outcomes = outcomes.result()
-    for out, res in zip(outcomes, results):
-        if not isinstance(out, Exception):
-            print('OUT OK:', out.sender.status, out.receiver.status)
-        else:
-            print('OUT NOTOK:', str(out))
+
+    # Print the result for all requests
+    if verbose:
+        for out, res in zip(outcomes, results):
+            if not isinstance(out, Exception):
+                print('OUT OK:', out.sender.status, out.receiver.status)
+            else:
+                print('OUT NOTOK:', str(out))
 
     print('All payments done.')
 
