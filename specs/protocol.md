@@ -322,7 +322,7 @@ The `sender`, `receiver`, `reference_id`, and `action` are mandatory. The other 
 
 * **sender/receiver (PaymentActorObject)** Information about the sender/receiver in this payment. (Mandatory for a new payment, see `PaymentActorObject`).
 
-* **reference_id (str)** Unique reference ID of this payment on the payment initiator VASP (the VASP which originally created this payment object). This value should be unique, and formatted as “<creator_vasp_address_hex>_<unique_id>”.  For example, ”lbr1x23456abcd_seqABCD“. This field is mandatory on payment creation and immutable after that.
+* **reference_id (str)** Unique reference ID of this payment on the payment initiator VASP (the VASP which originally created this payment object). This value should be unique, and formatted as “<creator_vasp_onchain_address_bech32>_<unique_id>”.  For example, ”lbr1x23456abcd_seqABCD“. This field is mandatory on payment creation and immutable after that.
 
 * **original_payment_reference_id (str)**
 Used for updates to a payment after it has been committed on chain. For example, used for refunds. The reference ID of the original payment will be placed into this field. This value is optional on payment creation and can only be written once after that.
@@ -345,7 +345,7 @@ A `PaymentActorObject` represents a participant in a payment - either sender or 
         "metadata": [],
     }
 
-* **address (str)** Address of the sender/receiver account. Addresses may be single use or valid for a limited time, and therefore VASPs should not rely on them remaining stable across time or different VASP addresses. The addresses are encoded using bech32 with a human readable part set to "lbr" (and version set to one). The bech32 address encodes both the address of the VASP as well as the specific user's subaddress. They should be no longer than 40 characters. Mandatory and immutable.
+* **address (str)** Address of the sender/receiver account. Addresses may be single use or valid for a limited time, and therefore VASPs should not rely on them remaining stable across time or different VASP addresses. The addresses are encoded using bech32 with a human readable part set to "lbr" (and version set to one). The bech32 address encodes both the address of the VASP as well as the specific user's subaddress. They should be no longer than 80 characters. Mandatory and immutable.
 
 * **kyc_data: KycDataObject**
 The KYC data for this account. This field is optional but immutable once it is set. Its structured is discussed in detail below.

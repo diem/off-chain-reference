@@ -384,9 +384,9 @@ class PaymentProcessor(CommandProcessor):
 
         # Ensure address and subaddress are consistent
         sender_addr = LibraAddress(new_payment.sender.get_address().as_str(),)
-        sender_subaddr = LibraAddress(new_payment.sender.subaddress)
+        sender_subaddr = LibraAddress(new_payment.sender.address)
         recv_addr = LibraAddress(new_payment.receiver.get_address().as_str(),)
-        recv_subaddr = LibraAddress(new_payment.receiver.subaddress)
+        recv_subaddr = LibraAddress(new_payment.receiver.address)
 
         if sender_subaddr.onchain() != sender_addr or \
                 recv_subaddr.onchain() != recv_addr:
@@ -406,8 +406,8 @@ class PaymentProcessor(CommandProcessor):
             raise PaymentLogicError('Invalid status transition.')
 
         # Check that the subaddreses are valid
-        sub_send = LibraSubAddress(new_payment.sender.subaddress)
-        sub_revr = LibraSubAddress(new_payment.receiver.subaddress)
+        sub_send = LibraSubAddress(new_payment.sender.address)
+        sub_revr = LibraSubAddress(new_payment.receiver.address)
 
         if sub_send.version == 0:
             raise PaymentLogicError('Sender Subaddress needs to contain'

@@ -93,11 +93,11 @@ class sample_business(BusinessContext):
         accounts = {acc['account'] for acc in self.accounts_db}
 
         if self.is_sender(payment):
-            sub = LibraAddress(payment.sender.subaddress).get_subaddress_bytes().decode('ascii')
+            sub = LibraAddress(payment.sender.address).get_subaddress_bytes().decode('ascii')
             if sub in accounts:
                 return
         else:
-            sub = LibraAddress(payment.receiver.subaddress).get_subaddress_bytes().decode('ascii')
+            sub = LibraAddress(payment.receiver.address).get_subaddress_bytes().decode('ascii')
             if sub in accounts:
                 return
         raise BusinessForceAbort('Subaccount does not exist.')
@@ -129,7 +129,7 @@ class sample_business(BusinessContext):
         my_role = self.get_my_role(payment)
         other_role = self.get_other_role(payment)
 
-        subaddress = payment.data[my_role].subaddress
+        subaddress = payment.data[my_role].address
 
         sub = LibraAddress(subaddress).get_subaddress_bytes().decode('ascii')
         account = self.get_account(sub)
@@ -152,7 +152,7 @@ class sample_business(BusinessContext):
     async def next_kyc_level_to_request(self, payment):
         my_role = self.get_my_role(payment)
         other_role = self.get_other_role(payment)
-        subaddress = payment.data[my_role].subaddress
+        subaddress = payment.data[my_role].address
 
         sub = LibraAddress(subaddress).get_subaddress_bytes().decode('ascii')
         account = self.get_account(sub)
@@ -176,7 +176,7 @@ class sample_business(BusinessContext):
                    BusinessNotAuthorized.
         '''
         my_role = self.get_my_role(payment)
-        subaddress = payment.data[my_role].subaddress
+        subaddress = payment.data[my_role].address
 
         sub = LibraAddress(subaddress).get_subaddress_bytes().decode('ascii')
         account = self.get_account(sub)
@@ -185,7 +185,7 @@ class sample_business(BusinessContext):
     async def ready_for_settlement(self, payment):
         my_role = self.get_my_role(payment)
         other_role = self.get_other_role(payment)
-        subaddress = payment.data[my_role].subaddress
+        subaddress = payment.data[my_role].address
 
         sub = LibraAddress(subaddress).get_subaddress_bytes().decode('ascii')
         account = self.get_account(sub)
@@ -231,7 +231,7 @@ class sample_business(BusinessContext):
             # In this VASP we consider we are ready to settle when the sender
             # says so (in reality we would check on-chain as well.)
             my_role = self.get_my_role(payment)
-            subaddress = payment.data[my_role].subaddress
+            subaddress = payment.data[my_role].address
 
             sub = LibraAddress(subaddress).get_subaddress_bytes().decode('ascii')
             account = self.get_account(sub)
