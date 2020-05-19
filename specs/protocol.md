@@ -92,9 +92,9 @@ All commands exchanged between pairs of VASPs are sequenced with respect to each
 
 In each channel one VASP takes the role of a _protocol server_ and the other the role of a _protocol client_ for the purposes of sequencing commands into a joint command sequence. Note that these roles are distinct to the HTTP client/server -- and both VASPs act as an HTTP server and client to listen and respond to requests.
 
-Who is the protocol server and who is the client VASP is determined by comparing their binary LibraAddress. The following rules are used to determine which entity serves as which party: The last bit of VASP A’s parent address in binary _w_ (where `w = addr[15] & 0x1`) is XOR’d with the last bit in VASP B’s parent address in binary _x_.  This results in either 0 or 1.
+Who is the protocol server and who is the client VASP is determined by comparing their binary on-chain 16-bytes Libra Address strings (we call those the _binary address_, and they can be extracted by decoding the bech32 encoded libra address). The following rules are used to determine which entity serves as which party: The last bit of VASP A’s parent binary address _w_ (where `w = addr[15] & 0x1`) is XOR’d with the last bit in VASP B’s parent binary address _x_.  This results in either 0 or 1.
 If the result is 0, the lexicographically lower parent address is used as the server side.
-If the result is 1, the lexicographically higher parent address is used as the server side.
+If the result is 1, the lexicographically higher parent address is used as the server side. Lexicographic ordering determines which binary address is higher by comparing byte positions one by one, and returning the address with the first higher byte.
 
 By convention the _server_ always determines the sequence of a request in the joint command sequence. When the server creates a `CommandRequestObject` it already assigns it a `command_seq` in the joint sequence of commands. When it responds to requests from the client, its `CommandResponseObject` contains a `command_seq` for the request into the joint command sequence. The protocol client never assigns a `command_seq`, but includes one provided by the protocol server in its responses.
 
