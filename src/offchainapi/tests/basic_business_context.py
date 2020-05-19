@@ -26,7 +26,7 @@ class BasicBusinessContext(BusinessContext):
 
     def is_sender(self, payment):
         myself = self.my_addr.as_str()
-        return myself == payment.sender.address
+        return myself == payment.sender.get_address().as_str()
 
     def is_recipient(self, payment):
         return not self.is_sender(payment)
@@ -38,7 +38,7 @@ class BasicBusinessContext(BusinessContext):
 
     def validate_recipient_signature(self, payment):
         assert 'recipient_signature' in payment
-        recepient = payment.receiver.address
+        recepient = payment.receiver.get_address().as_str()
         ref_id = payment.reference_id
         expected_signature = f'{recepient}.{ref_id}.SIGNED'
 
@@ -81,11 +81,6 @@ class BasicBusinessContext(BusinessContext):
 
         return None
 
-    def validate_kyc_signature(self, payment):
-        other_role = ['sender', 'receiver'][self.is_sender(payment)]
-        other_actor = payment.data[other_role]
-        assert 'kyc_data' in other_actor
-        return True
 
     async def get_extended_kyc(self, payment):
         ''' Returns the extended KYC information for this payment.
@@ -97,15 +92,9 @@ class BasicBusinessContext(BusinessContext):
         '''
         myself = self.my_addr.as_str()
         ref_id = payment.reference_id
-        return (
-                KYCData(
-                    f'{{\n'
-                    f'  "payment_reference_id": "{myself}.{ref_id}.KYC",\n'
-                    f'  "type": "individual"\n'
-                    f'}}\n'),
-                f'{myself}.{ref_id}.KYC_SIGN',
-                f'{myself}.{ref_id}.KYC_CERT',
-            )
+        return KYCData({
+                    "type": "individual"
+                })
 
     # ----- Settlement -----
 

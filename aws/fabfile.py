@@ -140,6 +140,12 @@ def update(ctx):
 
     run_script = 'offchainapi-aws-run.sh'
     port = 8090  # NOTE: Not a simple param, update nginx config accordingly.
+    test_compliance_key = { # All VASP have the same key.
+        "crv": "Ed25519",
+        "d": "HehJzMPH4d0JUNjfMKHrBTlSmQzOt2ikGrc72YY76q0",
+        "kty": "OKP",
+        "x": "9pS-MRZZwjRtGL3iqPnVGcrtDGXpWi-4UWsSRo-XWD4"
+    }
 
     # Update code.
     set_hosts(ctx)
@@ -152,7 +158,8 @@ def update(ctx):
         configs = {
             "addr": chr(65+i)*16,
             "base_url": f'{host}',
-            "port": port
+            "port": port,
+            "key": test_compliance_key
         }
         files += [f'{host}.json']
         with open(files[-1], 'w') as f:
@@ -180,17 +187,24 @@ def nginx(ctx):
     COMMANDS:   fab config
     '''
     nginx_conf = 'offchainapi-nginx.conf'
-    # tls_material = ['server_cert.pem', 'server_key.pem']
+
+    # NOTE: `nginx_conf` needs to be updated with the right cert and key names.
+    cert_name = 'nginx-selfsigned.crt'
+    key_name = 'nginx-selfsigned.key'
 
     set_hosts(ctx)
     for host in ctx.hosts:
         c = Connection(host, user=ctx.user, connect_kwargs=ctx.connect_kwargs)
 
-        # TLS certificates and keys.
-        c.put('server_cert.pem', '.')
-        c.put('server_key.pem', '.')
-        c.sudo('cp server_cert.pem /etc/ssl/certs')
-        c.sudo('update-ca-certificates')
+        # Create certificate and key
+        command = 'openssl req -x509 -nodes -days 365 -newkey rsa:2048 '
+        command += f'-keyout {key_name} -out {cert_name} '
+        command += f'-subj "/C=GB/ST=Test/L=Test/O=Test/OU=Test/CN={host}"'
+        c.sudo(command)
+
+        # Download certificates
+        c.get(f'{cert_name}', f'./{cert_name}')
+        c.local(f'mv {cert_name} {host}-{cert_name}')
 
         # NGINX Config.
         c.put(nginx_conf, '.')
@@ -200,6 +214,13 @@ def nginx(ctx):
         command += ' || true'
         c.sudo(command)
         c.sudo('service nginx restart')
+
+    # Upload certificates to all machines
+    files = [f'{host}-{cert_name}' for host in ctx.hosts]
+    for host in ctx.hosts:
+        c = Connection(host, user=ctx.user, connect_kwargs=ctx.connect_kwargs)
+        for f in files:
+            c.put(f, '.')
 
 
 @task

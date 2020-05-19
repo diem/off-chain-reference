@@ -8,6 +8,7 @@ from ..command_processor import CommandProcessor
 from ..libra_address import LibraAddress, LibraSubAddress
 from ..protocol_messages import CommandRequestObject
 from ..utils import JSONFlag
+from ..crypto import ComplianceKey
 
 import types
 import dbm
@@ -15,6 +16,7 @@ from copy import deepcopy
 from unittest.mock import MagicMock
 from mock import AsyncMock
 import pytest
+import json
 
 
 @pytest.fixture
@@ -27,16 +29,14 @@ def three_addresses():
 
 @pytest.fixture
 def sender_actor():
-    m_addr = LibraAddress.encode(b'A'*16).as_str()
     s_addr = LibraSubAddress.encode(b'A'*16, b'a'*8).as_str()
-    return PaymentActor(m_addr, s_addr, Status.none, [])
+    return PaymentActor(s_addr, Status.none, [])
 
 
 @pytest.fixture
 def receiver_actor():
-    m_addr = LibraAddress.encode(b'B'*16).as_str()
     s_addr = LibraSubAddress.encode(b'B'*16, b'b'*8).as_str()
-    return PaymentActor(m_addr, s_addr, Status.none, [])
+    return PaymentActor(s_addr, Status.none, [])
 
 
 @pytest.fixture
@@ -54,11 +54,10 @@ def payment(sender_actor, receiver_actor, payment_action):
 
 @pytest.fixture
 def kyc_data():
-    return KYCData("""{
-        "payment_reference_id" : "PAYMENT_XYZ",
-        "type" : "individual",
-        "other_field" : "other data"
-    }""")
+    return KYCData({
+        "type": "individual",
+        "other": {"other_feild": "other data"}
+    })
 
 
 @pytest.fixture
@@ -85,17 +84,26 @@ def executor(three_addresses, store):
 
 
 @pytest.fixture
-def vasp(three_addresses, store):
+def key():
+    return ComplianceKey.generate()
+
+
+@pytest.fixture
+def vasp(three_addresses, store, key):
     a0, _, _ = three_addresses
     command_processor = MagicMock(spec=CommandProcessor)
     info_context = MagicMock(spec=VASPInfo)
+    info_context.get_peer_compliance_verification_key.return_value = key
+    info_context.get_peer_compliance_signature_key.return_value = key
     return OffChainVASP(a0, command_processor, store, info_context)
+
 
 @pytest.fixture
 def channel(three_addresses, vasp, store):
     a0, a1, _ = three_addresses
     command_processor = MagicMock(spec=CommandProcessor)
     return VASPPairChannel(a1, a0, vasp, store, command_processor)
+
 
 @pytest.fixture
 def two_channels(three_addresses, vasp, store):
@@ -139,10 +147,10 @@ def db(tmp_path):
 @pytest.fixture
 def command(three_addresses, payment_action):
     a0, _, b0 = three_addresses
-    sender = PaymentActor(b0.as_str(), 'C', Status.none, [])
-    receiver = PaymentActor(a0.as_str(), '1', Status.none, [])
+    sender = PaymentActor('C', Status.none, [])
+    receiver = PaymentActor('1', Status.none, [])
     payment = PaymentObject(
-        sender, receiver, 'ref', 'orig_ref', 'desc', payment_action
+        sender, receiver, 'XYZ_ABC', 'orig_ref', 'desc', payment_action
     )
     return PaymentCommand(payment)
 
@@ -158,3 +166,12 @@ def json_request(command):
 @pytest.fixture
 def json_response():
     return {"seq": 0, "command_seq": 0, "status": "success"}
+
+
+@pytest.fixture
+def signed_json_request(json_request, key):
+    return key.sign_message(json.dumps(json_request))
+
+@pytest.fixture
+def signed_json_response(json_response, key):
+    return key.sign_message(json.dumps(json_response))

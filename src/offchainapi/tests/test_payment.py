@@ -29,12 +29,13 @@ def test_json_payment_flags(payment):
 
 def test_kyc_data_missing_payment_reference_fail():
     with pytest.raises(StructureException):
-        kyc_data = KYCData('{"type": "A"}')
+        kyc_data = KYCData({"type": "A"})
 
 
 def test_kyc_data_missing_type_fail():
     with pytest.raises(StructureException):
-        kyc_data = KYCData('{"payment_reference_id": "1234"}')
+        kyc_dict = {"some_random_field": "1234"}
+        kyc_data = KYCData(kyc_dict)
 
 
 def test_payment_action_creation():
@@ -66,23 +67,19 @@ def test_payment_action_creation():
 
 
 def test_payment_actor_creation():
-    actor = PaymentActor('ABCD', 'XYZ', Status.none, [])
-
-    with pytest.raises(StructureException):
-        # Bad address type
-        _ = PaymentActor(0, 'XYZ', Status.none, [])
+    actor = PaymentActor('XYZ', Status.none, [])
 
     with pytest.raises(StructureException):
         # Bad subaddress type
-        _ = PaymentActor('ABCD', 0, Status.none, [])
+        _ = PaymentActor(0, Status.none, [])
 
     with pytest.raises(StructureException):
         # Bad status type
-        _ = PaymentActor('ABCD', 'XYZ', 0, [])
+        _ = PaymentActor('XYZ', 0, [])
 
     with pytest.raises(StructureException):
         # Bad metadata type
-        _ = PaymentActor('ABCD', 'XYZ', Status.none, 0)
+        _ = PaymentActor('XYZ', Status.none, 0)
 
 
 def test_payment_actor_update_status(sender_actor):
@@ -94,31 +91,49 @@ def test_payment_actor_update_status(sender_actor):
 
 
 def test_payment_actor_update_kyc(sender_actor, kyc_data):
-    sender_actor.add_kyc_data(kyc_data, 'sigXXXX', 'certXXX')
+    sender_actor.add_kyc_data(kyc_data)
 
     # We tolerate writing again strictly the same record
-    sender_actor.add_kyc_data(kyc_data, 'sigXXXX', 'certXXX')
+    sender_actor.add_kyc_data(kyc_data)
 
 
-def test_payment_actor_change_kyc(sender_actor, kyc_data):
-    sender_actor.add_kyc_data(kyc_data, 'sigXXXX', 'certXXX')
-    with pytest.raises(StructureException):
-        sender_actor.add_kyc_data(kyc_data, 'sigYYYY', 'certYYYY')
+def test_full_kyc_info():
+    full_kyc = {
+            "payload_type": "KYC_DATA",
+            "payload_version": 1,
+            "type": "individual",
+            "given_name": "Alice",
+            "surname": "Alison",
+            "address": {
+                "city": "Sunnyvale",
+                "country": "US",
+                "line1": "1234 Maple Street",
+                "line2": "Apartment 123",
+                "postal_code": "12345",
+                "state": "California",
+            },
+            "dob": "1920-03-20",
+            "place_of_birth": {
+                "city": "Sunnyvale",
+                "country": "US",
+                "postal_code": "12345",
+                "state": "California",
+            },
+            "national_id": {
+            },
+            "legal_entity_name": "Superstore",
+        }
+    kyc = KYCData(full_kyc)
+    assert kyc.data == full_kyc
 
+    # Test serialization / deserialization
+    kyc_json = kyc.get_full_diff_record()
+    kyc2 = KYCData.from_full_record(kyc_json)
+    assert kyc2 == kyc
 
 def test_payment_actor_wronte_kyc_type(sender_actor, kyc_data):
     with pytest.raises(StructureException):
-        sender_actor.add_kyc_data(0, 'sigXXXX', 'certXXX')
-
-
-def test_payment_actor_wrong_kyc_sig_type(sender_actor, kyc_data):
-    with pytest.raises(StructureException):
-        sender_actor.add_kyc_data(kyc_data, 0, 'certXXX')
-
-
-def test_payment_actor_wrong_kyc_cert_type(sender_actor, kyc_data):
-    with pytest.raises(StructureException):
-        sender_actor.add_kyc_data(kyc_data, 'sigXXXX', 0)
+        sender_actor.add_kyc_data(0)
 
 
 def test_payment_object_creation(sender_actor, receiver_actor, payment_action):
@@ -134,7 +149,33 @@ def test_payment_object_update(payment):
 
 
 def test_specific():
-    json_struct = {'sender': {'address': 'QUFBQUFBQUFBQUFBQUFBQQ==', 'subaddress': 'aaaa', 'status': 'settled', 'metadata': [], 'kyc_data': {'blob': '{\n                    "payment_reference_id": "QUFBQUFBQUFBQUFBQUFBQQ==.ref 0.KYC",\n                    "type": "individual"\n                    }'}, 'kyc_signature': 'QUFBQUFBQUFBQUFBQUFBQQ==.ref 0.KYC_SIGN', 'kyc_certificate': 'QUFBQUFBQUFBQUFBQUFBQQ==.ref 0.KYC_CERT'}, 'receiver': {'address': 'QkJCQkJCQkJCQkJCQkJCQg==', 'subaddress': 'bbbb', 'status': 'needs_kyc_data', 'metadata': [], 'kyc_data': {'blob': '{\n                    "payment_reference_id": "QkJCQkJCQkJCQkJCQkJCQg==.ref 0.KYC",\n                    "type": "individual"\n                    }'}, 'kyc_signature': 'QkJCQkJCQkJCQkJCQkJCQg==.ref 0.KYC_SIGN', 'kyc_certificate': 'QkJCQkJCQkJCQkJCQkJCQg==.ref 0.KYC_CERT'}, 'reference_id': 'ref 0', 'original_payment_reference_id': 'orig_ref', 'description': 'desc', 'action': {'amount': 10, 'currency': 'TIK', 'action': 'charge', 'timestamp': '2020-01-02 18:00:00 UTC'}, 'recipient_signature': 'QkJCQkJCQkJCQkJCQkJCQg==.ref 0.SIGNED'}
+    json_struct = {
+                    'sender': {
+                        'subaddress': 'aaaa',
+                        'status': 'settled',
+                        'metadata': [],
+                        'kyc_data': {
+                            "type": "individual"}
+                        },
+                    'receiver': {
+                        'subaddress': 'bbbb',
+                        'status': 'needs_kyc_data',
+                        'metadata': [],
+                        'kyc_data': {
+                            "type": "individual"
+                            }
+                    },
+                    'reference_id': 'ref 0',
+                    'original_payment_reference_id': 'orig_ref',
+                    'description': 'desc',
+                    'action': {
+                        'amount': 10,
+                        'currency': 'TIK',
+                        'action': 'charge',
+                        'timestamp': '2020-01-02 18:00:00 UTC'
+                    },
+                    'recipient_signature': 'QkJCQkJCQkJCQkJCQkJCQg==.ref 0.SIGNED'
+                    }
     PaymentObject.from_full_record(json_struct)
 
 
@@ -156,8 +197,8 @@ def test_payment_to_diff(payment, sender_actor, receiver_actor, payment_action):
 
 
 def test_to_json(kyc_data, sender_actor, receiver_actor, payment_action):
-    sender_actor.add_kyc_data(kyc_data, "sigSENDER", 'certSENDER')
-    receiver_actor.add_kyc_data(kyc_data, "sigSENDER", 'certSENDER')
+    sender_actor.add_kyc_data(kyc_data)
+    receiver_actor.add_kyc_data(kyc_data)
     payment = PaymentObject(
         sender_actor, receiver_actor, 'ref2', 'orig_ref', 'desc', payment_action
     )
@@ -165,20 +206,6 @@ def test_to_json(kyc_data, sender_actor, receiver_actor, payment_action):
     json_payment = json.dumps(payment.get_full_diff_record())
     new_payment = PaymentObject.create_from_record(json.loads(json_payment))
     assert payment == new_payment
-
-
-def test_payment_actor_update_bad_kyc_fails(sender_actor):
-    diff = {'kyc_data': '1234'}
-    with pytest.raises(StructureException):
-        sender_actor.custom_update_checks(diff)
-
-    diff = {'kyc_data': '1234', 'kyc_signature': '1234'}
-    with pytest.raises(StructureException):
-        sender_actor.custom_update_checks(diff)
-
-    diff = {'kyc_certificate': '1234', 'kyc_signature': '1234'}
-    with pytest.raises(StructureException):
-        sender_actor.custom_update_checks(diff)
 
 
 def test_payment_actor_update_bad_status_fails(sender_actor):

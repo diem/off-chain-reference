@@ -148,10 +148,6 @@ class Aionet:
         other_addr = LibraAddress(request.match_info['other_addr'])
         self.logger.debug(f'Request Received from {other_addr.as_str()}')
 
-        my_addr_str = self.vasp.get_vasp_address().as_str()
-        my_key = self.vasp.info_context.get_peer_compliance_signature_key(my_addr_str)
-        other_key = self.vasp.info_context.get_peer_compliance_verification_key(other_addr.as_str())
-
         # Try to get a channel with the other VASP.
         try:
             channel = self.vasp.get_channel(other_addr)
@@ -160,28 +156,14 @@ class Aionet:
             self.logger.debug(f'Not Authorized {e}')
             raise web.HTTPUnauthorized
 
-        # Verify that the other VASP is authorised to submit the request;
-        # ie. that 'other_addr' matches the certificate.
-        client_certificate = None
-        if not self.vasp.info_context.is_authorised_VASP(
-            client_certificate, other_addr
-        ):
-            self.logger.debug(f'Not Authorized')
-            raise web.HTTPForbidden
-
         # Perform the request, send back the reponse.
         try:
             request_json = await request.json()
-            assert '_signed' in request_json
-
-            # Verify and decode the message
-            json_string = other_key.verify_message(request_json['_signed'])
-            request_json = json.loads(json_string)
 
             # TODO: Handle timeout errors here.
             self.logger.debug(f'Data Received from {other_addr.as_str()}.')
             response = await channel.parse_handle_request_to_future(
-                request_json, encoded=False
+                request_json
             )
 
         except json.decoder.JSONDecodeError as e:
@@ -221,20 +203,10 @@ class Aionet:
         # Try to get a channel with the other VASP.
         channel = self.vasp.get_channel(other_addr)
 
-        # Get the crypto keys
-        my_addr_str = self.vasp.get_vasp_address().as_str()
-        my_key = self.vasp.info_context.get_peer_compliance_signature_key(my_addr_str)
-        other_key = self.vasp.info_context.get_peer_compliance_verification_key(other_addr.as_str())
-
         # Get the URLs
         base_url = self.vasp.info_context.get_peer_base_url(other_addr)
         url = self.get_url(base_url, other_addr.as_str(), other_is_server=True)
         self.logger.debug(f'Sending post request to {url}')
-
-        # Add a signed version of the message
-        signed_request = my_key.sign_message(json.dumps(json_request))
-        json_request = {'_signed': signed_request}
-
         try:
             async with self.session.post(url, json=json_request) as response:
                 try:
@@ -243,7 +215,7 @@ class Aionet:
 
                     # Wait in case the requests are sent out of order.
                     res = await channel.parse_handle_response_to_future(
-                        json_response, encoded=False
+                        json_response
                     )
                     self.logger.debug(f'Response parsed with status: {res}')
 
@@ -259,6 +231,11 @@ class Aionet:
                     self.logger.debug(f'Exception {type(e)}: {str(e)}')
                     raise e
         except ClientError as e:
+            self.logger.debug(f'ClientError {type(e)}: {str(e)}')
+            raise NetworkException(e)
+
+        except aiohttp.ClientSSLError as e:
+            self.logger.debug(f'ClientSSLError {type(e)}: {str(e)}')
             raise NetworkException(e)
 
     def sequence_command(self, other_addr, command):

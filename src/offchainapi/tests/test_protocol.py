@@ -1,7 +1,7 @@
 from ..protocol import VASPPairChannel, make_protocol_error, NetMessage
 from ..executor import ExecutorException, ProtocolExecutor
-from ..protocol_messages import CommandRequestObject, \
-    CommandResponseObject, OffChainProtocolError, OffChainException, OffChainOutOfOrder
+from ..protocol_messages import CommandRequestObject, CommandResponseObject, \
+    OffChainProtocolError, OffChainException, OffChainOutOfOrder
 from ..sample.sample_command import SampleCommand
 from ..command_processor import CommandProcessor
 from ..utils import JSONSerializable, JSONFlag
@@ -14,6 +14,7 @@ from unittest.mock import MagicMock
 from mock import PropertyMock
 import pytest
 import asyncio
+import json
 
 
 def monkey_tap_to_list(pair, requests_sent, replies_sent):
@@ -499,8 +500,12 @@ def test_dependencies(two_channels):
     client = R.client
     server = R.server
 
-    mapcmd = {c.item(): client.executor.command_status_sequence[i] for i, c in enumerate(
-        client.get_final_sequence())}
+    command_status_sequence = client.executor.command_status_sequence
+    mapcmd = {
+        c.item(): command_status_sequence[i] for i, c in enumerate(
+            client.get_final_sequence()
+        )
+    }
     # Only one of the items with common dependency commits
     assert sum([mapcmd[1], mapcmd[4]]) == 1
     assert sum([mapcmd[8], mapcmd[9]]) == 1
@@ -589,35 +594,43 @@ def test_sample_command():
     assert obj2.previous_versions == obj.previous_versions
 
 
-def test_parse_handle_request_to_future(json_request, channel):
+def test_parse_handle_request_to_future(signed_json_request, channel, key):
     loop = asyncio.new_event_loop()
-    fut = channel.parse_handle_request_to_future(json_request, loop=loop)
-    res = fut.result()
-    assert isinstance(res, NetMessage)
+    fut = channel.parse_handle_request_to_future(
+        signed_json_request, loop=loop)
+    res = fut.result().content
+    res = json.loads(key.verify_message(res))
+    assert res['status'] == 'success'
 
 
-def test_parse_handle_request_to_future_out_of_order(json_request, channel):
+def test_parse_handle_request_to_future_out_of_order(json_request, channel,
+                                                     key):
     json_request['seq'] = 100
+    json_request = key.sign_message(json.dumps(json_request))
     loop = asyncio.new_event_loop()
     fut = channel.parse_handle_request_to_future(
         json_request, loop=loop, nowait=True
     )
-    res = fut.result().get_json_data_dict(JSONFlag.NET)
-    print(res['error']['code'] == 'wait')
+    res = fut.result().content
+    res = json.loads(key.verify_message(res))
+    assert res['error']['code'] == 'wait'
 
 
-def test_parse_handle_request_to_future_parsing_error(json_request, channel):
+def test_parse_handle_request_to_future_parsing_error(json_request, channel,
+                                                      key):
     json_request['seq'] = '"'  # Trigger a parsing error.
+    json_request = key.sign_message(json.dumps(json_request))
     loop = asyncio.new_event_loop()
     fut = channel.parse_handle_request_to_future(json_request, loop=loop)
     res = fut.result().content
+    res = json.loads(key.verify_message(res))
     assert res['error']['code'] == 'parsing'
 
 
 def test_parse_handle_request_to_future_exception(json_request, channel):
     loop = asyncio.new_event_loop()
     fut = channel.parse_handle_request_to_future(
-        json_request, loop=loop, encoded=True  # json_request is not encoded.
+        json_request, loop=loop  # json_request is not signed.
     )
     assert fut.exception() is not None
 
@@ -633,39 +646,44 @@ def test_handle_request_malformed(json_request, two_channels):
     assert json_response['error']['code'] == 'malformed'
 
 
-def test_parse_handle_response_to_future(json_response, channel, command):
+def test_parse_handle_response_to_future(signed_json_response, channel,
+                                         command):
     _ = channel.sequence_command_local(command)
     loop = asyncio.new_event_loop()
-    fut = channel.parse_handle_response_to_future(json_response, loop=loop)
+    fut = channel.parse_handle_response_to_future(
+        signed_json_response, loop=loop
+    )
     res = fut.result()
     assert res
 
 
-def test_parse_handle_response_to_future_parsing_error(json_response,
-                                                       channel, command):
+def test_parse_handle_response_to_future_parsing_error(json_response, channel,
+                                                       command, key):
     _ = channel.sequence_command_local(command)
     loop = asyncio.new_event_loop()
     json_response['seq'] = '"'  # Trigger a parsing error.
+    json_response = key.sign_message(json.dumps(json_response))
     fut = channel.parse_handle_response_to_future(json_response, loop=loop)
     assert fut.exception() is not None
 
 
-def test_parse_handle_response_to_future_out_of_order(json_response,
-                                                      channel,
-                                                      command):
+def test_parse_handle_response_to_future_out_of_order(json_response, channel,
+                                                      command, key):
     _ = channel.sequence_command_local(command)
     loop = asyncio.new_event_loop()
     json_response['command_seq'] = 100  # Trigger OffChainOutOfOrder.
+    json_response = key.sign_message(json.dumps(json_response))
     fut = channel.parse_handle_response_to_future(json_response, loop=loop)
     assert not fut.done()
 
 
 def test_parse_handle_response_to_future_out_of_order_with_nowait(json_response,
                                                                   channel,
-                                                                  command):
+                                                                  command, key):
     _ = channel.sequence_command_local(command)
     loop = asyncio.new_event_loop()
     json_response['command_seq'] = 100  # Trigger OffChainOutOfOrder.
+    json_response = key.sign_message(json.dumps(json_response))
     fut = channel.parse_handle_response_to_future(
         json_response, loop=loop, nowait=True
     )
@@ -692,11 +710,12 @@ def test_parse_handle_response_bad_duplicate(json_response, channel, command):
         channel.handle_response(response)
 
 
-def test_process_waiting_messages(channel, json_response, command):
+def test_process_waiting_messages(channel, json_response, command, key):
     # Add command to the waiting queue.
     _ = channel.sequence_command_local(command)
     loop = asyncio.new_event_loop()
     json_response['command_seq'] = 100
+    json_response = key.sign_message(json.dumps(json_response))
     fut = channel.parse_handle_response_to_future(json_response, loop=loop)
     assert not fut.done()
 
@@ -708,14 +727,17 @@ def test_process_waiting_messages(channel, json_response, command):
     assert not channel.waiting_response
 
 
-def test_handle_response_executor_exception(channel, json_response, command):
+def test_handle_response_executor_exception(channel, signed_json_response,
+                                            command):
     _ = channel.sequence_command_local(command)
     channel.executor = MagicMock(spec=ProtocolExecutor)
     channel.executor.sequence_next_command.side_effect = ExecutorException
     channel.executor.next_seq.return_value = 0
     type(channel.executor).last_confirmed = PropertyMock(return_value=0)
     loop = asyncio.new_event_loop()
-    fut = channel.parse_handle_response_to_future(json_response, loop=loop)
+    fut = channel.parse_handle_response_to_future(
+        signed_json_response, loop=loop
+    )
     assert fut.exception() is not None
 
 

@@ -135,6 +135,22 @@ class LibraAddress:
     def __hash__(self):
         return self.encoded_address.__hash__()
 
+    def onchain(self):
+        ''' Returns a Libra Address representing only the onchain address
+            without any subaddress information. '''
+        if self.decoded_sub_address is None:
+            return self
+        return LibraAddress.encode(self.decoded_address)
+
+    def get_onchain_bytes(self):
+        ''' Returns the decoded 16 bytes onchain address of the VASP.'''
+        return self.decoded_address
+
+    def get_subaddress_bytes(self):
+        ''' Returns the decoded 8+ bytes of the subaddress at the VASP.'''
+        return self.decoded_sub_address
+
+
 
 class LibraSubAddress(LibraAddress):
     ''' Represents a Libra subaddress. '''

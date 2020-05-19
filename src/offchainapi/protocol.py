@@ -5,6 +5,7 @@ from .protocol_messages import CommandRequestObject, CommandResponseObject, \
     make_parsing_error, make_command_error
 from .utils import JSONParsingError, JSONFlag
 from .libra_address import LibraAddress
+from .crypto import OffChainInvalidSignature
 
 import json
 from collections import namedtuple, defaultdict
@@ -244,6 +245,14 @@ class VASPPairChannel:
             NetMessage: The message to be sent on a network.
         """
         json_string = request.get_json_data_dict(JSONFlag.NET)
+
+        # Make signature.
+        vasp = self.get_vasp()
+        my_key = vasp.info_context.get_peer_compliance_signature_key(
+            self.get_my_address().as_str()
+        )
+        json_string = my_key.sign_message(json.dumps(json_string))
+
         net_message = NetMessage(
             self.myself,
             self.other,
@@ -258,20 +267,26 @@ class VASPPairChannel:
         self.logger.debug(f'Request SENT -> {self.other.as_str()}')
         return net_message
 
-    def send_response(self, response, encoded=True):
+    def send_response(self, response):
         """ A hook to send a response to other VASP.
 
         Args:
             response (CommandResponseObject): The request object.
-            encoded (bool): Whether the response is json enconded.
 
         Returns:
             NetMessage: The message to be sent on a network.
         """
         struct = response.get_json_data_dict(JSONFlag.NET)
-        struct = json.dumps(struct) if encoded else struct
+
+        # Sign response
+        my_key = self.get_vasp().info_context.get_peer_compliance_signature_key(
+            self.get_my_address().as_str()
+        )
+        signed_response = my_key.sign_message(json.dumps(struct))
+
         net_message = NetMessage(
-            self.myself, self.other, CommandResponseObject, struct)
+            self.myself, self.other, CommandResponseObject, signed_response
+        )
         if __debug__:
             self.net_queue += [net_message]
         self.logger.debug(f'Response SENT -> {self.other.as_str()}')
@@ -367,23 +382,18 @@ class VASPPairChannel:
         # for an asyncronous implementation.
         return self.send_request(request)
 
-    def parse_handle_request(self, json_command, encoded=False):
+    def parse_handle_request(self, json_command):
         """ Handles a request provided as a json string or dict.
 
         Args:
             json_command (str or dict): The json request.
-            encoded (bool, optional): Whether the request is json encoded
-                or not. Defaults to False.
 
         Returns:
             NetMessage: The message to be sent on a network.
         """
         loop = asyncio.new_event_loop()
         fut = self.parse_handle_request_to_future(
-            json_command,
-            encoded,
-            nowait=True,
-            loop=loop
+            json_command, nowait=True, loop=loop
         )
         return fut.result()
 
@@ -407,10 +417,8 @@ class VASPPairChannel:
             del self.waiting_response[next_cmd_seq]
 
             for resp_record in list_of_responses:
-                (json_command, encoded, fut) = resp_record
-                _ = self.parse_handle_response_to_future(
-                    json_command, encoded, fut
-                )
+                (json_command, fut) = resp_record
+                _ = self.parse_handle_response_to_future(json_command, fut)
 
             # Break if we made no progress.
             if next_cmd_seq == self.executor.last_confirmed:
@@ -425,28 +433,24 @@ class VASPPairChannel:
             del self.waiting_requests[next_seq]
 
             for req_record in list_of_requests:
-                (json_command, encoded, fut, old_time) = req_record
+                (json_command, fut, old_time) = req_record
 
                 # Call, and this will update the future and unblocks
                 # any processes waiting on it.
-                _ = self.parse_handle_request_to_future(
-                    json_command, encoded, fut
-                )
+                _ = self.parse_handle_request_to_future(json_command, fut)
 
             # Break if no progress is made.
             if next_seq == self.other_next_seq():
                 break
 
     def parse_handle_request_to_future(
-        self, json_command, encoded=False, fut=None, nowait=False, loop=None
+        self, json_command, fut=None, nowait=False, loop=None
     ):
         """ Handles a request provided as a json string or dict and returns
             a future that triggers when the command is processed.
 
         Args:
             json_command (str or dict): The json request.
-            encoded (bool, optional): Whether the request is json encoded
-                or not. Defaults to False.
             fut (asyncio.Future, optional): The future. Defaults to None.
             nowait (bool, optional): Whether to feed requests commands even
                   out of order without waiting. Defaults to False.
@@ -460,26 +464,40 @@ class VASPPairChannel:
 
         if fut is None:
             fut = asyncio.Future(loop=loop)
+        else:
+            # If we are passed a future that is done, when we just return it
+            # since there is nothing more to do.
+            if fut.done():
+                return fut
 
         self.logger.debug(f'Request Received -> {self.myself.as_str()}')
         try:
-            # Parse the request whoever necessary.
-            req_dict = json.loads(json_command) if encoded else json_command
-            request = CommandRequestObject.from_json_data_dict(
-                req_dict, JSONFlag.NET
+            # Check signature
+            vasp = self.get_vasp()
+            other_key = vasp.info_context.get_peer_compliance_verification_key(
+                self.get_other_address().as_str()
             )
+            request = json.loads(other_key.verify_message(json_command))
+
+            # Parse the request whoever necessary.
+            request = CommandRequestObject.from_json_data_dict(
+                request, JSONFlag.NET
+            )
+
             with self.rlock:
                 # Going ahead to process the request.
                 self.logger.debug(f'Processing Req Seq #{request.seq}')
                 response = self.handle_request(request, raise_on_wait=True)
 
+        except OffChainInvalidSignature:
+            # TODO: Package proper exception
+            fut.set_result('Signature verification failed.')
+            return fut
+
         except OffChainOutOfOrder as e:
             if nowait:
-                # No waiting -- so bubble up the error response.
+                # No waiting -- so bubble up the potocol error response.
                 response = e.args[0]
-                fut.set_result(response)
-                return fut
-
             else:
                 # We were told to wait for this requests turn.
                 self.logger.debug(
@@ -487,20 +505,19 @@ class VASPPairChannel:
                     f'Len: {len(self.waiting_requests)}'
                 )
                 self.waiting_requests[request.seq] += [(
-                    json_command,
-                    encoded,
-                    fut, time.time()
+                    json_command, fut, time.time()
                 )]
-            return fut
+                return fut
+
         except JSONParsingError:
             response = make_parsing_error()
-            full_response = self.send_response(response, encoded=False)
+
         except Exception as e:
             fut.set_exception(e)
             return fut
 
         # Prepare the response.
-        full_response = self.send_response(response, encoded=False)
+        full_response = self.send_response(response)
         fut.set_result(full_response)
         return fut
 
@@ -595,27 +612,23 @@ class VASPPairChannel:
         self.apply_response_to_executor(request)
         return request.response
 
-    def parse_handle_response(self, json_response, encoded=False):
+    def parse_handle_response(self, json_response):
         """ Handles a response as json string or dict.
 
         Args:
             json_response (str or dict): The json response.
-            encoded (bool, optional): Whether the request is json encoded
-                or not. Defaults to False.
 
         Returns:
             NetMessage: The message to be sent on a network.
         """
         loop = asyncio.new_event_loop()
         fut = self.parse_handle_response_to_future(
-            json_response,
-            encoded,
-            nowait=True,
-            loop=loop)
+            json_response, nowait=True, loop=loop
+        )
         return fut.result()
 
     def parse_handle_response_to_future(
-        self, json_response, encoded=False, fut=None, nowait=False, loop=None
+        self, json_response, fut=None, nowait=False, loop=None
     ):
         """ Handles a response provided as a json string. Returns a future
             that fires when the response is processed. You may `await` this
@@ -623,8 +636,6 @@ class VASPPairChannel:
 
         Args:
             json_response (dict or str): The json response.
-            encoded (bool, optional): Whether the request is json encoded
-                or not. Defaults to False.
             fut (asyncio.Future, optional): The future. Defaults to None.
             nowait (bool, optional): Whether to wait for the reponse to be in
                 order to feed it directly to the protocol state machine.
@@ -641,9 +652,13 @@ class VASPPairChannel:
             fut = asyncio.Future(loop=loop)
 
         try:
-            resp_dict = json.loads(json_response) if encoded else json_response
+            vasp = self.get_vasp()
+            other_key = vasp.info_context.get_peer_compliance_verification_key(
+                self.get_other_address().as_str()
+            )
+            response = json.loads(other_key.verify_message(json_response))
             response = CommandResponseObject.from_json_data_dict(
-                resp_dict, JSONFlag.NET
+                response, JSONFlag.NET
             )
             command_seq = response.command_seq
 
@@ -651,22 +666,20 @@ class VASPPairChannel:
                 result = self.handle_response(response)
             fut.set_result(result)
 
+        except OffChainInvalidSignature:
+            # TODO: Package proper exception
+            fut.set_result('Signature verification failed.')
         except JSONParsingError as e:
             fut.set_exception(e)
-
         except OffChainOutOfOrder as e:
             # If we were told to not wait, raise this.
             if nowait:
                 fut.set_exception(e)
             else:
                 # Otherwise wait for longer.
-                self.waiting_response[command_seq] += [(
-                    json_response, encoded, fut
-                )]
-
+                self.waiting_response[command_seq] += [(json_response, fut)]
         except OffChainException or OffChainProtocolError as e:
             fut.set_exception(e)
-
         except ExecutorException as e:
             fut.set_exception(e)
 
