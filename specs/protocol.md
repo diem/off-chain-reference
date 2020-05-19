@@ -44,7 +44,7 @@ We describe a number of additional lower-level requirements throughout the remai
 ## Basic Building Blocks
 
 * **HTTP end-points**: Each VASP exposes an HTTPS POST end point at
-`https://hostname:port/<localVASPAddress>/<RemoteVASPAddress>/process`. It receives `CommandRequestObject`s in the POST body, and responds with `CommandResponseObject`s in the HTTP response. Single command requests-responses are supported (HTTP1.0) but also pipelined request-responses are supported (HTTP1.1).
+`https://hostname:port/<protocol_version>/<localVASPAddress>/<RemoteVASPAddress>/command`. It receives `CommandRequestObject`s in the POST body, and responds with `CommandResponseObject`s in the HTTP response. Single command requests-responses are supported (HTTP1.0) but also pipelined request-responses are supported (HTTP1.1). The version for the Off-chain protocol is the sting `v1`.
 * **Serialization to JSON**: All structures transmitted, nested within `CommandRequestObject` and `CommandResponseObject` are valid JSON serialized objects and can be parsed and serialized using standard JSON libraries. The content type for requests and responses is set to `Content-type: application/json; charset=utf-8` indicating all content is JSON encoded.
 * **JWS Signatures**: all transmitted structures are signed by the sending party using the JWS Signature standard (with the Ed25519 / EdDSA ciphersuite, and `compact` encoding). This ensures all information and meta-data about payments is authenticated and cannot be repudiated.
 * **Addresss and subaddresses**: Throughout the off-chain protocol Libra addresses and subaddresses are encoded using a `bech32` encoding with a 'human readable prefix' equal to `lbr`. Addresses of entities on chain (such as VASPs) are encoded as 16 bytes, with version equal zero (0); and combinations of addresses and sub-address as a concatenation of 16 bytes for address and 8 bytes for subaddress with a version equal one (1). For usage of the Off-Chain APIs with another Blockchain, a similar definition of addressing should be established.
@@ -99,7 +99,7 @@ If the result is 1, the lexicographically higher parent address is used as the s
 By convention the _server_ always determines the sequence of a request in the joint command sequence. When the server creates a `CommandRequestObject` it already assigns it a `command_seq` in the joint sequence of commands. When it responds to requests from the client, its `CommandResponseObject` contains a `command_seq` for the request into the joint command sequence. The protocol client never assigns a `command_seq`, but includes one provided by the protocol server in its responses.
 
 ### Message signatures.
- All `CommandRequestObject` and `CommandResponseObject` messages are signed with the VASP's compliance key. Signatures are EdDSA (curve Ed25519) based on the [JWCrypto Library](https://jwcrypto.readthedocs.io/en/latest/index.html). 
+ All `CommandRequestObject` and `CommandResponseObject` messages are signed with the VASP's compliance key. Signatures are EdDSA (curve Ed25519) based on the [JWCrypto Library](https://jwcrypto.readthedocs.io/en/latest/index.html).
 
 ### `CommandRequestObject` messages.
 
