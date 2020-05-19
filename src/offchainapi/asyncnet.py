@@ -11,7 +11,6 @@ from urllib.parse import urljoin
 import json
 
 
-
 class NetworkException(Exception):
     pass
 
@@ -140,7 +139,7 @@ class Aionet:
         Raises:
             aiohttp.web.HTTPUnauthorized: An exception for 401 Unauthorized.
             aiohttp.web.HTTPForbidden: An exception for 403 Forbidden.
-            aiohttp.web.HTTPBadRequest: An exception for 400 Bad Request
+            aiohttp.web.HTTPBadRequest: An exception for 400 Bad Request.
 
         Returns:
             aiohttp.web.Response: A json response with predefined
@@ -189,9 +188,7 @@ class Aionet:
         self.logger.debug(f'Process Waiting messages.')
         channel.process_waiting_messages()
         self.logger.debug(f'Sending back response to {other_addr.as_str()}.')
-        return web.json_response(
-            response.content,
-            headers=headers)
+        return web.json_response(response.content, headers=headers)
 
     async def send_request(self, other_addr, json_request):
         """ Uses an Http client to send an OffChainAPI request to another VASP.
@@ -220,18 +217,21 @@ class Aionet:
         self.logger.debug(f'Sending post request to {url}')
 
         # Add a custom request header
-        headers = {'X-Request-ID': get_unique_string() }
+        headers = {'X-Request-ID': get_unique_string()}
 
         try:
             async with self.session.post(
                     url,
                     json=json_request,
-                    headers=headers) as response:
+                    headers=headers
+            ) as response:
                 try:
                     # Check the header is correct
                     if 'X-Request-ID' not in response.headers or \
                             response.headers['X-Request-ID'] != headers['X-Request-ID']:
-                        raise Exception('Incorrect X-Request-ID header:', response.headers)
+                        raise Exception(
+                            'Incorrect X-Request-ID header:', response.headers
+                        )
 
                     json_response = await response.json()
                     self.logger.debug(f'Json response: {json_response}')

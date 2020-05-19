@@ -1,6 +1,7 @@
 from ..asyncnet import Aionet
 from ..protocol_messages import OffChainException
 from ..business import BusinessNotAuthorized
+from ..utils import get_unique_string
 
 import pytest
 import aiohttp
@@ -38,7 +39,8 @@ async def client(net_handler, aiohttp_client):
 @pytest.fixture
 async def server(net_handler, tester_addr, aiohttp_server, signed_json_response):
     async def handler(request):
-        return aiohttp.web.json_response(signed_json_response)
+        headers = {'X-Request-ID': request.headers['X-Request-ID']}
+        return aiohttp.web.json_response(signed_json_response, headers=headers)
 
     app = aiohttp.web.Application()
     url = net_handler.get_url('/', tester_addr.as_str(), other_is_server=True)
@@ -83,7 +85,6 @@ async def test_handle_request_bad_payload(client, url):
     assert response.status == 400
 
 
-@pytest.mark.skip(reason="Needs fixing")
 async def test_send_request(net_handler, tester_addr, server, signed_json_request):
     base_url = f'http://{server.host}:{server.port}'
     net_handler.vasp.info_context.get_peer_base_url.return_value = base_url
@@ -92,7 +93,7 @@ async def test_send_request(net_handler, tester_addr, server, signed_json_reques
     # Raises since the vasp did not emit the command; so it does
     # not expect a response.
 
-@pytest.mark.skip(reason="Needs fixing")
+
 async def test_send_command(net_handler, tester_addr, server, command):
     base_url = f'http://{server.host}:{server.port}'
     net_handler.vasp.info_context.get_peer_base_url.return_value = base_url
