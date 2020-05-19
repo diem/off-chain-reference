@@ -133,9 +133,12 @@ async def main_perf(messages_num=10, wait_num=0, verbose=False):
         return res
 
     async def wait_for_all_payment_outcome(nodeA, payments, results):
+        fut_list = [nodeA.wait_for_payment_outcome_async(p.reference_id) for p,r in zip(payments, results)]
+
         res = await asyncio.gather(
-            *[nodeA.wait_for_payment_outcome_async(p.reference_id) for p,r in zip(payments,results)],
-            return_exceptions=True)
+                *fut_list,
+                return_exceptions=True)
+
         return res
 
     # Execute 100 requests
@@ -145,7 +148,7 @@ async def main_perf(messages_num=10, wait_num=0, verbose=False):
     results = results.result()
 
     # Print the result for all initial commands
-    if True: # verbose:
+    if verbose: # verbose:
         for res in results:
             print('RES:', res)
 

@@ -152,14 +152,18 @@ class PaymentProcessor(CommandProcessor):
         try:
             if command.origin != other_address:
                 self.logger.error(
-                f'Command with {other_address.as_str()}.#{seq}'
-                f' Trigger outcome.')
+                    f'Command with {other_address.as_str()}.#{seq}'
+                    f' Trigger outcome.')
 
                 # try to constuct a payment.
                 payment = command.get_payment(self.object_store)
                 self.set_payment_outcome_exception(
                                 payment.reference_id,
                                 PaymentProcessorRemoteError(error))
+            else:
+                self.logger.error(
+                    f'Command with {other_address.as_str()}.#{seq}'
+                    f' Error on other VASPs command.')
         except Exception:
             self.logger.error(
                 f'Command with {other_address.as_str()}.#{seq}'
@@ -614,7 +618,9 @@ class PaymentProcessor(CommandProcessor):
             called multiple times for the same payment to support
             async business operations and recovery.
 
-            If there is no update to the payment simply return None.
+            Must always return a new payment but,
+            if there is no update to the new payment
+            no new command will be emiited.
         '''
         business = self.business
 
@@ -624,6 +630,13 @@ class PaymentProcessor(CommandProcessor):
         other_role = ['sender', 'receiver'][not is_receiver]
 
         status = payment.data[role].status
+
+        if status in {Status.settled, Status.abort}:
+            # Nothing more to be done with this payment
+            # Return a new payment version with no modification
+            # To singnal no changes, and therefore no new command.
+            return payment.new_version()
+
         current_status = status
         other_status = payment.data[other_role].status
 
@@ -667,7 +680,8 @@ class PaymentProcessor(CommandProcessor):
             # Check if we have all the KYC we need
             if current_status not in {
                     Status.ready_for_settlement,
-                    Status.settled}:
+                    Status.settled,
+                    Status.abort}:
                 ready = await business.ready_for_settlement(new_payment)
                 if ready:
                     current_status = Status.ready_for_settlement
@@ -688,9 +702,16 @@ class PaymentProcessor(CommandProcessor):
                 current_status = Status.abort
 
         except Exception as e:
+            self.logger.error(
+                f'Error while processing payment {payment.reference_id}'
+                ' return error in metadata & abort.')
+            self.logger.exception(e)
+
+            # Only report the error in meta-data
+            # & Abort the payment.
             new_payment = payment.new_version()
-            new_payment.data[role].add_metadata(f'Error ({role}): {str(e)}')
-            current_status = payment.data[role].status
+            new_payment.data[role].add_metadata(f'Error: ({role}): {str(e)}')
+            current_status = Status.abort
 
         # Do an internal consistency check:
         if not self.can_change_status(payment, current_status, is_sender):

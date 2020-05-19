@@ -2,7 +2,6 @@ from ..business import BusinessContext, BusinessValidationFailure
 from ..payment import KYCData
 from ..status_logic import Status
 
-
 class BasicBusinessContext(BusinessContext):
 
     def __init__(self, my_addr, reliable=True):
@@ -17,7 +16,12 @@ class BasicBusinessContext(BusinessContext):
         self.reliable_count += 1
         fail = (self.reliable_count % 5 == 0)
         if fail:
-            raise BusinessValidationFailure()
+            e = BusinessValidationFailure(
+                'Artifical error caused for '
+                'testing error handling')
+            raise e
+
+
 
     def open_channel_to(self, other_vasp_info):
         return True
