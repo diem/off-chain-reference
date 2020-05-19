@@ -248,21 +248,6 @@ class VASPInfo:
         """
         raise NotImplementedError()  # pragma: no cover
 
-    def is_authorised_VASP(self, certificate, other_addr):
-        """ Check whether an incoming network request is authorised or not.
-            This function checks that the certificate belongs to the sender
-            of the request (ie. the network client); it ensures that a
-            VASP is not impersonating one of the other authorised VASPs.
-
-            Args:
-                other_addr (LibraAddress): The address of the other VASP.
-                certificate (?): TODO
-
-            Returns:
-                bool: Whether the request of the other VASP is authorized.
-        """
-        raise NotImplementedError()  # pragma: no cover
-
     # --- The functions below are currently unused ---
 
     def get_libra_address(self):
@@ -294,5 +279,27 @@ class VASPInfo:
             Returns:
                 bool: Whether the other VASP is an unhosted wallet.
 
+        """
+        raise NotImplementedError()  # pragma: no cover
+
+    def get_peer_compliance_verification_key(self, other_addr):
+        """ Returns the compliance verfication key of the other VASP.
+
+        Args:
+            other_addr (LibraAddress): The address of the other VASP.
+
+        Returns:
+            ComplianceKey: The compliance verification key of the other VASP.
+        """
+        raise NotImplementedError()  # pragma: no cover
+
+    def get_peer_compliance_signature_key(self, my_addr):
+        """ Returns the compliance signature (secret) key of the VASP.
+
+        Args:
+            my_addr (LibraAddress): The Libra address of the VASP.
+
+        Returns:
+            ComplianceKey: The compliance key of the VASP.
         """
         raise NotImplementedError()  # pragma: no cover

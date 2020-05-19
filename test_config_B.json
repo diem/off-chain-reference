@@ -1,1 +1,1 @@
-{"addr": "BBBBBBBBBBBBBBBB", "base_url": "127.0.0.1", "port": 8090}
+{"addr": "BBBBBBBBBBBBBBBB", "base_url": "127.0.0.1", "port": 7090, "key": {"crv": "Ed25519", "d": "HehJzMPH4d0JUNjfMKHrBTlSmQzOt2ikGrc72YY76q0", "kty": "OKP", "x": "9pS-MRZZwjRtGL3iqPnVGcrtDGXpWi-4UWsSRo-XWD4"}}

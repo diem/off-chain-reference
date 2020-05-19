@@ -6,7 +6,7 @@ from .status_logic import status_heights_MUST, \
 from .payment_command import PaymentCommand, PaymentLogicError
 from .asyncnet import NetworkException
 from .shared_object import SharedObject
-from .libra_address import LibraAddress
+from .libra_address import LibraAddress, LibraSubAddress
 
 import asyncio
 import logging
@@ -395,6 +395,17 @@ class PaymentProcessor(CommandProcessor):
 
         if not self.good_initial_status(new_payment, not is_sender):
             raise PaymentLogicError('Invalid status transition.')
+
+        # Check that the subaddreses are valid
+        sub_send = LibraSubAddress(new_payment.sender.subaddress)
+        sub_revr = LibraSubAddress(new_payment.receiver.subaddress)
+
+        if sub_send.version == 0:
+            raise PaymentLogicError('Sender Subaddress needs to contain'
+                                    ' an encoded subaddress.')
+        if sub_revr.version == 0:
+            raise PaymentLogicError('Receiver Subaddress needs to contain'
+                                    ' an encoded subaddress.')
 
         self.check_signatures(new_payment)
 

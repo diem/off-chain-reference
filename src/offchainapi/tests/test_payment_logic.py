@@ -100,29 +100,26 @@ def test_check_new_update_receiver_modify_sender_state_fail(payment, processor):
 
 def test_check_command(payment, processor, executor):
     states = [
-        ('AAAA', 'BBBB', 'AAAA', True),
-        ('BBBB', 'AAAA', 'AAAA', True),
-        ('CCCC', 'AAAA', 'AAAA', False),
-        ('BBBB', 'CCCC', 'AAAA', False),
-        ('DDDD', 'CCCC', 'AAAA', False),
-        ('AAAA', 'BBBB', 'BBBB', True),
-        ('BBBB', 'AAAA', 'DDDD', False),
+        (b'AAAA', b'BBBB', b'AAAA', True),
+        (b'BBBB', b'AAAA', b'AAAA', True),
+        (b'CCCC', b'AAAA', b'AAAA', False),
+        (b'BBBB', b'CCCC', b'AAAA', False),
+        (b'DDDD', b'CCCC', b'AAAA', False),
+        (b'AAAA', b'BBBB', b'BBBB', True),
+        (b'BBBB', b'AAAA', b'DDDD', False),
     ]
     for state in states:
         src_addr, dst_addr, origin_addr, res = state
 
-        a0 = MagicMock(spec=LibraAddress)
-        a0.as_str.return_value = src_addr
-        a1 = MagicMock(spec=LibraAddress)
-        a1.as_str.return_value = dst_addr
-        origin = MagicMock(spec=LibraAddress)
-        origin.as_str.return_value = origin_addr
+        a0 = LibraAddress.encode(src_addr*4)
+        a1 = LibraAddress.encode(dst_addr*4)
+        origin = LibraAddress.encode(origin_addr*4)
 
         vasp, channel, _ = executor.get_context()
         channel.get_my_address.return_value = a0
         channel.get_other_address.return_value = a1
 
-        payment.data['reference_id'] = f'{origin_addr}_XYZ'
+        payment.data['reference_id'] = f'{origin.as_str()}_XYZ'
         command = PaymentCommand(payment)
         command.set_origin(origin)
 
@@ -196,7 +193,7 @@ def test_payment_process_get_extended_kyc(payment, processor, kyc_data):
 def test_persist(payment):
     store = StorableFactory({})
 
-    my_addr = LibraAddress(b'A'*32)
+    my_addr = LibraAddress.encode(b'A'*16)
     my_addr_str = my_addr.as_str()
     bcm = BasicBusinessContext(my_addr)
     processor = PaymentProcessor(bcm, store)
@@ -234,7 +231,7 @@ def test_persist(payment):
 def test_reprocess(payment,  loop):
     store = StorableFactory({})
 
-    my_addr = LibraAddress(b'A'*32)
+    my_addr = LibraAddress.encode(b'A'*16)
     my_addr_str = my_addr.as_str()
     bcm = BasicBusinessContext(my_addr)
     processor = PaymentProcessor(bcm, store, loop)
@@ -265,8 +262,8 @@ def test_reprocess(payment,  loop):
 def test_process_command_success_no_proc(payment, loop):
     store = StorableFactory({})
 
-    my_addr = LibraAddress(b'B'*32)
-    other_addr = LibraAddress('AAAA')
+    my_addr = LibraAddress.encode(b'B'*16)
+    other_addr = LibraAddress.encode(b'A'*16)
     bcm = BasicBusinessContext(my_addr)
     processor = PaymentProcessor(bcm, store, loop)
 
@@ -283,8 +280,8 @@ def test_process_command_success_no_proc(payment, loop):
 def test_process_command_success_vanilla(payment, loop):
     store = StorableFactory({})
 
-    my_addr = LibraAddress(b'B'*32)
-    other_addr = LibraAddress('AAAA')
+    my_addr = LibraAddress.encode(b'B'*16)
+    other_addr = LibraAddress.encode(b'A'*16)
     bcm = BasicBusinessContext(my_addr)
     processor = PaymentProcessor(bcm, store, loop)
 

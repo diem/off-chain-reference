@@ -156,15 +156,6 @@ class Aionet:
             self.logger.debug(f'Not Authorized {e}')
             raise web.HTTPUnauthorized
 
-        # Verify that the other VASP is authorised to submit the request;
-        # ie. that 'other_addr' matches the certificate.
-        client_certificate = None
-        if not self.vasp.info_context.is_authorised_VASP(
-            client_certificate, other_addr
-        ):
-            self.logger.debug(f'Not Authorized')
-            raise web.HTTPForbidden
-
         # Perform the request, send back the reponse.
         try:
             request_json = await request.json()
@@ -172,7 +163,7 @@ class Aionet:
             # TODO: Handle timeout errors here.
             self.logger.debug(f'Data Received from {other_addr.as_str()}.')
             response = await channel.parse_handle_request_to_future(
-                request_json, encoded=False
+                request_json
             )
 
         except json.decoder.JSONDecodeError as e:
@@ -212,10 +203,10 @@ class Aionet:
         # Try to get a channel with the other VASP.
         channel = self.vasp.get_channel(other_addr)
 
+        # Get the URLs
         base_url = self.vasp.info_context.get_peer_base_url(other_addr)
         url = self.get_url(base_url, other_addr.as_str(), other_is_server=True)
         self.logger.debug(f'Sending post request to {url}')
-
         try:
             async with self.session.post(url, json=json_request) as response:
                 try:
@@ -224,7 +215,7 @@ class Aionet:
 
                     # Wait in case the requests are sent out of order.
                     res = await channel.parse_handle_response_to_future(
-                        json_response, encoded=False
+                        json_response
                     )
                     self.logger.debug(f'Response parsed with status: {res}')
 
@@ -240,6 +231,7 @@ class Aionet:
                     self.logger.debug(f'Exception {type(e)}: {str(e)}')
                     raise e
         except ClientError as e:
+            self.logger.debug(f'ClientError {type(e)}: {str(e)}')
             raise NetworkException(e)
 
     def sequence_command(self, other_addr, command):
