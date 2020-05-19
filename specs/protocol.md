@@ -31,23 +31,23 @@ The Off-chain protocol, as is, supports a number of use-cases:
 
 The Off-Chain protocol has been architected to allow two further use-cases in the near future:
 
-**Scalability**. In the initial version of the Off-chain protocol all off-chain PaymentObjects that are ready for settlement, are then settled individually (gross) through a separate Libra Blockchain transaction. However, the architecture of the Off-chain protocol allows in the future the introduction of netting batches of transactions, and settling all of them through a single Libra Blockchain transaction. This allows costs associated with multiple on-chain transactions to be kept low for VASPs, and allows for a number of user transactions or payment between VASPs that exceed the capacity of the Libra Blockchain.
+**Scalability**. In the initial version of the Off-chain protocol all off-chain PaymentObjects that are ready for settlement, are then settled individually (gross) through a separate Libra Blockchain transaction. However, the architecture of the Off-chain protocol allows in the future the introduction of netting batches of transactions, and settling all of them through a single Libra Blockchain transaction. This allows costs associated with multiple on-chain transactions to be kept low for VASPs, and allows for a number of user transactions or payment between VASPs that exceed the capacity of the Libra Blockchain. Additionally, batches enhance privacy via hiding the number of transactions between VASPs and by only placing a single on-chain transaction which hides the individual transaction amounts.
 
 **Extensibility**. The current Off-Chain protocols accommodate simple payments where a customer of a VASP sends funds to the customer of another VASP over a limit, requiring some additional compliance-related information. However, in the future the Libra eco-system will support more complex flows of funds between customers of VASPs as well as merchants. The Off-chain protocol can be augmented to support the transfer of rich meta-data relating to those flows between VASPs in a compliant, secure, private, scalable and extensible manner.
 
-**Loose Coupling**. While the Off-Chain protocol is designed to support the Libra Blockchain, and its ecosystem, it makes few and well defined assumptions about the Libra Blockchain environment, which can instead be fulfilled by other Blockchains. The Off-chain protocol can therefore be re-purposed to support compliance, privacy and scalability use-cases between VASPs in other Blockchains, as well as in multiple blockchains simultaneously.
+**Usability by Other Blockchains**. The Off-Chain protocol is designed as a generic communication framework which can be utilized by any Blockchain and requires no ties to Libra whatsoever. While the first usage of the Off-Chain protocol is within the Libra Blockchain, the Off-Chain protocol makes few and well defined assumptions about the underlying Blockchain environment, which can be fulfilled by other Blockchains. The Off-chain protocol can therefore be re-purposed to support compliance, privacy and scalability use-cases between VASPs in other Blockchains, as well as in multiple blockchains simultaneously.
 
-We describe a number of additional lower-level requirements throughout the remaining of the documents, such as ease of deployment through the use of established web technologies (like HTTP and JSON), tolerance to delays and crash-recovery failures of either VASPs, and compatibility with cryptography and serialization within the Libra MOVE language.
+We describe a number of additional lower-level requirements throughout the remaining of the documents, such as ease of deployment through the use of established web technologies (like HTTP and JSON), tolerance to delays and crash-recovery failures of either VASPs, and compatibility with common cryptography and serialization schemes.
 
 # Protocols
 
 ## Basic Building Blocks
 
 * **HTTP end-points**: Each VASP exposes an HTTPS POST end point at
-`https://hostname:port/<localVASPAddress>/<RemoteVASPAddress>/process`. It receives `CommandRequestObject`s in the POST body, and responds with `CommandResponseObjects`s in the HTTP response. Single command requests-responses are supported (HTTP1.0) but also pipelined request-responses are supported (HTTP1.1).
+`https://hostname:port/<localVASPAddress>/<RemoteVASPAddress>/process`. It receives `CommandRequestObject`s in the POST body, and responds with `CommandResponseObject`s in the HTTP response. Single command requests-responses are supported (HTTP1.0) but also pipelined request-responses are supported (HTTP1.1).
 * **Serialization to JSON**: All structures transmitted, nested within `CommandRequestObject` and `CommandResponseObject` are valid JSON serialized objects and can be parsed and serialized using standard JSON libraries. The content type for requests and responses is set to `Content-type: application/json; charset=utf-8` indicating all content is JSON encoded.
 * **JWS Signatures**: all transmitted structures are signed by the sending party using the JWS Signature standard (with the Ed25519 / EdDSA ciphersuite, and `compact` encoding). This ensures all information and meta-data about payments is authenticated and cannot be repudiated.
-* **Addresss and subaddresses**: Throughout the off-chain protocol libra addresses and subaddresses are encoded using a `bech32` encoding with a 'human readable prefix' equal to `lbr`. Addresses of entities on chain (such as VASPs) are encoded as 16 bytes, with version equal zero (0); and combinations of addresses and sub-address as a concatenation of 16 bytes for address and 8 bytes for subaddress with a version equal one (1).
+* **Addresss and subaddresses**: Throughout the off-chain protocol Libra addresses and subaddresses are encoded using a `bech32` encoding with a 'human readable prefix' equal to `lbr`. Addresses of entities on chain (such as VASPs) are encoded as 16 bytes, with version equal zero (0); and combinations of addresses and sub-address as a concatenation of 16 bytes for address and 8 bytes for subaddress with a version equal one (1). For usage of the Off-Chain APIs with another Blockchain, a similar definition of addressing should be established.
 * **Random strings**: We assume that object versions are generated as cryptographically strong random strings. These should be at least 16 bytes long and encoded to string in hexadecimal notation using characters in the range[A-Za-z0-9].
 
 ## Interface to Libra
@@ -59,12 +59,12 @@ The Off-chain protocol interacts with the Libra Blockchain in a narrow and very 
 * **Settlement Confirmation**. Given a `PaymentObject` that is ready for settlement, a VASP is able to create a payment within the Libra Blockchain to settle the payment, or observe the Libra Blockchain and confirm whether the payment has been settled. The on-chain payment settling an off-chain payment will contain a signed variant of the Reference ID of the off-chain payment.
 * **Payment reference ID & Recipient VASP signatures**. The Libra Blockchain value transfer contact is able to verify that a signature on the reference ID of an on-chain payment is valid (and that signature is provided through the off-chain protocol.)
 
-The Off-chain protocol could be adapted to be used with other Blockchains as long as address format, authentication and network endpoint discovery, and settlement confirmation can be done for these other chains. The inclusion of a signed reference identifier is a Libra specific feature, and other systems may or may not use it depending on their own compliance strategy.
+The Off-chain protocol can be adapted to be used with other Blockchains as long as address format, authentication and network endpoint discovery, and settlement confirmation can be done for these other chains. The inclusion of a signed reference identifier is a Libra-specific feature, and other systems may or may not use it depending on their own compliance strategy.
 
 ## Command Sequencing Protocol
 
 The low-level Off-Chain protocol allows two VASPs to sequence request-responses for commands originating from either VASP, in order to maintain a
-consistent database of shared objects. Specifically, the commands sequenced are PaymentCommands, defining or updating a PaymentObject. Sequencing a command requires both VAPSs to confirm it is valid, as well as its sequence in relation to other commands.
+consistent database of shared objects. Specifically for the initial version of the Off-Chain protocol, the commands sequenced are PaymentCommands, which define or update a PaymentObject. Sequencing a command requires both VAPSs to confirm it is valid, as well as its sequence in relation to other commands.
 
 The basic protocol interaction consists of:
 
@@ -125,7 +125,7 @@ Such a `CommandRequestObject` contains the following fields.
 |command_type | str| Y |A string representing the type of command contained in the request. |
 |seq | int  | Y | The sequence of this request in the sender local sequence. |
 | command | `ProtocolCommand` sub-structure | Y | The command to sequence. |
-|command_seq    | int | Server   | The sequence of this command in the joint command sequence, only set if the server is the sender. |
+|command_seq    | int | Server   | The sequence of this command in the joint command sequence only set if the server is the sender. |
 
 Since the initiator of the example request has a server role, for this channel, the `CommandRequestObject` contains a field `command_seq` with the sequence number of this command in the joint sequence of commands. A `CommandRequestObject` initiated by a protocol client role would omit the `command_seq` field, since the sequence number will be determined by the server processing the request and included in the response.
 
@@ -202,15 +202,15 @@ All commands act on object versions and update them or create new object version
 
 ### Ordering or Message Processing
 
-Each VASP receives `CommandRequestObjects` on an open server port, in the body of HTTPS POST commands, and responds to them through `CommandResponseObjects` in the body of HTTPS responses. Such requests and responses may be received asynchronously with respect to each other, but should be processed in a specific order.
+Each VASP receives `CommandRequestObject`s on an open server port, in the body of HTTPS POST commands, and responds to them through `CommandResponseObject`s in the body of HTTPS responses. Such requests and responses may be received asynchronously with respect to each other, but should be processed in a specific order.
 
-A `CommandRequestObjects` can be processed if:
+A `CommandRequestObject` can be processed if:
 
-* At a server VASP all local requests have already received a response from the client VASP. (If not a protocol error response with code `wait` may be generated and sent back.). Otherwise the protocol server waits for all responses to its own requests be received first.
+* At a server VASP, all local requests have already received a response from the client VASP. (If not a protocol error response with code `wait` may be generated and sent back.). Otherwise the protocol server waits for all responses to its own requests be received first.
 * The Request is the next request in the remote request sequence. All previous remote requests have already been assigned success or failure responses. (If not a protocol error with code `missing` may be generated and sent back.)
 * The Request has the same sequence number and contents as a previous one. In this case the same response must be sent back. (If the sequence number matches but the command is different a `conflict` protocol error must be sent back.)
 
-Once a `CommandRequestObjects` can be processed its sequence number in the joint command sequence can be determined. In case the protocol server is processing a client request it should assign it the next sequence number in the command sequence, and include it in the `command_seq` field of the response. In case the protocol client is processing a server request it will find its sequence number in the `command_seq` field included in the request.
+Once a `CommandRequestObject` can be processed, its sequence number in the joint command sequence can be determined. In case the protocol server is processing a client request, it should assign it the next sequence number in the command sequence, and include it in the `command_seq` field of the response. In case the protocol client is processing a server request it will find its sequence number in the `command_seq` field included in the request.
 
 If a protocol error is not generated then the request is sequenced into the joint command sequence, and the VASP needs to determine if it is a success or a command failure. This is done by processing commands in order, and applying checks to
 determine the success or failure of a command:
@@ -228,7 +228,7 @@ Depending on the nature of the HTTPS request, responses may be received out of o
 
 **Implementation Notes:** Both requests and responses need to be processed in a specific order to ensure that the joint objects remain consistent. However, an implementation may chose to buffer out-of-order requests and responses. It can then process them later when they become eligible, rather than immediately responding with a protocol error of type `wait` or `missing`. This limits the need for retransmissions saving on bandwidth costs and reducing latency -- and in practice limits the use of the `wait` or `missing` protocol errors to cases when message caches are full.
 
-However, to ensure compatibility with simple implementation as well as crash recovery all implementations should be capable of re-transmitting requests that returned a `wait` or `missing` protocol error, and also re-issue commands from the local sequence that have received no response after some timeout or upon reconnection with another VASP.
+However, to ensure compatibility with simple implementation as well as crash recovery, all implementations should be capable of re-transmitting requests that returned a `wait` or `missing` protocol error, and also re-issue commands from the local sequence that have received no response after some timeout or upon reconnection with another VASP.
 
 We note that the core state machine of the protocol requires protocol requests and responses to be processed sequentially and using a strict order. However, expensive parts of message processing, such as verifying signatures and parsing do not need to be executed sequentially, and may instead be executed in parallel or on multiple machines to increase throughput.
 
@@ -287,7 +287,7 @@ An example `PaymentObject` with all fields (besides optional KYC fields) underst
             },
             "metadata": [],
             "status": "ready_for_settlement",
-            "subaddress": "lbr1pgfpyysjzgfpyysjzgfpyysjzgf3xycnzvf3xycsm957ne"
+            "address": "lbr1pgfpyysjzgfpyysjzgfpyysjzgf3xycnzvf3xycsm957ne"
         },
         "recipient_signature": "lbr1qgfpyysjzgfpyysjzgfpyysjzgg8cfqvy.lbr1qg9q5zs2pg9q5zs2pg9q5zs2pgy7gvd9u_ref00000000.SIGNED",
         "reference_id": "lbr1qg9q5zs2pg9q5zs2pg9q5zs2pgy7gvd9u_ref00000000",
@@ -298,7 +298,7 @@ An example `PaymentObject` with all fields (besides optional KYC fields) underst
             },
             "metadata": [],
             "status": "settled",
-            "subaddress": "lbr1pg9q5zs2pg9q5zs2pg9q5zs2pg9skzctpv9skzcg9kmwta"
+            "address": "lbr1pg9q5zs2pg9q5zs2pg9q5zs2pg9skzctpv9skzcg9kmwta"
         }
     }
 
@@ -332,20 +332,20 @@ Signature of the recipient of this transaction. The signature is over the `refer
 
 * **description (str)** Description of the payment. To be displayed to the user. Unicode utf-8 encoded max length of 255 characters. This field is optional but can only be written once.
 
-* **action (PaymentAction)** Number of Libra + currency type (LibraUSD, LibraEUR, etc.). This field is mandatory and immutable (see `PaymentActionObject`).
+* **action (PaymentAction)** Number of Libra + currency type (LibraUSD, LibraEUR, etc.) + type of action to take. This field is mandatory and immutable (see `PaymentActionObject`).
 
 ### Object Definition: `PaymentActorObject`
 
 A `PaymentActorObject` represents a participant in a payment - either sender or receiver. It also includes the status of the actor, that indicates missing information or willingness to settle or abort the payment, and the Know-Your-Customer information of the customer involved in the payment:
 
     {
-        "subaddress": "lbr1pgfpyysjzgfpyysjzgfpyysjzgf3xycnzvf3xycsm957ne",
+        "address": "lbr1pgfpyysjzgfpyysjzgfpyysjzgf3xycnzvf3xycsm957ne",
         "kyc_data": kyc_data_object(),
         "status": "ready_for_settlement",
         "metadata": [],
     }
 
-* **subaddress (str)** Subaddress of the sender/receiver account. Subaddresses may be single use or valid for a limited time, and therefore VASPs should not rely on them remaining stable across time or different VASP addresses. The subaddresses are encoded using bech32 with a human readable part set to "lbr" (and version set to one). The bech32 subaddress also encodes the address of the VASP, replicating the information in `address'. They should be no longer than 40 characters. Mandatory and immutable.
+* **address (str)** Address of the sender/receiver account. Addresses may be single use or valid for a limited time, and therefore VASPs should not rely on them remaining stable across time or different VASP addresses. The addresses are encoded using bech32 with a human readable part set to "lbr" (and version set to one). The bech32 address encodes both the address of the VASP as well as the specific user's subaddress. They should be no longer than 40 characters. Mandatory and immutable.
 
 * **kyc_data: KycDataObject**
 The KYC data for this account. This field is optional but immutable once it is set. Its structured is discussed in detail below.
@@ -365,16 +365,14 @@ Status of the payment from the perspective of this actor. This field can only be
 
 ### Object Definition: `KYCDataObject`
 
-The `KYCDataObject` is serialized as a string and contained in the `blob` attribute of an object in the `kyc_data` field of a `PaymentObject` (see the example payment at the top of this section). The reason we store KYC data in a serialized manner is that VASPs must check signatures on them, and therefore we need to maintain binary transparency (which is not provided by many HTTP/JSON frameworks). The `blob` field must parse to a valid JSON object of type `KYCDataObject`.
-
-A `KYCDataObject` represents the KYC data for a single subaddress. This should be in canonical JSON format to ensure repeatable hashes of JSON-encoded data.
+A `KYCDataObject` represents the KYC data for a single subaddress.  Proof of non-repudiation is provided by the signatures included in the JWS payloads.
 
     {
         "payload_type": "KYC_DATA"
         "payload_version": 1,
         "type": "individual",
         "given_name": "ben",
-        "surname": "mauer",
+        "surname": "maurer",
         "address": {
             "city": "Sunnyvale",
             "country": "US",
@@ -413,7 +411,7 @@ Legal given name of the user for which this KYC data object applies.
 Legal surname of the user for which this KYC data object applies.
 
 * **address (Object)**.
-Address data for this account
+Physical address data for this account
 
 * **dob: string** Date of birth for the holder of this account.  Specified as an ISO 8601 calendar date format: https://en.wikipedia.org/wiki/ISO_8601
 
@@ -447,7 +445,7 @@ Optional field to indicate the type of ID
 
 ### Object Definition: `AddressObject`
 
-Represents an address
+Represents a physical address
 
     {
         "city": "Sunnyvale",
