@@ -229,8 +229,57 @@ Valid values are:
 **Valid Status Transitions**. Each side of the transaction is only allowed to mutate their own status (sender or receiver), and upon payment creation may only set the status of the other party to `none`. Subsequently, each party may only modify their own state to a higher or equal state in the order `none`, (`needs_kyc_data`, `needs_recipient_signature`, `abort`), `ready_for_settlement`, and `settled`. A status of `abort` and `settle` is terminal and must not be changed. As a consequence of this ordering of valid status updates once a transaction is in a `ready_for_settlement` state by both parties it cannot be aborted any more and can be considered final from the point of view of the off-chain protocol. It is therefore safe for a VASP sending funds to initiate an On-Chain payment to settle an Off-chain payment after it observed the other party setting their status to `ready_for_settlement` and it is also willing to go past this state.
 
 
+## Response Payload
+All responses to a CommandRequestObject is in the form of a CommandResponseObject
 
 
+All requests between VASPs are structured as `CommandRequestObject`s.  For a travel rule exchange, the command is a PaymentCommand as follows:
+
+| Field 	     | Type 	| Required? 	| Description 	|
+|-------	     |------	|-----------	|-------------	|
+| _ObjectType    | str      | Y             | The fixed string `CommandResponseObject`. |
+| seq            | int       | Y             | The sequence number of the request responded to in the local sender request sequence. |
+| command_seq    | int or str=`null` | Y    | The sequence of the command responded to in the joint command sequence |
+| status         | str      | Y             | Either `success` or `failure`. |
+| error          | List of [OffChainErrorObject](#offchainerrorobject) | N | Details on errors when status == "failure"
+
+<details>
+<summary> CommandResponseObject example </summary>
+<pre>
+{
+    "_ObjectType": "CommandResponseObject",
+    "command_seq": null,
+    "error": [OffChainErrorObject()],
+    "seq": 0,
+    "status": "failure"
+}
+</pre>
+</details>
+
+When the `CommandResponseObject` status field is `failure`, the `error` field is included in the response to indicate the nature of the failure. The `error` field (type `OffChainError`) is a list of OffChainError objects. 
+
+### OffChainErrorObject
+Represents an error that occurred in response to a command.
+
+| Field 	     | Type 	| Required? 	| Description 	|
+|-------	     |------	|-----------	|-------------	|
+| type    | str (enum)     | Y             | Either "command_error" or "protocol_error" |
+| field            | str       | N             | The field on which this error occurred|
+| code    | str (enum) | Y    | The error code of the corresponding error |
+| message         | str      | N             | Additional details about this error |
+
+<details>
+<summary> OffChainErrorObject example </summary>
+<pre>
+{
+    "type": "command_error",
+    "field": "0.sender.kyc_data.surname",
+    "code": "missing_data",
+    "message": "",
+}
+
+</pre>
+</details>
 
 
 
