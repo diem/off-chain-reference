@@ -1,6 +1,6 @@
 from ..business import VASPInfo, BusinessContext
 from ..protocol import OffChainVASP
-from ..libra_address import LibraAddress, LibraSubAddress
+from ..libra_address import LibraAddress
 from ..payment_logic import PaymentCommand, PaymentProcessor
 from ..status_logic import Status
 from ..storage import StorableFactory
@@ -173,8 +173,8 @@ def run_client(my_configs_path, other_configs_path, num_of_commands=10, port=0):
     # Make a payment commands.
     commands = []
     for cid in range(num_of_commands):
-        sub_a = LibraSubAddress.encode(b'A'*16, b'a'*8).as_str()
-        sub_b = LibraSubAddress.encode(b'B'*16, b'b'*8).as_str()
+        sub_a = LibraAddress.encode(b'A'*16, b'a'*8).as_str()
+        sub_b = LibraAddress.encode(b'B'*16, b'b'*8).as_str()
         sender = PaymentActor(my_addr.as_str(), sub_a, Status.none, [])
         receiver = PaymentActor(other_addr.as_str(), sub_b, Status.none, [])
         action = PaymentAction(10, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')

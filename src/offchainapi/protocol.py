@@ -465,7 +465,7 @@ class VASPPairChannel:
         if fut is None:
             fut = asyncio.Future(loop=loop)
         else:
-            # If we are passed a future that is done, when we just return it
+            # If we are passed a future that is done, we just return it
             # since there is nothing more to do.
             if fut.done():
                 return fut
