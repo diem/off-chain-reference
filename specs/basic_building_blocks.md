@@ -7,4 +7,4 @@
 
 Next: [Travel Rule Data Exchange](travel_rule_data_exchange.md)
 
-Previous: [Overview](off_chain_protocol.md)
+Previous: [Design Principles](design_principles.md)
