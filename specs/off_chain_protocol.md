@@ -9,7 +9,7 @@ The initial use-case for the Off-Chain protocol relates to _supporting complianc
 
 A secondary use-case for the Off-Chain protocol is to provide higher levels of privacy than those that can be achieved directly on a Blockchain. The exact details of the customer accounts involved in a payment, as well as any personal information that needs to be exchanged to support compliance, remain off-chain. They are exchanged within a secure, authenticated and encrypted, channel and only made available to the parties that strictly require them.
 
-[Design Principles](design_principles.md)
+Next: [Design Principles](design_principles.md)
 
 
 
