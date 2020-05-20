@@ -2,8 +2,84 @@
 
 Add description
 
-## Request Payload
-All requests between VASPs are structured as `CommandRequestObject`s.  For a travel rule exchange, the command is a PaymentCommand as follows:
+## Request/Response Payload
+All requests between VASPs are structured as [`CommandRequestObject`s](#commandrequestobject) and all responses are structured as [`CommandResponseObject`s](#commandresponseobject).  The resulting request takes a form of the following:
+
+<details>
+<summary> Request Payload Example </summary>
+<pre>
+{
+    "_ObjectType": "CommandRequestObject",
+    "command_type": "PaymentCommand",
+    "seq": 1,
+    "command": {
+	    "_ObjectType": "PaymentCommand",
+	    "_creates_versions": [
+	        "08697804e12212fa1c979283963d5c71"
+	    ],
+	    "_dependencies": [],
+	    "payment": {
+	        {
+			    "sender": {
+				    "address": "lbr1pgfpyysjzgfpyysjzgfpyysjzgf3xycnzvf3xycsm957ne",
+				    "kyc_data": {
+					    "payload_type": "KYC_DATA"
+					    "payload_version": 1,
+					    "type": "individual",
+					    "given_name": "ben",
+					    "surname": "maurer",
+					    "address": {
+					        "city": "Sunnyvale",
+					        "country": "US",
+					        "line1": "1234 Maple Street",
+					        "line2": "Apartment 123",
+					        "postal_code": "12345",
+					        "state": "California",
+					    },
+					    "dob": "1920-03-20",
+					    "place_of_birth": {
+					        "city": "Sunnyvale",
+					        "country": "US",
+					        "postal_code": "12345",
+					        "state": "California",
+					    }
+					},
+				    "status": "ready_for_settlement",
+				},
+			    "receiver": {
+				    "address": "lbr1pgfpnegv9gfpyysjzgfpyysjzgf3xycnzvf3xycsmxycyy",
+				},
+			    "reference_id": "lbr1qg9q5zs2pg9q5zs2pg9q5zs2pgy7gvd9u_ref1001",
+			    "action": {
+				    "amount": 100,
+				    "currency": "USD",
+				    "action": "charge",
+				    "timestamp": 72322,
+				},
+			    "description": "A free form or structured description of the payment.",
+			},
+	    }
+	},
+    "command_seq": 1,
+}
+</pre>
+</details>
+
+A response would look like the following:
+<details>
+<summary> CommandRequestObject example </summary>
+<pre>
+{
+    "_ObjectType": "CommandResponseObject",
+    "seq": 1,
+    "command_seq": 1,
+    "status": "success",
+}
+</pre>
+</details>
+
+### CommandRequestObject
+All requests between VASPs are structured as `CommandRequestObject`s. For a travel rule exchange, the command is a PaymentCommand as follows:
 
 | Field 	| Type 	| Required? 	| Description 	|
 |-------	|------	|-----------	|-------------	|
@@ -86,7 +162,7 @@ A `PaymentActorObject` represents a participant in a payment - either sender or 
 |-------	    |------	|-----------	|-------------	|
 | address | str | Y | Address of the sender/receiver account. Addresses may be single use or valid for a limited time, and therefore VASPs should not rely on them remaining stable across time or different VASP addresses. The addresses are encoded using bech32. The bech32 address encodes both the address of the VASP as well as the specific user's subaddress. They should be no longer than 80 characters. Mandatory and immutable. For Libra addresses, refer to (TODO) for format. |
 | kyc_data | [KycDataObject](#kycdataobject) | N | The KYC data for this account. This field is optional but immutable once it is set. |
-| status | str enum | Y | Status of the payment from the perspective of this actor. This field can only be set by the respective sender/receiver VASP and represents the status on the sender/receiver VASP side. This field is mandatory and mutable. Valid values are specified in [ StatusEnum ](#statusenum) |
+| status | str enum | Y | Status of the payment from the perspective of this actor. This field can only be set by the respective sender/receiver VASP and represents the status on the sender/receiver VASP side. This field is mandatory by this respective actor (either sender or receiver side) and mutable. Valid values are specified in [ StatusEnum ](#statusenum) |
 | metadata | list of str | Y | Can be specified by the respective VASP to hold metadata that the sender/receiver VASP wishes to associate with this payment. This is a mandatory field but can be set to an empty list (i.e. `[]`). New string-typed entries can be appended at the end of the list, but not deleted.
 
 <details>
@@ -127,19 +203,11 @@ A `KYCDataObject` represents the KYC data for a single subaddress.  Proof of non
     "given_name": "ben",
     "surname": "maurer",
     "address": {
-        "city": "Sunnyvale",
-        "country": "US",
-        "line1": "1234 Maple Street",
-        "line2": "Apartment 123",
-        "postal_code": "12345",
-        "state": "California",
+        AddressObject(),
     },
     "dob": "1920-03-20",
     "place_of_birth": {
-        "city": "Sunnyvale",
-        "country": "US",
-        "postal_code": "12345",
-        "state": "California",
+        AddressObject(),
     }
     "national_id": {
     },
