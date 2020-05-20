@@ -5,5 +5,6 @@
 * **Serialization to JSON**: All structures transmitted, nested within `CommandRequestObject` and `CommandResponseObject` are valid JSON serialized objects and can be parsed and serialized using standard JSON libraries. The content type for requests and responses is set to `Content-type: application/json; charset=utf-8` indicating all content is JSON encoded.
 * **JWS Signatures**: all transmitted structures are signed by the sending party using the JWS Signature standard (with the Ed25519 / EdDSA ciphersuite, and `compact` encoding). This ensures all information and meta-data about payments is authenticated and cannot be repudiated.
 
-Next: [Travel Rule Data Exchange](travel_rule_data_exchange.md
+Next: [Travel Rule Data Exchange](travel_rule_data_exchange.md)
+
 Previous: [Overview](off_chain_protocol.md)
