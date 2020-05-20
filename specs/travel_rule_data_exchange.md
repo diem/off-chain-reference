@@ -349,6 +349,6 @@ Represents an error that occurred in response to a command.
 
 Previous: [Command Sequencing](command_sequencing.md)
 
-
+Next: [Open source implementation of off-chain APIs](https://github.com/calibra/off-chain-api)
 
 
