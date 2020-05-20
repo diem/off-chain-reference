@@ -219,12 +219,12 @@ Represents a national ID.
 
 ### StatusEnum
 Valid values are:
-    * `none` - No status is yet set from this actor.
-    * `needs_kyc_data` - KYC data about the subaddresses is required by this actor.
-    * `needs_recipient_signature` - Can only be associated with the sender actor.  Means that the sender still requires that the recipient VASP provide the signature so that the transaction can be put on-chain.
-    * `ready_for_settlement` - Transaction is ready for settlement according to this actor (i.e. the required signatures/KYC data have been provided)
-    * `settled` - Payment has been settled on chain and funds delivered to the subaddress
-    * `abort` - Indicates the actor wishes to abort this payment, instead of settling it.
+* `none` - No status is yet set from this actor.
+* `needs_kyc_data` - KYC data about the subaddresses is required by this actor.
+* `needs_recipient_signature` - Can only be associated with the sender actor.  Means that the sender still requires that the recipient VASP provide the signature so that the transaction can be put on-chain.
+* `ready_for_settlement` - Transaction is ready for settlement according to this actor (i.e. the required signatures/KYC data have been provided)
+* `settled` - Payment has been settled on chain and funds delivered to the subaddress
+* `abort` - Indicates the actor wishes to abort this payment, instead of settling it.
 
 **Valid Status Transitions**. Each side of the transaction is only allowed to mutate their own status (sender or receiver), and upon payment creation may only set the status of the other party to `none`. Subsequently, each party may only modify their own state to a higher or equal state in the order `none`, (`needs_kyc_data`, `needs_recipient_signature`, `abort`), `ready_for_settlement`, and `settled`. A status of `abort` and `settle` is terminal and must not be changed. As a consequence of this ordering of valid status updates once a transaction is in a `ready_for_settlement` state by both parties it cannot be aborted any more and can be considered final from the point of view of the off-chain protocol. It is therefore safe for a VASP sending funds to initiate an On-Chain payment to settle an Off-chain payment after it observed the other party setting their status to `ready_for_settlement` and it is also willing to go past this state.
 
