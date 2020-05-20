@@ -1,6 +1,6 @@
 # Command Sequencing
 
-The low-level Off-Chain protocol allows two VASPs to sequence request-responses for commands originating from either VASP, in order to maintain a consistent database of shared objects. Sequencing a command requires both VAPSs to confirm it is valid, as well as its sequence in relation to other commands.  Both VASPs in a channel can asynchronously attempt to initiate and execute commands on shared objects. The purpose of the command sequencing protocols is to ensure that such concurrent requests are applied in the same sequence at both VASPs to ensure that the state of shared objects remains consistent.
+The low-level Off-Chain protocol allows two VASPs to sequence request-responses for commands originating from either VASP, in order to maintain a consistent database of shared objects. Sequencing a command requires both VAPSs to confirm it is valid, as well as its sequence in relation to other commands.  Both VASPs in a channel can asynchronously attempt to initiate and execute commands on shared objects. The purpose of the command sequencing protocols is to ensure that such concurrent requests are applied in the same sequence at both VASPs to ensure that the state of shared objects remains consistent. All commands exchanged between pairs of VASPs are sequenced with respect to each other. This allows the VASPs to define commands that act on the totality of the state they share without ambiguitiy, and enable in the future locking multiple payments into batches for settlement.
 
 
 ## Protocol Server and Client roles
