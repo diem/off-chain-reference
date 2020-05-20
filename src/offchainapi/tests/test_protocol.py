@@ -611,7 +611,8 @@ def test_parse_handle_request_to_future_out_of_order(json_request, channel,
     fut = channel.parse_handle_request_to_future(
         json_request, loop=loop, nowait=True
     )
-    res = fut.result().get_json_data_dict(JSONFlag.NET)
+    res = fut.result().content
+    res = json.loads(key.verify_message(res))
     assert res['error']['code'] == 'wait'
 
 

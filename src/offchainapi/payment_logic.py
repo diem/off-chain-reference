@@ -6,7 +6,7 @@ from .status_logic import status_heights_MUST, \
 from .payment_command import PaymentCommand, PaymentLogicError
 from .asyncnet import NetworkException
 from .shared_object import SharedObject
-from .libra_address import LibraAddress, LibraSubAddress
+from .libra_address import LibraAddress
 
 import asyncio
 import logging
@@ -225,8 +225,8 @@ class PaymentProcessor(CommandProcessor):
 
         # Ensure that the two parties involved are in the VASP channel
         parties = set([
-            new_payment.sender.address,
-            new_payment.receiver.address
+            new_payment.sender.get_address().as_str(),
+            new_payment.receiver.get_address().as_str(),
         ])
 
         needed_parties = set([
@@ -360,9 +360,6 @@ class PaymentProcessor(CommandProcessor):
         is_sender = business.is_sender(payment)
         other_actor = payment.receiver if is_sender else payment.sender
 
-        if 'kyc_signature' in other_actor:
-            business.validate_kyc_signature(payment)
-
         if is_sender and 'recipient_signature' in payment:
             business.validate_recipient_signature(payment)
 
@@ -385,6 +382,18 @@ class PaymentProcessor(CommandProcessor):
         is_receipient = business.is_recipient(new_payment)
         is_sender = not is_receipient
 
+        # Ensure address and subaddress are consistent
+        sender_addr = LibraAddress(new_payment.sender.get_address().as_str(),)
+        sender_subaddr = LibraAddress(new_payment.sender.subaddress)
+        recv_addr = LibraAddress(new_payment.receiver.get_address().as_str(),)
+        recv_subaddr = LibraAddress(new_payment.receiver.subaddress)
+
+        if sender_subaddr.onchain() != sender_addr or \
+                recv_subaddr.onchain() != recv_addr:
+            raise PaymentLogicError(
+                'Address and subaddress mismatch.'
+            )
+
         role = ['sender', 'receiver'][is_receipient]
         other_role = ['sender', 'receiver'][is_sender]
         other_status = new_payment.data[other_role].status
@@ -397,8 +406,8 @@ class PaymentProcessor(CommandProcessor):
             raise PaymentLogicError('Invalid status transition.')
 
         # Check that the subaddreses are valid
-        sub_send = LibraSubAddress(new_payment.sender.subaddress)
-        sub_revr = LibraSubAddress(new_payment.receiver.subaddress)
+        sub_send = LibraAddress(new_payment.sender.subaddress)
+        sub_revr = LibraAddress(new_payment.receiver.subaddress)
 
         if sub_send.version == 0:
             raise PaymentLogicError('Sender Subaddress needs to contain'
@@ -534,7 +543,7 @@ class PaymentProcessor(CommandProcessor):
 
                 if Status.needs_kyc_data in kyc_to_provide:
                     extended_kyc = await business.get_extended_kyc(new_payment)
-                    myself_new_actor.add_kyc_data(*extended_kyc)
+                    myself_new_actor.add_kyc_data(extended_kyc)
 
                 if Status.needs_recipient_signature in kyc_to_provide:
                     signature = await business.get_recipient_signature(

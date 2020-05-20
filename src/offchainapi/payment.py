@@ -3,6 +3,7 @@ from .utils import StructureException, StructureChecker, \
     JSONSerializable
 from .shared_object import SharedObject
 from .status_logic import Status
+from .libra_address import LibraAddress
 
 import json
 
@@ -15,15 +16,23 @@ class KYCData(StructureChecker):
     """
 
     fields = [
-        ('blob', str, REQUIRED, WRITE_ONCE)
+        ("payload_type", str, OPTIONAL, WRITE_ONCE),
+        ("payload_version", int, OPTIONAL, WRITE_ONCE),
+        ("type", str, OPTIONAL, WRITE_ONCE),
+        ("given_name", str, OPTIONAL, WRITE_ONCE),
+        ("surname", str, OPTIONAL, WRITE_ONCE),
+        ("address", dict, OPTIONAL, WRITE_ONCE),
+        ("dob", str, OPTIONAL, WRITE_ONCE),
+        ("place_of_birth", dict, OPTIONAL, WRITE_ONCE),
+        ("national_id", dict, OPTIONAL, WRITE_ONCE),
+        ("legal_entity_name", str, OPTIONAL, WRITE_ONCE),
+        ("other", dict, OPTIONAL, WRITE_ONCE),
     ]
 
-    def __init__(self, kyc_json_blob):
+    def __init__(self, kyc_dict):
         # Keep as blob since we need to sign / verify byte string.
         StructureChecker.__init__(self)
-        self.update({
-            'blob': kyc_json_blob
-        })
+        self.update(kyc_dict)
 
     def parse(self):
         """ Parse the KYC blob and return a data dictionary.
@@ -31,28 +40,19 @@ class KYCData(StructureChecker):
             Returns:
                 dict: KYC data as a dictionary.
         """
-        return json.loads(self.data['blob'])
+        return self.data
 
     def custom_update_checks(self, diff):
         """ Override StructureChecker. """
-        # Tests JSON parsing before accepting blob.
-        if 'blob' in diff:
-            try:
-                data = json.loads(diff['blob'])
-            except Exception as e:
-                raise StructureException(
-                    f'JSON Parsing Exception :'
-                    f'ensure KYCData is a valid JSON object ({e})'
-                )
 
-            if 'payment_reference_id' not in data:
-                raise StructureException('Missing: field payment_reference_id')
+        # Check all data is JSON serializable
+        json.dumps(diff)
 
-            types = ['individual', 'entity']
-            if 'type' not in data:
-                raise StructureException('Missing: field type')
-            if data['type'] not in types:
-                raise StructureException(f'Wrong KYC "type": {data["type"]}')
+        types = ['individual', 'entity']
+        if 'type' not in diff:
+            raise StructureException('Missing: field type')
+        if diff['type'] not in types:
+            raise StructureException(f'Wrong KYC "type": {diff["type"]}')
 
 
 
@@ -67,35 +67,25 @@ class PaymentActor(StructureChecker):
     """
 
     fields = [
-        ('address', str, REQUIRED, WRITE_ONCE),
         ('subaddress', str, REQUIRED, WRITE_ONCE),
         ('kyc_data', KYCData, OPTIONAL, WRITE_ONCE),
-        ('kyc_signature', str, OPTIONAL, WRITE_ONCE),
-        ('kyc_certificate', str, OPTIONAL, WRITE_ONCE),
         ('status', Status, REQUIRED, UPDATABLE),
         ('metadata', list, REQUIRED, UPDATABLE)
     ]
 
-    def __init__(self, address, subaddress, status, metadata):
+    def __init__(self, subaddress, status, metadata):
         StructureChecker.__init__(self)
         self.update({
-            'address': address,
             'subaddress': subaddress,
             'status': status,
             'metadata': metadata
         })
 
+    def get_address(self):
+        return LibraAddress(self.subaddress).onchain()
+
     def custom_update_checks(self, diff):
         """ Override StructureChecker. """
-        # If any of kyc data, signature or certificate is provided, we expect
-        # all the other fields as well
-        missing = set([
-            "kyc_data",
-            "kyc_signature",
-            "kyc_certificate"
-        ]) - set(diff.keys())
-        if len(missing) != 0 and len(missing) != 3:
-            raise StructureException('Missing: field %s' % (str(missing),))
 
         if 'status' in diff and not isinstance(diff['status'], Status):
             raise StructureException('Wrong status: %s' % diff['status'])
@@ -108,18 +98,14 @@ class PaymentActor(StructureChecker):
                         'Wrong type: metadata item type expected str, got %s' %
                         type(item))
 
-    def add_kyc_data(self, kyc_data, kyc_signature, kyc_certificate):
+    def add_kyc_data(self, kyc_data):
         """ Add extended KYC information and kyc signature.
 
         Args:
-            kyc_data (str): The KYC data.
-            kyc_signature (str): The KYC signature.
-            kyc_certificate (str): The KYC certificate.
+            kyc_data (str): The KYC data object
         """
         self.update({
             'kyc_data': kyc_data,
-            'kyc_signature': kyc_signature,
-            'kyc_certificate': kyc_certificate
         })
 
     def add_metadata(self, item):

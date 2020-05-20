@@ -141,18 +141,6 @@ class BusinessContext:
         '''
         raise NotImplementedError()  # pragma: no cover
 
-    def validate_kyc_signature(self, payment):
-        ''' Validates the kyc signature is correct. If the signature is valid
-            do nothing.
-
-            Args:
-                payment (PaymentCommand): The concerned payment.
-
-            Raises:
-                BusinessValidationFailure: If the signature is invalid
-                    or not present.
-        '''
-        raise NotImplementedError()  # pragma: no cover
 
     async def get_extended_kyc(self, payment):
         ''' Provides the extended KYC information for this payment.
@@ -165,9 +153,8 @@ class BusinessContext:
                     receive extended KYC data for this payment.
 
             Returns:
-                (str, str, str): Returns the extended KYC information for
-                this payment, in the format:
-                (`kyc_data`, `kyc_signature`, `kyc_certificate`)
+                KYCData: Returns the extended KYC information for
+                this payment.
         '''
         raise NotImplementedError()  # pragma: no cover
 

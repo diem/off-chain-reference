@@ -1,7 +1,7 @@
 from ..sample.sample_service import sample_business, sample_vasp
 from ..payment_logic import Status, PaymentProcessor, PaymentCommand
 from ..payment import PaymentActor, PaymentObject
-from ..libra_address import LibraAddress, LibraSubAddress
+from ..libra_address import LibraAddress
 from ..utils import JSONFlag
 from ..protocol_messages import CommandRequestObject, CommandResponseObject, \
     OffChainError
@@ -25,7 +25,8 @@ def business_and_processor(three_addresses, store):
 @pytest.fixture
 def payment_as_receiver(three_addresses, sender_actor, payment_action):
     _, _, a0 = three_addresses
-    receiver = PaymentActor(a0.as_str(), '1', Status.none, [])
+    subaddr = LibraAddress.encode(a0.decoded_address, b'x'*8)
+    receiver = PaymentActor(subaddr.as_str(), Status.none, [])
     return PaymentObject(
         sender_actor, receiver, 'ref', 'orig_ref', 'desc', payment_action
     )
@@ -34,8 +35,8 @@ def payment_as_receiver(three_addresses, sender_actor, payment_action):
 @pytest.fixture
 def kyc_payment_as_receiver(payment_as_receiver, kyc_data):
     payment = payment_as_receiver
-    payment.sender.add_kyc_data(kyc_data, 'KYC_SIG', 'CERT')
-    payment.receiver.add_kyc_data(kyc_data, 'KYC_SIG', 'CERT')
+    payment.sender.add_kyc_data(kyc_data)
+    payment.receiver.add_kyc_data(kyc_data)
     payment.sender.change_status(Status.needs_recipient_signature)
     return payment
 
@@ -51,7 +52,8 @@ def settled_payment_as_receiver(kyc_payment_as_receiver):
 @pytest.fixture
 def payment_as_sender(three_addresses, receiver_actor, payment_action):
     _, _, a0 = three_addresses
-    sender = PaymentActor(a0.as_str(), '1', Status.none, [])
+    subaddr = LibraAddress.encode(a0.decoded_address, b'x'*8)
+    sender = PaymentActor(subaddr.as_str(), Status.none, [])
     return PaymentObject(
         sender, receiver_actor, 'ref', 'orig_ref', 'desc', payment_action
     )
@@ -60,8 +62,8 @@ def payment_as_sender(three_addresses, receiver_actor, payment_action):
 @pytest.fixture
 def kyc_payment_as_sender(payment_as_sender, kyc_data):
     payment = payment_as_sender
-    payment.sender.add_kyc_data(kyc_data, 'KYC_SIG', 'CERT')
-    payment.receiver.add_kyc_data(kyc_data, 'KYC_SIG', 'CERT')
+    payment.sender.add_kyc_data(kyc_data)
+    payment.receiver.add_kyc_data(kyc_data)
     payment.sender.change_status(Status.needs_recipient_signature)
     payment.add_recipient_signature('SIG')
     assert payment.sender is not None
@@ -87,16 +89,14 @@ def vasp(my_addr):
 
 @pytest.fixture
 def json_request(my_addr, other_addr, payment_action):
-    sub_sender = LibraSubAddress.encode(my_addr.decoded_address, b'a'*8)
-    sub_receiver = LibraSubAddress.encode(other_addr.decoded_address, b'b'*8)
+    sub_sender = LibraAddress.encode(my_addr.decoded_address, b'a'*8)
+    sub_receiver = LibraAddress.encode(other_addr.decoded_address, b'b'*8)
 
-    sender = PaymentActor(my_addr.as_str(), sub_sender.as_str(), Status.none, [])
-    receiver = PaymentActor(
-        other_addr.as_str(), sub_receiver.as_str(), Status.none, []
-    )
+    sender = PaymentActor(sub_sender.as_str(), Status.none, [])
+    receiver = PaymentActor(sub_receiver.as_str(), Status.none, [])
     ref = f'{other_addr.as_str()}_XYZ'
     payment = PaymentObject(
-        sender, receiver, ref, 'orig_ref', 'desc', payment_action
+        sender, receiver, ref, 'Original Reference', 'A description...', payment_action
     )
     command = PaymentCommand(payment)
     request = CommandRequestObject(command)
@@ -171,7 +171,7 @@ def test_business_is_kyc_provided_sender(business_and_processor, kyc_payment_as_
     ready = proc.loop.run_until_complete(bc.ready_for_settlement(ret_payment))
     assert ready
     assert ret_payment.data['sender'].data['status'] == Status.ready_for_settlement
-    assert bc.get_account('1')['balance'] == 5.0
+    assert bc.get_account('x'*8)['balance'] == 5.0
 
 
 def test_vasp_simple(json_request, vasp, other_addr, loop):
