@@ -9,4 +9,5 @@
 We describe a number of additional lower-level requirements throughout the remaining of the documents, such as ease of deployment through the use of established web technologies (like HTTP and JSON), tolerance to delays and crash-recovery failures of either VASPs, and compatibility with common cryptography and serialization schemes.
 
 Next: [Basic Building Blocks](basic_building_blocks.md)
+
 Previous: [Overview](off_chain_protocol.md)
