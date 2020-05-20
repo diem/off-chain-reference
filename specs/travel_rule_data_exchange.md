@@ -60,7 +60,7 @@ The structure in this object can be a full payment of just the fields of an exis
 | reference_id | str | Y | Unique reference ID of this payment on the payment initiator VASP (the VASP which originally created this payment object). This value should be unique, and formatted as “<creator_vasp_onchain_address_bech32>_<unique_id>”.  For example, ”lbr1x23456abcd_seqABCD“. This field is mandatory on payment creation and immutable after that. |
 | original_payment_reference_id | str | N | Used for updates to a payment after it has been committed on chain. For example, used for refunds. The reference ID of the original payment will be placed into this field. This value is optional on payment creation and invalid on updates. |
 | recipient_signature | str | N | (TODO) Signature of the recipient of this transaction. The signature is over the `reference_id` and is signed with the compliance key of the recipient VASP. |
-| action | [`PaymentActionObject`](#paymentactionobject) | Y | Number of Libra + currency type (LibraUSD, LibraEUR, etc.) + type of action to take. This field is mandatory and immutable |
+| action | [`PaymentActionObject`](#paymentactionobject) | Y | Number of Libra + currency type (LibraUSD, LibraEUR, BTC, etc.) + type of action to take. This field is mandatory and immutable |
 | description | str | N | Description of the payment. To be displayed to the user. Unicode utf-8 encoded max length of 255 characters. This field is optional but can only be written once.
 
 <details>
@@ -200,7 +200,7 @@ Represents a national ID.
 | Field 	    | Type 	| Required? 	| Description 	|
 |-------	    |------	|-----------	|-------------	|
 | amount | uint | Y | Amount of the transfer.  Base units are the same as for on-chain transactions for this currency.  For example, if LibraUSD is represented on-chain where “1” equals 1e-6 dollars, then “1” equals the same amount here.  For any currency, the on-chain mapping must be used for amounts. |
-| currency | enum | Y | One of the supported on-chain currency types - ex. LibraUSD, LibraEUR, etc. |
+| currency | enum | Y | One of the supported on-chain currency types - ex. LBR, BTC, USD, EUR, etc. |
 | action | enum | Y | Populated in the request.  This value indicates the requested action to perform, and the only valid value is `charge`. |
 | timestamp | uint | Y | Unix timestamp indicating the time that the payment command was created.
 
@@ -209,7 +209,7 @@ Represents a national ID.
 <pre>
 {
     "amount": 100,
-    "currency": "LibraUSD",
+    "currency": "USD",
     "action": "charge",
     "timestamp": 72322,
 }
