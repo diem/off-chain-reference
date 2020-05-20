@@ -16,6 +16,6 @@ Both VASPs in a channel can asynchronously attempt to initiate and execute comma
 
 As a reminder, all `CommandRequestObject` and `CommandResponseObject` objects sent are signed using JWS Signatures, using EdDSA and compact encoding. Recipients must verify the signatures when receiving any objects.
 
-Next: [Travel Rule Data Exchange](travel_rule_data_exchange.md)
+Next: [Command Sequencing](command_sequencing.md)
 
 Previous: [Design Principles](design_principles.md)
