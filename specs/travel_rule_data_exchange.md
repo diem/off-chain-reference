@@ -87,7 +87,7 @@ All requests between VASPs are structured as `CommandRequestObject`s. For a trav
 |command_type | str| Y |A string representing the type of command contained in the request. Set to `PaymentCommand` for travel rule data exchange |
 |seq | int  | Y | The sequence of this request in the sender local sequence. |
 | command | [`PaymentCommand` object](#paymentcommand-object) | Y | The payment command to sequence. |
-|command_seq    | int | Server   | The sequence of this command in the joint command sequence only set if the server is the sender. |
+|command_seq    | int | Server   | The sequence of this command in the joint command sequence. Only set if the server is the sender. See [Command Sequencing](command_sequencing.md) |
 
 <details>
 <summary> CommandRequestObject example </summary>
