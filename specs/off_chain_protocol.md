@@ -11,6 +11,3 @@ A secondary use-case for the Off-Chain protocol is to provide higher levels of p
 
 Next: [Design Principles](design_principles.md)
 
-
-
-[Open source implementation of off-chain APIs](https://github.com/calibra/off-chain-api)
