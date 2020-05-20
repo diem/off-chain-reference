@@ -150,13 +150,6 @@ class LibraAddress:
         ''' Returns the decoded 8+ bytes of the subaddress at the VASP.'''
         return self.decoded_sub_address
 
-
-
-class LibraSubAddress(LibraAddress):
-    ''' Represents a Libra subaddress. '''
-    pass
-
-
 # Adapted from : https://github.com/fiatjaf/bech32/blob/master/bech32/__init__.py
 # MIT Licence here: https://github.com/fiatjaf/bech32/blob/master/LICENSE
 # Copyright (c) 2017 Pieter Wuille

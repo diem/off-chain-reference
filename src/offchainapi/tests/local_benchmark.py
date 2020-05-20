@@ -4,7 +4,7 @@
 # $ python -m cProfile -s tottime src/scripts/run_perf.py > report.txt
 #
 from ..business import VASPInfo
-from ..libra_address import LibraAddress, LibraSubAddress
+from ..libra_address import LibraAddress
 from ..payment_logic import PaymentCommand
 from ..status_logic import Status
 from ..payment import PaymentAction, PaymentActor, PaymentObject
@@ -111,8 +111,8 @@ async def main_perf(messages_num=10, wait_num=0, verbose=False):
     payments = []
     for cid in range(messages_num):
         peerA_addr = PeerA_addr.as_str()
-        sub_a = LibraSubAddress.encode(b'A'*16, b'a'*8).as_str()
-        sub_b = LibraSubAddress.encode(b'B'*16, b'b'*8).as_str()
+        sub_a = LibraAddress.encode(b'A'*16, b'a'*8).as_str()
+        sub_b = LibraAddress.encode(b'B'*16, b'b'*8).as_str()
         sender = PaymentActor(sub_a, Status.needs_kyc_data, [])
         receiver = PaymentActor(sub_b, Status.none, [])
         action = PaymentAction(10, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
