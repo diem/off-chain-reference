@@ -135,8 +135,8 @@ The structure in this object can be a full payment of just the fields of an exis
 | sender/receiver | [`PaymentActorObject`](#paymentactorobject) | Required for payment creation | Information about the sender/receiver in this payment |
 | reference_id | str | Y | Unique reference ID of this payment on the payment initiator VASP (the VASP which originally created this payment object). This value should be unique, and formatted as “<creator_vasp_onchain_address_bech32>_<unique_id>”.  For example, ”lbr1x23456abcd_seqABCD“. This field is mandatory on payment creation and immutable after that. |
 | original_payment_reference_id | str | N | Used for updates to a payment after it has been committed on chain. For example, used for refunds. The reference ID of the original payment will be placed into this field. This value is optional on payment creation and invalid on updates. |
-| recipient_signature | str | N | (TODO) Signature of the recipient of this transaction. The signature is over the `reference_id` and is signed with the compliance key of the recipient VASP. |
-| action | [`PaymentActionObject`](#paymentactionobject) | Y | Number of Libra + currency type (LibraUSD, LibraEUR, BTC, etc.) + type of action to take. This field is mandatory and immutable |
+| recipient_signature | str | N | Signature of the recipient of this transaction. The signature is over the LCS serialized representation of `reference_id`, `sender_address`, `amount` and is signed with the compliance key of the recipient VASP.  This is used for on-chain attestation from the recipient party.  This may be omitted on blockchains which do not require on-chain attestation |
+| action | [`PaymentActionObject`](#paymentactionobject) | Y | Number of cryptocurrency + currency type (USD, LBR, EUR, BTC, etc.) + type of action to take. This field is mandatory and immutable |
 | description | str | N | Description of the payment. To be displayed to the user. Unicode utf-8 encoded max length of 255 characters. This field is optional but can only be written once.
 
 <details>
