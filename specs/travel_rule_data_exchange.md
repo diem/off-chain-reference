@@ -297,11 +297,8 @@ Valid values are:
 **Valid Status Transitions**. Each side of the transaction is only allowed to mutate their own status (sender or receiver), and upon payment creation may only set the status of the other party to `none`. Subsequently, each party may only modify their own state to a higher or equal state in the order `none`, (`needs_kyc_data`, `needs_recipient_signature`, `abort`), `ready_for_settlement`, and `settled`. A status of `abort` and `settle` is terminal and must not be changed. As a consequence of this ordering of valid status updates once a transaction is in a `ready_for_settlement` state by both parties it cannot be aborted any more and can be considered final from the point of view of the off-chain protocol. It is therefore safe for a VASP sending funds to initiate an On-Chain payment to settle an Off-chain payment after it observed the other party setting their status to `ready_for_settlement` and it is also willing to go past this state.
 
 
-## Response Payload
-All responses to a CommandRequestObject is in the form of a CommandResponseObject
-
-
-All requests between VASPs are structured as `CommandRequestObject`s.  For a travel rule exchange, the command is a PaymentCommand as follows:
+### CommandResponseObject
+All responses to a CommandRequestObject are in the form of a CommandResponseObject
 
 | Field 	     | Type 	| Required? 	| Description 	|
 |-------	     |------	|-----------	|-------------	|
