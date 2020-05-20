@@ -1,4 +1,4 @@
-# Off-Chain Protocol (OCP)
+# Overview: Off-Chain Protocol
 
 The Off-Chain protocol is an API and payload specification to support compliance, privacy and scalability on blockchains.
 It is executed between pairs of _Virtual Asset Service Providers_ (VASPs),
