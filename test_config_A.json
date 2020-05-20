@@ -1,1 +1,1 @@
-{"addr": "AAAAAAAAAAAAAAAA", "base_url": "127.0.0.1", "port": 8091, "key": {"crv": "Ed25519", "d": "HehJzMPH4d0JUNjfMKHrBTlSmQzOt2ikGrc72YY76q0", "kty": "OKP", "x": "9pS-MRZZwjRtGL3iqPnVGcrtDGXpWi-4UWsSRo-XWD4"}}
+{"addr": "AAAAAAAAAAAAAAAA", "base_url": "127.0.0.1", "port": 7091, "key": {"crv": "Ed25519", "d": "HehJzMPH4d0JUNjfMKHrBTlSmQzOt2ikGrc72YY76q0", "kty": "OKP", "x": "9pS-MRZZwjRtGL3iqPnVGcrtDGXpWi-4UWsSRo-XWD4"}}

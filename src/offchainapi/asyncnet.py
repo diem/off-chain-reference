@@ -257,10 +257,6 @@ class Aionet:
             self.logger.debug(f'ClientError {type(e)}: {str(e)}')
             raise NetworkException(e)
 
-        except aiohttp.ClientSSLError as e:
-            self.logger.debug(f'ClientSSLError {type(e)}: {str(e)}')
-            raise NetworkException(e)
-
     def sequence_command(self, other_addr, command):
         ''' Sequences a new command to the local queue, ready to be
             sent to the other VASP.
