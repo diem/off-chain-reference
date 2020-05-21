@@ -10,13 +10,11 @@ def test_example_sign_verify():
     # Generate and export keys
     key = jwk.JWK.generate(kty='OKP', crv='Ed25519')
     pub_data = key.export_to_pem(private_key=False, password=None)
-    print(pub_data)
-    # pub = jwk.JWK.from_pem(pub_data)
-    print(key.export_to_pem(private_key=True, password=None))
+    print('--- KEY / SIGN / VERIFY TEST ---')
 
     # Export public
     pub = key.export_public()
-    print(pub, type(pub))
+    print(pub)
     key_pub = jwk.JWK(**json.loads(pub))
 
     # Sign a message
