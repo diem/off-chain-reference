@@ -161,6 +161,15 @@ At any point, the user can withdraw permission at which point the status will be
 ### CommandResponseObject
 All responses to a CommandRequestObject are in the form of a [CommandResponseObject](travel_rule_data_exchange.md#commandresponseobject)
 
+## Usage of a pre-approval
+Pre-approval usage manifests as an extension of [PaymentCommand](travel_rule_data_exchange.md#paymentcommand-object).  The extension happens primarily within the [PaymentObject](travel_rule_data_exchange.md#paymentobject) and the status changes.
+
+### PaymentObject Extension
+Payment object remains the same as [PaymentObject](travel_rule_data_exchange.md#paymentobject), but adds the following fields:
+
+| Field 	    | Type 	| Required? 	| Description 	|
+|-------	    |------	|-----------	|-------------	|
+| funds_pre_approval_id | str | N | ID of the funds pre-approval previously created via a [FundPullPreApprovalCommand](#fundpullpreapprovalcommand-object).  Must match the value of "funds_pre_approval_id" in the already-created funds pre-approval.
 
 Previous: [Travel Rule Data Exchange](travel_rule_data_exchange.md)
 
