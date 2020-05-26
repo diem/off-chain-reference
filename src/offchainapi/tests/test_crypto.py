@@ -10,21 +10,24 @@ def test_example_sign_verify():
     # Generate and export keys
     key = jwk.JWK.generate(kty='OKP', crv='Ed25519')
     pub_data = key.export_to_pem(private_key=False, password=None)
-    print(pub_data)
-    # pub = jwk.JWK.from_pem(pub_data)
-    print(key.export_to_pem(private_key=True, password=None))
+    print('--- KEY / SIGN / VERIFY TEST ---')
+
+    # Export full key:
+    full = key.export_private()
+    print('K.Pair:', full)
 
     # Export public
     pub = key.export_public()
-    print(pub, type(pub))
+    print('Public:', pub)
     key_pub = jwk.JWK(**json.loads(pub))
 
     # Sign a message
     payload = "My Integrity protected message"
+    print('Payload:', payload)
     jwstoken = jws.JWS(payload.encode('utf-8'))
     jwstoken.add_signature(key, alg='EdDSA')
     sig = jwstoken.serialize(compact=True)
-    print(sig)
+    print('Signature:', sig)
 
     # Verify a message
     verifier = jws.JWS()

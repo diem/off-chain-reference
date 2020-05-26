@@ -40,12 +40,17 @@ class OffChainError(JSONSerializable):
     Args:
         protocol_error (bool, optional): Whether it is a protocol error.
                                          Defaults to True.
-        code (int or None, optional): The error code. Defaults to None.
+        code (str or None, optional): The error code. Defaults to None.
+        message (str): An error message explaining the problem. Defaults to None.
     """
 
-    def __init__(self, protocol_error=True, code=None):
+    def __init__(self, protocol_error=True, code=None, message=None):
         self.protocol_error = protocol_error
         self.code = code
+        self.message = message
+        # If no separate message, then message is code.
+        if message is None:
+            self.message = code
 
     def __eq__(self, other):
         return isinstance(other, OffChainError) \
@@ -58,6 +63,10 @@ class OffChainError(JSONSerializable):
             "protocol_error": self.protocol_error,
             "code": self.code
             }
+
+        if self.message is not None:
+            data_dict['message'] = self.message
+
         if __debug__:
             import json
             assert json.dumps(data_dict)
@@ -67,9 +76,16 @@ class OffChainError(JSONSerializable):
     def from_json_data_dict(cls, data, flag):
         ''' Override JSONSerializable. '''
         try:
+            protocol_error = bool(data['protocol_error'])
+            code = str(data['code'])
+            message = None
+            if 'message' in data:
+                message = str(data['message'])
+
             return OffChainError(
-                bool(data['protocol_error']),
-                str(data['code']))
+                protocol_error,
+                code,
+                message)
         except Exception as e:
             raise JSONParsingError(*e.args)
 
@@ -205,9 +221,12 @@ class CommandResponseObject(JSONSerializable):
         ''' Override JSONSerializable. '''
         data_dict = {
             "seq": self.seq,
-            "command_seq": self.command_seq,
             "status": self.status
         }
+
+        # Do not include if None
+        if self.command_seq is not None:
+            data_dict["command_seq"] = self.command_seq
 
         if self.error is not None:
             data_dict["error"] = self.error.get_json_data_dict(flag)

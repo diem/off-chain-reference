@@ -151,14 +151,14 @@ def test_payment_object_update(payment):
 def test_specific():
     json_struct = {
                     'sender': {
-                        'subaddress': 'aaaa',
+                        'address': 'aaaa',
                         'status': 'settled',
                         'metadata': [],
                         'kyc_data': {
                             "type": "individual"}
                         },
                     'receiver': {
-                        'subaddress': 'bbbb',
+                        'address': 'bbbb',
                         'status': 'needs_kyc_data',
                         'metadata': [],
                         'kyc_data': {
