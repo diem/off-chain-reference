@@ -28,4 +28,4 @@ This should create a number of resources:
 * It will create HTML *source code coverage reports* under `htmlcov/index.html`.
 * It will build the documentation under `docs/_build/html/index.html`.
 
-The index of the documentation is a very good place to start to learn more.
+The index of the documentation is a very good place to start to learn more. [Overview](specs/off_chain_protocol.md)
