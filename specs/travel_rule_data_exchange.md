@@ -19,46 +19,44 @@ All requests between VASPs are structured as [`CommandRequestObject`s](#commandr
 	    ],
 	    "_dependencies": [],
 	    "payment": {
-	        {
-			    "sender": {
-				    "address": "lbr1pgfpyysjzgfpyysjzgfpyysjzgf3xycnzvf3xycsm957ne",
-				    "kyc_data": {
-					    "payload_type": "KYC_DATA"
-					    "payload_version": 1,
-					    "type": "individual",
-					    "given_name": "ben",
-					    "surname": "maurer",
-					    "address": {
-					        "city": "Sunnyvale",
-					        "country": "US",
-					        "line1": "1234 Maple Street",
-					        "line2": "Apartment 123",
-					        "postal_code": "12345",
-					        "state": "California",
-					    },
-					    "dob": "1920-03-20",
-					    "place_of_birth": {
-					        "city": "Sunnyvale",
-					        "country": "US",
-					        "postal_code": "12345",
-					        "state": "California",
-					    }
-					},
-				    "status": "ready_for_settlement",
+		    "sender": {
+			    "address": "lbr1pgfpyysjzgfpyysjzgfpyysjzgf3xycnzvf3xycsm957ne",
+			    "kyc_data": {
+				    "payload_type": "KYC_DATA"
+				    "payload_version": 1,
+				    "type": "individual",
+				    "given_name": "ben",
+				    "surname": "maurer",
+				    "address": {
+					"city": "Sunnyvale",
+					"country": "US",
+					"line1": "1234 Maple Street",
+					"line2": "Apartment 123",
+					"postal_code": "12345",
+					"state": "California",
+				    },
+				    "dob": "1920-03-20",
+				    "place_of_birth": {
+					"city": "Sunnyvale",
+					"country": "US",
+					"postal_code": "12345",
+					"state": "California",
+				    }
 				},
-			    "receiver": {
-				    "address": "lbr1pgfpnegv9gfpyysjzgfpyysjzgf3xycnzvf3xycsmxycyy",
-				},
-			    "reference_id": "lbr1qg9q5zs2pg9q5zs2pg9q5zs2pgy7gvd9u_ref1001",
-			    "action": {
-				    "amount": 100,
-				    "currency": "USD",
-				    "action": "charge",
-				    "timestamp": 72322,
-				},
-			    "description": "A free form or structured description of the payment.",
+			    "status": "ready_for_settlement",
 			},
-	    }
+		    "receiver": {
+			    "address": "lbr1pgfpnegv9gfpyysjzgfpyysjzgf3xycnzvf3xycsmxycyy",
+			},
+		    "reference_id": "lbr1qg9q5zs2pg9q5zs2pg9q5zs2pgy7gvd9u_ref1001",
+		    "action": {
+			    "amount": 100,
+			    "currency": "USD",
+			    "action": "charge",
+			    "timestamp": 72322,
+			},
+		    "description": "A free form or structured description of the payment.",
+		},
 	},
     "command_seq": 1,
 }
