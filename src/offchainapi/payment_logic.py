@@ -61,16 +61,16 @@ class PaymentProcessor(CommandProcessor):
             self.object_store = storage_factory.make_dict(
                 'object_store', SharedObject, root=root)
 
-            # TODO: how much of this do we want to persist?
+            # Persist those to enable crash-recovery
             self.pending_commands = storage_factory.make_dict(
                 'pending_commands', str, root)
             self.command_cache = storage_factory.make_dict(
                 'command_cache', ProtocolCommand, root)
 
         # Allow mapping a set of future to payment reference_id outcomes
-        # Once a payment has an outcode (settled, abort, or command exception)
-        # nootify the appropriate futures of the result. These do not persist
-        # crashes sine they are run-time objects.
+        # Once a payment has an outcome (settled, abort, or command exception)
+        # notify the appropriate futures of the result. These do not persist
+        # crashes since they are run-time objects.
 
         # Mapping: payment reference_id -> List of futures.
         self.outcome_futures = {}
@@ -208,6 +208,11 @@ class PaymentProcessor(CommandProcessor):
         self.set_payment_outcome(payment)
 
         try:
+            # Notify the business context about the new payment.
+            # This allows the business to do any custom record-keeping
+            await self.business.notify_payment_update(
+                other_address, seq, command, payment)
+
             # Only respond to commands by other side.
             if command.origin == other_address:
 
@@ -697,9 +702,8 @@ class PaymentProcessor(CommandProcessor):
             # We cannot abort once we said we are ready_for_settlement
             # or beyond. However we will catch a wrong change in the
             # check when we change status.
-            new_payment = payment.new_version()
-            if self.can_change_status(payment, Status.abort, is_sender):
-                current_status = Status.abort
+            new_payment = payment.new_version(new_payment.version)
+            current_status = Status.abort
 
         except Exception as e:
             self.logger.error(
@@ -709,7 +713,7 @@ class PaymentProcessor(CommandProcessor):
 
             # Only report the error in meta-data
             # & Abort the payment.
-            new_payment = payment.new_version()
+            new_payment = payment.new_version(new_payment.version)
             new_payment.data[role].add_metadata(f'Error: ({role}): {str(e)}')
             current_status = Status.abort
 
@@ -725,5 +729,4 @@ class PaymentProcessor(CommandProcessor):
             )
 
         new_payment.data[role].change_status(current_status)
-
         return new_payment

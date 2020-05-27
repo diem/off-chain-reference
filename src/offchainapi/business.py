@@ -24,6 +24,23 @@ class BusinessForceAbort(Exception):
 class BusinessContext:
     """ The interface a VASP should define to drive the Off-chain protocol. """
 
+    async def notify_payment_update(self, other_address, seq, command, payment):
+        """ An async method to notify the VASP that a successsful command has
+        been sequenced resulting in a new or updated payment. This provides the
+        VASP with full visibility into the sequence of payments. The command
+        could have originated either from the other VASP or this VASP (see
+        `command.origin` to determine this).
+
+        Args:
+            other_address (str): the encoded libra address of the other VASP.
+            seq (int): the sequence number into the shared command sequence.
+            command (ProtocolCommand): the command that lead to the new or updated payment.
+            payment (PaymentObject): the payment resulting from this command.
+
+        Returns nothing.
+        """
+        pass
+
     def open_channel_to(self, other_vasp_addr):
         """Requests authorization to open a channel to another VASP.
         If it is authorized nothing is returned. If not an exception is
