@@ -52,19 +52,9 @@ class SimpleVASPInfo(VASPInfo):
         return True
 
 
-global_dir = {}
-
-
-async def update_dir(vasp):
-    global_dir[vasp.vasp.get_vasp_address().as_str()] = vasp
-
-
 def start_thread_main(vasp, loop):
     # Initialize the VASP services.
     vasp.start_services(loop)
-
-    # Run this once the loop is running
-    loop.create_task(update_dir(vasp))
 
     try:
         # Start the loop
@@ -87,20 +77,22 @@ def make_new_VASP(Peer_addr, port, reliable=True):
         database={})
 
     loop = asyncio.new_event_loop()
+    VASPx.set_loop(loop)
+
+    # Create and launch a thread with the VASP event loop
     t = Thread(target=start_thread_main, args=(VASPx, loop))
     t.start()
     print(f'Start Node {port}')
+
+    # Block until the event loop in the thread is running.
+    VASPx.wait_for_start()
+
     return (VASPx, loop, t)
 
 
 async def main_perf(messages_num=10, wait_num=0, verbose=False):
     VASPa, loopA, tA = make_new_VASP(PeerA_addr, port=8091)
     VASPb, loopB, tB = make_new_VASP(PeerB_addr, port=8092, reliable=False)
-
-    await asyncio.sleep(2.0)
-    while len(global_dir) != 2:
-        await asyncio.sleep(0.1)
-    print(global_dir)
 
     # Get the channel from A -> B
     channelAB = VASPa.vasp.get_channel(PeerB_addr)

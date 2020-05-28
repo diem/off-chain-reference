@@ -57,9 +57,20 @@ class Vasp:
         self.site = None
         self.loop = None
         self.runner = None
+        self.all_started_future = None
 
         # Logger
         self.logger = logging.getLogger(f'VASP.{my_addr.as_str()}')
+
+    def set_loop(self, loop):
+        self.loop = loop
+        self.all_started_future = self.loop.create_future()
+
+    async def _set_start_notifier(self):
+        self.all_started_future.set_result(True)
+
+    async def _await_start_notifier(self):
+        return await self.all_started_future
 
     def start_services(self, loop, watch_period=10.0):
         ''' Registers services with the even loop provided.
@@ -72,11 +83,13 @@ class Vasp:
                 retransmits. Defaults to 10.0.
 
         '''
-        asyncio.set_event_loop(loop)
+
+        if self.loop is None:
+            self.loop = loop
+        asyncio.set_event_loop(self.loop)
 
         # Assign a loop  to the processor.
-        self.pp.loop = loop
-        self.loop = loop
+        self.pp.loop = self.loop
 
         # Start the http server.
         self.runner = self.net_handler.get_runner()
@@ -89,6 +102,17 @@ class Vasp:
 
         # Reschedule commands to be processed, when the loop starts.
         self.loop.create_task(self.pp.retry_process_commands())
+
+        # Mechanism to notify the running of loop
+        self.loop.create_task(self._set_start_notifier())
+
+    def wait_for_start(self):
+        ''' A syncronous function that blocks until the asyncio loop serving the VASP
+        is running. It is thread safe, and can therefore be called from another thread
+        than the one where the asyncio loop is running.'''
+        result = asyncio.run_coroutine_threadsafe(
+            self._await_start_notifier(), self.loop)
+        return result.result()
 
     async def wait_for_payment_outcome_async(self, payment_reference_id):
         ''' Awaits until the payment with the given reference_id is either
