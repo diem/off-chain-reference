@@ -101,7 +101,8 @@ def run_server(my_configs_path, other_configs_path, num_of_commands=10, loop=Non
     # Run VASP services.
     vasp.logger.info(f'Running VASP {my_addr.as_str()}.')
     loop = asyncio.get_event_loop() if loop is None else loop
-    vasp.start_services(loop)
+    vasp.set_loop(loop)
+    vasp.start_services()
     vasp.logger.info(f'VASP services are running on port {vasp.port}.')
 
     def stop_server(vasp):
@@ -160,7 +161,7 @@ def run_client(my_configs_path, other_configs_path, num_of_commands=10, port=0):
 
     # Run VASP services.
     def start_services(vasp, loop):
-        vasp.start_services(loop)
+        vasp.start_services()
         vasp.logger.debug('Start main loop.')
         try:
             loop.run_forever()
@@ -169,6 +170,7 @@ def run_client(my_configs_path, other_configs_path, num_of_commands=10, port=0):
             loop.close()
 
     loop = asyncio.new_event_loop()
+    vasp.set_loop(loop)
     t = Thread(target=start_services, args=(vasp, loop), daemon=True)
     t.start()
     vasp.logger.info(f'VASP services are running on port {vasp.port}.')

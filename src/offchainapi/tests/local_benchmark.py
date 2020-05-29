@@ -57,7 +57,7 @@ class SimpleVASPInfo(VASPInfo):
 
 def start_thread_main(vasp, loop):
     # Initialize the VASP services.
-    vasp.start_services(loop)
+    vasp.start_services()
 
     try:
         # Start the loop

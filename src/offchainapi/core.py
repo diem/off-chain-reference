@@ -66,8 +66,10 @@ class Vasp:
         self.logger = logging.getLogger(f'VASP.{my_addr.as_str()}')
 
     def set_loop(self, loop):
-        self.loop = loop
-        self.all_started_future = self.loop.create_future()
+        ''' Set the asyncio event loop associated with this VASP.'''
+        if self.loop is None:
+            self.loop = loop
+            self.all_started_future = self.loop.create_future()
 
     async def _set_start_notifier(self):
         self.all_started_future.set_result(True)
@@ -75,7 +77,7 @@ class Vasp:
     async def _await_start_notifier(self):
         return await self.all_started_future
 
-    def start_services(self, loop, watch_period=10.0):
+    def start_services(self, *, watch_period=10.0):
         ''' Registers services with the even loop provided.
 
         Parameters:
@@ -86,9 +88,9 @@ class Vasp:
                 retransmits. Defaults to 10.0.
 
         '''
-
         if self.loop is None:
-            self.loop = loop
+            raise Exception('Missing event loop: set with "set_loop".')
+
         asyncio.set_event_loop(self.loop)
 
         # Assign a loop  to the processor.
@@ -96,12 +98,12 @@ class Vasp:
 
         # Start the http server.
         self.runner = self.net_handler.get_runner()
-        loop.run_until_complete(self.runner.setup())
+        self.loop.run_until_complete(self.runner.setup())
         self.site = web.TCPSite(self.runner, self.host, self.port)
-        loop.run_until_complete(self.site.start())
+        self.loop.run_until_complete(self.site.start())
 
         # Run the watchdor task to log statistics.
-        self.net_handler.schedule_watchdog(loop, period=watch_period)
+        self.net_handler.schedule_watchdog(self.loop, period=watch_period)
 
         # Reschedule commands to be processed, when the loop starts.
         self.loop.create_task(self.pp.retry_process_commands())
