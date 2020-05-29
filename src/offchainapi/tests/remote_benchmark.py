@@ -25,6 +25,7 @@ import sys
 from json import loads, dumps
 import aiohttp
 
+LOGGING_LEVEL = logging.ERROR
 
 class SimpleVASPInfo(VASPInfo):
     ''' Simple implementation of VASPInfo. '''
@@ -94,8 +95,8 @@ def run_server(my_configs_path, other_configs_path, num_of_commands=10, loop=Non
         info_context=SimpleVASPInfo(my_configs, other_configs),
         database={}
     )
-    vasp.logger.setLevel(logging.ERROR)
-    vasp.net_handler.logger.setLevel(logging.ERROR)
+    vasp.logger.setLevel(LOGGING_LEVEL)
+    vasp.net_handler.logger.setLevel(LOGGING_LEVEL)
     vasp.logger.info(f'Created VASP {my_addr.as_str()}.')
 
     # Run VASP services.
@@ -154,8 +155,8 @@ def run_client(my_configs_path, other_configs_path, num_of_commands=10, port=0):
         info_context=SimpleVASPInfo(my_configs, other_configs, port),
         database={}
     )
-    vasp.logger.setLevel(logging.ERROR)
-    vasp.net_handler.logger.setLevel(logging.ERROR)
+    vasp.logger.setLevel(LOGGING_LEVEL)
+    vasp.net_handler.logger.setLevel(LOGGING_LEVEL)
     vasp.logger.info(f'Created VASP {my_addr.as_str()}.')
 
     # Run VASP services.
@@ -214,3 +215,6 @@ def run_client(my_configs_path, other_configs_path, num_of_commands=10, port=0):
     vasp.logger.info(f'Commands executed in {elapsed:0.2f} seconds.')
     vasp.logger.info(f'Success #: {success_number}/{len(commands)}.')
     vasp.logger.info(f'Estimate throughput #: {len(commands)/elapsed} TPS.')
+
+    #while True:
+    #    time.sleep(2)
