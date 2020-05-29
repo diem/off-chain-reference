@@ -148,8 +148,9 @@ class BusinessContext:
                 payment (PaymentCommand): The concerned payment.
 
             Returns:
-                Status: The current status if no new information is required,
-                otherwise a status code from:
+                Status: Returns Status.none or the current status
+                if no new information is required, otherwise a status
+                code from:
                     - `status_logic.Status.needs_kyc_data`
                     - `status_logic.Status.needs_recipient_signature`
 
