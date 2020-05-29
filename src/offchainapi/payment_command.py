@@ -1,3 +1,6 @@
+# Copyright (c) The Libra Core Contributors
+# SPDX-License-Identifier: Apache-2.0
+
 from .executor import ProtocolCommand
 from .payment import PaymentObject
 from .utils import JSONSerializable

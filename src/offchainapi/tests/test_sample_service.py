@@ -1,3 +1,6 @@
+# Copyright (c) The Libra Core Contributors
+# SPDX-License-Identifier: Apache-2.0
+
 from ..sample.sample_service import sample_business, sample_vasp
 from ..payment_logic import Status, PaymentProcessor, PaymentCommand
 from ..payment import PaymentActor, PaymentObject

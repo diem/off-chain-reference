@@ -1,3 +1,6 @@
+# Copyright (c) The Libra Core Contributors
+# SPDX-License-Identifier: Apache-2.0
+
 """ The Payment object status is defined by the status of both actors,
     senders and receivers, namely the tuple (sender_status, recipient_status).
     An actor status may have the following values:

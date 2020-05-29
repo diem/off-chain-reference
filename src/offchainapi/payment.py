@@ -1,3 +1,6 @@
+# Copyright (c) The Libra Core Contributors
+# SPDX-License-Identifier: Apache-2.0
+
 from .utils import StructureException, StructureChecker, \
     REQUIRED, OPTIONAL, WRITE_ONCE, UPDATABLE, \
     JSONSerializable

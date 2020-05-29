@@ -1,3 +1,6 @@
+# Copyright (c) The Libra Core Contributors
+# SPDX-License-Identifier: Apache-2.0
+
 from ..business import VASPInfo, BusinessContext
 from ..protocol import OffChainVASP
 from ..libra_address import LibraAddress

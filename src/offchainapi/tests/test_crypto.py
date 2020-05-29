@@ -1,3 +1,6 @@
+# Copyright (c) The Libra Core Contributors
+# SPDX-License-Identifier: Apache-2.0
+
 from jwcrypto import jwk, jws
 import json
 from ..crypto import ComplianceKey, OffChainInvalidSignature
