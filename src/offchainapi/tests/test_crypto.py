@@ -10,6 +10,8 @@ def test_init():
     pass
 
 def test_example_sign_verify():
+    from jwcrypto.common import json_encode
+
     # Generate and export keys
     key = jwk.JWK.generate(kty='OKP', crv='Ed25519')
     pub_data = key.export_to_pem(private_key=False, password=None)
@@ -28,20 +30,24 @@ def test_example_sign_verify():
     payload = "My Integrity protected message"
     print('Payload:', payload)
     jwstoken = jws.JWS(payload.encode('utf-8'))
-    jwstoken.add_signature(key, alg='EdDSA')
+    jwstoken.add_signature(
+        key,
+        alg=None,
+        protected=json_encode({"alg": "EdDSA"}),
+        header=json_encode({"kid": key.thumbprint()}))
     sig = jwstoken.serialize(compact=True)
     print('Signature:', sig)
 
     # Verify a message
     verifier = jws.JWS()
     verifier.deserialize(sig)
-    verifier.verify(key, alg='EdDSA')
+    verifier.verify(key)  # , alg='EdDSA')
     payload2 = verifier.payload
 
     # Verify a message -- pub only
     verifier_pub = jws.JWS()
     verifier_pub.deserialize(sig)
-    verifier_pub.verify(key_pub, alg='EdDSA')
+    verifier_pub.verify(key_pub)  #, alg='EdDSA')
     payload3 = verifier_pub.payload
 
     assert payload.encode('utf-8') == payload3
