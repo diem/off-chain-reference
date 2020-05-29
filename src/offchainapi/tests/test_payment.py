@@ -91,6 +91,7 @@ def test_payment_actor_update_status(sender_actor):
 
 
 def test_payment_actor_update_kyc(sender_actor, kyc_data):
+    kyc_data.data
     sender_actor.add_kyc_data(kyc_data)
 
     # We tolerate writing again strictly the same record
@@ -155,15 +156,20 @@ def test_specific():
                         'status': 'settled',
                         'metadata': [],
                         'kyc_data': {
-                            "type": "individual"}
-                        },
+                            "payload_type": "KYC_DATA",
+                            "payload_version": 1,
+                            "type": "individual"
+                        }
+                    },
                     'receiver': {
                         'address': 'bbbb',
                         'status': 'needs_kyc_data',
                         'metadata': [],
                         'kyc_data': {
+                            "payload_type": "KYC_DATA",
+                            "payload_version": 1,
                             "type": "individual"
-                            }
+                        }
                     },
                     'reference_id': 'ref 0',
                     'original_payment_reference_id': 'orig_ref',

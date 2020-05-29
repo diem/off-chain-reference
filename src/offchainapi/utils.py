@@ -35,12 +35,12 @@ class StructureChecker:
         self.update_record = []
 
     def __getattr__(self, name):
-        ''' Provide a more humaine interface to the data '''
+        ''' Provide a more humane interface to the data '''
         if name == "data":
-            raise AttributeError()
+            raise AttributeError("")
         if name in self.data:
             return self.data[name]
-        raise AttributeError()
+        raise AttributeError(f"{self.__class__.__name__} does not have attribute {name}")
 
     def __contains__(self, item):
         ''' Allows for `in` boolean queries between attribute names
@@ -235,7 +235,7 @@ class JSONParsingError(Exception):
 
 
 class JSONSerializable:
-    """ A CLass that denotes a subclass is serializable, and
+    """ A Class that denotes a subclass is serializable, and
         provdes facilities to serialize and parse that class. """
 
     # Define a type map for decoding
