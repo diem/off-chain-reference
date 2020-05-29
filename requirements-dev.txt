@@ -5,5 +5,3 @@ pytest-aiohttp
 pytest-httpserver
 coverage
 sphinx
-boto3
-fabric
