@@ -1,3 +1,6 @@
+# Copyright (c) The Libra Core Contributors
+# SPDX-License-Identifier: Apache-2.0
+
 from .executor import ProtocolExecutor, ExecutorException, CommandProcessor
 from .protocol_messages import CommandRequestObject, CommandResponseObject, \
     OffChainProtocolError, OffChainOutOfOrder, OffChainException, \

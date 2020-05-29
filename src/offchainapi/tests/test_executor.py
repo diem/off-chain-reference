@@ -1,3 +1,6 @@
+# Copyright (c) The Libra Core Contributors
+# SPDX-License-Identifier: Apache-2.0
+
 from ..executor import ProtocolExecutor, ExecutorException
 from ..command_processor import CommandProcessor
 from ..payment_logic import PaymentCommand, Status

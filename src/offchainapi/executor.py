@@ -1,3 +1,6 @@
+# Copyright (c) The Libra Core Contributors
+# SPDX-License-Identifier: Apache-2.0
+
 from .utils import JSONSerializable, JSONFlag
 from .command_processor import CommandProcessor
 from .libra_address import LibraAddress

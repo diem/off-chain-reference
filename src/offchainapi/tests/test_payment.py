@@ -1,3 +1,6 @@
+# Copyright (c) The Libra Core Contributors
+# SPDX-License-Identifier: Apache-2.0
+
 from ..payment import PaymentActor, PaymentAction, PaymentObject, KYCData
 from ..utils import StructureException, JSONFlag
 from ..payment_logic import Status

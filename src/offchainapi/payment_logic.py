@@ -1,3 +1,6 @@
+# Copyright (c) The Libra Core Contributors
+# SPDX-License-Identifier: Apache-2.0
+
 from .business import BusinessForceAbort
 from .executor import CommandProcessor, ProtocolCommand
 from .payment import Status, PaymentObject
