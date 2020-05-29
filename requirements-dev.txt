@@ -2,6 +2,5 @@ mock
 pytest
 pytest-cov
 pytest-aiohttp
-pytest-httpserver
 coverage
 sphinx
