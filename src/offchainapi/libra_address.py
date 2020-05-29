@@ -1,3 +1,6 @@
+# Copyright (c) The Libra Core Contributors
+# SPDX-License-Identifier: Apache-2.0
+
 from binascii import unhexlify, hexlify
 from bech32 import bech32_encode, bech32_decode, convertbits
 
@@ -9,7 +12,7 @@ class LibraAddressError(Exception):
 
 class LibraAddress:
 
-    def __init__(self, encoded_address, hrp='lbr'):
+    def __init__(self, encoded_address):
         """ An interface that abstracts a Libra Address
             and bit manipulations on it.
 
@@ -21,7 +24,10 @@ class LibraAddress:
                                to a Libra Address.
         """
 
+        # First extract the hrp:
+        hrp = encoded_address.split('1')[0]
         assert hrp in ('lbr', 'tlb')
+
         self.hrp = hrp
         self.encoded_address = encoded_address
 
@@ -94,7 +100,7 @@ class LibraAddress:
             raise LibraAddressError(
                 f'Cannot convert to LibraAddress: "{raw_bytes}"')
 
-        addr = cls(enc, hrp)
+        addr = cls(enc)
         return addr
 
     def last_bit(self):
@@ -140,7 +146,7 @@ class LibraAddress:
             without any subaddress information. '''
         if self.decoded_sub_address is None:
             return self
-        return LibraAddress.encode(self.decoded_address)
+        return LibraAddress.encode(self.decoded_address, hrp=self.hrp)
 
     def get_onchain_bytes(self):
         ''' Returns the decoded 16 bytes onchain address of the VASP.'''
@@ -149,13 +155,6 @@ class LibraAddress:
     def get_subaddress_bytes(self):
         ''' Returns the decoded 8+ bytes of the subaddress at the VASP.'''
         return self.decoded_sub_address
-
-
-
-class LibraSubAddress(LibraAddress):
-    ''' Represents a Libra subaddress. '''
-    pass
-
 
 # Adapted from : https://github.com/fiatjaf/bech32/blob/master/bech32/__init__.py
 # MIT Licence here: https://github.com/fiatjaf/bech32/blob/master/LICENSE

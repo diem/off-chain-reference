@@ -1,3 +1,6 @@
+# Copyright (c) The Libra Core Contributors
+# SPDX-License-Identifier: Apache-2.0
+
 # Tests for the storage framework
 from ..storage import StorableDict, StorableList, StorableValue, StorableFactory
 from ..payment_logic import PaymentCommand

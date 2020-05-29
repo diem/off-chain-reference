@@ -1,6 +1,10 @@
+# Copyright (c) The Libra Core Contributors
+# SPDX-License-Identifier: Apache-2.0
+
 from ..business import BusinessContext, BusinessValidationFailure
 from ..payment import KYCData
 from ..status_logic import Status
+
 
 class BasicBusinessContext(BusinessContext):
 

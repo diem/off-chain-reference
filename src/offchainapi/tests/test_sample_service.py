@@ -1,7 +1,10 @@
+# Copyright (c) The Libra Core Contributors
+# SPDX-License-Identifier: Apache-2.0
+
 from ..sample.sample_service import sample_business, sample_vasp
 from ..payment_logic import Status, PaymentProcessor, PaymentCommand
 from ..payment import PaymentActor, PaymentObject
-from ..libra_address import LibraAddress, LibraSubAddress
+from ..libra_address import LibraAddress
 from ..utils import JSONFlag
 from ..protocol_messages import CommandRequestObject, CommandResponseObject, \
     OffChainError
@@ -89,8 +92,8 @@ def vasp(my_addr):
 
 @pytest.fixture
 def json_request(my_addr, other_addr, payment_action):
-    sub_sender = LibraSubAddress.encode(my_addr.decoded_address, b'a'*8)
-    sub_receiver = LibraSubAddress.encode(other_addr.decoded_address, b'b'*8)
+    sub_sender = LibraAddress.encode(my_addr.decoded_address, b'a'*8)
+    sub_receiver = LibraAddress.encode(other_addr.decoded_address, b'b'*8)
 
     sender = PaymentActor(sub_sender.as_str(), Status.none, [])
     receiver = PaymentActor(sub_receiver.as_str(), Status.none, [])

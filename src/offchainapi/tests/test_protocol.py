@@ -1,3 +1,6 @@
+# Copyright (c) The Libra Core Contributors
+# SPDX-License-Identifier: Apache-2.0
+
 from ..protocol import VASPPairChannel, make_protocol_error, NetMessage
 from ..executor import ExecutorException, ProtocolExecutor
 from ..protocol_messages import CommandRequestObject, CommandResponseObject, \

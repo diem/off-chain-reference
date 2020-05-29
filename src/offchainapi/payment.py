@@ -1,3 +1,6 @@
+# Copyright (c) The Libra Core Contributors
+# SPDX-License-Identifier: Apache-2.0
+
 from .utils import StructureException, StructureChecker, \
     REQUIRED, OPTIONAL, WRITE_ONCE, UPDATABLE, \
     JSONSerializable
@@ -60,29 +63,28 @@ class PaymentActor(StructureChecker):
     """ Represents a payment actor.
 
         Args:
-            address (LibraAddress): The address of the VASP.
-            subaddress (str): The subaddress of the account on the VASP.
+            address (str): The subaddress of the account on the VASP.
             status (utils.Status): The payment status for this actor.
             metadata (list): Arbitrary metadata.
     """
 
     fields = [
-        ('subaddress', str, REQUIRED, WRITE_ONCE),
+        ('address', str, REQUIRED, WRITE_ONCE),
         ('kyc_data', KYCData, OPTIONAL, WRITE_ONCE),
         ('status', Status, REQUIRED, UPDATABLE),
         ('metadata', list, REQUIRED, UPDATABLE)
     ]
 
-    def __init__(self, subaddress, status, metadata):
+    def __init__(self, address, status, metadata):
         StructureChecker.__init__(self)
         self.update({
-            'subaddress': subaddress,
+            'address': address,
             'status': status,
             'metadata': metadata
         })
 
     def get_address(self):
-        return LibraAddress(self.subaddress).onchain()
+        return LibraAddress(self.address).onchain()
 
     def custom_update_checks(self, diff):
         """ Override StructureChecker. """
@@ -190,14 +192,26 @@ class PaymentObject(SharedObject, StructureChecker, JSONSerializable):
         SharedObject.__init__(self)
         StructureChecker.__init__(self)
         self.notes = {}
-        self.update({
+
+        main_state = {
             'sender': sender,
             'receiver': receiver,
             'reference_id': reference_id,
-            'original_payment_reference_id': original_payment_reference_id,
-            'description': description,
             'action': action
-        })
+        }
+
+        # Optional fields are only included if not None
+
+        if original_payment_reference_id is not None:
+            main_state['original_payment_reference_id'] \
+                = original_payment_reference_id
+
+        if description is not None:
+            main_state['description'] \
+                = description
+
+        self.update(main_state)
+
 
     @classmethod
     def create_from_record(cls, diff):

@@ -1,6 +1,9 @@
+# Copyright (c) The Libra Core Contributors
+# SPDX-License-Identifier: Apache-2.0
+
 from ..business import VASPInfo, BusinessContext
 from ..protocol import OffChainVASP
-from ..libra_address import LibraAddress, LibraSubAddress
+from ..libra_address import LibraAddress
 from ..payment_logic import PaymentCommand, PaymentProcessor
 from ..status_logic import Status
 from ..storage import StorableFactory
@@ -8,6 +11,7 @@ from ..payment import PaymentAction, PaymentActor, PaymentObject
 from ..asyncnet import Aionet
 from ..core import Vasp
 from ..crypto import ComplianceKey
+from .basic_business_context import BasicBusinessContext
 
 import logging
 import json
@@ -64,7 +68,7 @@ def load_configs(configs_path):
     return configs
 
 
-def run_server(my_configs_path, other_configs_path):
+def run_server(my_configs_path, other_configs_path, num_of_commands=10, loop=None):
     ''' Run the VASP as server (do not send commands).
 
     The arguments <my_configs_path> and <other_configs_path> are paths to
@@ -79,6 +83,7 @@ def run_server(my_configs_path, other_configs_path):
     my_configs = load_configs(my_configs_path)
     other_configs = load_configs(other_configs_path)
     my_addr = my_configs['addr']
+    other_addr = other_configs['addr']
 
     # Create VASP.
     vasp = Vasp(
@@ -89,18 +94,28 @@ def run_server(my_configs_path, other_configs_path):
         info_context=SimpleVASPInfo(my_configs, other_configs),
         database={}
     )
-    vasp.logger.setLevel(logging.DEBUG)
-    vasp.net_handler.logger.setLevel(logging.DEBUG)
+    vasp.logger.setLevel(logging.ERROR)
+    vasp.net_handler.logger.setLevel(logging.ERROR)
     vasp.logger.info(f'Created VASP {my_addr.as_str()}.')
 
     # Run VASP services.
     vasp.logger.info(f'Running VASP {my_addr.as_str()}.')
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_event_loop() if loop is None else loop
     vasp.start_services(loop)
     vasp.logger.info(f'VASP services are running on port {vasp.port}.')
 
+    def stop_server(vasp):
+        channel = vasp.vasp.get_channel(other_addr)
+        requests = len(channel.other_requests)
+        while requests < num_of_commands:
+            requests = len(channel.other_requests)
+            time.sleep(0.1)
+        vasp.close()
+    Thread(target=stop_server, args=(vasp,)).start()
+
     try:
         loop.run_forever()
+
     finally:
         loop.run_until_complete(loop.shutdown_asyncgens())
         loop.close()
@@ -135,12 +150,12 @@ def run_client(my_configs_path, other_configs_path, num_of_commands=10, port=0):
         my_addr,
         host='0.0.0.0',
         port=my_configs['port'],
-        business_context=AsyncMock(spec=BusinessContext),
+        business_context=BasicBusinessContext(my_addr),
         info_context=SimpleVASPInfo(my_configs, other_configs, port),
         database={}
     )
-    vasp.logger.setLevel(logging.DEBUG)
-    vasp.net_handler.logger.setLevel(logging.DEBUG)
+    vasp.logger.setLevel(logging.ERROR)
+    vasp.net_handler.logger.setLevel(logging.ERROR)
     vasp.logger.info(f'Created VASP {my_addr.as_str()}.')
 
     # Run VASP services.
@@ -161,10 +176,10 @@ def run_client(my_configs_path, other_configs_path, num_of_commands=10, port=0):
     # Make a payment commands.
     commands = []
     for cid in range(num_of_commands):
-        sub_a = LibraSubAddress.encode(b'A'*16, b'a'*8).as_str()
-        sub_b = LibraSubAddress.encode(b'B'*16, b'b'*8).as_str()
-        sender = PaymentActor(my_addr.as_str(), sub_a, Status.none, [])
-        receiver = PaymentActor(other_addr.as_str(), sub_b, Status.none, [])
+        sub_a = LibraAddress.encode(b'A'*16, b'a'*8).as_str()
+        sub_b = LibraAddress.encode(b'B'*16, b'b'*8).as_str()
+        sender = PaymentActor(sub_b, Status.none, [])
+        receiver = PaymentActor(sub_a, Status.none, [])
         action = PaymentAction(10, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
         reference = f'{my_addr.as_str()}_{cid}'
         payment = PaymentObject(

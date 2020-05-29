@@ -1,5 +1,9 @@
+# Copyright (c) The Libra Core Contributors
+# SPDX-License-Identifier: Apache-2.0
+
 from .business import BusinessNotAuthorized
 from .libra_address import LibraAddress
+from .utils import get_unique_string
 
 import aiohttp
 from aiohttp import web
@@ -122,7 +126,7 @@ class Aionet:
         else:
             server = self.vasp.get_vasp_address().as_str()
             client = other_addr_str
-        url = f'{server}/{client}/process/'
+        url = f'v1/{server}/{client}/command/'
         return urljoin(base_url, url)
 
     if __debug__:
@@ -133,12 +137,12 @@ class Aionet:
         """ Main Http server handler for incomming OffChainAPI requests.
 
         Args:
-            request (CommandRequestObject): The request from the other VASP.
+            request (aiohttp.web.Request): The request from the other VASP.
 
         Raises:
             aiohttp.web.HTTPUnauthorized: An exception for 401 Unauthorized.
             aiohttp.web.HTTPForbidden: An exception for 403 Forbidden.
-            aiohttp.web.HTTPBadRequest: An exception for 400 Bad Request
+            aiohttp.web.HTTPBadRequest: An exception for 400 Bad Request.
 
         Returns:
             aiohttp.web.Response: A json response with predefined
@@ -148,13 +152,19 @@ class Aionet:
         other_addr = LibraAddress(request.match_info['other_addr'])
         self.logger.debug(f'Request Received from {other_addr.as_str()}')
 
+        # Check and extract '
+        if 'X-Request-ID' not in request.headers:
+            raise web.HTTPBadRequest(headers={'X-Request-ID': 'None'})
+        x_request_id = request.headers['X-Request-ID']
+        headers = {'X-Request-ID': x_request_id}
+
         # Try to get a channel with the other VASP.
         try:
             channel = self.vasp.get_channel(other_addr)
         except BusinessNotAuthorized as e:
             # Raised if the other VASP is not an authorised business.
             self.logger.debug(f'Not Authorized {e}')
-            raise web.HTTPUnauthorized
+            raise web.HTTPUnauthorized(headers=headers)
 
         # Perform the request, send back the reponse.
         try:
@@ -169,18 +179,19 @@ class Aionet:
         except json.decoder.JSONDecodeError as e:
             # Raised if the request does not contain valid json.
             self.logger.debug(f'Type Error {str(e)}')
-            raise web.HTTPBadRequest
+            raise web.HTTPBadRequest(headers=headers)
+
         except aiohttp.client_exceptions.ContentTypeError as e:
             # Raised when the server replies with wrong content type;
             # eg. text/html instead of json.
             self.logger.debug(f'ContentTypeError Error {e}')
-            raise web.HTTPBadRequest
+            raise web.HTTPBadRequest(headers=headers)
 
         # Send back the response.
         self.logger.debug(f'Process Waiting messages.')
         channel.process_waiting_messages()
         self.logger.debug(f'Sending back response to {other_addr.as_str()}.')
-        return web.json_response(response.content)
+        return web.json_response(response.content, headers=headers)
 
     async def send_request(self, other_addr, json_request):
         """ Uses an Http client to send an OffChainAPI request to another VASP.
@@ -207,9 +218,24 @@ class Aionet:
         base_url = self.vasp.info_context.get_peer_base_url(other_addr)
         url = self.get_url(base_url, other_addr.as_str(), other_is_server=True)
         self.logger.debug(f'Sending post request to {url}')
+
+        # Add a custom request header
+        headers = {'X-Request-ID': get_unique_string()}
+
         try:
-            async with self.session.post(url, json=json_request) as response:
+            async with self.session.post(
+                    url,
+                    json=json_request,
+                    headers=headers
+            ) as response:
                 try:
+                    # Check the header is correct
+                    if 'X-Request-ID' not in response.headers or \
+                            response.headers['X-Request-ID'] != headers['X-Request-ID']:
+                        raise Exception(
+                            'Incorrect X-Request-ID header:', response.headers
+                        )
+
                     json_response = await response.json()
                     self.logger.debug(f'Json response: {json_response}')
 
@@ -232,10 +258,6 @@ class Aionet:
                     raise e
         except ClientError as e:
             self.logger.debug(f'ClientError {type(e)}: {str(e)}')
-            raise NetworkException(e)
-
-        except aiohttp.ClientSSLError as e:
-            self.logger.debug(f'ClientSSLError {type(e)}: {str(e)}')
             raise NetworkException(e)
 
     def sequence_command(self, other_addr, command):
