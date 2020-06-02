@@ -163,6 +163,8 @@ Payment object remains the same as [PaymentObject](travel_rule_data_exchange.md#
 |-------	    |------	|-----------	|-------------	|
 | funds_pre_approval_id | str | N | ID of the funds pre-approval previously created via a [FundPullPreApprovalCommand](#fundpullpreapprovalcommand-object).  Must match the value of "funds_pre_approval_id" in the already-created funds pre-approval.
 
+In addition, the "dependencies" array of the PaymentObject must contain the latest version of the FundPullPreApprovalObject.
+
 Previous: [Travel Rule Data Exchange](travel_rule_data_exchange.md)
 
 Next: [Auth and Capture](auth_capture.md)
