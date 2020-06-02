@@ -4,10 +4,10 @@
 Establishes a relationship between sender and recipient where the recipient can now pull funds from the sender without sender approving each transaction.  This allows recipient to bill the sender without sender approving each payment.  This relationship exists between a subaddress on the biller side and a subaddress on the sender side.  After this request is POSTed, the target VASP can use out-of-band methods to determine if this request should be granted.  If the target VASP chooses to allow the relationship to be established, the biller can create a payment object and POST to the billed party’s VASP to request funds.  The “funds_pull_approval_id” object must then match the ID established by this request.
 
 ## Request/Response Payload
-All requests between VASPs are structured as [`CommandRequestObject`s](#commandrequestobject) and all responses are structured as [`CommandResponseObject`s](#commandresponseobject).  The resulting request takes a form of the following:
+All requests between VASPs are structured as [`CommandRequestObject`s](#commandrequestobject) and all responses are structured as [`CommandResponseObject`s](#commandresponseobject).  For a fund pre-approval command, the resulting request takes a form of the following:
 
 <details>
-<summary> Request Payload Example </summary>
+<summary> Fund Pre-approval Request Payload Example </summary>
 <pre>
 {
     "_ObjectType": "CommandRequestObject",
@@ -51,15 +51,7 @@ A response would look like the following:
 </details>
 
 ### CommandRequestObject
-All requests between VASPs are structured as `CommandRequestObject`s. For a funds pull pre-approval, the command is a FundPullPreApprovalCommand as follows:
-
-| Field 	| Type 	| Required? 	| Description 	|
-|-------	|------	|-----------	|-------------	|
-| _ObjectType| str| Y | Fixed value: `CommandRequestObject`|
-|command_type | str| Y |A string representing the type of command contained in the request. Set to `FundPullPreApprovalCommand` for funds pull pre-approval |
-|seq | int  | Y | The sequence of this request in the sender local sequence. |
-| command | [`FundPullPreApprovalCommand` object](#fundpullpreapprovalcommand-object) | Y | The pre-approval command to sequence. |
-|command_seq    | int | Server   | The sequence of this command in the joint command sequence. Only set if the server is the sender. See [Command Sequencing](command_sequencing.md) |
+For a fund pre-approval request, the [command_type](basic_building_blocks.md#commandrequestobject) field is set to "FundPullPreApprovalCommand".  The command object is a [`FundPullPreApprovalCommand` object](#fundpullpreapprovalcommand-object).
 
 <details>
 <summary> CommandRequestObject example </summary>
@@ -159,7 +151,7 @@ At any point, the user can withdraw permission at which point the status will be
 
 
 ### CommandResponseObject
-All responses to a CommandRequestObject are in the form of a [CommandResponseObject](travel_rule_data_exchange.md#commandresponseobject)
+All responses to a CommandRequestObject are in the form of a [CommandResponseObject](basic_building_blocks.md#commandresponseobject)
 
 ## Usage of a pre-approval
 Pre-approval usage manifests as an extension of [PaymentCommand](travel_rule_data_exchange.md#paymentcommand-object).  The extension happens primarily within the [PaymentObject](travel_rule_data_exchange.md#paymentobject) and the status changes.
