@@ -11,7 +11,7 @@ from ..payment import PaymentAction, PaymentActor, PaymentObject
 from ..asyncnet import Aionet
 from ..core import Vasp
 from ..crypto import ComplianceKey
-from .basic_business_context import BasicBusinessContext
+from .basic_business_context import TestBusinessContext
 
 import logging
 import json
@@ -151,7 +151,7 @@ def run_client(my_configs_path, other_configs_path, num_of_commands=10, port=0):
         my_addr,
         host='0.0.0.0',
         port=my_configs['port'],
-        business_context=BasicBusinessContext(my_addr),
+        business_context=TestBusinessContext(my_addr),
         info_context=SimpleVASPInfo(my_configs, other_configs, port),
         database={}
     )

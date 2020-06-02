@@ -274,22 +274,22 @@ class PaymentProcessor(CommandProcessor):
 
     # -------- Machinery for notification for outcomes -------
 
-    async def wait_for_payment_outcome(self, payment_id):
+    async def wait_for_payment_outcome(self, reference_id):
         ''' Returns the payment object with the given a reference_id once the
         object has the sender or receiver status set to either 'settled' or
         'abort'.
         '''
         fut = self.loop.create_future()
 
-        if payment_id not in self.outcome_futures:
-            self.outcome_futures[payment_id] = []
+        if reference_id not in self.outcome_futures:
+            self.outcome_futures[reference_id] = []
 
         # Register this future to call later.
-        self.outcome_futures[payment_id] += [fut]
+        self.outcome_futures[reference_id] += [fut]
 
         # Check to see if the payment is already resolved.
-        if payment_id in self.reference_id_index:
-            payment = self.get_latest_payment_by_ref_id(payment_id)
+        if reference_id in self.reference_id_index:
+            payment = self.get_latest_payment_by_ref_id(reference_id)
             self.set_payment_outcome(payment)
 
         return (await fut)
@@ -320,7 +320,6 @@ class PaymentProcessor(CommandProcessor):
         # Update the outcome for each of the futures.
         for fut in outcome_futures:
             fut.set_result(payment)
-        return
 
     def set_payment_outcome_exception(self, reference_id, payment_exception):
         # Check if anyone is waiting for this payment.
@@ -335,7 +334,6 @@ class PaymentProcessor(CommandProcessor):
         # Update the outcome for each of the futures.
         for fut in outcome_futures:
             fut.set_exception(payment_exception)
-        return
 
     # -------- Implements CommandProcessor interface ---------
 

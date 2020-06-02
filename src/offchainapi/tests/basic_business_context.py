@@ -6,7 +6,7 @@ from ..payment import KYCData
 from ..status_logic import Status
 
 
-class BasicBusinessContext(BusinessContext):
+class TestBusinessContext(BusinessContext):
 
     def __init__(self, my_addr, reliable=True):
         self.my_addr = my_addr

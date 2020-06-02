@@ -12,7 +12,7 @@ from ..payment_logic import PaymentCommand
 from ..status_logic import Status
 from ..payment import PaymentAction, PaymentActor, PaymentObject
 from ..core import Vasp
-from .basic_business_context import BasicBusinessContext
+from .basic_business_context import TestBusinessContext
 from ..crypto import ComplianceKey
 
 from threading import Thread
@@ -75,7 +75,7 @@ def make_new_VASP(Peer_addr, port, reliable=True):
         Peer_addr,
         host='localhost',
         port=port,
-        business_context=BasicBusinessContext(Peer_addr, reliable=reliable),
+        business_context=TestBusinessContext(Peer_addr, reliable=reliable),
         info_context=SimpleVASPInfo(Peer_addr),
         database={})
 
