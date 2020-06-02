@@ -37,10 +37,12 @@ class BusinessContext:
         Args:
             other_address (str): the encoded libra address of the other VASP.
             seq (int): the sequence number into the shared command sequence.
-            command (ProtocolCommand): the command that lead to the new or updated payment.
+            command (ProtocolCommand): the command that lead to the new or
+            updated payment.
             payment (PaymentObject): the payment resulting from this command.
 
-        Returns nothing.
+        Returns None or a context objext that will be passed on the
+        other business context functions.
         """
         pass
 
@@ -60,7 +62,7 @@ class BusinessContext:
 
     # ----- Actors -----
 
-    def is_sender(self, payment):
+    def is_sender(self, payment, ctx=None):
         """Returns true if the VASP is the sender of a payment.
 
         Args:
@@ -71,7 +73,7 @@ class BusinessContext:
         """
         raise NotImplementedError()  # pragma: no cover
 
-    def is_recipient(self, payment):
+    def is_recipient(self, payment, ctx=None):
         """ Returns true if the VASP is the recipient of a payment.
 
         Args:
@@ -82,7 +84,7 @@ class BusinessContext:
         """
         return not self.is_sender(payment)
 
-    async def check_account_existence(self, payment):
+    async def check_account_existence(self, payment, ctx=None):
         """ Checks that the actor (sub-account / sub-address) on this VASP
             exists. This may be either the recipient or the sender, since VASPs
             can initiate payments in both directions. If not throw an exception.
@@ -98,7 +100,7 @@ class BusinessContext:
 
 # ----- VASP Signature -----
 
-    def validate_recipient_signature(self, payment):
+    def validate_recipient_signature(self, payment, ctx=None):
         """ Validates the recipient signature is correct. Raise an
             exception if the signature is invalid or not present.
             If the signature is valid do nothing.
@@ -113,7 +115,7 @@ class BusinessContext:
         """
         raise NotImplementedError()  # pragma: no cover
 
-    async def get_recipient_signature(self, payment):
+    async def get_recipient_signature(self, payment, ctx=None):
         """ Gets a recipient signature on the payment ID.
 
         Args:
@@ -123,7 +125,7 @@ class BusinessContext:
 
 # ----- KYC/Compliance checks -----
 
-    async def next_kyc_to_provide(self, payment):
+    async def next_kyc_to_provide(self, payment, ctx=None):
         ''' Returns the level of kyc to provide to the other VASP based on its
             status. Can provide more if deemed necessary or less.
 
@@ -143,7 +145,7 @@ class BusinessContext:
         '''
         raise NotImplementedError()  # pragma: no cover
 
-    async def next_kyc_level_to_request(self, payment):
+    async def next_kyc_level_to_request(self, payment, ctx=None):
         ''' Returns the next level of KYC to request from the other VASP. Must
             not request a level that is either already requested or provided.
 
@@ -163,7 +165,7 @@ class BusinessContext:
         raise NotImplementedError()  # pragma: no cover
 
 
-    async def get_extended_kyc(self, payment):
+    async def get_extended_kyc(self, payment, ctx=None):
         ''' Provides the extended KYC information for this payment.
 
             Args:
@@ -181,7 +183,7 @@ class BusinessContext:
 
 # ----- Settlement -----
 
-    async def ready_for_settlement(self, payment):
+    async def ready_for_settlement(self, payment, ctx=None):
         ''' Indicates whether a payment is ready for settlement as far as this
             VASP is concerned. Once it returns True it must never return False.
 
@@ -212,7 +214,7 @@ class BusinessContext:
             '''
         raise NotImplementedError()  # pragma: no cover
 
-    async def has_settled(self, payment):
+    async def has_settled(self, payment, ctx=None):
         ''' Returns whether the payment was settled on chain. If the payment can
             be settled also package it and settle it on chain. This function
             may be called multiple times for the same payment, but any on-chain

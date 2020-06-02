@@ -213,14 +213,15 @@ class PaymentProcessor(CommandProcessor):
         try:
             # Notify the business context about the new payment.
             # This allows the business to do any custom record-keeping
-            await self.business.notify_payment_update(
+            command_ctx = await self.business.notify_payment_update(
                 other_address, seq, command, payment)
 
             # Only respond to commands by other side.
             if command.origin == other_address:
 
                 # Determine if we should inject a new command.
-                new_payment = await self.payment_process_async(payment)
+                new_payment = await self.payment_process_async(
+                    payment, ctx=command_ctx)
 
                 if new_payment.has_changed():
                     new_cmd = PaymentCommand(new_payment)
@@ -620,7 +621,7 @@ class PaymentProcessor(CommandProcessor):
         receiver_st = payment.receiver.status
         return is_valid_initial(sender_st, receiver_st, actor_is_sender)
 
-    async def payment_process_async(self, payment):
+    async def payment_process_async(self, payment, ctx=None):
         ''' Processes a payment that was just updated, and returns a
             new payment with potential updates. This function may be
             called multiple times for the same payment to support
@@ -632,7 +633,7 @@ class PaymentProcessor(CommandProcessor):
         '''
         business = self.business
 
-        is_receiver = business.is_recipient(payment)
+        is_receiver = business.is_recipient(payment, ctx)
         is_sender = not is_receiver
         role = ['sender', 'receiver'][is_receiver]
         other_role = ['sender', 'receiver'][not is_receiver]
@@ -656,7 +657,7 @@ class PaymentProcessor(CommandProcessor):
                 current_status = Status.abort
 
             if current_status == Status.none:
-                await business.check_account_existence(new_payment)
+                await business.check_account_existence(new_payment, ctx)
 
             if current_status in {Status.none,
                                   Status.needs_kyc_data,
@@ -665,24 +666,24 @@ class PaymentProcessor(CommandProcessor):
                 # Request KYC -- this may be async in case
                 # of need for user input
                 next_kyc = await business.next_kyc_level_to_request(
-                    new_payment)
+                    new_payment, ctx)
                 if next_kyc != Status.none:
                     current_status = next_kyc
 
                 # Provide KYC -- this may be async in case
                 # of need for user input
                 kyc_to_provide = await business.next_kyc_to_provide(
-                    new_payment)
+                    new_payment, ctx)
 
                 myself_new_actor = new_payment.data[role]
 
                 if Status.needs_kyc_data in kyc_to_provide:
-                    extended_kyc = await business.get_extended_kyc(new_payment)
+                    extended_kyc = await business.get_extended_kyc(new_payment, ctx)
                     myself_new_actor.add_kyc_data(extended_kyc)
 
                 if Status.needs_recipient_signature in kyc_to_provide:
                     signature = await business.get_recipient_signature(
-                        new_payment)
+                        new_payment, ctx)
                     new_payment.add_recipient_signature(signature)
 
             # Check if we have all the KYC we need
@@ -690,14 +691,14 @@ class PaymentProcessor(CommandProcessor):
                     Status.ready_for_settlement,
                     Status.settled,
                     Status.abort}:
-                ready = await business.ready_for_settlement(new_payment)
+                ready = await business.ready_for_settlement(new_payment, ctx)
                 if ready:
                     current_status = Status.ready_for_settlement
 
             # Ensure both sides are past the finality barrier
             if current_status == Status.ready_for_settlement \
                     and self.can_change_status(payment, Status.settled, is_sender):
-                if await business.has_settled(new_payment):
+                if await business.has_settled(new_payment, ctx):
                     current_status = Status.settled
 
         except BusinessForceAbort:

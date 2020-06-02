@@ -32,19 +32,19 @@ class BasicBusinessContext(BusinessContext):
 
     # ----- Actors -----
 
-    def is_sender(self, payment):
+    def is_sender(self, payment, ctx=None):
         myself = self.my_addr.as_str()
         return myself == payment.sender.get_address().as_str()
 
-    def is_recipient(self, payment):
+    def is_recipient(self, payment, ctx=None):
         return not self.is_sender(payment)
 
-    async def check_account_existence(self, payment):
+    async def check_account_existence(self, payment, ctx=None):
         return True
 
 # ----- VASP Signature -----
 
-    def validate_recipient_signature(self, payment):
+    def validate_recipient_signature(self, payment, ctx=None):
         assert 'recipient_signature' in payment
         recepient = payment.receiver.get_address().as_str()
         ref_id = payment.reference_id
@@ -55,14 +55,14 @@ class BasicBusinessContext(BusinessContext):
 
         return payment.recipient_signature == expected_signature
 
-    async def get_recipient_signature(self, payment):
+    async def get_recipient_signature(self, payment, ctx=None):
         myself = self.my_addr.as_str()
         ref_id = payment.reference_id
         return f'{myself}.{ref_id}.SIGNED'
 
 # ----- KYC/Compliance checks -----
 
-    async def next_kyc_to_provide(self, payment):
+    async def next_kyc_to_provide(self, payment, ctx=None):
         role = ['receiver', 'sender'][self.is_sender(payment)]
         own_actor = payment.data[role]
         kyc_data = set()
@@ -76,7 +76,7 @@ class BasicBusinessContext(BusinessContext):
 
         return kyc_data
 
-    async def next_kyc_level_to_request(self, payment):
+    async def next_kyc_level_to_request(self, payment, ctx=None):
         other_role = ['sender', 'receiver'][self.is_sender(payment)]
         other_actor = payment.data[other_role]
 
@@ -90,7 +90,7 @@ class BasicBusinessContext(BusinessContext):
         return None
 
 
-    async def get_extended_kyc(self, payment):
+    async def get_extended_kyc(self, payment, ctx=None):
         ''' Returns the extended KYC information for this payment.
             In the format: (kyc_data, kyc_signature, kyc_certificate), where
             all fields are of type str.
@@ -106,11 +106,11 @@ class BasicBusinessContext(BusinessContext):
 
     # ----- Settlement -----
 
-    async def ready_for_settlement(self, payment):
+    async def ready_for_settlement(self, payment, ctx=None):
         if not self.reliable:
             self.cause_error()
 
         return (await self.next_kyc_level_to_request(payment)) is None
 
-    async def has_settled(self, payment):
+    async def has_settled(self, payment, ctx=None):
         return True
