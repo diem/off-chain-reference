@@ -26,15 +26,13 @@ class CommandProcessor:
         '''
         raise NotImplementedError()  # pragma: no cover
 
-    def process_command(self, vasp, channel, executor,
+    def process_command(self, other_addr,
                         command, seq, status, error=None):
         """Processes a command to generate more subsequent commands.
             This schedules a task that will be executed later.
 
             Args:
-                vasp (OffChainVASP): The current VASP.
-                channel (VASPPairChannel):  A VASP channel.
-                executor (ProtocolExecutor): The protocol executor.
+                other_addr (LibraAddress): the address of the other party.
                 command (PaymentCommand): The current payment command.
                 seq (int): The sequence number of the payment command.
                 status (bool): Whether the command is a success or failure.

@@ -393,11 +393,11 @@ class PaymentProcessor(CommandProcessor):
                 old_payment = dependencies[old_version]
                 self.check_new_update(old_payment, new_payment)
 
-    def process_command(self, vasp, channel, executor, command,
+    def process_command(self, other_addr, command,
                         seq, status_success, error=None):
         ''' Overrides CommandProcessor. '''
 
-        other_addr = channel.get_other_address()
+        #other_addr = channel.get_other_address()
         other_str = other_addr.as_str()
 
         # Call the failure handler and exit.

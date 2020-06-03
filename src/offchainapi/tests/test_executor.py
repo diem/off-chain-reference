@@ -29,7 +29,7 @@ def test_handlers(payment, executor):
             return self.bc
 
         def process_command(
-                self, vasp, channel, executor, command, seq,
+                self, other_addr, command, seq,
                 status_success, error=None):
             if status_success:
                 self.success_no += 1
