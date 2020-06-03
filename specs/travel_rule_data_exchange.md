@@ -3,10 +3,10 @@
 In the initial version of the off-chain APIs, the usage is intended as a means of transferring travel-rule information between VASPs.  The following will detail the request and response payloads utilized for this purpose.
 
 ## Request/Response Payload
-All requests between VASPs are structured as [`CommandRequestObject`s](#commandrequestobject) and all responses are structured as [`CommandResponseObject`s](#commandresponseobject).  The resulting request takes a form of the following:
+All requests between VASPs are structured as [`CommandRequestObject`s](basic_building_blocks.md#commandrequestobject) and all responses are structured as [`CommandResponseObject`s](basic_building_blocks.md#commandresponseobject).  For a travel-rule data exchange, the resulting request takes a form of the following:
 
 <details>
-<summary> Request Payload Example </summary>
+<summary> Sample Travel Rule Request Payload Example </summary>
 <pre>
 {
     "_ObjectType": "CommandRequestObject",
@@ -19,46 +19,44 @@ All requests between VASPs are structured as [`CommandRequestObject`s](#commandr
 	    ],
 	    "_dependencies": [],
 	    "payment": {
-	        {
-			    "sender": {
-				    "address": "lbr1pgfpyysjzgfpyysjzgfpyysjzgf3xycnzvf3xycsm957ne",
-				    "kyc_data": {
-					    "payload_type": "KYC_DATA"
-					    "payload_version": 1,
-					    "type": "individual",
-					    "given_name": "ben",
-					    "surname": "maurer",
-					    "address": {
-					        "city": "Sunnyvale",
-					        "country": "US",
-					        "line1": "1234 Maple Street",
-					        "line2": "Apartment 123",
-					        "postal_code": "12345",
-					        "state": "California",
-					    },
-					    "dob": "1920-03-20",
-					    "place_of_birth": {
-					        "city": "Sunnyvale",
-					        "country": "US",
-					        "postal_code": "12345",
-					        "state": "California",
-					    }
-					},
-				    "status": "ready_for_settlement",
+		    "sender": {
+			    "address": "lbr1pgfpyysjzgfpyysjzgfpyysjzgf3xycnzvf3xycsm957ne",
+			    "kyc_data": {
+				    "payload_type": "KYC_DATA"
+				    "payload_version": 1,
+				    "type": "individual",
+				    "given_name": "ben",
+				    "surname": "maurer",
+				    "address": {
+					"city": "Sunnyvale",
+					"country": "US",
+					"line1": "1234 Maple Street",
+					"line2": "Apartment 123",
+					"postal_code": "12345",
+					"state": "California",
+				    },
+				    "dob": "1920-03-20",
+				    "place_of_birth": {
+					"city": "Sunnyvale",
+					"country": "US",
+					"postal_code": "12345",
+					"state": "California",
+				    }
 				},
-			    "receiver": {
-				    "address": "lbr1pgfpnegv9gfpyysjzgfpyysjzgf3xycnzvf3xycsmxycyy",
-				},
-			    "reference_id": "lbr1qg9q5zs2pg9q5zs2pg9q5zs2pgy7gvd9u_ref1001",
-			    "action": {
-				    "amount": 100,
-				    "currency": "USD",
-				    "action": "charge",
-				    "timestamp": 72322,
-				},
-			    "description": "A free form or structured description of the payment.",
+			    "status": "ready_for_settlement",
 			},
-	    }
+		    "receiver": {
+			    "address": "lbr1pgfpnegv9gfpyysjzgfpyysjzgf3xycnzvf3xycsmxycyy",
+			},
+		    "reference_id": "lbr1qg9q5zs2pg9q5zs2pg9q5zs2pgy7gvd9u_ref1001",
+		    "action": {
+			    "amount": 100,
+			    "currency": "USD",
+			    "action": "charge",
+			    "timestamp": 72322,
+			},
+		    "description": "A free form or structured description of the payment.",
+		},
 	},
     "command_seq": 1,
 }
@@ -79,28 +77,7 @@ A response would look like the following:
 </details>
 
 ### CommandRequestObject
-All requests between VASPs are structured as `CommandRequestObject`s. For a travel rule exchange, the command is a PaymentCommand as follows:
-
-| Field 	| Type 	| Required? 	| Description 	|
-|-------	|------	|-----------	|-------------	|
-| _ObjectType| str| Y | Fixed value: `CommandRequestObject`|
-|command_type | str| Y |A string representing the type of command contained in the request. Set to `PaymentCommand` for travel rule data exchange |
-|seq | int  | Y | The sequence of this request in the sender local sequence. |
-| command | [`PaymentCommand` object](#paymentcommand-object) | Y | The payment command to sequence. |
-|command_seq    | int | Server   | The sequence of this command in the joint command sequence. Only set if the server is the sender. See [Command Sequencing](command_sequencing.md) |
-
-<details>
-<summary> CommandRequestObject example </summary>
-<pre>
-{
-    "_ObjectType": "CommandRequestObject",
-    "command_type": "PaymentCommand",
-    "seq": 1,
-    "command": PaymentCommand(),
-    "command_seq": 1,
-}
-</pre>
-</details>
+For a travel rule data exchange, the [command_type](basic_building_blocks.md#commandrequestobject) field is set to "PaymentCommand".  The command object is a [`PaymentCommand` object](#paymentcommand-object).
 
 ### PaymentCommand object
 | Field 	    | Type 	| Required? 	| Description 	|
@@ -295,56 +272,6 @@ Valid values are:
 * `abort` - Indicates the actor wishes to abort this payment, instead of settling it.
 
 **Valid Status Transitions**. Each side of the transaction is only allowed to mutate their own status (sender or receiver), and upon payment creation may only set the status of the other party to `none`. Subsequently, each party may only modify their own state to a higher or equal state in the order `none`, (`needs_kyc_data`, `needs_recipient_signature`, `abort`), `ready_for_settlement`, and `settled`. A status of `abort` and `settle` is terminal and must not be changed. As a consequence of this ordering of valid status updates once a transaction is in a `ready_for_settlement` state by both parties it cannot be aborted any more and can be considered final from the point of view of the off-chain protocol. It is therefore safe for a VASP sending funds to initiate an On-Chain payment to settle an Off-chain payment after it observed the other party setting their status to `ready_for_settlement` and it is also willing to go past this state.
-
-
-### CommandResponseObject
-All responses to a CommandRequestObject are in the form of a CommandResponseObject
-
-| Field 	     | Type 	| Required? 	| Description 	|
-|-------	     |------	|-----------	|-------------	|
-| _ObjectType    | str      | Y             | The fixed string `CommandResponseObject`. |
-| seq            | int       | Y             | The sequence number of the request responded to in the local sender request sequence. |
-| command_seq    | int or str=`null` | Y    | The sequence of the command responded to in the joint command sequence |
-| status         | str      | Y             | Either `success` or `failure`. |
-| error          | List of [OffChainErrorObject](#offchainerrorobject) | N | Details on errors when status == "failure"
-
-<details>
-<summary> CommandResponseObject example </summary>
-<pre>
-{
-    "_ObjectType": "CommandResponseObject",
-    "command_seq": null,
-    "error": [OffChainErrorObject()],
-    "seq": 0,
-    "status": "failure"
-}
-</pre>
-</details>
-
-When the `CommandResponseObject` status field is `failure`, the `error` field is included in the response to indicate the nature of the failure. The `error` field (type `OffChainError`) is a list of OffChainError objects. 
-
-### OffChainErrorObject
-Represents an error that occurred in response to a command.
-
-| Field 	     | Type 	| Required? 	| Description 	|
-|-------	     |------	|-----------	|-------------	|
-| type    | str (enum)     | Y             | Either "command_error" or "protocol_error" |
-| field            | str       | N             | The field on which this error occurred|
-| code    | str (enum) | Y    | The error code of the corresponding error |
-| message         | str      | N             | Additional details about this error |
-
-<details>
-<summary> OffChainErrorObject example </summary>
-<pre>
-{
-    "type": "command_error",
-    "field": "0.sender.kyc_data.surname",
-    "code": "missing_data",
-    "message": "",
-}
-
-</pre>
-</details>
 
 
 Previous: [Command Sequencing](command_sequencing.md)
