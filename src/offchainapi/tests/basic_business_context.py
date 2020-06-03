@@ -7,6 +7,7 @@ from ..status_logic import Status
 
 
 class TestBusinessContext(BusinessContext):
+    __test__ = False
 
     def __init__(self, my_addr, reliable=True):
         self.my_addr = my_addr
