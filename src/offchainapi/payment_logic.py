@@ -341,7 +341,7 @@ class PaymentProcessor(CommandProcessor):
         ''' Overrides CommandProcessor. '''
         return self.business
 
-    def check_command(self, channel, command):
+    def check_command(self, my_address, other_address, command):
         ''' Overrides CommandProcessor. '''
 
         dependencies = self.object_store
@@ -355,8 +355,8 @@ class PaymentProcessor(CommandProcessor):
         ])
 
         needed_parties = set([
-            channel.get_my_address().as_str(),
-            channel.get_other_address().as_str()
+            my_address.as_str(),
+            other_address.as_str()
         ])
 
         if parties != needed_parties:
@@ -365,7 +365,7 @@ class PaymentProcessor(CommandProcessor):
                 f'but got {str(parties)}'
             )
 
-        other_addr = channel.get_other_address().as_str()
+        other_addr = other_address.as_str()
 
         # Ensure the originator is one of the VASPs in the channel.
         origin = command.get_origin().as_str()

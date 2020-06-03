@@ -36,7 +36,7 @@ def test_handlers(payment, executor):
             else:
                 self.failure_no += 1
 
-        def check_command(self, channel, command):
+        def check_command(self, my_address, other_address, command):
             return True
 
 

@@ -115,10 +115,14 @@ def test_check_command(payment, processor, executor):
         command.set_origin(origin)
 
         if res:
-            processor.check_command(channel, command)
+            my_address = channel.get_my_address()
+            other_address = channel.get_other_address()
+            processor.check_command(my_address, other_address, command)
         else:
             with pytest.raises(PaymentLogicError):
-                processor.check_command(channel, command)
+                my_address = channel.get_my_address()
+                other_address = channel.get_other_address()
+                processor.check_command(my_address, other_address, command)
 
 
 def test_payment_process_receiver_new_payment(payment, processor):

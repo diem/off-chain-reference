@@ -12,7 +12,7 @@ class CommandProcessor:
         '''
         raise NotImplementedError()  # pragma: no cover
 
-    def check_command(self, channel, command):
+    def check_command(self, my_address, other_address, command):
         ''' Called when receiving a new payment command to validate it.
 
             All checks here are blocking subsequent comments, and therefore they
@@ -21,7 +21,8 @@ class CommandProcessor:
             remote stores or accounts.
 
             Args:
-                channel (VASPPairChannel):  A VASP channel.
+                my_address (LibraAddress): own address.
+                other_address (LibraAddress): other party address.
                 command (PaymentCommand): The current payment.
         '''
         raise NotImplementedError()  # pragma: no cover
