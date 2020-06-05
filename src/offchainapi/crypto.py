@@ -1,6 +1,10 @@
 # Copyright (c) The Libra Core Contributors
 # SPDX-License-Identifier: Apache-2.0
 
+
+from cryptography.hazmat.primitives.asymmetric.ed25519 import (
+    Ed25519PublicKey, Ed25519PrivateKey
+)
 from jwcrypto import jwk, jws
 import json
 
@@ -29,6 +33,15 @@ class ComplianceKey:
     @staticmethod
     def from_str(data):
         key = jwk.JWK(**json.loads(data))
+        return ComplianceKey(key)
+
+    @staticmethod
+    def from_pub_bytes(pub_key_data):
+        key = jwk.JWK(
+            kty='OKP',
+            crv='Ed25519',
+            x=base64url_encode(pub_key_data)
+        )
         return ComplianceKey(key)
 
     @staticmethod
@@ -110,3 +123,5 @@ def encode_ref_id_data(reference_id_bytes, libra_address_bytes, value_u64):
     domain_sep = b'@@$$LIBRA_ATTEST$$@@'
     message += domain_sep
     return message
+
+from jwcrypto.common import base64url_decode, base64url_encode

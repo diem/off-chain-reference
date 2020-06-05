@@ -291,6 +291,16 @@ def test_encode_receipient():
     )
     assert enc == msg_b
 
+    # Now check the same using our own ComplianceKey abstraction
+    ck = ComplianceKey.from_pub_bytes(pub_b)
+    ck.verify_ref_id(
+        bytes([0x61, 0x1e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0]),
+        bytes([0x65, 0xe9, 0xe9, 0xd3, 0x6, 0x3b, 0xbb, 0x14,
+               0x31, 0xb3, 0xb6, 0x55, 0xc8, 0x1e, 0x2b, 0x7b]),
+        1_000_000,
+        sig_b.hex()
+    )
+
 
 def test_example_ref_id_sign_verify():
     # Generate and export keys
