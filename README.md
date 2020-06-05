@@ -31,6 +31,10 @@ This should create a number of resources:
 
 The index of the documentation is a very good place to start to learn more. [Overview](specs/off_chain_protocol.md)
 
+## Status
+
+The specifications and code are shared here to support discussions within the Libra Association. Neither the specifications nor the code should be considered final, and breaking API changes are likely to occur.
+
 ## License
 
 Off-Chain API is licensed as [Apache 2.0](https://github.com/novifinancial/off-chain-api/blob/master/LICENSE).
