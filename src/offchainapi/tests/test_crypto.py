@@ -3,7 +3,7 @@
 
 from jwcrypto import jwk, jws
 import json
-from ..crypto import ComplianceKey, OffChainInvalidSignature
+from ..crypto import ComplianceKey, OffChainInvalidSignature, encode_ref_id_data
 import pytest
 
 def test_init():
@@ -97,8 +97,11 @@ def decode_to_hex(data_string):
     all_hex = ['0'*(2-len(x))+x for x in all_hex]
     return ''.join(all_hex)
 
+
+
+
 def test_encode_receipient():
-    MSG = """[
+    MSG = """MSG: [
     0x61,
     0x1e,
     0x0,
@@ -106,23 +109,23 @@ def test_encode_receipient():
     0x0,
     0x0,
     0x0,
-    0x0, # u64
-    0x67,
-    0x4a,
-    0x68,
-    0xa3,
-    0xa6,
-    0xa,
-    0xcb,
-    0x27,
-    0x69,
-    0x7b,
-    0x25,
-    0x42,
-    0x6c,
-    0x4a,
-    0x77,
-    0x1d, # 16 byte address
+    0x0, # u64 that is the bytes of meta-data
+    0x65,
+    0xe9,
+    0xe9,
+    0xd3,
+    0x6,
+    0x3b,
+    0xbb,
+    0x14,
+    0x31,
+    0xb3,
+    0xb6,
+    0x55,
+    0xc8,
+    0x1e,
+    0x2b,
+    0x7b, # 16 bytes of libra address
     0x40,
     0x42,
     0xf,
@@ -130,7 +133,7 @@ def test_encode_receipient():
     0x0,
     0x0,
     0x0,
-    0x0, # u64 amount
+    0x0, # 8 bytes of u64 value
     0x40,
     0x40,
     0x24,
@@ -150,7 +153,7 @@ def test_encode_receipient():
     0x24,
     0x24,
     0x40,
-    0x40, # domain sep
+    0x40, # 20 bytes of domain sep
 ]"""
     SIG= """[
     0x2b,
@@ -278,3 +281,29 @@ def test_encode_receipient():
 
     pub = Ed25519PublicKey.from_public_bytes(pub_b)
     pub.verify(sig_b, msg_b)
+
+    # Check the encoding is the same
+    enc = encode_ref_id_data(
+        bytes([0x61, 0x1e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0]),
+        bytes([0x65, 0xe9, 0xe9, 0xd3, 0x6, 0x3b, 0xbb, 0x14,
+               0x31, 0xb3, 0xb6, 0x55, 0xc8, 0x1e, 0x2b, 0x7b]),
+        1_000_000
+    )
+    assert enc == msg_b
+
+
+def test_example_ref_id_sign_verify():
+    # Generate and export keys
+    key = ComplianceKey.generate()
+
+    meta = bytes([0x61, 0x1e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0])
+    addr = bytes([0x65, 0xe9, 0xe9, 0xd3, 0x6, 0x3b, 0xbb, 0x14,
+                  0x31, 0xb3, 0xb6, 0x55, 0xc8, 0x1e, 0x2b, 0x7b])
+    value = 1_000_000
+
+    sign = key.sign_ref_id(meta, addr, value)
+    key.verify_ref_id(meta, addr, value, sign)
+
+    from cryptography.exceptions import InvalidSignature
+    with pytest.raises(InvalidSignature):
+        key.verify_ref_id(meta, addr, value-1, sign)

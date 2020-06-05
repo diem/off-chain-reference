@@ -73,3 +73,40 @@ class ComplianceKey:
             return False
         return self._key.has_private == other._key.has_private \
             and self._key.thumbprint() == other._key.thumbprint()
+
+    def sign_ref_id(self, reference_id_bytes, libra_address_bytes, value_u64):
+        """ Sign the reference_id and associated data required for the recipient
+            signature using the complance key.
+
+            Params:
+               reference_id_bytes (bytes): the bytes of the reference_id.
+               libra_address_bytes (bytes): the 16 bytes of the  libra address
+               value_u64 (int): a unsigned integer of the value.
+
+            Returns the hex encoded string ed25519 signature (64 x 2 char).
+        """
+
+        msg_b = encode_ref_id_data(reference_id_bytes, libra_address_bytes, value_u64)
+        priv = self._key._get_private_key()
+        return priv.sign(msg_b).hex()
+
+    def verify_ref_id(self, reference_id_bytes, libra_address_bytes, value_u64, signature):
+        """ Verify the reference_id and  associated data sgnature from a recipient. Parameters
+        are the same as for sign_ref_id, with the addition of the signature in hex format
+        as returned by sign_ref_id. """
+        msg_b = encode_ref_id_data(reference_id_bytes, libra_address_bytes, value_u64)
+        pub = self._key._get_public_key()
+        pub.verify(bytes.fromhex(signature), msg_b)
+
+def encode_ref_id_data(reference_id_bytes, libra_address_bytes, value_u64):
+    if len(libra_address_bytes) != 16:
+        raise Exception('Libra Address raw format is 16 bytes.')
+
+    message = b''
+    message += reference_id_bytes
+    message += libra_address_bytes
+    message += value_u64.to_bytes(8, byteorder='little')
+
+    domain_sep = b'@@$$LIBRA_ATTEST$$@@'
+    message += domain_sep
+    return message
