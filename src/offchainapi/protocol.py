@@ -619,7 +619,7 @@ class VASPPairChannel:
             json_response (str or dict): The json response.
 
         Returns:
-            NetMessage: The message to be sent on a network.
+            bool: Whether the command was a success or not
         """
         loop = asyncio.new_event_loop()
         fut = self.parse_handle_response_to_future(
@@ -644,7 +644,7 @@ class VASPPairChannel:
                 in which this is executed. Defaults to None.
 
         Returns:
-            bool: Whether the command was a success  or not (Command error).
+            bool: Whether the command was a success or not (Command error).
         """
         self.logger.debug(f'Response Received -> {self.myself.as_str()}')
 
