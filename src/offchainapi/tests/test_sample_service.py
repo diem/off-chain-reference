@@ -216,4 +216,5 @@ def test_vasp_simple_wrong_VASP(json_request, other_addr, loop, key):
 
 
 def test_vasp_response(simple_response_json_error, vasp, other_addr):
+    # asyncio.set_event_loop(asyncio.new_event_loop())
     vasp.process_response(other_addr, simple_response_json_error)

@@ -271,13 +271,12 @@ class Aionet:
                 command (ProtocolCommand) : A ProtocolCommand instance.
 
             Returns:
-                CommandRequestObject : An instance of a CommandRequestObject
-                representing the command.
+                str: json str of the net message
         '''
 
         channel = self.vasp.get_channel(other_addr)
         request = channel.sequence_command_local(command)
-        request = request[3]
+        request = request.content
         return request
 
     def get_runner(self):
