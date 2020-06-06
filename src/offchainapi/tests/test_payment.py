@@ -91,7 +91,6 @@ def test_payment_actor_update_status(sender_actor):
 
 
 def test_payment_actor_update_kyc(sender_actor, kyc_data):
-    kyc_data.data
     sender_actor.add_kyc_data(kyc_data)
 
     # We tolerate writing again strictly the same record

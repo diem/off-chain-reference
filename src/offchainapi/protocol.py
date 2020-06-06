@@ -787,7 +787,7 @@ class VASPPairChannel:
     def would_retransmit(self, do_retransmit=False):
         """ Returns true if there are any pending re-transmits, namely
             requests for which the response has not yet been received.
-            Note that this function re-transmit at most one request
+            Note that this function re-transmits at most one request
             at a time.
         """
 
@@ -818,7 +818,7 @@ class VASPPairChannel:
     def pending_retransmit_number(self):
         '''
         Returns:
-            the number of requets that are waiting to be
+            the number of requests that are waiting to be
             retransmitted on this channel.
         '''
         if not self.would_retransmit():
