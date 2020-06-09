@@ -1,3 +1,6 @@
+# Copyright (c) The Libra Core Contributors
+# SPDX-License-Identifier: Apache-2.0
+
 from ..status_logic import Status
 from ..payment_command import PaymentCommand, PaymentLogicError
 from ..business import BusinessForceAbort, BusinessValidationFailure

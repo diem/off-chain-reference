@@ -1,3 +1,6 @@
+# Copyright (c) The Libra Core Contributors
+# SPDX-License-Identifier: Apache-2.0
+
 from ..sample.sample_command import SampleCommand
 from ..payment_command import PaymentCommand, PaymentLogicError
 from ..protocol_messages import CommandRequestObject, make_success_response

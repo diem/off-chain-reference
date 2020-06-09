@@ -1,6 +1,10 @@
+# Copyright (c) The Libra Core Contributors
+# SPDX-License-Identifier: Apache-2.0
+
 from ..asyncnet import Aionet
 from ..protocol_messages import OffChainException
 from ..business import BusinessNotAuthorized
+from ..utils import get_unique_string
 
 import pytest
 import aiohttp
@@ -38,7 +42,8 @@ async def client(net_handler, aiohttp_client):
 @pytest.fixture
 async def server(net_handler, tester_addr, aiohttp_server, signed_json_response):
     async def handler(request):
-        return aiohttp.web.json_response(signed_json_response)
+        headers = {'X-Request-ID': request.headers['X-Request-ID']}
+        return aiohttp.web.json_response(signed_json_response, headers=headers)
 
     app = aiohttp.web.Application()
     url = net_handler.get_url('/', tester_addr.as_str(), other_is_server=True)
@@ -60,7 +65,10 @@ async def test_handle_request_debug(client):
 
 async def test_handle_request(url, net_handler, key, client, signed_json_request):
     #from json import dumps
-    response = await client.post(url, json=signed_json_request)
+    headers = {'X-Request-ID' : 'abc'}
+    response = await client.post(
+        url, json=signed_json_request,
+        headers=headers)
     assert response.status == 200
     content = await response.json()
     content = json.loads(key.verify_message(content))
@@ -69,12 +77,14 @@ async def test_handle_request(url, net_handler, key, client, signed_json_request
 
 async def test_handle_request_not_authorised(vasp, url, json_request, client):
     vasp.business_context.open_channel_to.side_effect = BusinessNotAuthorized
-    response = await client.post(url, json=json_request)
+    headers = {'X-Request-ID' : 'abc'}
+    response = await client.post(url, json=json_request, headers=headers)
     assert response.status == 401
 
 
 async def test_handle_request_bad_payload(client, url):
-    response = await client.post(url)
+    headers = {'X-Request-ID' : 'abc'}
+    response = await client.post(url, headers=headers)
     assert response.status == 400
 
 

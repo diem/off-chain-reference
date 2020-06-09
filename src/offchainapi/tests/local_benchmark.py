@@ -1,3 +1,6 @@
+# Copyright (c) The Libra Core Contributors
+# SPDX-License-Identifier: Apache-2.0
+
 # Sample benchmark to profile performance and observe bottlenecks.
 #
 # Run as:
@@ -117,7 +120,7 @@ async def main_perf(messages_num=10, wait_num=0, verbose=False):
         receiver = PaymentActor(sub_b, Status.none, [])
         action = PaymentAction(10, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
         payment = PaymentObject(
-            sender, receiver, f'{peerA_addr}_ref{cid:08d}', '', 'Description ...', action
+            sender, receiver, f'{peerA_addr}_ref{cid:08d}', None, 'Description ...', action
         )
         kyc_data = asyncio.run_coroutine_threadsafe(VASPa.bc.get_extended_kyc(payment), loopA)
         kyc_data = kyc_data.result()

@@ -1,3 +1,6 @@
+# Copyright (c) The Libra Core Contributors
+# SPDX-License-Identifier: Apache-2.0
+
 from .utils import get_unique_string, JSONSerializable, JSONFlag
 from copy import deepcopy
 import json

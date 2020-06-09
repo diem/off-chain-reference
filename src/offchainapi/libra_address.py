@@ -1,3 +1,6 @@
+# Copyright (c) The Libra Core Contributors
+# SPDX-License-Identifier: Apache-2.0
+
 from binascii import unhexlify, hexlify
 from bech32 import bech32_encode, bech32_decode, convertbits
 
