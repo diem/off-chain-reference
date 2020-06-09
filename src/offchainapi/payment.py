@@ -19,9 +19,9 @@ class KYCData(StructureChecker):
     """
 
     fields = [
-        ("payload_type", str, OPTIONAL, WRITE_ONCE),
-        ("payload_version", int, OPTIONAL, WRITE_ONCE),
-        ("type", str, OPTIONAL, WRITE_ONCE),
+        ("payload_type", str, REQUIRED, WRITE_ONCE),
+        ("payload_version", int, REQUIRED, WRITE_ONCE),
+        ("type", str, REQUIRED, WRITE_ONCE),
         ("given_name", str, OPTIONAL, WRITE_ONCE),
         ("surname", str, OPTIONAL, WRITE_ONCE),
         ("address", dict, OPTIONAL, WRITE_ONCE),

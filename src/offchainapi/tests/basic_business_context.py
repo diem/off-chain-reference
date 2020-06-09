@@ -81,7 +81,9 @@ class BasicBusinessContext(BusinessContext):
         myself = self.my_addr.as_str()
         ref_id = payment.reference_id
         return KYCData({
-                    "type": "individual"
+                    "payload_type": "KYC_DATA",
+                    "payload_version": 1,
+                    "type": "individual",
                 })
 
     # ----- Settlement -----

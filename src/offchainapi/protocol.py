@@ -247,14 +247,14 @@ class VASPPairChannel:
         Returns:
             NetMessage: The message to be sent on a network.
         """
-        json_string = request.get_json_data_dict(JSONFlag.NET)
+        json_dict = request.get_json_data_dict(JSONFlag.NET)
 
         # Make signature.
         vasp = self.get_vasp()
         my_key = vasp.info_context.get_peer_compliance_signature_key(
             self.get_my_address().as_str()
         )
-        json_string = my_key.sign_message(json.dumps(json_string))
+        json_string = my_key.sign_message(json.dumps(json_dict))
 
         net_message = NetMessage(
             self.myself,
@@ -723,36 +723,37 @@ class VASPPairChannel:
         request_seq = response.seq
 
         # Check this is the next expected response.
-        if not request_seq < len(self.my_requests):
+        my_next_seq = self.my_next_seq()
+        if request_seq >= my_next_seq:
             raise OffChainException(
                 f'Response for seq {request_seq} received, '
-                f'but has requests only up to seq < {len(self.my_requests)}'
+                f'but has requests only up to seq < {my_next_seq}'
             )
 
         # Idenpotent: We have already processed the response.
-        if self.my_requests[request_seq].has_response():
-
+        request = self.my_requests[request_seq]
+        if request.has_response():
             # Check the reponse is the same and log warning otherwise.
-            if self.my_requests[request_seq].response != response:
+            if request.response != response:
                 excp = OffChainException(
                     'Got duplicate but different responses.'
                 )
-                excp.reponse1 = self.my_requests[request_seq].response
+                excp.response1 = request.response
                 excp.response2 = response
                 raise excp
+            # this request may have concurrent modification
+            # read db to get latest status
             return self.my_requests[request_seq].is_success()
 
         # This is too high -- wait for more data.
-        if response.command_seq > self.next_final_sequence() \
-                or not (response.command_seq == self.executor.last_confirmed):
-            next_cmd_seq = self.next_final_sequence()
-            actual_cmd_seq = response.command_seq
+        next_final_sequence = self.next_final_sequence()
+        if response.command_seq > next_final_sequence \
+                or (response.command_seq != self.executor.last_confirmed):
             raise OffChainOutOfOrder(
-                f'Expect command seq {next_cmd_seq} but got {actual_cmd_seq}'
+                f'Expect command seq {next_final_sequence} but got {response.command_seq}'
             )
 
         # Read and write back response into request.
-        request = self.my_requests[request_seq]
         request.response = response
         self.my_requests[request_seq] = request
 
@@ -789,6 +790,8 @@ class VASPPairChannel:
     def would_retransmit(self, do_retransmit=False):
         """ Returns true if there are any pending re-transmits, namely
             requests for which the response has not yet been received.
+            Note that this function re-transmits at most one request
+            at a time.
         """
 
         request_to_send = None
@@ -796,7 +799,7 @@ class VASPPairChannel:
         with self.rlock:
             with self.storage.atomic_writes():
                 next_retransmit = self.next_retransmit.get_value()
-                while next_retransmit < len(self.my_requests):
+                while next_retransmit < self.my_next_seq():
                     request = self.my_requests[next_retransmit]
                     if request.has_response():
                         next_retransmit += 1
@@ -818,10 +821,10 @@ class VASPPairChannel:
     def pending_retransmit_number(self):
         '''
         Returns:
-            Returns the number of requets that are waiting to be
+            the number of requests that are waiting to be
             retransmitted on this channel.
         '''
         if not self.would_retransmit():
             return 0
 
-        return len(self.my_requests) - self.next_retransmit.get_value()
+        return self.my_next_seq() - self.next_retransmit.get_value()

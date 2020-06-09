@@ -58,8 +58,9 @@ def payment(sender_actor, receiver_actor, payment_action):
 @pytest.fixture
 def kyc_data():
     return KYCData({
+        "payload_type": "KYC_DATA",
+        "payload_version": 1,
         "type": "individual",
-        "other": {"other_feild": "other data"}
     })
 
 
