@@ -262,7 +262,7 @@ Represents a national ID.
 </pre>
 </details>
 
-## RequestedKycData
+### RequestedKycData
 When a counterparty user's KYC information returns a soft match on a VASP, the VASP may require additional information in order to clear the transaction.  When this occurs, the `status` field under the VASP shall be placed into `needs_kyc_data` or `pending_review` and the VASP shall set the `requested_kyc_data` field of its respective counterparty's PaymentActor object to a list of what fields are requested.  The counterparty shall then populate the requested fields or abort the transaction.  Valid values for the `requested_kyc_data` list are as follows (see [KycDataObject](#kycdataobject) for field details:
 * `given_name`
 * `surname`
