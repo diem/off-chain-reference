@@ -4,11 +4,12 @@
 '''
 A benchmark to measure command throughput between a client and a server.
 
-RUN SERVER: python3 -O src/scripts/run_remote_perf.py src/offchainapi/tests/test_config_A.json
-RUN CLIENT: python3 -O src/scripts/run_remote_perf.py src/offchainapi/tests/test_config_B.json 10
+RUN SERVER: python3 -O src/scripts/run_remote_perf.py src/offchainapi/tests/assets/test_config_A.json
+RUN CLIENT: python3 -O src/scripts/run_remote_perf.py src/offchainapi/tests/assets/test_config_B.json 10
 '''
 from threading import Thread
 from glob import glob
+from os.path import join
 import time
 import asyncio
 import sys
@@ -17,10 +18,12 @@ sys.path += ['src/.']
 from offchainapi.tests import remote_benchmark
 
 if __name__ == '__main__':
+    assets_dir = 'src/offchainapi/tests/assets/'
+
     # Run by tox on same machine
     if len(sys.argv) == 1:
-        my_configs_path = 'src/offchainapi/tests/test_config_A.json'
-        other_configs_path = 'src/offchainapi/tests/test_config_B.json'
+        my_configs_path = join(assets_dir, 'test_config_A.json')
+        other_configs_path = join(assets_dir, 'test_config_B.json')
         num_of_commands = 10
         loop = asyncio.get_event_loop()
         server = Thread(
@@ -41,7 +44,7 @@ if __name__ == '__main__':
         num_of_commands = int(sys.argv[2]) if len(sys.argv) > 2 else 0
         port = int(sys.argv[3]) if len(sys.argv) > 3 else 0
 
-        files = glob('src/offchainapi/tests/*.json')
+        files = glob(join(assets_dir, '*.json'))
         assert len(files) == 2
         other_configs_path = files[1] if my_configs_path == files[0] else files[0]
 
