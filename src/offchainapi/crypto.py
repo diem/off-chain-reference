@@ -1,10 +1,9 @@
 # Copyright (c) The Libra Core Contributors
 # SPDX-License-Identifier: Apache-2.0
 
+from jwcrypto.common import base64url_encode
+from cryptography.exceptions import InvalidSignature
 
-from cryptography.hazmat.primitives.asymmetric.ed25519 import (
-    Ed25519PublicKey, Ed25519PrivateKey
-)
 from jwcrypto import jwk, jws
 import json
 
@@ -16,6 +15,7 @@ class OffChainInvalidSignature(Exception):
 class ComplianceKey:
 
     def __init__(self, key):
+        ''' Creates a compliance key from a JWK Ed25519 key. '''
         self._key = key
 
     def get_public(self):
@@ -32,11 +32,14 @@ class ComplianceKey:
 
     @staticmethod
     def from_str(data):
+        ''' Generate a compliance key from a JWK JSON string. '''
         key = jwk.JWK(**json.loads(data))
         return ComplianceKey(key)
 
     @staticmethod
     def from_pub_bytes(pub_key_data):
+        ''' Generate a compliance public key (for verification) from
+        32 bytes of Ed25519 key. '''
         key = jwk.JWK(
             kty='OKP',
             crv='Ed25519',
@@ -109,7 +112,10 @@ class ComplianceKey:
         as returned by sign_ref_id. """
         msg_b = encode_ref_id_data(reference_id_bytes, libra_address_bytes, value_u64)
         pub = self._key._get_public_key()
-        pub.verify(bytes.fromhex(signature), msg_b)
+        try:
+            pub.verify(bytes.fromhex(signature), msg_b)
+        except InvalidSignature:
+            raise OffChainInvalidSignature()
 
 def encode_ref_id_data(reference_id_bytes, libra_address_bytes, value_u64):
     if len(libra_address_bytes) != 16:
@@ -123,5 +129,3 @@ def encode_ref_id_data(reference_id_bytes, libra_address_bytes, value_u64):
     domain_sep = b'@@$$LIBRA_ATTEST$$@@'
     message += domain_sep
     return message
-
-from jwcrypto.common import base64url_decode, base64url_encode
