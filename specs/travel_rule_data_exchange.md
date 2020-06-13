@@ -11,7 +11,6 @@ All requests between VASPs are structured as [`CommandRequestObject`s](basic_bui
 {
     "_ObjectType": "CommandRequestObject",
     "command_type": "PaymentCommand",
-    "seq": 1,
     "command": {
 	    "_ObjectType": "PaymentCommand",
 	    "_creates_versions": [
@@ -58,7 +57,6 @@ All requests between VASPs are structured as [`CommandRequestObject`s](basic_bui
 		    "description": "A free form or structured description of the payment.",
 		},
 	},
-    "command_seq": 1,
 }
 </pre>
 </details>
@@ -69,8 +67,6 @@ A response would look like the following:
 <pre>
 {
     "_ObjectType": "CommandResponseObject",
-    "seq": 1,
-    "command_seq": 1,
     "status": "success",
 }
 </pre>
