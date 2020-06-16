@@ -17,6 +17,8 @@ import time
 """ A Class to store messages meant to be sent on a network. """
 NetMessage = namedtuple('NetMessage', ['src', 'dst', 'type', 'content'])
 
+logger = logging.getLogger(name='libra_off_chain_api.protocol')
+
 
 class OffChainVASP:
     """ Manages the off-chain protocol on behalf of one VASP.
@@ -30,7 +32,7 @@ class OffChainVASP:
     """
 
     def __init__(self, vasp_addr, processor, storage_factory, info_context):
-        logging.debug(f'Creating VASP {vasp_addr.as_str()}')
+        logger.debug(f"Creating VASP {vasp_addr.as_str()}")
 
         assert isinstance(processor, CommandProcessor)
         assert isinstance(vasp_addr, LibraAddress)
@@ -123,27 +125,27 @@ class VASPPairChannel:
         # State that is given by constructor.
         self.myself = myself
         self.other = other
+        self.other_address_str = self.other.as_str()
         self.processor = processor
         self.vasp = vasp
         self.storage = storage
 
         # Check we are not making a channel with ourselves.
-        if self.myself.as_str() == self.other.as_str():
+        if self.myself.as_str() == self.other_address_str:
             raise OffChainException(
                 'Must talk to another VASP:',
                 self.myself.as_str(),
-                self.other.as_str()
+                self.other_address_str
             )
 
         # A reentrant lock to manage access.
         self.rlock = RLock()
-        self.logger = logging.getLogger(name=f'channel.{self.other.as_str()}')
 
         # State that is persisted.
 
         root = self.storage.make_value(self.myself.as_str(), None)
         other_vasp = self.storage.make_value(
-            self.other.as_str(), None, root=root
+            self.other_address_str, None, root=root
         )
 
         with self.storage.atomic_writes() as _:
@@ -178,8 +180,7 @@ class VASPPairChannel:
         # Network handler
         self.net_queue = []
 
-        oth_addr = other.as_str()
-        self.logger.debug(f'Created VASP channel to {oth_addr}.')
+        logger.debug(f"(other:{self.other_address_str}) Created VASP channel")
 
     def my_next_seq(self):
         """
@@ -264,7 +265,6 @@ class VASPPairChannel:
         if __debug__:
             self.net_queue += [net_message]
 
-        self.logger.debug(f'Request SENT -> {self.other.as_str()}')
         return net_message
 
     def send_response(self, response):
@@ -289,7 +289,6 @@ class VASPPairChannel:
         )
         if __debug__:
             self.net_queue += [net_message]
-        self.logger.debug(f'Response SENT -> {self.other.as_str()}')
         return net_message
 
     def is_client(self):
@@ -401,16 +400,21 @@ class VASPPairChannel:
         ''' Executes any requets that are now capable of executing, and were
             not before due to being received out of order. '''
 
-        self.logger.debug(
-            f'Activate:'
-            f' Remote Seq {self.other_next_seq()}'
-            f' Command Seq #{self.next_final_sequence()}'
-            f' Last Confirmed: {self.executor.last_confirmed}'
+        logger.debug(
+            f"(other:{self.other_address_str}) "
+            f"Processing waiting messages: "
+            f"remote Seq {self.other_next_seq()}, "
+            f"command Seq #{self.next_final_sequence()}, "
+            f"last Confirmed: {self.executor.last_confirmed}, ",
         )
 
         while self.executor.last_confirmed in self.waiting_response:
             next_cmd_seq = self.executor.last_confirmed
-            self.logger.debug(f'Activate: Response for #{next_cmd_seq}')
+
+            logger.debug(
+                f"(other:{self.other_address_str}) "
+                f"Activate response to #{next_cmd_seq}",
+            )
 
             # Take a copy of the pending responses.
             list_of_responses = self.waiting_response[next_cmd_seq]
@@ -426,7 +430,10 @@ class VASPPairChannel:
 
         while self.other_next_seq() in self.waiting_requests:
             next_seq = self.other_next_seq()
-            self.logger.debug(f'Activate: Request for #{next_seq}')
+            logger.debug(
+                f"(other:{self.other_address_str}) "
+                f"Activate request to other next seq: #{next_seq}",
+            )
 
             # Take a copy of the pending requests.
             list_of_requests = self.waiting_requests[next_seq]
@@ -470,7 +477,6 @@ class VASPPairChannel:
             if fut.done():
                 return fut
 
-        self.logger.debug(f'Request Received -> {self.myself.as_str()}')
         try:
             # Check signature
             vasp = self.get_vasp()
@@ -486,10 +492,17 @@ class VASPPairChannel:
 
             with self.rlock:
                 # Going ahead to process the request.
-                self.logger.debug(f'Processing Req Seq #{request.seq}')
+                logger.debug(
+                    f"(other:{self.other_address_str}) "
+                    f"Processing request seq #{request.seq}",
+                )
                 response = self.handle_request(request, raise_on_wait=True)
 
-        except OffChainInvalidSignature:
+        except OffChainInvalidSignature as e:
+            logger.warning(
+                f"(other:{self.other_address_str}) "
+                f"Signature verification failed. OffChainInvalidSignature: {e}",
+            )
             # TODO: Package proper exception
             fut.set_result('Signature verification failed.')
             return fut
@@ -497,22 +510,30 @@ class VASPPairChannel:
         except OffChainOutOfOrder as e:
             if nowait:
                 # No waiting -- so bubble up the potocol error response.
+                logger.info(
+                    f"(other:{self.other_address_str}) "
+                    f"Request OutOfOrder and no wait",
+                )
                 response = e.args[0]
             else:
                 # We were told to wait for this requests turn.
-                self.logger.debug(
-                    f'Except. Waiting Req Seq #{request.seq}'
-                    f'Len: {len(self.waiting_requests)}'
+                logger.info(
+                    f"(other:{self.other_address_str}) "
+                    f"Request OutOfOrder, add to waiting requests",
                 )
                 self.waiting_requests[request.seq] += [(
                     json_command, fut, time.time()
                 )]
                 return fut
-
-        except JSONParsingError:
+        except JSONParsingError as e:
+            logger.error(
+                f"(other:{self.other_address_str}) JSONParsingError: {e}"
+            )
             response = make_parsing_error()
-
         except Exception as e:
+            logger.error(
+                f"(other:{self.other_address_str}) exception: {e}"
+            )
             fut.set_exception(e)
             return fut
 
@@ -546,10 +567,16 @@ class VASPPairChannel:
         request.command.set_origin(self.other)
 
         # Always answer old requests.
-        if request.seq < self.other_next_seq():
+        other_next_seq = self.other_next_seq()
+        if request.seq < other_next_seq:
             previous_request = self.other_requests[request.seq]
             if previous_request.is_same_command(request):
                 # Re-send the response.
+                logger.debug(
+                    f"(other:{self.other_address_str}) "
+                    f"Handle request that alerady has a response: "
+                    f"seq #{request.seq}, other next #{other_next_seq}",
+                )
                 return previous_request.response
             else:
                 # There is a conflict, and it will have to be resolved
@@ -557,7 +584,10 @@ class VASPPairChannel:
                 # With only two participants we cannot tolerate errors.
                 response = make_protocol_error(request, code='conflict')
                 response.previous_command = previous_request.command
-                self.logger.error('Conflicting requests for seq {request.seq}')
+                logger.error(
+                    f"(other:{self.other_address_str}) "
+                    "Conflicting requests for seq {request.seq}",
+                )
                 return response
 
         # Clients are not to suggest sequence numbers.
@@ -571,6 +601,12 @@ class VASPPairChannel:
         # acknowledging the next ones.
         if self.is_server() and self.has_pending_responses() \
                 or request.seq > self.other_next_seq():
+            logger.info(
+                f"(other:{self.other_address_str}) "
+                f"Request OutOfOrder! I'm server, has pending responses: "
+                f"{self.has_pending_responses()}, req.seq: #{request.seq} "
+                f"other next seq: #{self.other_next_seq()}",
+            )
             response = make_protocol_error(request, code='wait')
             if raise_on_wait:
                 raise OffChainOutOfOrder(response)
@@ -585,6 +621,12 @@ class VASPPairChannel:
                 and request.command_seq != self.next_final_sequence():
             # We must wait, since we cannot give an answer
             # before sequencing previous commands.
+            logger.info(
+                f"(other:{self.other_address_str}) "
+                f"Request OutOfOrder! I'm client: req.com_seq: "
+                f"{request.command_seq}, next final seq: "
+                f"{self.next_final_sequence()}",
+            )
             response = make_protocol_error(request, code='wait')
             if raise_on_wait:
                 raise OffChainOutOfOrder(response)
@@ -646,8 +688,6 @@ class VASPPairChannel:
         Returns:
             bool: Whether the command was a success or not (Command error).
         """
-        self.logger.debug(f'Response Received -> {self.myself.as_str()}')
-
         if fut is None:
             fut = asyncio.Future(loop=loop)
 
@@ -666,21 +706,44 @@ class VASPPairChannel:
                 result = self.handle_response(response)
             fut.set_result(result)
 
-        except OffChainInvalidSignature:
+        except OffChainInvalidSignature as e:
+            logger.warning(
+                f"(other:{self.other_address_str}) "
+                f"Signature verification failed. OffChainInvalidSignature: {e}",
+            )
             # TODO: Package proper exception
             fut.set_result('Signature verification failed.')
         except JSONParsingError as e:
+            logger.warning(
+                f"(other:{self.other_address_str}) JSONParsingError: {e}"
+            )
             fut.set_exception(e)
         except OffChainOutOfOrder as e:
             # If we were told to not wait, raise this.
             if nowait:
+                logger.info(
+                    f"(other:{self.other_address_str}) "
+                    f"response OutofOrder and no wait. OffChainOutOfOrder: {e}",
+                )
                 fut.set_exception(e)
             else:
+                logger.info(
+                    f"(other:{self.other_address_str}) "
+                    f"response OutOfOrder, adding a waiting response. Exception: {e}",
+                )
                 # Otherwise wait for longer.
                 self.waiting_response[command_seq] += [(json_response, fut)]
         except OffChainException or OffChainProtocolError as e:
+            logger.warning(
+                f"(other:{self.other_address_str}) "
+                f"OffChainException/OffChainProtocolError: {e}",
+            )
             fut.set_exception(e)
         except ExecutorException as e:
+            logger.warning(
+                f"(other:{self.other_address_str}) "
+                f"ExecutorException: {e}",
+            )
             fut.set_exception(e)
 
         return fut
@@ -744,10 +807,12 @@ class VASPPairChannel:
 
         # This is too high -- wait for more data.
         next_final_sequence = self.next_final_sequence()
+        last_confirmed = self.executor.last_confirmed
         if response.command_seq > next_final_sequence \
-                or (response.command_seq != self.executor.last_confirmed):
+                or (response.command_seq != last_confirmed):
             raise OffChainOutOfOrder(
-                f'Expect command seq {next_final_sequence} but got {response.command_seq}'
+                f"Expect command seq {next_final_sequence} but got {response.command_seq}, "
+                f"last confirmed: {last_confirmed}"
             )
 
         # Read and write back response into request.
@@ -770,7 +835,7 @@ class VASPPairChannel:
                 # good -- we expected an error and this is why the command
                 # possibly failed.
                 if request.is_success():
-                    self.logger.exception(e)
+                    logger.error(f"(other:{self.other_address_str}) {e}", exc_info=True)
                     raise e
 
         # KEY INVARIANT: Can we prove this always holds?

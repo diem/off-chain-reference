@@ -13,6 +13,9 @@ import logging
 import json
 
 
+logger = logging.getLogger(name='libra_off_chain_api.payment_logic')
+
+
 class PaymentProcessor(CommandProcessor):
     ''' The logic to process a payment from either side.
 
@@ -38,7 +41,6 @@ class PaymentProcessor(CommandProcessor):
         # Asyncio support
         self.loop = loop
         self.net = None
-        self.logger = logging.getLogger(name='Processor')
 
         # The processor state -- only access through event loop to prevent
         # mutlithreading bugs.
@@ -110,8 +112,10 @@ class PaymentProcessor(CommandProcessor):
             after recovering from a crash. '''
 
         pending_commands = self.list_command_obligations()
-        self.logger.info(f'Re-scheduling {len(pending_commands)} commands for'
-                         f' processing ...')
+
+        logger.info(
+            f"Re-scheduling {len(pending_commands)} commands for processing"
+        )
         new_tasks = []
         for (other_address_str, command, seq) in pending_commands:
             other_address = LibraAddress(other_address_str)
@@ -126,11 +130,9 @@ class PaymentProcessor(CommandProcessor):
     async def process_command_failure_async(
             self, other_address, command, seq, error):
         ''' Process any command failures from either ends of a channel.'''
-        self.logger.error(
-            f'Command with {other_address.as_str()}.#{seq}'
-            f' Failure: {error}'
+        logger.error(
+            f"(other:{other_address.as_str()}) Command #{seq} Failure: {error}"
         )
-        return
 
     async def process_command_success_async(self, other_address, command, seq):
         """ The asyncronous command processing logic.
@@ -155,13 +157,13 @@ class PaymentProcessor(CommandProcessor):
         # might be due to a bug.
         other_address_str = other_address.as_str()
         if not self.obligation_exists(other_address_str, seq):
-            self.logger.error(
-                f'Process command called without obligation '
-                f'{other_address_str}.#{seq}'
+            logger.error(
+                f"(other:{other_address_str}) "
+                f"Process command called without obligation #{seq}"
             )
             return
 
-        self.logger.debug(f'Process Command {other_address_str}.#{seq}')
+        logger.info(f"(other:{other_address_str}) Process Command #{seq}")
 
         try:
             # Only respond to commands by other side.
@@ -191,6 +193,11 @@ class PaymentProcessor(CommandProcessor):
 
                     # Attempt to send it to the other VASP.
                     await self.net.send_request(other_address, request)
+                else:
+                    logger.debug(
+                        f"(other:{other_address_str}) No more commands "
+                        f"created for Payment lastly with seq num #{seq}"
+                    )
 
             # If we are here we are done with this obligation.
             with self.storage_factory.atomic_writes():
@@ -202,13 +209,15 @@ class PaymentProcessor(CommandProcessor):
             raise e
 
         except NetworkException as e:
-            self.logger.debug(f'Network error: seq #{seq}: {str(e)}')
-
-        except Exception as e:
-            self.logger.error(
-                f'Payment processing error: seq #{seq}: {str(e)}'
+            logger.warning(
+                f"(other:{other_address_str}) Network error: seq #{seq}: {str(e)}"
             )
-            self.logger.exception(e)
+        except Exception as e:
+            logger.error(
+                f"(other:{other_address_str}) "
+                f"Payment processing error: seq #{seq}: {str(e)}",
+                exc_info=True,
+            )
 
     # -------- Implements CommandProcessor interface ---------
 
@@ -298,7 +307,7 @@ class PaymentProcessor(CommandProcessor):
         self.persist_command_obligation(other_str, seq, command)
 
         # Spin further command processing in its own task.
-        self.logger.debug(f'Schedule cmd {seq}')
+        logger.debug(f"(other:{other_addr.as_str()}) Schedule cmd {seq}")
         fut = self.loop.create_task(self.process_command_success_async(
             other_addr, command, seq))
 
