@@ -7,6 +7,10 @@ from .libra_address import LibraAddress
 
 import logging
 
+
+logger = logging.getLogger(name='libra_off_chain_api.executor')
+
+
 # Interface we need to do commands:
 class ProtocolCommand(JSONSerializable):
     def __init__(self):
@@ -154,8 +158,7 @@ class ProtocolExecutor:
 
         self.processor = processor
         self.channel = channel
-        other_name = self.channel.get_other_address().as_str()
-        self.logger = logging.getLogger(name=f'executor.{other_name}')
+        self.other_name = self.channel.get_other_address().as_str()
 
         # <STARTS to persist>
 
@@ -263,9 +266,8 @@ class ProtocolExecutor:
 
         except Exception as e:
             all_good = False
-            type_str = f'{str(type(e))}: {str(e)}'
-            self.logger.error(type_str)
-            self.logger.exception(e)
+            type_str = f'{str(type(e))}: {e}'
+            logger.error(f'(other:{self.other_name}) {type_str}', exc_info=True)
 
             raise ExecutorException(type_str)
 
@@ -302,6 +304,10 @@ class ProtocolExecutor:
             self.object_liveness[version] = True
 
         # Call the command processor.
+        logger.info(
+            f'(other:{self.other_name}) '
+            f'Confirm success of command #{seq_no}'
+        )
         self.command_status_sequence += [True]
         self.set_outcome(command, is_success=True, seq=seq_no)
 
@@ -318,5 +324,9 @@ class ProtocolExecutor:
         self.command_status_sequence += [False]
 
         # Call the command processor.
+        logger.info(
+            f'(other:{self.other_name}) '
+            f'Confirm failure of command #{seq_no}'
+        )
         command = self.command_sequence[seq_no]
         self.set_outcome(command, is_success=False, seq=seq_no, error=error)
