@@ -527,12 +527,14 @@ class VASPPairChannel:
                 return fut
         except JSONParsingError as e:
             logger.error(
-                f'(other:{self.other_address_str}) JSONParsingError: {e}'
+                f'(other:{self.other_address_str}) JSONParsingError: {e}',
+                exc_info=True,
             )
             response = make_parsing_error()
         except Exception as e:
             logger.error(
-                f'(other:{self.other_address_str}) exception: {e}'
+                f'(other:{self.other_address_str}) exception: {e}',
+                exc_info=True,
             )
             fut.set_exception(e)
             return fut
