@@ -246,7 +246,7 @@ class Aionet:
                     channel.process_waiting_messages()
                     return res
                 except json.decoder.JSONDecodeError as e:
-                    logger.debug(f"JSONDecodeError", exc_info=True)
+                    logger.debug(f'JSONDecodeError', exc_info=True)
                     raise e
                 except asyncio.CancelledError as e:
                     raise e

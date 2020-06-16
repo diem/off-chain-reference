@@ -163,7 +163,7 @@ class PaymentProcessor(CommandProcessor):
             )
             return
 
-        logger.info(f"(other:{other_address_str}) Process Command #{seq}")
+        logger.info(f'(other:{other_address_str}) Process Command #{seq}')
 
         try:
             # Only respond to commands by other side.

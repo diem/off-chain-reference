@@ -586,7 +586,7 @@ class VASPPairChannel:
                 response.previous_command = previous_request.command
                 logger.error(
                     f'(other:{self.other_address_str}) '
-                    'Conflicting requests for seq {request.seq}',
+                    f'Conflicting requests for seq {request.seq}',
                 )
                 return response
 
