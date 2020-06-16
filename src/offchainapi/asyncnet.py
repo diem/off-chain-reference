@@ -11,7 +11,7 @@ from urllib.parse import urljoin
 import json
 
 
-logger = logging.getLogger(name="libra_off_chain_api.asyncnet")
+logger = logging.getLogger(name='libra_off_chain_api.asyncnet')
 
 
 class NetworkException(Exception):
@@ -160,7 +160,7 @@ class Aionet:
             channel = self.vasp.get_channel(other_addr)
         except BusinessNotAuthorized as e:
             # Raised if the other VASP is not an authorised business.
-            logger.debug(f'Not Authorized: {e}')
+            logger.debug(f'Not Authorized', exc_info=True)
             raise web.HTTPUnauthorized(headers=headers)
 
         # Perform the request, send back the reponse.
@@ -175,13 +175,13 @@ class Aionet:
 
         except json.decoder.JSONDecodeError as e:
             # Raised if the request does not contain valid json.
-            logger.debug(f"JSONDecodeError: {e}")
+            logger.debug(f'JSONDecodeError', exc_info=True)
             raise web.HTTPBadRequest(headers=headers)
 
         except aiohttp.client_exceptions.ContentTypeError as e:
             # Raised when the server replies with wrong content type;
             # eg. text/html instead of json.
-            logger.debug(f'ContentTypeError Error: {e}')
+            logger.debug(f'ContentTypeError', exc_info=True)
             raise web.HTTPBadRequest(headers=headers)
 
         # Send back the response.
@@ -246,15 +246,15 @@ class Aionet:
                     channel.process_waiting_messages()
                     return res
                 except json.decoder.JSONDecodeError as e:
-                    logger.debug(f'JSONDecodeError {str(e)}')
+                    logger.debug(f"JSONDecodeError", exc_info=True)
                     raise e
                 except asyncio.CancelledError as e:
                     raise e
                 except Exception as e:
-                    logger.debug(f'Exception {type(e)}: {str(e)}')
+                    logger.debug(f'Exception: {type(e)}', exc_info=True)
                     raise e
         except ClientError as e:
-            logger.debug(f'ClientError {type(e)}: {str(e)}')
+            logger.debug(f'ClientError {type(e)}: {e}')
             raise NetworkException(e)
 
     def sequence_command(self, other_addr, command):

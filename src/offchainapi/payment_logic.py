@@ -114,7 +114,7 @@ class PaymentProcessor(CommandProcessor):
         pending_commands = self.list_command_obligations()
 
         logger.info(
-            f"Re-scheduling {len(pending_commands)} commands for processing"
+            f'Re-scheduling {len(pending_commands)} commands for processing'
         )
         new_tasks = []
         for (other_address_str, command, seq) in pending_commands:
@@ -131,7 +131,7 @@ class PaymentProcessor(CommandProcessor):
             self, other_address, command, seq, error):
         ''' Process any command failures from either ends of a channel.'''
         logger.error(
-            f"(other:{other_address.as_str()}) Command #{seq} Failure: {error}"
+            f'(other:{other_address.as_str()}) Command #{seq} Failure: {error}'
         )
 
     async def process_command_success_async(self, other_address, command, seq):
@@ -158,8 +158,8 @@ class PaymentProcessor(CommandProcessor):
         other_address_str = other_address.as_str()
         if not self.obligation_exists(other_address_str, seq):
             logger.error(
-                f"(other:{other_address_str}) "
-                f"Process command called without obligation #{seq}"
+                f'(other:{other_address_str}) '
+                f'Process command called without obligation #{seq}'
             )
             return
 
@@ -195,8 +195,8 @@ class PaymentProcessor(CommandProcessor):
                     await self.net.send_request(other_address, request)
                 else:
                     logger.debug(
-                        f"(other:{other_address_str}) No more commands "
-                        f"created for Payment lastly with seq num #{seq}"
+                        f'(other:{other_address_str}) No more commands '
+                        f'created for Payment lastly with seq num #{seq}'
                     )
 
             # If we are here we are done with this obligation.
@@ -210,12 +210,12 @@ class PaymentProcessor(CommandProcessor):
 
         except NetworkException as e:
             logger.warning(
-                f"(other:{other_address_str}) Network error: seq #{seq}: {str(e)}"
+                f'(other:{other_address_str}) Network error: seq #{seq}: {e}'
             )
         except Exception as e:
             logger.error(
-                f"(other:{other_address_str}) "
-                f"Payment processing error: seq #{seq}: {str(e)}",
+                f'(other:{other_address_str}) '
+                f'Payment processing error: seq #{seq}: {e}',
                 exc_info=True,
             )
 
@@ -307,7 +307,7 @@ class PaymentProcessor(CommandProcessor):
         self.persist_command_obligation(other_str, seq, command)
 
         # Spin further command processing in its own task.
-        logger.debug(f"(other:{other_addr.as_str()}) Schedule cmd {seq}")
+        logger.debug(f'(other:{other_addr.as_str()}) Schedule cmd {seq}')
         fut = self.loop.create_task(self.process_command_success_async(
             other_addr, command, seq))
 

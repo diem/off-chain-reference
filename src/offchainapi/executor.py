@@ -5,7 +5,7 @@ from .libra_address import LibraAddress
 import logging
 
 
-logger = logging.getLogger(name="libra_off_chain_api.executor")
+logger = logging.getLogger(name='libra_off_chain_api.executor')
 
 
 # Interface we need to do commands:
@@ -263,8 +263,8 @@ class ProtocolExecutor:
 
         except Exception as e:
             all_good = False
-            type_str = f'{str(type(e))}: {str(e)}'
-            logger.error(f"(other:{self.other_name}) {type_str}", exc_info=True)
+            type_str = f'{str(type(e))}: {e}'
+            logger.error(f'(other:{self.other_name}) {type_str}', exc_info=True)
 
             raise ExecutorException(type_str)
 
@@ -302,8 +302,8 @@ class ProtocolExecutor:
 
         # Call the command processor.
         logger.info(
-            f"(other:{self.other_name}) "
-            f"Confirm success of command #{seq_no}"
+            f'(other:{self.other_name}) '
+            f'Confirm success of command #{seq_no}'
         )
         self.command_status_sequence += [True]
         self.set_outcome(command, is_success=True, seq=seq_no)
@@ -322,8 +322,8 @@ class ProtocolExecutor:
 
         # Call the command processor.
         logger.info(
-            f"(other:{self.other_name}) "
-            f"Confirm failure of command #{seq_no}"
+            f'(other:{self.other_name}) '
+            f'Confirm failure of command #{seq_no}'
         )
         command = self.command_sequence[seq_no]
         self.set_outcome(command, is_success=False, seq=seq_no, error=error)
