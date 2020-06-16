@@ -22,6 +22,9 @@ import sys
 from json import loads, dumps
 import aiohttp
 
+VASP_LOGGER = logging.getLogger(name='libra_off_chain_api.core')
+NET_LOGGER = logging.getLogger(name='libra_off_chain_api.asyncnet')
+
 
 class SimpleVASPInfo(VASPInfo):
     ''' Simple implementation of VASPInfo. '''
@@ -91,15 +94,15 @@ def run_server(my_configs_path, other_configs_path, num_of_commands=10, loop=Non
         info_context=SimpleVASPInfo(my_configs, other_configs),
         database={}
     )
-    vasp.logger.setLevel(logging.ERROR)
-    vasp.net_handler.logger.setLevel(logging.ERROR)
-    vasp.logger.info(f'Created VASP {my_addr.as_str()}.')
+    VASP_LOGGER.setLevel(logging.ERROR)
+    NET_LOGGER.setLevel(logging.ERROR)
+    VASP_LOGGER.info(f'Created VASP {my_addr.as_str()}.')
 
     # Run VASP services.
-    vasp.logger.info(f'Running VASP {my_addr.as_str()}.')
+    VASP_LOGGER.info(f'Running VASP {my_addr.as_str()}.')
     loop = asyncio.get_event_loop() if loop is None else loop
     vasp.start_services(loop)
-    vasp.logger.info(f'VASP services are running on port {vasp.port}.')
+    VASP_LOGGER.info(f'VASP services are running on port {vasp.port}.')
 
     def stop_server(vasp):
         channel = vasp.vasp.get_channel(other_addr)
@@ -151,14 +154,14 @@ def run_client(my_configs_path, other_configs_path, num_of_commands=10, port=0):
         info_context=SimpleVASPInfo(my_configs, other_configs, port),
         database={}
     )
-    vasp.logger.setLevel(logging.ERROR)
-    vasp.net_handler.logger.setLevel(logging.ERROR)
-    vasp.logger.info(f'Created VASP {my_addr.as_str()}.')
+    VASP_LOGGER.setLevel(logging.ERROR)
+    NET_LOGGER.setLevel(logging.ERROR)
+    VASP_LOGGER.info(f'Created VASP {my_addr.as_str()}.')
 
     # Run VASP services.
     def start_services(vasp, loop):
         vasp.start_services(loop)
-        vasp.logger.debug('Start main loop.')
+        VASP_LOGGER.debug('Start main loop.')
         try:
             loop.run_forever()
         finally:
@@ -168,7 +171,7 @@ def run_client(my_configs_path, other_configs_path, num_of_commands=10, port=0):
     loop = asyncio.new_event_loop()
     t = Thread(target=start_services, args=(vasp, loop), daemon=True)
     t.start()
-    vasp.logger.info(f'VASP services are running on port {vasp.port}.')
+    VASP_LOGGER.info(f'VASP services are running on port {vasp.port}.')
 
     # Make a payment commands.
     commands = []
@@ -186,11 +189,11 @@ def run_client(my_configs_path, other_configs_path, num_of_commands=10, port=0):
         commands += [cmd]
 
     # Send commands.
-    vasp.logger.info(
+    VASP_LOGGER.info(
         'Start measurements: '
         f'sending {num_of_commands} commands to {other_addr.as_str()}.'
     )
-    vasp.logger.info(
+    VASP_LOGGER.info(
         f'The target URL is {vasp.info_context.get_peer_base_url(other_addr)}'
     )
     start_time = time.perf_counter()
@@ -208,6 +211,6 @@ def run_client(my_configs_path, other_configs_path, num_of_commands=10, port=0):
 
     # Display performance and success rate.
     success_number = sum([1 for r in res if r])
-    vasp.logger.info(f'Commands executed in {elapsed:0.2f} seconds.')
-    vasp.logger.info(f'Success #: {success_number}/{len(commands)}.')
-    vasp.logger.info(f'Estimate throughput #: {len(commands)/elapsed} TPS.')
+    VASP_LOGGER.info(f'Commands executed in {elapsed:0.2f} seconds.')
+    VASP_LOGGER.info(f'Success #: {success_number}/{len(commands)}.')
+    VASP_LOGGER.info(f'Estimate throughput #: {len(commands)/elapsed} TPS.')
