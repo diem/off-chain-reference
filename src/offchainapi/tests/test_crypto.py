@@ -92,7 +92,7 @@ def test_sign_verif_incorrect():
         assert key2.verify_message(sig) == 'Hello World!'
 
 
-def test_encode_receipient():
+def test_encode_recipient():
 
     META_DATA_BYTES = [0x61, 0x1e, 0x0,  0x0,  0x0, 0x0,  0x0, 0x0]
     LIBRA_ADDRESS = [

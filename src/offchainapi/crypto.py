@@ -12,6 +12,11 @@ class OffChainInvalidSignature(Exception):
     pass
 
 
+class IncorrectInputException(Exception):
+    pass
+
+
+
 class ComplianceKey:
 
     def __init__(self, key):
@@ -79,7 +84,7 @@ class ComplianceKey:
             verifier.verify(self._key, alg='EdDSA')
             return verifier.payload.decode("utf-8")
         except jws.InvalidJWSSignature:
-            raise OffChainInvalidSignature()
+            raise OffChainInvalidSignature(signature)
 
     def thumbprint(self):
         return self._key.thumbprint()
@@ -115,11 +120,11 @@ class ComplianceKey:
         try:
             pub.verify(bytes.fromhex(signature), msg_b)
         except InvalidSignature:
-            raise OffChainInvalidSignature()
+            raise OffChainInvalidSignature(reference_id_bytes, libra_address_bytes, value_u64, signature)
 
 def encode_ref_id_data(reference_id_bytes, libra_address_bytes, value_u64):
     if len(libra_address_bytes) != 16:
-        raise Exception('Libra Address raw format is 16 bytes.')
+        raise IncorrectInputException('Libra Address raw format is 16 bytes.')
 
     message = b''
     message += reference_id_bytes
