@@ -174,6 +174,9 @@ class VASPPairChannel:
 
         # Ephemeral state that can be forgotten upon a crash.
 
+        # Keep track of object locks
+        self.object_locks = {}
+
         # Request / response cache to allow reordering.
         self.waiting_requests = defaultdict(list)
         self.request_window = 1000
@@ -571,6 +574,22 @@ class VASPPairChannel:
         """
         request.command.set_origin(self.other)
 
+
+        # Keep track of object locks here.
+
+        #create_versions = request.command.new_object_versions()
+        #depends_on_version = request.command.get_dependencies()
+
+        #if all(v in self.object_locks for v in create_versions):
+        #    # Command already processed.
+        #    print('Processed')
+        #
+        # if any(v not in self.object_locks for v in depends_on_version):
+        #     print('Missing dependencies')
+        #     print(depends_on_version, self.object_locks)
+        # else:
+        #     print('Go ahead wrt dependencies')
+
         # Always answer old requests.
         other_next_seq = self.other_next_seq()
         if request.seq < other_next_seq:
@@ -657,7 +676,29 @@ class VASPPairChannel:
         request.response.command_seq = seq
         self.other_requests += [request]
         self.apply_response_to_executor(request)
+        self.register_deps(request)
+
         return request.response
+
+    def register_deps(self, request):
+        # Keep track of object locks here.
+        create_versions = request.command.new_object_versions()
+        depends_on_version = request.command.get_dependencies()
+
+        if request.response.status == 'success':
+            # print(f'Deps: {depends_on_version}')
+            assert all(v in self.object_locks for v in depends_on_version)
+
+            for dv in depends_on_version:
+                self.object_locks[dv] = False
+                # print(f'Set: {dv} <- False')
+
+            for cv in create_versions:
+                self.object_locks[cv] = True
+                # print(f'Set: {cv} <- True')
+
+            # print(f'final locks: {self.object_locks}')
+
 
     def parse_handle_response(self, json_response):
         """ Handles a response as json string or dict.
@@ -847,6 +888,7 @@ class VASPPairChannel:
         assert response.command_seq == self.executor.last_confirmed
 
         self.apply_response_to_executor(request)
+        self.register_deps(request)
         return request.is_success()
 
     def retransmit(self):
