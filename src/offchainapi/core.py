@@ -13,6 +13,8 @@ import asyncio
 import logging
 from aiohttp import web
 
+logger = logging.getLogger(name='libra_off_chain_api.core')
+
 
 class Vasp:
     ''' Creates a VASP with the standard networking and storage backend.
@@ -62,8 +64,6 @@ class Vasp:
         self.runner = None
         self.all_started_future = None
 
-        # Logger
-        self.logger = logging.getLogger(f'VASP.{my_addr.as_str()}')
 
     def set_loop(self, loop):
         ''' Set the asyncio event loop associated with this VASP.'''
@@ -242,7 +242,7 @@ class Vasp:
            and any pending commands being processed. '''
 
         # Close the network
-        self.logger.info('Closing the network ...')
+        logger.info('Closing the network ...')
         await self.runner.cleanup()
         await self.net_handler.close()
 
@@ -256,10 +256,10 @@ class Vasp:
             T.cancel()
             other_tasks += [T]
 
-        self.logger.info('Cancelling all tasks ...')
+        logger.info('Cancelling all tasks ...')
         await asyncio.gather(*other_tasks, return_exceptions=True)
 
-        self.logger.info('Closing loop ...')
+        logger.info('Closing loop ...')
         self.loop.stop()
         if self.loop is not None:
             self.loop = None

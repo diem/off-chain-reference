@@ -16,6 +16,108 @@ Both VASPs in a channel can asynchronously attempt to initiate and execute comma
 
 As a reminder, all `CommandRequestObject` and `CommandResponseObject` objects sent are signed using JWS Signatures, using EdDSA and compact encoding. Recipients must verify the signatures when receiving any objects.
 
+## Request/Response Payload
+All requests between VASPs are structured as [`CommandRequestObject`s](#commandrequestobject) and all responses are structured as [`CommandResponseObject`s](#commandresponseobject).  The resulting request takes a form of the following:
+
+<details>
+<summary> Request Payload Example </summary>
+<pre>
+{
+    "_ObjectType": "CommandRequestObject",
+    "command_type": "PaymentCommand", // Command type
+    "seq": 1,
+    "command": CommandObject(), // Object of type as specified by command_type
+}
+</pre>
+</details>
+
+A response would look like the following:
+<details>
+<summary> CommandRequestObject example </summary>
+<pre>
+{
+    "_ObjectType": "CommandResponseObject",
+    "seq": 1,
+    "command_seq": 1,
+    "status": "success",
+}
+</pre>
+</details>
+
+### CommandRequestObject
+All requests between VASPs are structured as `CommandRequestObject`s. 
+
+| Field 	| Type 	| Required? 	| Description 	|
+|-------	|------	|-----------	|-------------	|
+| _ObjectType| str| Y | Fixed value: `CommandRequestObject`|
+|command_type | str| Y |A string representing the type of command contained in the request. |
+|seq | int  | Y | The sequence of this request in the sender local sequence. |
+| command | Command object | Y | The command to sequence. |
+|command_seq    | int | Server   | The sequence of this command in the joint command sequence. Only set if the server is the sender. See [Command Sequencing](command_sequencing.md) |
+
+<details>
+<summary> CommandRequestObject example </summary>
+<pre>
+{
+    "_ObjectType": "CommandRequestObject",
+    "command_type": CommandType,
+    "seq": 1,
+    "command": CommandObject(),
+    "command_seq": 1,
+}
+</pre>
+</details>
+
+### CommandResponseObject
+All responses to a CommandRequestObject are in the form of a CommandResponseObject
+
+| Field 	     | Type 	| Required? 	| Description 	|
+|-------	     |------	|-----------	|-------------	|
+| _ObjectType    | str      | Y             | The fixed string `CommandResponseObject`. |
+| seq            | int       | Y             | The sequence number of the request responded to in the local sender request sequence. |
+| command_seq    | int or str=`null` | Y    | The sequence of the command responded to in the joint command sequence |
+| status         | str      | Y             | Either `success` or `failure`. |
+| error          | List of [OffChainErrorObject](#offchainerrorobject) | N | Details on errors when status == "failure"
+
+<details>
+<summary> CommandResponseObject example </summary>
+<pre>
+{
+    "_ObjectType": "CommandResponseObject",
+    "command_seq": null,
+    "error": [OffChainErrorObject()],
+    "seq": 0,
+    "status": "failure"
+}
+</pre>
+</details>
+
+When the `CommandResponseObject` status field is `failure`, the `error` field is included in the response to indicate the nature of the failure. The `error` field (type `OffChainError`) is a list of OffChainError objects. 
+
+### OffChainErrorObject
+Represents an error that occurred in response to a command.
+
+| Field 	     | Type 	| Required? 	| Description 	|
+|-------	     |------	|-----------	|-------------	|
+| type    | str (enum)     | Y             | Either "command_error" or "protocol_error" |
+| field            | str       | N             | The field on which this error occurred|
+| code    | str (enum) | Y    | The error code of the corresponding error |
+| message         | str      | N             | Additional details about this error |
+
+<details>
+<summary> OffChainErrorObject example </summary>
+<pre>
+{
+    "type": "command_error",
+    "field": "0.sender.kyc_data.surname",
+    "code": "missing_data",
+    "message": "",
+}
+
+</pre>
+</details>
+
+
 Next: [Command Sequencing](command_sequencing.md)
 
 Previous: [Design Principles](design_principles.md)

@@ -14,6 +14,9 @@ from urllib.parse import urljoin
 import json
 
 
+logger = logging.getLogger(name='libra_off_chain_api.asyncnet')
+
+
 class NetworkException(Exception):
     pass
 
@@ -27,8 +30,6 @@ class Aionet:
     """
 
     def __init__(self, vasp):
-        self.logger = logging.getLogger(name='aionet')
-
         self.vasp = vasp
 
         # For the moment hold one session per VASP.
@@ -38,7 +39,7 @@ class Aionet:
         # Register routes.
         route = self.get_url('/', '{other_addr}')
         self.app.add_routes([web.post(route, self.handle_request)])
-        self.logger.debug(f'Register route {route}')
+        logger.debug(f'Register route {route}')
 
         if __debug__:
             self.app.add_routes([
@@ -74,7 +75,7 @@ class Aionet:
 
     async def watchdog_task(self):
         ''' Provides a priodic debug view of pending requests and replies. '''
-        self.logger.info('Start Network Watchdog.')
+        logger.info('Start Network Watchdog.')
         try:
             while True:
                 for k in self.vasp.channel_store:
@@ -92,7 +93,7 @@ class Aionet:
                     len_my = len(channel.my_requests)
                     len_oth = len(channel.other_requests)
 
-                    self.logger.info(
+                    logger.info(
                         f'''
                         Channel: {me} [{role}] <-> {other}
                         Queues: my: {len_my} (Wait: {waiting}) other: {len_oth}
@@ -103,10 +104,9 @@ class Aionet:
         except asyncio.CancelledError:
             pass
         except Exception as e:
-            self.logger.error('Watchdog exception')
-            self.logger.exception(e)
+            logger.error('Watchdog exception', exc_info=True)
         finally:
-            self.logger.info('Stop Network Watchdog.')
+            logger.info('Stop Network Watchdog')
 
     def get_url(self, base_url, other_addr_str, other_is_server=False):
         """Composes the URL for the Off-chain API VASP end point.
@@ -150,7 +150,7 @@ class Aionet:
         """
 
         other_addr = LibraAddress(request.match_info['other_addr'])
-        self.logger.debug(f'Request Received from {other_addr.as_str()}')
+        logger.debug(f'Request Received from {other_addr.as_str()}')
 
         # Check and extract '
         if 'X-Request-ID' not in request.headers:
@@ -163,7 +163,7 @@ class Aionet:
             channel = self.vasp.get_channel(other_addr)
         except BusinessNotAuthorized as e:
             # Raised if the other VASP is not an authorised business.
-            self.logger.debug(f'Not Authorized {e}')
+            logger.debug(f'Not Authorized', exc_info=True)
             raise web.HTTPUnauthorized(headers=headers)
 
         # Perform the request, send back the reponse.
@@ -171,26 +171,26 @@ class Aionet:
             request_json = await request.json()
 
             # TODO: Handle timeout errors here.
-            self.logger.debug(f'Data Received from {other_addr.as_str()}.')
+            logger.debug(f'Data Received from {other_addr.as_str()}.')
             response = await channel.parse_handle_request_to_future(
                 request_json
             )
 
         except json.decoder.JSONDecodeError as e:
             # Raised if the request does not contain valid json.
-            self.logger.debug(f'Type Error {str(e)}')
+            logger.debug(f'JSONDecodeError', exc_info=True)
             raise web.HTTPBadRequest(headers=headers)
 
         except aiohttp.client_exceptions.ContentTypeError as e:
             # Raised when the server replies with wrong content type;
             # eg. text/html instead of json.
-            self.logger.debug(f'ContentTypeError Error {e}')
+            logger.debug(f'ContentTypeError', exc_info=True)
             raise web.HTTPBadRequest(headers=headers)
 
         # Send back the response.
-        self.logger.debug(f'Process Waiting messages.')
+        logger.debug(f'Process Waiting messages.')
         channel.process_waiting_messages()
-        self.logger.debug(f'Sending back response to {other_addr.as_str()}.')
+        logger.debug(f'Sending back response to {other_addr.as_str()}.')
         return web.json_response(response.content, headers=headers)
 
     async def send_request(self, other_addr, json_request):
@@ -205,7 +205,7 @@ class Aionet:
             NetworkException: [description]
         """
 
-        self.logger.debug(f'Connect to {other_addr.as_str()}')
+        logger.debug(f'Connect to {other_addr.as_str()}')
 
         # Initialize the client.
         if self.session is None:
@@ -217,7 +217,7 @@ class Aionet:
         # Get the URLs
         base_url = self.vasp.info_context.get_peer_base_url(other_addr)
         url = self.get_url(base_url, other_addr.as_str(), other_is_server=True)
-        self.logger.debug(f'Sending post request to {url}')
+        logger.debug(f'Sending post request to {url}')
 
         # Add a custom request header
         headers = {'X-Request-ID': get_unique_string()}
@@ -237,27 +237,27 @@ class Aionet:
                         )
 
                     json_response = await response.json()
-                    self.logger.debug(f'Json response: {json_response}')
+                    logger.debug(f'Json response: {json_response}')
 
                     # Wait in case the requests are sent out of order.
                     res = await channel.parse_handle_response_to_future(
                         json_response
                     )
-                    self.logger.debug(f'Response parsed with status: {res}')
+                    logger.debug(f'Response parsed with status: {res}')
 
-                    self.logger.debug(f'Process Waiting messages')
+                    logger.debug(f'Process Waiting messages')
                     channel.process_waiting_messages()
                     return res
                 except json.decoder.JSONDecodeError as e:
-                    self.logger.debug(f'JSONDecodeError {str(e)}')
+                    logger.debug(f'JSONDecodeError', exc_info=True)
                     raise e
                 except asyncio.CancelledError as e:
                     raise e
                 except Exception as e:
-                    self.logger.debug(f'Exception {type(e)}: {str(e)}')
+                    logger.debug(f'Exception: {type(e)}', exc_info=True)
                     raise e
         except ClientError as e:
-            self.logger.debug(f'ClientError {type(e)}: {str(e)}')
+            logger.debug(f'ClientError {type(e)}: {e}')
             raise NetworkException(e)
 
     def sequence_command(self, other_addr, command):
@@ -274,13 +274,12 @@ class Aionet:
                 command (ProtocolCommand) : A ProtocolCommand instance.
 
             Returns:
-                CommandRequestObject : An instance of a CommandRequestObject
-                representing the command.
+                str: json str of the net message
         '''
 
         channel = self.vasp.get_channel(other_addr)
         request = channel.sequence_command_local(command)
-        request = request[3]
+        request = request.content
         return request
 
     def get_runner(self):

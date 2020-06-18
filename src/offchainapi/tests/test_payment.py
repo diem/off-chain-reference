@@ -158,15 +158,20 @@ def test_specific():
                         'status': 'settled',
                         'metadata': [],
                         'kyc_data': {
-                            "type": "individual"}
-                        },
+                            "payload_type": "KYC_DATA",
+                            "payload_version": 1,
+                            "type": "individual"
+                        }
+                    },
                     'receiver': {
                         'address': 'bbbb',
                         'status': 'needs_kyc_data',
                         'metadata': [],
                         'kyc_data': {
+                            "payload_type": "KYC_DATA",
+                            "payload_version": 1,
                             "type": "individual"
-                            }
+                        }
                     },
                     'reference_id': 'ref 0',
                     'original_payment_reference_id': 'orig_ref',

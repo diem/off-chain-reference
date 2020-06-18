@@ -24,6 +24,9 @@ class PaymentProcessorRemoteError(Exception):
     pass
 
 
+logger = logging.getLogger(name='libra_off_chain_api.payment_logic')
+
+
 class PaymentProcessor(CommandProcessor):
     ''' The logic to process a payment from either side.
 
@@ -49,7 +52,6 @@ class PaymentProcessor(CommandProcessor):
         # Asyncio support
         self.loop = loop
         self.net = None
-        self.logger = logging.getLogger(name='Processor')
 
         # The processor state -- only access through event loop to prevent
         # mutlithreading bugs.
@@ -129,8 +131,10 @@ class PaymentProcessor(CommandProcessor):
             after recovering from a crash. '''
 
         pending_commands = self.list_command_obligations()
-        self.logger.info(f'Re-scheduling {len(pending_commands)} commands for'
-                         f' processing ...')
+
+        logger.info(
+            f'Re-scheduling {len(pending_commands)} commands for processing'
+        )
         new_tasks = []
         for (other_address_str, command, seq) in pending_commands:
             other_address = LibraAddress(other_address_str)
@@ -145,16 +149,15 @@ class PaymentProcessor(CommandProcessor):
     async def process_command_failure_async(
             self, other_address, command, seq, error):
         ''' Process any command failures from either ends of a channel.'''
-        self.logger.error(
-            f'Command with {other_address.as_str()}.#{seq}'
-            f' Failure: {error}'
+        logger.error(
+            f'(other:{other_address.as_str()}) Command #{seq} Failure: {error}'
         )
 
         # If this is our own command, that just failed, we should update
         # the outcome:
         try:
             if command.origin != other_address:
-                self.logger.error(
+                logger.error(
                     f'Command with {other_address.as_str()}.#{seq}'
                     f' Trigger outcome.')
 
@@ -164,11 +167,11 @@ class PaymentProcessor(CommandProcessor):
                                 payment.reference_id,
                                 PaymentProcessorRemoteError(error))
             else:
-                self.logger.error(
+                logger.error(
                     f'Command with {other_address.as_str()}.#{seq}'
                     f' Error on other VASPs command.')
         except Exception:
-            self.logger.error(
+            logger.error(
                 f'Command with {other_address.as_str()}.#{seq}'
                 f' Cannot recover payment or reference_id'
             )
@@ -198,13 +201,13 @@ class PaymentProcessor(CommandProcessor):
         # might be due to a bug.
         other_address_str = other_address.as_str()
         if not self.obligation_exists(other_address_str, seq):
-            self.logger.error(
-                f'Process command called without obligation '
-                f'{other_address_str}.#{seq}'
+            logger.error(
+                f'(other:{other_address_str}) '
+                f'Process command called without obligation #{seq}'
             )
             return
 
-        self.logger.debug(f'Process Command {other_address_str}.#{seq}')
+        logger.info(f'(other:{other_address_str}) Process Command #{seq}')
 
         # Update the outcome of the payment
         payment = command.get_payment(self.object_store)
@@ -253,6 +256,10 @@ class PaymentProcessor(CommandProcessor):
                     self.set_payment_outcome_exception(
                         payment.reference_id,
                         PaymentProcessorNoProgress())
+                    logger.debug(
+                        f'(other:{other_address_str}) No more commands '
+                        f'created for Payment lastly with seq num #{seq}'
+                    )
 
             # If we are here we are done with this obligation.
             with self.storage_factory.atomic_writes():
@@ -264,13 +271,15 @@ class PaymentProcessor(CommandProcessor):
             raise e
 
         except NetworkException as e:
-            self.logger.debug(f'Network error: seq #{seq}: {str(e)}')
-
-        except Exception as e:
-            self.logger.error(
-                f'Payment processing error: seq #{seq}: {str(e)}'
+            logger.warning(
+                f'(other:{other_address_str}) Network error: seq #{seq}: {e}'
             )
-            self.logger.exception(e)
+        except Exception as e:
+            logger.error(
+                f'(other:{other_address_str}) '
+                f'Payment processing error: seq #{seq}: {e}',
+                exc_info=True,
+            )
 
     # -------- Machinery for notification for outcomes -------
 
@@ -423,7 +432,7 @@ class PaymentProcessor(CommandProcessor):
         self.persist_command_obligation(other_str, seq, command)
 
         # Spin further command processing in its own task.
-        self.logger.debug(f'Schedule cmd {seq}')
+        logger.debug(f'(other:{other_addr.as_str()}) Schedule cmd {seq}')
         fut = self.loop.create_task(self.process_command_success_async(
             other_addr, command, seq))
 
@@ -708,10 +717,10 @@ class PaymentProcessor(CommandProcessor):
             current_status = Status.abort
 
         except Exception as e:
-            self.logger.error(
+            logger.error(
                 f'Error while processing payment {payment.reference_id}'
                 ' return error in metadata & abort.')
-            self.logger.exception(e)
+            logger.exception(e)
 
             # Only report the error in meta-data
             # & Abort the payment.
