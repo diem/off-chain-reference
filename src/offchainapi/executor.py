@@ -261,7 +261,7 @@ class ProtocolExecutor:
                 raise ExecutorException('Required objects do not exist')
 
             # Check the command is well formed.
-            vasp, channel, executor = self.get_context()
+            _, channel, _ = self.get_context()
             my_address = channel.get_my_address()
             other_address = channel.get_other_address()
             self.processor.check_command(my_address, other_address, command)

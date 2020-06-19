@@ -23,6 +23,10 @@ NetMessage = namedtuple('NetMessage', ['src', 'dst', 'type', 'content'])
 logger = logging.getLogger(name='libra_off_chain_api.protocol')
 
 
+class DependencyException(Exception):
+    pass
+
+
 class OffChainVASP:
     """ Manages the off-chain protocol on behalf of one VASP.
 
@@ -176,6 +180,8 @@ class VASPPairChannel:
 
         # Keep track of object locks
         self.object_locks = {}
+        self.my_request_index = {}
+        self.other_request_index = {}
 
         # Request / response cache to allow reordering.
         self.waiting_requests = defaultdict(list)
@@ -222,11 +228,6 @@ class VASPPairChannel:
             OffChainVASP: The OffChainVASP to which this channel is attached.
         """
         return self.vasp
-
-    # Define a stub here to make the linter happy
-    if __debug__:
-        def tap(self):
-            return []
 
     def next_final_sequence(self):
         """
@@ -368,6 +369,24 @@ class VASPPairChannel:
         off_chain_command.set_origin(self.get_my_address())
         request = CommandRequestObject(off_chain_command)
 
+        # Before adding locally, check the dependencies
+        create_versions = request.command.new_object_versions()
+        depends_on_version = request.command.get_dependencies()
+
+        if any(dv not in self.object_locks for dv in depends_on_version):
+            raise DependencyException('Depends not present.')
+
+        if any(self.object_locks[dv] is False for dv in depends_on_version):
+            raise DependencyException('Depends used.')
+
+        if any(cv in self.object_locks for cv in create_versions):
+            raise DependencyException('Object version already exists.')
+
+        is_locked = any(self.object_locks[dv] is not True
+                        for dv in depends_on_version)
+        if is_locked:
+            raise DependencyException('Depends locked.')
+
         # Ensure all storage operations are written atomically.
         with self.rlock:
             with self.storage.atomic_writes() as _:
@@ -382,6 +401,12 @@ class VASPPairChannel:
                     )
 
                 self.my_requests += [request]
+                self.my_request_index[request.seq] = request
+
+                for dv in depends_on_version:
+                    self.object_locks[dv] = request.seq
+                    # By definition nothing was waiting here, since
+                    # we checked it was all True.
 
         # Send the requests outside the locks to allow
         # for an asyncronous implementation.
@@ -574,27 +599,23 @@ class VASPPairChannel:
         """
         request.command.set_origin(self.other)
 
-
         # Keep track of object locks here.
+        create_versions = request.command.new_object_versions()
+        depends_on_version = request.command.get_dependencies()
 
-        #create_versions = request.command.new_object_versions()
-        #depends_on_version = request.command.get_dependencies()
-
-        #if all(v in self.object_locks for v in create_versions):
-        #    # Command already processed.
-        #    print('Processed')
-        #
-        # if any(v not in self.object_locks for v in depends_on_version):
-        #     print('Missing dependencies')
-        #     print(depends_on_version, self.object_locks)
-        # else:
-        #     print('Go ahead wrt dependencies')
+        has_all_deps = all(dv in self.object_locks
+                           for dv in depends_on_version)
 
         # Always answer old requests.
         other_next_seq = self.other_next_seq()
         if request.seq < other_next_seq:
             previous_request = self.other_requests[request.seq]
             if previous_request.is_same_command(request):
+
+                # Invariant
+                assert request.seq in self.other_request_index
+                assert all(cv in self.object_locks for cv in create_versions)
+
                 # Re-send the response.
                 logger.debug(
                     f'(other:{self.other_address_str}) '
@@ -618,6 +639,17 @@ class VASPPairChannel:
         if self.is_server() and request.command_seq is not None:
             response = make_protocol_error(request, code='malformed')
             return response
+
+        # If one of the dependency is locked then wait.
+        if self.is_server() and has_all_deps:
+            is_locked = any(self.object_locks[dv] is not True
+                            for dv in depends_on_version)
+            if is_locked:
+                # The server requests take precedence, so make this wait.
+                response = make_protocol_error(request, code='wait')
+                if raise_on_wait:
+                    raise OffChainOutOfOrder(response)
+                return response
 
         # As a server we first wait for the status of all server
         # requests to sequence any new client requests.
@@ -663,41 +695,65 @@ class VASPPairChannel:
         seq = self.next_final_sequence()
 
         try:
+            if not has_all_deps:
+                raise Exception('Missing dependencies')
+
+            #command = request.command
+            #my_address = self.get_my_address()
+            #other_address = self.get_other_address()
+            #self.executor.processor.check_command(
+            #    my_address, other_address, command)
+
             self.executor.sequence_next_command(
                 request.command,
                 do_not_sequence_errors=False
             )
             response = make_success_response(request)
-        except ExecutorException as e:
+        except Exception as e:
             response = make_command_error(request, str(e))
 
         # Write back to storage
         request.response = response
         request.response.command_seq = seq
         self.other_requests += [request]
-        self.apply_response_to_executor(request)
+
+        # Update the index of others' requests
+        self.other_request_index[request.seq] = request
         self.register_deps(request)
+        self.apply_response_to_executor(request)
 
         return request.response
 
     def register_deps(self, request):
+        ''' A helper function to register dependencies of a successful request. '''
+
         # Keep track of object locks here.
         create_versions = request.command.new_object_versions()
         depends_on_version = request.command.get_dependencies()
 
-        if request.response.status == 'success':
-            # print(f'Deps: {depends_on_version}')
+        if any(cv in self.object_locks for cv in create_versions):
+            # The objects already exist? Do not change them!
+            return
+
+        if request.is_success():
             assert all(v in self.object_locks for v in depends_on_version)
 
             for dv in depends_on_version:
                 self.object_locks[dv] = False
-                # print(f'Set: {dv} <- False')
+                # Here activate an event for those waiting on
+                # this change of status
 
             for cv in create_versions:
                 self.object_locks[cv] = True
-                # print(f'Set: {cv} <- True')
+                # Here activate an event for those waiting on
+                # this change of status
+        else:
+            assert all(v in self.object_locks for v in depends_on_version)
 
-            # print(f'final locks: {self.object_locks}')
+            for dv in depends_on_version:
+                self.object_locks[dv] = True
+                # Here activate an event for those waiting on
+                # this change of status
 
 
     def parse_handle_response(self, json_response):
@@ -820,6 +876,7 @@ class VASPPairChannel:
         if response.is_protocol_failure():
             raise OffChainProtocolError.make(response.error)
 
+        # TODO: clean this up -- check on parsing.
         if type(response.seq) is not int:
             raise OffChainException(
                 f'Response seq must be int not '
@@ -835,6 +892,9 @@ class VASPPairChannel:
                 f'Response for seq {request_seq} received, '
                 f'but has requests only up to seq < {my_next_seq}'
             )
+
+        # Invariant
+        assert response.seq in self.my_request_index
 
         # Idenpotent: We have already processed the response.
         request = self.my_requests[request_seq]
@@ -864,6 +924,15 @@ class VASPPairChannel:
         # Read and write back response into request.
         request.response = response
         self.my_requests[request_seq] = request
+
+        # We must have set the locks to this request
+        create_versions = request.command.new_object_versions()
+        depends_on_version = request.command.get_dependencies()
+
+        for dv in depends_on_version:
+            assert dv in self.object_locks
+            if request.is_success():
+                assert self.object_locks[dv] == request.seq
 
         # Optimization -- update the retransmit index.
         self.would_retransmit()
