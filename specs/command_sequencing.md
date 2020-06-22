@@ -51,8 +51,8 @@ We now try to create a batch inclusive of payments 1,2,3.  To do so, we grab the
 | version 	    | object_id 	| object_type 	| 
 |-------	    |-----------	|-----------	|
 | e | 1 | payment (locked) |
-| f | 2 | payment <locked> |
-| g | 3 | payment <locked> |
+| f | 2 | payment (locked) |
+| g | 3 | payment (locked) |
 | h | 4 | payment |
 | i | 1 | batch |
 
