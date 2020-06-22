@@ -81,7 +81,7 @@ class Aionet:
                 for k in self.vasp.channel_store:
                     channel = self.vasp.channel_store[k]
                     len_req = len(channel.waiting_requests)
-                    len_resp = len(channel.waiting_response)
+                    len_resp = 0 # len(channel.waiting_response)
 
                     role = ['Client', 'Server'][channel.is_server()]
                     waiting = channel.is_server() \

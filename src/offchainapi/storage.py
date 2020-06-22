@@ -174,6 +174,9 @@ class StorableFactory:
             else:
                 non_existent_entries += [key]
 
+        if len(old_entries) == 0 and len(non_existent_entries) == 0:
+            return
+
         backup_data = json.dumps([old_entries, non_existent_entries])
         self.db['__backup_recovery'] = backup_data
         # TODO: call to flush to disk

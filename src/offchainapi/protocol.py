@@ -186,7 +186,8 @@ class VASPPairChannel:
         # Request / response cache to allow reordering.
         self.waiting_requests = defaultdict(list)
         self.request_window = 1000
-        self.waiting_response = defaultdict(list)
+
+        # self.waiting_response = defaultdict(list)
         self.response_window = 1000
 
         # Network handler
@@ -352,9 +353,9 @@ class VASPPairChannel:
         assert request.response is not None
         response = request.response
         if request.is_success():
-            self.executor.set_success(response.command_seq)
+            self.executor.set_success(request.command)
         else:
-            self.executor.set_fail(response.command_seq, response.error)
+            self.executor.set_fail(request.command, response.error)
 
     def sequence_command_local(self, off_chain_command):
         """The local VASP attempts to sequence a new off-chain command.
@@ -392,13 +393,13 @@ class VASPPairChannel:
             with self.storage.atomic_writes() as _:
                 request.seq = self.my_next_seq()
 
+                my_address = self.get_my_address()
+                other_address = self.get_other_address()
+                self.processor.check_command(my_address, other_address, off_chain_command)
+
                 if self.is_server():
                     request.command_seq = self.next_final_sequence()
-                    # Raises and exits on error -- does not sequence.
-                    self.executor.sequence_next_command(
-                        off_chain_command,
-                        do_not_sequence_errors=True
-                    )
+                    self.executor.extend_sequence(off_chain_command)
 
                 self.my_requests += [request]
                 self.my_request_index[request.seq] = request
@@ -431,55 +432,8 @@ class VASPPairChannel:
         ''' Executes any requets that are now capable of executing, and were
             not before due to being received out of order. '''
 
-        logger.debug(
-            f'(other:{self.other_address_str}) '
-            f'Processing waiting messages: '
-            f'remote Seq {self.other_next_seq()}, '
-            f'command Seq #{self.next_final_sequence()}, '
-            f'last Confirmed: {self.executor.last_confirmed}, ',
-        )
-
-        while self.executor.last_confirmed in self.waiting_response:
-            next_cmd_seq = self.executor.last_confirmed
-
-            logger.debug(
-                f'(other:{self.other_address_str}) '
-                f'Activate response to #{next_cmd_seq}',
-            )
-
-            # Take a copy of the pending responses.
-            list_of_responses = self.waiting_response[next_cmd_seq]
-            del self.waiting_response[next_cmd_seq]
-
-            for resp_record in list_of_responses:
-                (json_command, fut) = resp_record
-                _ = self.parse_handle_response_to_future(json_command, fut)
-
-            # Break if we made no progress.
-            if next_cmd_seq == self.executor.last_confirmed:
-                break
-
-        while self.other_next_seq() in self.waiting_requests:
-            next_seq = self.other_next_seq()
-            logger.debug(
-                f'(other:{self.other_address_str}) '
-                f'Activate request to other next seq: #{next_seq}',
-            )
-
-            # Take a copy of the pending requests.
-            list_of_requests = self.waiting_requests[next_seq]
-            del self.waiting_requests[next_seq]
-
-            for req_record in list_of_requests:
-                (json_command, fut, old_time) = req_record
-
-                # Call, and this will update the future and unblocks
-                # any processes waiting on it.
-                _ = self.parse_handle_request_to_future(json_command, fut)
-
-            # Break if no progress is made.
-            if next_seq == self.other_next_seq():
-                break
+        print('Waiting: ', self.waiting_requests.keys())
+        pass
 
     def parse_handle_request_to_future(
         self, json_command, fut=None, nowait=False, loop=None
@@ -552,6 +506,12 @@ class VASPPairChannel:
                     f'(other:{self.other_address_str}) '
                     f'Request OutOfOrder, add to waiting requests',
                 )
+
+                depends_on_version = request.command.get_dependencies()
+                is_locked = any(self.object_locks[dv] is not True
+                                for dv in depends_on_version)
+                assert is_locked
+
                 self.waiting_requests[request.seq] += [(
                     json_command, fut, time.time()
                 )]
@@ -607,33 +567,33 @@ class VASPPairChannel:
                            for dv in depends_on_version)
 
         # Always answer old requests.
-        other_next_seq = self.other_next_seq()
-        if request.seq < other_next_seq:
-            previous_request = self.other_requests[request.seq]
-            if previous_request.is_same_command(request):
+        if request.seq in self.other_request_index:
+            previous_request = self.other_request_index[request.seq]
+            if previous_request.has_response():
+                if previous_request.is_same_command(request):
 
-                # Invariant
-                assert request.seq in self.other_request_index
-                assert all(cv in self.object_locks for cv in create_versions)
+                    # Invariant
+                    assert all(cv in self.object_locks for cv in create_versions)
 
-                # Re-send the response.
-                logger.debug(
-                    f'(other:{self.other_address_str}) '
-                    f'Handle request that alerady has a response: '
-                    f'seq #{request.seq}, other next #{other_next_seq}',
-                )
-                return previous_request.response
-            else:
-                # There is a conflict, and it will have to be resolved
-                # TODO[issue 8]: How are conflicts meant to be resolved?
-                # With only two participants we cannot tolerate errors.
-                response = make_protocol_error(request, code='conflict')
-                response.previous_command = previous_request.command
-                logger.error(
-                    f'(other:{self.other_address_str}) '
-                    f'Conflicting requests for seq {request.seq}',
-                )
-                return response
+                    # Re-send the response.
+                    logger.debug(
+                        f'(other:{self.other_address_str}) '
+                        f'Handle request that alerady has a response: '
+                        f'seq #{request.seq}, other next #XXX',
+                    )
+                    return previous_request.response
+                else:
+                    # There is a conflict, and it will have to be resolved
+                    # TODO[issue 8]: How are conflicts meant to be resolved?
+                    # With only two participants we cannot tolerate errors.
+                    response = make_protocol_error(request, code='conflict')
+                    response.previous_command = previous_request.command
+                    logger.error(
+                        f'(other:{self.other_address_str}) '
+                        f'Conflicting requests for seq {request.seq}',
+                    )
+                    return response
+
 
         # Clients are not to suggest sequence numbers.
         if self.is_server() and request.command_seq is not None:
@@ -641,73 +601,38 @@ class VASPPairChannel:
             return response
 
         # If one of the dependency is locked then wait.
-        if self.is_server() and has_all_deps:
+        if has_all_deps:
             is_locked = any(self.object_locks[dv] is not True
-                            for dv in depends_on_version)
+                for dv in depends_on_version)
             if is_locked:
-                # The server requests take precedence, so make this wait.
-                response = make_protocol_error(request, code='wait')
-                if raise_on_wait:
-                    raise OffChainOutOfOrder(response)
-                return response
+                if self.is_server():
+                    # The server requests take precedence, so make this wait.
+                    response = make_protocol_error(request, code='wait')
+                    if raise_on_wait:
+                        raise OffChainOutOfOrder(response)
+                    return response
+                else:
+                    # A client yields the locks to the server.
+                    pass
 
-        # As a server we first wait for the status of all server
-        # requests to sequence any new client requests.
-        # We also wait to acknowledge previous requests before
-        # acknowledging the next ones.
-        if self.is_server() and self.has_pending_responses() \
-                or request.seq > self.other_next_seq():
-            logger.info(
-                f'(other:{self.other_address_str}) '
-                f'Request OutOfOrder! I am server, has pending responses: '
-                f'{self.has_pending_responses()}, req.seq: #{request.seq} '
-                f'other next seq: #{self.other_next_seq()}',
-            )
-            response = make_protocol_error(request, code='wait')
-            if raise_on_wait:
-                raise OffChainOutOfOrder(response)
-            return response
-
-        # Sequence newer requests.
-        assert request.seq == self.other_next_seq()
-        assert (self.is_server() and request.command_seq is None) \
-            or (self.is_client() and request.command_seq is not None)
-
-        if self.is_client() \
-                and request.command_seq != self.next_final_sequence():
-            # We must wait, since we cannot give an answer
-            # before sequencing previous commands.
-            logger.info(
-                f'(other:{self.other_address_str}) '
-                f'Request OutOfOrder! I am client: req.com_seq: '
-                f'{request.command_seq}, next final seq: '
-                f'{self.next_final_sequence()}',
-            )
-            response = make_protocol_error(request, code='wait')
-            if raise_on_wait:
-                raise OffChainOutOfOrder(response)
-            return response
 
         # What is the sequence of this request.
-        # Either given by the server to the client, or made by the server.
-        # Due to the guard conditions above this will always
-        # be self.next_final_sequence().
-        seq = self.next_final_sequence()
+        if self.is_server():
+            seq = self.next_final_sequence()
+        else:
+            seq = request.command_seq
 
         try:
             if not has_all_deps:
                 raise Exception('Missing dependencies')
 
-            #command = request.command
-            #my_address = self.get_my_address()
-            #other_address = self.get_other_address()
-            #self.executor.processor.check_command(
-            #    my_address, other_address, command)
+            command = request.command
+            my_address = self.get_my_address()
+            other_address = self.get_other_address()
+            self.processor.check_command(
+                my_address, other_address, command)
 
-            self.executor.sequence_next_command(
-                request.command,
-                do_not_sequence_errors=False
-            )
+            self.executor.extend_sequence(request.command)
             response = make_success_response(request)
         except Exception as e:
             response = make_command_error(request, str(e))
@@ -715,7 +640,6 @@ class VASPPairChannel:
         # Write back to storage
         request.response = response
         request.response.command_seq = seq
-        self.other_requests += [request]
 
         # Update the index of others' requests
         self.other_request_index[request.seq] = request
@@ -802,7 +726,7 @@ class VASPPairChannel:
             response = CommandResponseObject.from_json_data_dict(
                 response, JSONFlag.NET
             )
-            command_seq = response.command_seq
+            # command_seq = response.seq
 
             with self.rlock:
                 result = self.handle_response(response)
@@ -820,22 +744,10 @@ class VASPPairChannel:
                 f'(other:{self.other_address_str}) JSONParsingError: {e}'
             )
             fut.set_exception(e)
-        except OffChainOutOfOrder as e:
-            # If we were told to not wait, raise this.
-            if nowait:
-                logger.info(
-                    f'(other:{self.other_address_str}) '
-                    f'response OutofOrder and no wait. OffChainOutOfOrder: {e}',
-                )
-                fut.set_exception(e)
-            else:
-                logger.info(
-                    f'(other:{self.other_address_str}) '
-                    f'response OutOfOrder, adding a waiting response. Exception: {e}',
-                )
-                # Otherwise wait for longer.
-                self.waiting_response[command_seq] += [(json_response, fut)]
-        except OffChainException or OffChainProtocolError as e:
+        # except OffChainOutOfOrder as e:
+        # TODO: What if two consecutive  server responses on the same object
+        # arrive out of order?
+        except OffChainOutOfOrder or OffChainException or OffChainProtocolError as e:
             logger.warning(
                 f'(other:{self.other_address_str}) '
                 f'OffChainException/OffChainProtocolError: {e}',
@@ -876,28 +788,16 @@ class VASPPairChannel:
         if response.is_protocol_failure():
             raise OffChainProtocolError.make(response.error)
 
-        # TODO: clean this up -- check on parsing.
-        if type(response.seq) is not int:
-            raise OffChainException(
-                f'Response seq must be int not '
-                f'{response.seq} ({type(response.seq)})'
-            )
-
         request_seq = response.seq
 
-        # Check this is the next expected response.
-        my_next_seq = self.my_next_seq()
-        if request_seq >= my_next_seq:
+        if response.seq not in self.my_request_index:
             raise OffChainException(
                 f'Response for seq {request_seq} received, '
-                f'but has requests only up to seq < {my_next_seq}'
+                f'but has requests only up to seq < xxx'
             )
 
-        # Invariant
-        assert response.seq in self.my_request_index
-
         # Idenpotent: We have already processed the response.
-        request = self.my_requests[request_seq]
+        request = self.my_request_index[request_seq]
         if request.has_response():
             # Check the reponse is the same and log warning otherwise.
             if request.response != response:
@@ -909,52 +809,24 @@ class VASPPairChannel:
                 raise excp
             # this request may have concurrent modification
             # read db to get latest status
-            return self.my_requests[request_seq].is_success()
-
-        # This is too high -- wait for more data.
-        next_final_sequence = self.next_final_sequence()
-        last_confirmed = self.executor.last_confirmed
-        if response.command_seq > next_final_sequence \
-                or (response.command_seq != last_confirmed):
-            raise OffChainOutOfOrder(
-                f'Expect command seq {next_final_sequence} but got {response.command_seq}, '
-                f'last confirmed: {last_confirmed}'
-            )
+            return self.my_request_index[request_seq].is_success()
 
         # Read and write back response into request.
         request.response = response
         self.my_requests[request_seq] = request
+        self.my_request_index[request_seq] = request
 
         # We must have set the locks to this request
-        create_versions = request.command.new_object_versions()
-        depends_on_version = request.command.get_dependencies()
-
-        for dv in depends_on_version:
-            assert dv in self.object_locks
-            if request.is_success():
-                assert self.object_locks[dv] == request.seq
+        #create_versions = request.command.new_object_versions()
+        #depends_on_version = request.command.get_dependencies()
+        # TODO: Here check we know of the dependency objects.
 
         # Optimization -- update the retransmit index.
         self.would_retransmit()
 
         # Add the next command to the common sequence.
-        if response.command_seq == self.next_final_sequence():
-            try:
-                self.executor.sequence_next_command(
-                    request.command,
-                    do_not_sequence_errors=False
-                )
-            except ExecutorException as e:
-                # If an error is raised, but the response is a success, then
-                # raise a serious error and stop the channel. If not, all is
-                # good -- we expected an error and this is why the command
-                # possibly failed.
-                if request.is_success():
-                    logger.error(f'(other:{self.other_address_str}) {e}', exc_info=True)
-                    raise e
-
-        # KEY INVARIANT: Can we prove this always holds?
-        assert response.command_seq == self.executor.last_confirmed
+        if self.is_client():
+            self.executor.extend_sequence(request.command)
 
         self.apply_response_to_executor(request)
         self.register_deps(request)
