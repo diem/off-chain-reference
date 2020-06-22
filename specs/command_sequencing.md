@@ -3,17 +3,24 @@
 The low-level Off-Chain protocol allows two VASPs to sequence request-responses for commands originating from either VASP, in order to maintain a consistent database of shared objects. Sequencing a command requires both VAPSs to confirm it is valid, as well as its sequence in relation to other commands operating upon the same objects.  Since commands may operate upon multiple objects, a command only succeeds if the command is able to be applied to every dependent object - ensuring atomicity of the command and consistency of the objects. Both VASPs in a channel can asynchronously attempt to initiate and execute commands on shared objects. The purpose of the command sequencing protocols is to ensure that such concurrent requests are applied in the same sequence at both VASPs to ensure that the state of shared objects remains consistent. All commands upon shared objects which are exchanged between pairs of VASPs are sequenced relative to the prior state of each shared object in the command.
 
 
-## Protocol Server and Client roles
+## Object Versioning
 
-In each channel one VASP takes the role of a _protocol server_ and the other the role of a _protocol client_ for the purposes of sequencing commands into a joint command sequence. Note that these roles are distinct to the HTTP client/server -- and both VASPs act as an HTTP server and client to listen and respond to requests.
+When either VASP creates a request, they assign a `_creates_version` to the object being created or mutated.  This string must be a unique random string between this pair of VASPs and is used to represent the version of the item created. These should be at least 16 bytes long and encoded to string in hexadecimal notation using characters in the range[A-Za-z0-9].  Upon every mutation of an object, this string must be updated to a new unique value.
+
+To maintain relative ordering of commands on objects, every creation or mutation of an object must also specify the `_dependencies`.  The value in this field must match a version previously specified by the `_creates_versions` parameter on a prior command and indicates the version being mutated (or in the case of a new object being created which depends on no previous objects, the `_dependencies` list may be empty).  Each version may only be mutated once - because once it has been mutated, a new version is created to represent the latest state of the object. This results in what is essentially a per-object sequencing.
+
+
+## Protocol Server and Client Roles
+
+In each channel, one VASP takes the role of a _protocol server_ and the other the role of a _protocol client_ for the purposes of simplifying shared object locking / state management. Note that these roles are distinct to the HTTP client/server -- and both VASPs act as an HTTP server and client to listen and respond to requests.
 
 Who is the protocol server and who is the client VASP is determined by comparing their binary on-chain Address strings (we call those the _binary address_. The following rules are used to determine which entity serves as which party: The last bit of VASP A’s parent binary address _w_ (where `w = addr[15] & 0x1`) is XOR’d with the last bit in VASP B’s parent binary address _x_.  This results in either 0 or 1.
 If the result is 0, the lexicographically lower parent address is used as the server side.
 If the result is 1, the lexicographically higher parent address is used as the server side. Lexicographic ordering determines which binary address is higher by comparing byte positions one by one, and returning the address with the first higher byte.
 
-To avoid excessive locking and intermediate state management during requests, by convention the _server_ always determines the sequence of a request in the joint command sequence - meaning .  When either client or server create a request, they assign a `_creates_version` to the object being created or mutated.  This string must be a unique random string between this pair of VASPs and is used to represent the version of the item created. These should be at least 16 bytes long and encoded to string in hexadecimal notation using characters in the range[A-Za-z0-9].  Upon every mutation of an object, this string must be updated to a new unique value.
+To avoid excessive locking and intermediate state management during API requests, by convention the _server_ acts as the source of truth for the state of an object.  In practice, this means that when the _server_ wishes to update state of an object, it writes the update directly to its database and then transmits the command.  When a _client_ wishes to update state of an object, it sends the command and then updates its database after receipt of confirmation from the _server_.  This avoids locking of objects during remote calls to the other VASP and state management due to the potential of dropped network connections.  Instead, upon dropped connections, each side must replay the request. 
 
-To maintain relative ordering of commands on objects, every creation or mutation of an object must also specify the `_dependencies`.  The value in this field must match a version previously specified by the `_creates_versions` parameter on a prior command and indicates the version being mutated.  Each version may only be mutated once - because once it has been mutated, a new version is created to represent the latest state of the object. This results in what is essentially a per-object sequencing.
+## Example
 
 To demonstrate how this protects against concurrent requests on objects, let us assume a mock database in the following format:
 
