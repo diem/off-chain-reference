@@ -223,44 +223,6 @@ class ProtocolExecutor:
         """
         return (self.channel.get_vasp(), self.channel, self)
 
-    # def sequence_next_command(self, command, do_not_sequence_errors=False):
-    #     """ Sequence the next command in the shared sequence.
-
-    #     Args:
-    #         command (PaymentCommand): The next command to sequence.
-    #         do_not_sequence_errors (bool, optional): Whether to sequence errors.
-    #                                                  Defaults to False.
-
-    #     Raises:
-    #         ExecutorException: If an error occured when sequencing the command.
-
-    #     Returns:
-    #         int: The position of the command in the sequence.
-    #     """
-
-    #     try:
-    #         all_good = True
-    #         _, channel, _ = self.get_context()
-    #         my_address = channel.get_my_address()
-    #         other_address = channel.get_other_address()
-    #         self.processor.check_command(my_address, other_address, command)
-
-    #         self.command_sequence += [command]
-
-    #     except Exception as e:
-    #         all_good = False
-    #         type_str = f'{str(type(e))}: {e}'
-    #         logger.error(f'(other:{self.other_name}) {type_str}', exc_info=True)
-
-    #         raise ExecutorException(type_str)
-
-    #     finally:
-    #         # Sequence if all is good, or if we were asked to. Note that
-    #         # we do sequence command failure, if the failure is due to a
-    #         # high level protocol failure (for audit).
-    #         if all_good:
-    #             pass
-
     def extend_sequence(self, command):
         self.command_sequence += [command]
 
