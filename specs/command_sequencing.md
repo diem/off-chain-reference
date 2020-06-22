@@ -58,9 +58,17 @@ We now try to create a batch inclusive of payments 1,2,3.  To do so, we grab the
 
 As this is happening, a request to batch 2,3,4 arrives.  This request specifies the "_dependencies" of each as f,g,h and says it "creates_versions" 'w' which is the batch version it's trying to create.  Since 2 and 3 are locked, this request waits on those locks and nothing yet happens.
 
-We go back to batch 'i' which is still in progress and holding the locks on the payments.  It updates each payment object in the payment table to say that they are in batch 1.  Then it unlocks the payments.
+We go back to batch 'i' which is still in progress and holding the locks on the payments.  It updates each payment object in the payment table to say that they are in batch 1.  Then it unlocks the payments, resulting in:
 
-Now batch 2 gets the locks on the payments 2,3,4.  It then goes and reads the payment objects for those and sees that they already have a batch ID on them, so they can't be included in another batch.
+| version 	    | object_id 	| object_type 	| 
+|-------	    |-----------	|-----------	|
+| j | 1 | payment |
+| k | 2 | payment |
+| l | 3 | payment |
+| h | 4 | payment |
+| i | 1 | batch |
+
+Now batch 2 gets the locks on the payments 2,3,4.  It then goes and reads the payment objects for those and sees that they already have a batch ID on them (and that their versions have changed), so they can't be included in another batch.
 
 So in effect, the version/dependencies work as a per-item sequence number. 
 
