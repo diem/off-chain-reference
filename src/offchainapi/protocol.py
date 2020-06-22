@@ -474,8 +474,9 @@ class VASPPairChannel:
                 f'(other:{self.other_address_str}) '
                 f'Signature verification failed. OffChainInvalidSignature: {e}',
             )
+
             # TODO: Package proper exception
-            fut.set_result('Signature verification failed.')
+            fut.set_exception(Exception('Signature verification failed.'))
             return fut
 
         except OffChainOutOfOrder as e:

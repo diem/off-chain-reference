@@ -1,7 +1,8 @@
 # Copyright (c) The Libra Core Contributors
 # SPDX-License-Identifier: Apache-2.0
 
-from ..protocol import VASPPairChannel, make_protocol_error, NetMessage
+from ..protocol import VASPPairChannel, make_protocol_error, \
+                       NetMessage, DependencyException
 from ..executor import ExecutorException, ProtocolExecutor
 from ..protocol_messages import CommandRequestObject, CommandResponseObject, \
     OffChainProtocolError, OffChainException, OffChainOutOfOrder
@@ -66,6 +67,8 @@ class RandomRun(object):
         self.DROP = True
         self.VERBOSE = False
 
+        self.rejected = 0
+
     def run(self):
         to_server_requests = self.to_server_requests
         to_client_response = self.to_client_response
@@ -74,6 +77,7 @@ class RandomRun(object):
         server = self.server
         client = self.client
         commands = self.commands
+
 
         while True:
 
@@ -88,6 +92,8 @@ class RandomRun(object):
                             server.sequence_command_local(c)
                     except ExecutorException:
                         commands.insert(0, c)
+                    except DependencyException:
+                        self.rejected += 1
 
             # Random drop
             while self.DROP and random.random() > 0.3:
@@ -150,8 +156,8 @@ class RandomRun(object):
                        client.executor.last_confirmed])
 
             if not server.would_retransmit() and not client.would_retransmit() \
-                    and server.executor.last_confirmed == self.number \
-                    and client.executor.last_confirmed == self.number:
+                    and server.executor.last_confirmed + self.rejected == self.number \
+                    and client.executor.last_confirmed + self.rejected == self.number:
                 break
 
     def checks(self, NUMBER):
@@ -161,9 +167,9 @@ class RandomRun(object):
         client_seq = [c.item() for c in client.get_final_sequence()]
         server_seq = [c.item() for c in server.get_final_sequence()]
 
-        assert len(client_seq) == NUMBER
+        assert len(client_seq) == NUMBER - self.rejected
         assert set(client_seq) == set(server_seq)
-        assert set(range(NUMBER)) == set(client_seq)
+        # assert set(range(NUMBER)) == set(client_seq)
 
         client_exec_seq = [c.item() for c in client.executor.command_sequence]
         server_exec_seq = [c.item() for c in server.executor.command_sequence]
@@ -503,17 +509,16 @@ def test_dependencies(two_channels):
     client = R.client
     server = R.server
 
-    command_status_sequence = client.executor.command_status_sequence
     mapcmd = {
-        c.item(): command_status_sequence[i] for i, c in enumerate(
+        c.item() for i, c in enumerate(
             client.get_final_sequence()
         )
     }
     # Only one of the items with common dependency commits
-    assert sum([mapcmd[1], mapcmd[4]]) == 1
-    assert sum([mapcmd[8], mapcmd[9]]) == 1
+    assert len(mapcmd & {1, 4}) == 1
+    assert len(mapcmd & {8, 9}) == 1
     # All items commit (except those with common deps)
-    assert sum(mapcmd.values()) == 8
+    assert len(mapcmd) == 8
 
 
 def test_json_serlialize():
