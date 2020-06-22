@@ -111,9 +111,9 @@ def run_server(my_configs_path, other_configs_path, num_of_commands=10, loop=Non
 
     def stop_server(vasp):
         channel = vasp.vasp.get_channel(other_addr)
-        requests = len(channel.other_requests)
+        requests = len(channel.other_request_index)
         while requests < num_of_commands:
-            requests = len(channel.other_requests)
+            requests = len(channel.other_request_index)
             time.sleep(0.1)
         vasp.close()
     Thread(target=stop_server, args=(vasp,)).start()

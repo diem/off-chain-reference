@@ -162,11 +162,6 @@ class VASPPairChannel:
                 'my_requests', CommandRequestObject, root=other_vasp
             )
 
-            # The list of requests the other side has initiated.
-            self.other_requests = self.storage.make_list(
-                'other_requests', CommandRequestObject, root=other_vasp
-            )
-
             # The index of the next request from my sequence that I should
             # retransmit (ie. for which I have not got a response yet.).
             self.next_retransmit = self.storage.make_value(
@@ -201,13 +196,6 @@ class VASPPairChannel:
             int: The next request sequence number for this VASP.
         """
         return len(self.my_requests)
-
-    def other_next_seq(self):
-        """
-        Returns:
-            int: The next request sequence number for the other VASP.
-        """
-        return len(self.other_requests)
 
     def get_my_address(self):
         """
@@ -431,8 +419,6 @@ class VASPPairChannel:
     def process_waiting_messages(self):
         ''' Executes any requets that are now capable of executing, and were
             not before due to being received out of order. '''
-
-        print('Waiting: ', self.waiting_requests.keys())
         pass
 
     def parse_handle_request_to_future(

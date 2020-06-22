@@ -91,7 +91,7 @@ class Aionet:
                     # TODO: Retransmit a few of the requests here.
 
                     len_my = len(channel.my_requests)
-                    len_oth = len(channel.other_requests)
+                    len_oth = 'XXXX'
 
                     logger.info(
                         f'''
