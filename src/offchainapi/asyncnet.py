@@ -80,8 +80,8 @@ class Aionet:
             while True:
                 for k in self.vasp.channel_store:
                     channel = self.vasp.channel_store[k]
-                    len_req = len(channel.waiting_requests)
-                    len_resp = 0 # len(channel.waiting_response)
+                    len_req = 0
+                    len_resp = 0
 
                     role = ['Client', 'Server'][channel.is_server()]
                     waiting = channel.is_server() \
@@ -172,9 +172,7 @@ class Aionet:
 
             # TODO: Handle timeout errors here.
             logger.debug(f'Data Received from {other_addr.as_str()}.')
-            response = await channel.parse_handle_request_to_future(
-                request_json
-            )
+            response = channel.parse_handle_request(request_json)
 
         except json.decoder.JSONDecodeError as e:
             # Raised if the request does not contain valid json.
@@ -189,7 +187,6 @@ class Aionet:
 
         # Send back the response.
         logger.debug(f'Process Waiting messages.')
-        channel.process_waiting_messages()
         logger.debug(f'Sending back response to {other_addr.as_str()}.')
         return web.json_response(response.content, headers=headers)
 
@@ -240,13 +237,10 @@ class Aionet:
                     logger.debug(f'Json response: {json_response}')
 
                     # Wait in case the requests are sent out of order.
-                    res = await channel.parse_handle_response_to_future(
-                        json_response
-                    )
+                    res = channel.parse_handle_response(json_response)
                     logger.debug(f'Response parsed with status: {res}')
 
                     logger.debug(f'Process Waiting messages')
-                    channel.process_waiting_messages()
                     return res
                 except json.decoder.JSONDecodeError as e:
                     logger.debug(f'JSONDecodeError', exc_info=True)
@@ -263,11 +257,6 @@ class Aionet:
     def sequence_command(self, other_addr, command):
         ''' Sequences a new command to the local queue, ready to be
             sent to the other VASP.
-
-            Upon successful completing the sender should call
-            `send_request` to actually send the request to the other
-            side. However, even if that fails subsequent retrasmissions
-            will automatically re-send the request.
 
             Parameters:
                 other_addr (LibraAddress) : the LibraAddress of the other VASP.

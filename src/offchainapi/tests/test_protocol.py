@@ -1,9 +1,8 @@
 # Copyright (c) The Libra Core Contributors
 # SPDX-License-Identifier: Apache-2.0
 
-from ..protocol import VASPPairChannel, make_protocol_error, \
-                       NetMessage, DependencyException
-from ..executor import ExecutorException, ProtocolExecutor
+from ..protocol import VASPPairChannel, make_protocol_error, DependencyException
+from ..executor import ExecutorException
 from ..protocol_messages import CommandRequestObject, CommandResponseObject, \
     OffChainProtocolError, OffChainException, OffChainOutOfOrder
 from ..sample.sample_command import SampleCommand
@@ -15,7 +14,6 @@ import types
 from copy import deepcopy
 import random
 from unittest.mock import MagicMock
-from mock import PropertyMock
 import pytest
 import asyncio
 import json
@@ -40,8 +38,8 @@ def monkey_tap_to_list(pair, requests_sent, replies_sent):
         self.xx_replies_stats += 1
         self.xx_replies_sent += [deepcopy(msg)]
 
-    pair.send_request = types.MethodType(to_tap_requests, pair)
-    pair.send_response = types.MethodType(to_tap_reply, pair)
+    pair.package_request = types.MethodType(to_tap_requests, pair)
+    pair.package_response = types.MethodType(to_tap_reply, pair)
     return pair
 
 
@@ -110,11 +108,11 @@ class RandomRun(object):
             # Make progress by delivering a random queue
             if Case[0] and len(to_server_requests) > 0:
                 client_request = to_server_requests.pop(0)
-                server.send_response(server.handle_request(client_request))
+                server.package_response(server.handle_request(client_request))
 
             if Case[1] and len(to_client_requests) > 0:
                 server_request = to_client_requests.pop(0)
-                client.send_response(client.handle_request(server_request))
+                client.package_response(client.handle_request(server_request))
 
             if Case[2] and len(to_client_response) > 0:
                 rep = to_client_response.pop(0)
@@ -225,7 +223,7 @@ def test_protocol_server_client_benign(two_channels):
     print(request.pretty(JSONFlag.NET))
 
     # Pass the request to the client
-    assert client.other_next_seq() == 0
+    assert len(client.other_request_index) == 0
     reply = client.handle_request(request)
     assert isinstance(reply, CommandResponseObject)
     assert len(client.other_request_index) == 1
@@ -603,10 +601,9 @@ def test_sample_command():
 
 
 def test_parse_handle_request_to_future(signed_json_request, channel, key):
-    loop = asyncio.new_event_loop()
-    fut = channel.parse_handle_request_to_future(
-        signed_json_request, loop=loop)
-    res = fut.result().content
+    fut = channel.parse_handle_request(
+        signed_json_request)
+    res = fut.content
     res = json.loads(key.verify_message(res))
     assert res['status'] == 'success'
 
@@ -616,10 +613,10 @@ def test_parse_handle_request_to_future_out_of_order(json_request, channel,
     json_request['seq'] = 100
     json_request = key.sign_message(json.dumps(json_request))
     loop = asyncio.new_event_loop()
-    fut = channel.parse_handle_request_to_future(
-        json_request, loop=loop, nowait=True
+    fut = channel.parse_handle_request(
+        json_request
     )
-    res = fut.result().content
+    res = fut.content
     res = json.loads(key.verify_message(res))
     assert res['status']== 'success'
 
@@ -629,18 +626,17 @@ def test_parse_handle_request_to_future_parsing_error(json_request, channel,
     json_request['seq'] = '"'  # Trigger a parsing error.
     json_request = key.sign_message(json.dumps(json_request))
     loop = asyncio.new_event_loop()
-    fut = channel.parse_handle_request_to_future(json_request, loop=loop)
-    res = fut.result().content
+    fut = channel.parse_handle_request(json_request)
+    res = fut.content
     res = json.loads(key.verify_message(res))
     assert res['error']['code'] == 'parsing'
 
 
 def test_parse_handle_request_to_future_exception(json_request, channel):
-    loop = asyncio.new_event_loop()
-    fut = channel.parse_handle_request_to_future(
-        json_request, loop=loop  # json_request is not signed.
-    )
-    assert fut.exception() is not None
+    with pytest.raises(Exception):
+        fut = channel.parse_handle_request(
+            json_request  # json_request is not signed.
+        )
 
 
 def test_handle_request_malformed(json_request, two_channels):
@@ -658,44 +654,38 @@ def test_parse_handle_response_to_future(signed_json_response, channel,
                                          command):
     _ = channel.sequence_command_local(command)
     loop = asyncio.new_event_loop()
-    fut = channel.parse_handle_response_to_future(
-        signed_json_response, loop=loop
-    )
-    res = fut.result()
+    fut = channel.parse_handle_response(signed_json_response)
+    res = fut
     assert res
 
 
 def test_parse_handle_response_to_future_parsing_error(json_response, channel,
                                                        command, key):
     _ = channel.sequence_command_local(command)
-    loop = asyncio.new_event_loop()
     json_response['seq'] = '"'  # Trigger a parsing error.
     json_response = key.sign_message(json.dumps(json_response))
-    fut = channel.parse_handle_response_to_future(json_response, loop=loop)
-    assert fut.exception() is not None
+    with pytest.raises(Exception):
+        _ = channel.parse_handle_response(json_response)
 
 
 def test_parse_handle_response_to_future_out_of_order(json_response, channel,
                                                       command, key):
     _ = channel.sequence_command_local(command)
-    loop = asyncio.new_event_loop()
     json_response['command_seq'] = 100  # Trigger OffChainOutOfOrder.
     json_response = key.sign_message(json.dumps(json_response))
-    fut = channel.parse_handle_response_to_future(json_response, loop=loop)
-    assert fut.done()
+    fut = channel.parse_handle_response(json_response)
+    assert fut
 
 
 def test_parse_handle_response_to_future_out_of_order_with_nowait(json_response,
                                                                   channel,
                                                                   command, key):
     _ = channel.sequence_command_local(command)
-    loop = asyncio.new_event_loop()
+
     json_response['command_seq'] = 100  # Trigger OffChainOutOfOrder.
     json_response = key.sign_message(json.dumps(json_response))
-    fut = channel.parse_handle_response_to_future(
-        json_response, loop=loop, nowait=True
-    )
-    assert fut.done()
+    fut = channel.parse_handle_response(json_response)
+    assert fut
 
 
 def test_parse_handle_response_wrong_type(json_response, channel):
@@ -720,48 +710,12 @@ def test_parse_handle_response_bad_duplicate(json_response, channel, command):
         channel.handle_response(response)
 
 
-def test_process_waiting_messages(channel, json_response, command, key):
-    # Add command to the waiting queue.
-    _ = channel.sequence_command_local(command)
-    loop = asyncio.new_event_loop()
-    json_response['command_seq'] = 100
-    json_response = key.sign_message(json.dumps(json_response))
-    fut = channel.parse_handle_response_to_future(json_response, loop=loop)
-    assert not fut.done()
-
-    # Clear the waiting queue.
-    channel.executor = MagicMock(spec=ProtocolExecutor)
-    channel.executor.next_seq.return_value = 100
-    type(channel.executor).last_confirmed = PropertyMock(return_value=100)
-    channel.process_waiting_messages()
-    assert not channel.waiting_response
-
-
-# def test_handle_response_executor_exception(channel, signed_json_response,
-#                                             command):
-#     _ = channel.sequence_command_local(command)
-#     channel.executor = MagicMock(spec=ProtocolExecutor)
-#     channel.executor.sequence_next_command.side_effect = ExecutorException
-#     channel.executor.next_seq.return_value = 0
-#     type(channel.executor).last_confirmed = PropertyMock(return_value=0)
-#     loop = asyncio.new_event_loop()
-#     fut = channel.parse_handle_response_to_future(
-#         signed_json_response, loop=loop
-#     )
-#     assert fut.exception() is not None
-
-
 def test_get_storage_factory(vasp):
     assert isinstance(vasp.get_storage_factory(), StorableFactory)
 
 
 def test_role(channel):
     assert channel.role() == 'Client'
-
-
-def test_num_pending_responses(channel):
-    assert channel.num_pending_responses() == 0
-
 
 def test_pending_retransmit_number(channel):
     assert channel.pending_retransmit_number() == 0

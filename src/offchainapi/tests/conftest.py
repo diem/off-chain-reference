@@ -123,8 +123,8 @@ def two_channels(three_addresses, vasp, store):
             return msg
 
         pair.tap = types.MethodType(tap, pair)
-        pair.send_request = types.MethodType(to_tap, pair)
-        pair.send_response = types.MethodType(to_tap, pair)
+        pair.package_request = types.MethodType(to_tap, pair)
+        pair.package_response = types.MethodType(to_tap, pair)
         return pair
 
     a0, a1, _ = three_addresses

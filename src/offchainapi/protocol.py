@@ -11,11 +11,9 @@ from .libra_address import LibraAddress
 from .crypto import OffChainInvalidSignature
 
 import json
-from collections import namedtuple, defaultdict
+from collections import namedtuple
 from threading import RLock
 import logging
-import asyncio
-import time
 
 """ A Class to store messages meant to be sent on a network. """
 NetMessage = namedtuple('NetMessage', ['src', 'dst', 'type', 'content'])
@@ -162,12 +160,6 @@ class VASPPairChannel:
                 'my_requests', CommandRequestObject, root=other_vasp
             )
 
-            # The index of the next request from my sequence that I should
-            # retransmit (ie. for which I have not got a response yet.).
-            self.next_retransmit = self.storage.make_value(
-                'next_retransmit', int, root=other_vasp, default=0
-            )
-
             # The final sequence
             self.executor = ProtocolExecutor(self, self.processor)
 
@@ -178,14 +170,9 @@ class VASPPairChannel:
         self.my_request_index = {}
         self.other_request_index = {}
 
-        # Request / response cache to allow reordering.
-        self.waiting_requests = defaultdict(list)
-        self.request_window = 1000
+        self.pending_response = {}
 
-        # self.waiting_response = defaultdict(list)
-        self.response_window = 1000
-
-        # Network handler
+        # Network handlerhhekhbebvccugkfbllkunijnunetrtdh
         self.net_queue = []
 
         logger.debug(f'(other:{self.other_address_str}) Created VASP channel')
@@ -195,7 +182,7 @@ class VASPPairChannel:
         Returns:
             int: The next request sequence number for this VASP.
         """
-        return len(self.my_requests)
+        return len(self.my_request_index)
 
     def get_my_address(self):
         """
@@ -232,7 +219,7 @@ class VASPPairChannel:
         """
         return self.executor.command_sequence
 
-    def send_request(self, request):
+    def package_request(self, request):
         """ A hook to send a request to other VASP.
 
         Args:
@@ -263,7 +250,7 @@ class VASPPairChannel:
 
         return net_message
 
-    def send_response(self, response):
+    def package_response(self, response):
         """ A hook to send a response to other VASP.
 
         Args:
@@ -317,20 +304,6 @@ class VASPPairChannel:
              bool: Whether the local VASP the server for this pair.
          """
         return not self.is_client()
-
-    def num_pending_responses(self):
-        """
-        Returns:
-            int: The number of responses this VASP is waiting for.
-        """
-        return len([1 for req in self.my_requests if not req.has_response()])
-
-    def has_pending_responses(self):
-        """
-        Returns:
-            bool: Whether this VASP has pending responses to retransmit.
-        """
-        return self.would_retransmit()
 
     def apply_response_to_executor(self, request):
         """Signals to the executor the success or failure of a command.
@@ -392,6 +365,9 @@ class VASPPairChannel:
                 self.my_requests += [request]
                 self.my_request_index[request.seq] = request
 
+                # Add the request to those requiring a response.
+                self.pending_response[request.seq] = request.seq
+
                 for dv in depends_on_version:
                     self.object_locks[dv] = request.seq
                     # By definition nothing was waiting here, since
@@ -399,7 +375,7 @@ class VASPPairChannel:
 
         # Send the requests outside the locks to allow
         # for an asyncronous implementation.
-        return self.send_request(request)
+        return self.package_request(request)
 
     def parse_handle_request(self, json_command):
         """ Handles a request provided as a json string or dict.
@@ -410,44 +386,6 @@ class VASPPairChannel:
         Returns:
             NetMessage: The message to be sent on a network.
         """
-        loop = asyncio.new_event_loop()
-        fut = self.parse_handle_request_to_future(
-            json_command, nowait=True, loop=loop
-        )
-        return fut.result()
-
-    def process_waiting_messages(self):
-        ''' Executes any requets that are now capable of executing, and were
-            not before due to being received out of order. '''
-        pass
-
-    def parse_handle_request_to_future(
-        self, json_command, fut=None, nowait=False, loop=None
-    ):
-        """ Handles a request provided as a json string or dict and returns
-            a future that triggers when the command is processed.
-
-        Args:
-            json_command (str or dict): The json request.
-            fut (asyncio.Future, optional): The future. Defaults to None.
-            nowait (bool, optional): Whether to feed requests commands even
-                  out of order without waiting. Defaults to False.
-            loop (asyncio.AbstractEventLoopPolicy, optional): The event loop
-                  to use. Defaults to None.
-
-        Returns:
-            asyncio.Future: A future to A NetMessage instance containing the
-                  response to the request.
-        """
-
-        if fut is None:
-            fut = asyncio.Future(loop=loop)
-        else:
-            # If we are passed a future that is done, we just return it
-            # since there is nothing more to do.
-            if fut.done():
-                return fut
-
         try:
             # Check signature
             vasp = self.get_vasp()
@@ -467,42 +405,15 @@ class VASPPairChannel:
                     f'(other:{self.other_address_str}) '
                     f'Processing request seq #{request.seq}',
                 )
-                response = self.handle_request(request, raise_on_wait=True)
+                response = self.handle_request(request)
 
         except OffChainInvalidSignature as e:
             logger.warning(
                 f'(other:{self.other_address_str}) '
                 f'Signature verification failed. OffChainInvalidSignature: {e}',
             )
+            raise e
 
-            # TODO: Package proper exception
-            fut.set_exception(Exception('Signature verification failed.'))
-            return fut
-
-        except OffChainOutOfOrder as e:
-            if nowait:
-                # No waiting -- so bubble up the potocol error response.
-                logger.info(
-                    f'(other:{self.other_address_str}) '
-                    f'Request OutOfOrder and no wait',
-                )
-                response = e.args[0]
-            else:
-                # We were told to wait for this requests turn.
-                logger.info(
-                    f'(other:{self.other_address_str}) '
-                    f'Request OutOfOrder, add to waiting requests',
-                )
-
-                depends_on_version = request.command.get_dependencies()
-                is_locked = any(self.object_locks[dv] is not True
-                                for dv in depends_on_version)
-                assert is_locked
-
-                self.waiting_requests[request.seq] += [(
-                    json_command, fut, time.time()
-                )]
-                return fut
         except JSONParsingError as e:
             logger.error(
                 f'(other:{self.other_address_str}) JSONParsingError: {e}',
@@ -514,28 +425,23 @@ class VASPPairChannel:
                 f'(other:{self.other_address_str}) exception: {e}',
                 exc_info=True,
             )
-            fut.set_exception(e)
-            return fut
+            raise e
 
         # Prepare the response.
-        full_response = self.send_response(response)
-        fut.set_result(full_response)
-        return fut
+        full_response = self.package_response(response)
+        return full_response
 
-    def handle_request(self, request, raise_on_wait=False):
+    def handle_request(self, request):
         """ Handles a request provided as a dictionary. (see `_handle_request`)
         """
         with self.storage.atomic_writes() as _:
-            return self._handle_request(request, raise_on_wait)
+            return self._handle_request(request)
 
-    def _handle_request(self, request, raise_on_wait):
+    def _handle_request(self, request):
         """ Handles a request provided as a dictionary.
 
         Args:
             request (CommandRequestObject): The request.
-            raise_on_wait (bool, optional): Whether to raise OffChainOutOfOrder
-                when we cannot generate a response before sequencing previous
-                commands. Defaults to False.
 
         Raises:
             OffChainOutOfOrder: In case the response is out of order
@@ -595,8 +501,6 @@ class VASPPairChannel:
                 if self.is_server():
                     # The server requests take precedence, so make this wait.
                     response = make_protocol_error(request, code='wait')
-                    if raise_on_wait:
-                        raise OffChainOutOfOrder(response)
                     return response
                 else:
                     # A client yields the locks to the server.
@@ -630,12 +534,12 @@ class VASPPairChannel:
 
         # Update the index of others' requests
         self.other_request_index[request.seq] = request
-        self.register_deps(request)
+        self.register_dependencies(request)
         self.apply_response_to_executor(request)
 
         return request.response
 
-    def register_deps(self, request):
+    def register_dependencies(self, request):
         ''' A helper function to register dependencies of a successful request. '''
 
         # Keep track of object locks here.
@@ -651,20 +555,16 @@ class VASPPairChannel:
 
             for dv in depends_on_version:
                 self.object_locks[dv] = False
-                # Here activate an event for those waiting on
-                # this change of status
 
             for cv in create_versions:
                 self.object_locks[cv] = True
-                # Here activate an event for those waiting on
-                # this change of status
+
         else:
             assert all(v in self.object_locks for v in depends_on_version)
 
             for dv in depends_on_version:
-                self.object_locks[dv] = True
-                # Here activate an event for those waiting on
-                # this change of status
+                if depends_on_version[dv] == request.seq:
+                    self.object_locks[dv] = True
 
 
     def parse_handle_response(self, json_response):
@@ -676,34 +576,6 @@ class VASPPairChannel:
         Returns:
             bool: Whether the command was a success or not
         """
-        loop = asyncio.new_event_loop()
-        fut = self.parse_handle_response_to_future(
-            json_response, nowait=True, loop=loop
-        )
-        return fut.result()
-
-    def parse_handle_response_to_future(
-        self, json_response, fut=None, nowait=False, loop=None
-    ):
-        """ Handles a response provided as a json string. Returns a future
-            that fires when the response is processed. You may `await` this
-            future from an asyncio coroutine.
-
-        Args:
-            json_response (dict or str): The json response.
-            fut (asyncio.Future, optional): The future. Defaults to None.
-            nowait (bool, optional): Whether to wait for the reponse to be in
-                order to feed it directly to the protocol state machine.
-                Defaults to False.
-            loop (asyncio.AbstractEventLoopPolicy, optional): the event loop
-                in which this is executed. Defaults to None.
-
-        Returns:
-            bool: Whether the command was a success or not (Command error).
-        """
-        if fut is None:
-            fut = asyncio.Future(loop=loop)
-
         try:
             vasp = self.get_vasp()
             other_key = vasp.info_context.get_peer_compliance_verification_key(
@@ -713,24 +585,22 @@ class VASPPairChannel:
             response = CommandResponseObject.from_json_data_dict(
                 response, JSONFlag.NET
             )
-            # command_seq = response.seq
 
             with self.rlock:
                 result = self.handle_response(response)
-            fut.set_result(result)
+            return result
 
         except OffChainInvalidSignature as e:
             logger.warning(
                 f'(other:{self.other_address_str}) '
                 f'Signature verification failed. OffChainInvalidSignature: {e}',
             )
-            # TODO: Package proper exception
-            fut.set_result('Signature verification failed.')
+            raise e
         except JSONParsingError as e:
             logger.warning(
                 f'(other:{self.other_address_str}) JSONParsingError: {e}'
             )
-            fut.set_exception(e)
+            raise e
         # except OffChainOutOfOrder as e:
         # TODO: What if two consecutive  server responses on the same object
         # arrive out of order?
@@ -739,15 +609,13 @@ class VASPPairChannel:
                 f'(other:{self.other_address_str}) '
                 f'OffChainException/OffChainProtocolError: {e}',
             )
-            fut.set_exception(e)
+            raise e
         except ExecutorException as e:
             logger.warning(
                 f'(other:{self.other_address_str}) '
                 f'ExecutorException: {e}',
             )
-            fut.set_exception(e)
-
-        return fut
+            raise e
 
     def handle_response(self, response):
         """ Handles a response provided as a dictionary. See `_handle_response`
@@ -802,21 +670,14 @@ class VASPPairChannel:
         request.response = response
         self.my_requests[request_seq] = request
         self.my_request_index[request_seq] = request
-
-        # We must have set the locks to this request
-        #create_versions = request.command.new_object_versions()
-        #depends_on_version = request.command.get_dependencies()
-        # TODO: Here check we know of the dependency objects.
-
-        # Optimization -- update the retransmit index.
-        self.would_retransmit()
+        del self.pending_response[request.seq]
 
         # Add the next command to the common sequence.
         if self.is_client():
             self.executor.extend_sequence(request.command)
 
         self.apply_response_to_executor(request)
-        self.register_deps(request)
+        self.register_dependencies(request)
         return request.is_success()
 
     def retransmit(self):
@@ -833,27 +694,15 @@ class VASPPairChannel:
 
         request_to_send = None
 
-        with self.rlock:
-            with self.storage.atomic_writes():
-                next_retransmit = self.next_retransmit.get_value()
-                while next_retransmit < self.my_next_seq():
-                    request = self.my_requests[next_retransmit]
-                    if request.has_response():
-                        next_retransmit += 1
-                    else:
-                        request_to_send = request
-                        break
-
-                if next_retransmit != self.next_retransmit.get_value():
-                    self.next_retransmit.set_value(next_retransmit)
-
-        # Send request outside the lock to allow for asynchronous
-        # sending methods.
         if not do_retransmit:
-            return request_to_send is not None
+            return len(self.pending_response) > 0
         else:
-            return self.send_request(request) if request_to_send is not None \
-                else None
+            if len(self.pending_response) > 0:
+                next_retransmit = list(self.pending_response.keys())[0]
+                request_to_send = self.my_request_index[next_retransmit]
+                return self.package_request(request_to_send)
+            else:
+                return None
 
     def pending_retransmit_number(self):
         '''
@@ -861,7 +710,4 @@ class VASPPairChannel:
             the number of requests that are waiting to be
             retransmitted on this channel.
         '''
-        if not self.would_retransmit():
-            return 0
-
-        return self.my_next_seq() - self.next_retransmit.get_value()
+        return len(self.pending_response)
