@@ -18,7 +18,7 @@ Who is the protocol server and who is the client VASP is determined by comparing
 If the result is 0, the lexicographically lower parent address is used as the server side.
 If the result is 1, the lexicographically higher parent address is used as the server side. Lexicographic ordering determines which binary address is higher by comparing byte positions one by one, and returning the address with the first higher byte.
 
-To avoid excessive locking and intermediate state management during API requests, by convention the _server_ acts as the source of truth for the state of an object.  In practice, this means that when the _server_ wishes to update state of an object, it writes the update directly to its database and then transmits the command.  When a _client_ wishes to update state of an object, it sends the command and then updates its database after receipt of confirmation from the _server_.  This avoids locking of objects during remote calls to the other VASP and state management due to the potential of dropped network connections.  Instead, upon dropped connections, each side must replay the request. 
+To avoid excessive locking and intermediate state management during API requests, by convention the _server_ acts as the source of truth for the state of an object.  In practice, this means that in the case of lock contention on a shared object, the _server_ command is prioritized.
 
 ## Example
 
