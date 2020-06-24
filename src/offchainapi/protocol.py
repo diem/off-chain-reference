@@ -113,7 +113,8 @@ class VASPPairChannel:
     Args:
         myself (LibraAddress): The address of the current VASP.
         other (LibraAddress): The address of the other VASP.
-        vasp (OffChainVASP): The OffChainVASP to which this channel is attached.
+        vasp (OffChainVASP): The OffChainVASP to which this channel
+                             is attached.
         storage (StorageFactory): The storage factory.
         processor (CommandProcessor): A command processor.
 
@@ -162,15 +163,17 @@ class VASPPairChannel:
                 'command_sequence', CommandRequestObject, root=other_vasp
             )
 
-            self.commands_no_store = self.storage.make_value(
-                                'command_no_store', int,
-                                root=other_vasp, default=0)
-
             # Keep track of object locks
-            self.object_locks = self.storage.make_dict('object_locks', str, root=other_vasp)
-            self.my_request_index = self.storage.make_dict('my_request_index', CommandRequestObject, root=other_vasp)
-            self.other_request_index = self.storage.make_dict('other_request_index', CommandRequestObject, root=other_vasp)
-            self.pending_response = self.storage.make_dict('pending_response', bool, root=other_vasp)
+            self.object_locks = self.storage.make_dict(
+                        'object_locks', str, root=other_vasp)
+            self.my_request_index = self.storage.make_dict(
+                        'my_request_index', CommandRequestObject,
+                        root=other_vasp)
+            self.other_request_index = self.storage.make_dict(
+                        'other_request_index', CommandRequestObject,
+                        root=other_vasp)
+            self.pending_response = self.storage.make_dict(
+                        'pending_response', bool, root=other_vasp)
 
         # Ephemeral state that can be forgotten upon a crash.
 
@@ -181,7 +184,7 @@ class VASPPairChannel:
 
     @property
     def commands_no(self):
-        return self.commands_no_store.get_value()
+        return len(self.command_sequence)
 
     def my_next_seq(self):
         """
@@ -268,7 +271,8 @@ class VASPPairChannel:
         struct = response.get_json_data_dict(JSONFlag.NET)
 
         # Sign response
-        my_key = self.get_vasp().info_context.get_peer_compliance_signature_key(
+        info_context = self.get_vasp().info_context
+        my_key = info_context.get_peer_compliance_signature_key(
             self.get_my_address().as_str()
         )
         signed_response = my_key.sign_message(json.dumps(struct))
@@ -320,7 +324,6 @@ class VASPPairChannel:
         assert request.response is not None
         response = request.response
 
-        self.commands_no_store.set_value(self.commands_no + 1)
         other_addr = self.get_other_address()
 
         self.processor.process_command(
@@ -369,7 +372,8 @@ class VASPPairChannel:
 
                 my_address = self.get_my_address()
                 other_address = self.get_other_address()
-                self.processor.check_command(my_address, other_address, off_chain_command)
+                self.processor.check_command(
+                    my_address, other_address, off_chain_command)
 
                 self.my_request_index[request.cid] = request
 
@@ -418,7 +422,7 @@ class VASPPairChannel:
         except OffChainInvalidSignature as e:
             logger.warning(
                 f'(other:{self.other_address_str}) '
-                f'Signature verification failed. OffChainInvalidSignature: {e}',
+                f'Signature verification failed. OffChainInvalidSignature: {e}'
             )
             raise e
 
@@ -474,7 +478,8 @@ class VASPPairChannel:
                 if previous_request.is_same_command(request):
 
                     # Invariant
-                    assert all(cv in self.object_locks for cv in create_versions)
+                    assert all(cv in self.object_locks
+                               for cv in create_versions)
 
                     # Re-send the response.
                     logger.debug(
@@ -491,15 +496,14 @@ class VASPPairChannel:
                     response.previous_command = previous_request.command
                     logger.error(
                         f'(other:{self.other_address_str}) '
-                        f'Conflicting requests for seq {request.cid}',
+                        f'Conflicting requests for seq {request.cid}'
                     )
                     return response
-
 
         # If one of the dependency is locked then wait.
         if has_all_deps:
             is_locked = any(self.object_locks[dv] != 'True'
-                for dv in depends_on_version)
+                            for dv in depends_on_version)
             if is_locked:
                 if self.is_server():
                     # The server requests take precedence, so make this wait.
@@ -535,7 +539,8 @@ class VASPPairChannel:
         return request.response
 
     def register_dependencies(self, request):
-        ''' A helper function to register dependencies of a successful request. '''
+        ''' A helper function to register dependencies
+            of a successful request.'''
 
         # Keep track of object locks here.
         create_versions = request.command.new_object_versions()
@@ -560,7 +565,6 @@ class VASPPairChannel:
             for dv in depends_on_version:
                 if depends_on_version[dv] == request.cid:
                     self.object_locks[dv] = 'True'
-
 
     def parse_handle_response(self, json_response):
         """ Handles a response as json string or dict.
@@ -588,7 +592,7 @@ class VASPPairChannel:
         except OffChainInvalidSignature as e:
             logger.warning(
                 f'(other:{self.other_address_str}) '
-                f'Signature verification failed. OffChainInvalidSignature: {e}',
+                f'Signature verification failed. OffChainInvalidSignature: {e}'
             )
             raise e
         except JSONParsingError as e:
@@ -596,16 +600,13 @@ class VASPPairChannel:
                 f'(other:{self.other_address_str}) JSONParsingError: {e}'
             )
             raise e
-        # except OffChainOutOfOrder as e:
-        # TODO: What if two consecutive  server responses on the same object
-        # arrive out of order?
-        except OffChainOutOfOrder or OffChainException or OffChainProtocolError as e:
+        except OffChainOutOfOrder or \
+                OffChainException or OffChainProtocolError as e:
             logger.warning(
                 f'(other:{self.other_address_str}) '
                 f'OffChainException/OffChainProtocolError: {e}',
             )
             raise e
-
 
     def handle_response(self, response):
         """ Handles a response provided as a dictionary. See `_handle_response`
@@ -674,7 +675,7 @@ class VASPPairChannel:
         net_messages = []
         for num, next_retransmit in enumerate(self.pending_response.keys()):
             request_to_send = self.my_request_index[next_retransmit]
-            net_messages += [ self.package_request(request_to_send)]
+            net_messages += [self.package_request(request_to_send)]
             if num == number:
                 break
 
