@@ -1,7 +1,7 @@
 # Copyright (c) The Libra Core Contributors
 # SPDX-License-Identifier: Apache-2.0
 
-from .executor import ExecutorException
+
 from .command_processor import CommandProcessor
 from .protocol_messages import CommandRequestObject, CommandResponseObject, \
     OffChainProtocolError, OffChainOutOfOrder, OffChainException, \
@@ -600,12 +600,7 @@ class VASPPairChannel:
                 f'OffChainException/OffChainProtocolError: {e}',
             )
             raise e
-        except ExecutorException as e:
-            logger.warning(
-                f'(other:{self.other_address_str}) '
-                f'ExecutorException: {e}',
-            )
-            raise e
+
 
     def handle_response(self, response):
         """ Handles a response provided as a dictionary. See `_handle_response`
@@ -622,7 +617,6 @@ class VASPPairChannel:
         Raises:
             OffChainProtocolError: On protocol error.
             OffChainException: On an unrecoverabe error.
-            ExecutorException: Can happy if the other VASP is buggy.
 
         Returns:
             bool: Whether the response is successfully sequenced.

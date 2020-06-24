@@ -9,7 +9,7 @@ from .protocol_messages import CommandRequestObject
 import logging
 
 
-logger = logging.getLogger(name='libra_off_chain_api.executor')
+logger = logging.getLogger(name='libra_off_chain_api.protocol_command')
 
 
 # Interface we need to do commands:
@@ -113,8 +113,3 @@ class ProtocolCommand(JSONSerializable):
             if "_origin" in data:
                 self.origin = LibraAddress(data["_origin"])
         return self
-
-
-class ExecutorException(Exception):
-    """ Indicates an exception in the executor. """
-    pass

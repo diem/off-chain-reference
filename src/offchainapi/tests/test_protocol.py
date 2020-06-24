@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from ..protocol import VASPPairChannel, make_protocol_error, DependencyException
-from ..executor import ExecutorException
 from ..protocol_messages import CommandRequestObject, CommandResponseObject, \
     OffChainProtocolError, OffChainException, OffChainOutOfOrder
 from ..sample.sample_command import SampleCommand
@@ -88,8 +87,6 @@ class RandomRun(object):
                             client.sequence_command_local(c)
                         else:
                             server.sequence_command_local(c)
-                    except ExecutorException:
-                        commands.insert(0, c)
                     except DependencyException:
                         self.rejected += 1
 

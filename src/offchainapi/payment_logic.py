@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from .business import BusinessForceAbort
-from .executor import ProtocolCommand
+from .protocol_command import ProtocolCommand
 from .command_processor import CommandProcessor
 from .payment import Status, PaymentObject
 from .status_logic import is_valid_status_transition, is_valid_initial
