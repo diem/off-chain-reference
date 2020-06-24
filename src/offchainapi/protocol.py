@@ -162,28 +162,33 @@ class VASPPairChannel:
                 'command_sequence', CommandRequestObject, root=other_vasp
             )
 
-            self.commands_no = 0
+            self.commands_no_store = self.storage.make_value(
+                                'command_no_store', int,
+                                root=other_vasp, default=0)
+
+            # Keep track of object locks
+            self.object_locks = self.storage.make_dict('object_locks', str, root=other_vasp)
+            self.my_request_index = self.storage.make_dict('my_request_index', CommandRequestObject, root=other_vasp)
+            self.other_request_index = self.storage.make_dict('other_request_index', CommandRequestObject, root=other_vasp)
+            self.pending_response = self.storage.make_dict('pending_response', bool, root=other_vasp)
 
         # Ephemeral state that can be forgotten upon a crash.
-
-        # Keep track of object locks
-        self.object_locks = {}
-        self.my_request_index = {}
-        self.other_request_index = {}
-
-        self.pending_response = {}
 
         # Network handler
         self.net_queue = []
 
         logger.debug(f'(other:{self.other_address_str}) Created VASP channel')
 
+    @property
+    def commands_no(self):
+        return self.commands_no_store.get_value()
+
     def my_next_seq(self):
         """
         Returns:
             int: The next request sequence number for this VASP.
         """
-        return len(self.my_request_index)
+        return 'SEQ_' + str(len(self.my_request_index))
 
     def get_my_address(self):
         """
@@ -315,7 +320,7 @@ class VASPPairChannel:
         assert request.response is not None
         response = request.response
 
-        self.commands_no += 1
+        self.commands_no_store.set_value(self.commands_no + 1)
         other_addr = self.get_other_address()
 
         self.processor.process_command(
@@ -346,13 +351,13 @@ class VASPPairChannel:
         if any(dv not in self.object_locks for dv in depends_on_version):
             raise DependencyException('Depends not present.')
 
-        if any(self.object_locks[dv] is False for dv in depends_on_version):
+        if any(self.object_locks[dv] == 'False' for dv in depends_on_version):
             raise DependencyException('Depends used.')
 
         if any(cv in self.object_locks for cv in create_versions):
             raise DependencyException('Object version already exists.')
 
-        is_locked = any(self.object_locks[dv] is not True
+        is_locked = any(self.object_locks[dv] != 'True'
                         for dv in depends_on_version)
         if is_locked:
             raise DependencyException('Depends locked.')
@@ -369,7 +374,7 @@ class VASPPairChannel:
                 self.my_request_index[request.cid] = request
 
                 # Add the request to those requiring a response.
-                self.pending_response[request.cid] = request.cid
+                self.pending_response[request.cid] = True
 
                 for dv in depends_on_version:
                     self.object_locks[dv] = request.cid
@@ -493,7 +498,7 @@ class VASPPairChannel:
 
         # If one of the dependency is locked then wait.
         if has_all_deps:
-            is_locked = any(self.object_locks[dv] is not True
+            is_locked = any(self.object_locks[dv] != 'True'
                 for dv in depends_on_version)
             if is_locked:
                 if self.is_server():
@@ -514,7 +519,6 @@ class VASPPairChannel:
             self.processor.check_command(
                 my_address, other_address, command)
 
-            self.command_sequence += [request]
             response = make_success_response(request)
         except Exception as e:
             response = make_command_error(request, str(e))
@@ -523,6 +527,7 @@ class VASPPairChannel:
         request.response = response
 
         # Update the index of others' requests
+        self.command_sequence += [request]
         self.other_request_index[request.cid] = request
         self.register_dependencies(request)
         self.apply_response_to_executor(request)
@@ -544,17 +549,17 @@ class VASPPairChannel:
             assert all(v in self.object_locks for v in depends_on_version)
 
             for dv in depends_on_version:
-                self.object_locks[dv] = False
+                self.object_locks[dv] = 'False'
 
             for cv in create_versions:
-                self.object_locks[cv] = True
+                self.object_locks[cv] = 'True'
 
         else:
             assert all(v in self.object_locks for v in depends_on_version)
 
             for dv in depends_on_version:
                 if depends_on_version[dv] == request.cid:
-                    self.object_locks[dv] = True
+                    self.object_locks[dv] = 'True'
 
 
     def parse_handle_response(self, json_response):
@@ -652,14 +657,14 @@ class VASPPairChannel:
 
         # Read and write back response into request.
         request.response = response
-        self.my_request_index[request_seq] = request
         del self.pending_response[request.cid]
 
         # Add the next command to the common sequence.
         self.command_sequence += [request]
-
-        self.apply_response_to_executor(request)
+        self.my_request_index[request_seq] = request
         self.register_dependencies(request)
+        self.apply_response_to_executor(request)
+
         return request.is_success()
 
     def package_retransmit(self, number=1):
@@ -667,9 +672,9 @@ class VASPPairChannel:
         if any """
 
         net_messages = []
-        for num, next_retransmit in enumerate(self.pending_response):
+        for num, next_retransmit in enumerate(self.pending_response.keys()):
             request_to_send = self.my_request_index[next_retransmit]
-            net_messages += [ self.package_request(request_to_send) ]
+            net_messages += [ self.package_request(request_to_send)]
             if num == number:
                 break
 

@@ -173,7 +173,7 @@ class CommandRequestObject(JSONSerializable):
             # Use generic/dynamic parse functionality
             command = JSONSerializable.parse(data['command'], flag)
             self = CommandRequestObject(command)
-            self.cid = int(data["cid"])
+            self.cid = str(data["cid"])
             if 'signature' in data:
                 self.signature = data["signature"]
             if flag == JSONFlag.STORE and 'response' in data:
@@ -235,7 +235,7 @@ class CommandResponseObject(JSONSerializable):
             self = CommandResponseObject()
 
             if 'cid' in data and data['cid'] is not None:
-                self.cid = int(data['cid'])
+                self.cid = str(data['cid'])
 
             self.status = str(data['status'])
 
@@ -244,7 +244,7 @@ class CommandResponseObject(JSONSerializable):
                 raise JSONParsingError(
                     f'Status must be success or failure not {self.status}')
             if self.status == 'success':
-                self.seq = int(data['cid'])
+                self.cid = str(data['cid'])
             if self.status == 'failure':
                 self.error = OffChainError.from_json_data_dict(
                     data['error'], flag)

@@ -147,13 +147,13 @@ def command(payment_action):
 @pytest.fixture
 def json_request(command):
     request = CommandRequestObject(command)
-    request.cid = 0
+    request.cid = 'SEQ_0'
     return request.get_json_data_dict(JSONFlag.NET)
 
 
 @pytest.fixture
 def json_response():
-    return {"cid": 0, "status": "success"}
+    return {"cid": 'SEQ_0', "status": "success"}
 
 
 @pytest.fixture
