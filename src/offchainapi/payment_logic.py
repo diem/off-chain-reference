@@ -2,10 +2,10 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from .business import BusinessForceAbort
-from .executor import CommandProcessor, ProtocolCommand
+from .executor import ProtocolCommand
+from .command_processor import CommandProcessor
 from .payment import Status, PaymentObject
-from .status_logic import status_heights_MUST, \
-    is_valid_status_transition, is_valid_initial
+from .status_logic import is_valid_status_transition, is_valid_initial
 from .payment_command import PaymentCommand, PaymentLogicError
 from .asyncnet import NetworkException
 from .shared_object import SharedObject

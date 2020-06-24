@@ -283,9 +283,6 @@ class sample_vasp:
 
     def insert_local_command(self, other_vasp, command):
         channel = self.get_channel(other_vasp)
-
-        if command.depend_on != []:
-            assert len(channel.executor.object_store) > 0
         channel.sequence_command_local(command)
 
     def process_response(self, other_vasp, response_json):

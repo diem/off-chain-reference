@@ -1,7 +1,8 @@
 # Copyright (c) The Libra Core Contributors
 # SPDX-License-Identifier: Apache-2.0
 
-from .executor import ProtocolExecutor, ExecutorException, CommandProcessor
+from .executor import ExecutorException
+from .command_processor import CommandProcessor
 from .protocol_messages import CommandRequestObject, CommandResponseObject, \
     OffChainProtocolError, OffChainOutOfOrder, OffChainException, \
     make_success_response, make_protocol_error, \
@@ -155,8 +156,13 @@ class VASPPairChannel:
 
         with self.storage.atomic_writes() as _:
 
-            # The final sequence
-            self.executor = ProtocolExecutor(self, self.processor)
+            # The common sequence of commands & and their
+            # status for those committed.
+            self.command_sequence = self.storage.make_list(
+                'command_sequence', CommandRequestObject, root=other_vasp
+            )
+
+            self.commands_no = 0
 
         # Ephemeral state that can be forgotten upon a crash.
 
@@ -205,14 +211,14 @@ class VASPPairChannel:
         Returns:
             int: The next sequence number in the common sequence.
         """
-        return self.executor.next_seq()
+        return len(self.command_sequence)
 
     def get_final_sequence(self):
         """
         Returns:
             list: The list of commands in the common sequence.
         """
-        return self.executor.command_sequence
+        return self.command_sequence
 
     def package_request(self, request):
         """ A hook to send a request to other VASP.
@@ -308,10 +314,17 @@ class VASPPairChannel:
         """
         assert request.response is not None
         response = request.response
-        if request.is_success():
-            self.executor.set_success(request.command)
-        else:
-            self.executor.set_fail(request.command, response.error)
+
+        self.commands_no += 1
+        other_addr = self.get_other_address()
+
+        self.processor.process_command(
+            other_addr=other_addr,
+            command=request.command,
+            seq=self.commands_no,
+            status_success=request.is_success(),
+            error=response.error if response.error else None
+        )
 
     def sequence_command_local(self, off_chain_command):
         """The local VASP attempts to sequence a new off-chain command.
@@ -501,7 +514,7 @@ class VASPPairChannel:
             self.processor.check_command(
                 my_address, other_address, command)
 
-            self.executor.extend_sequence(request)
+            self.command_sequence += [request]
             response = make_success_response(request)
         except Exception as e:
             response = make_command_error(request, str(e))
@@ -649,8 +662,7 @@ class VASPPairChannel:
         del self.pending_response[request.cid]
 
         # Add the next command to the common sequence.
-        # if self.is_client():
-        self.executor.extend_sequence(request)
+        self.command_sequence += [request]
 
         self.apply_response_to_executor(request)
         self.register_dependencies(request)

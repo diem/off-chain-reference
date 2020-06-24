@@ -1,6 +1,7 @@
 # Copyright (c) The Libra Core Contributors
 # SPDX-License-Identifier: Apache-2.0
 
+from ..protocol import VASPPairChannel
 from ..status_logic import Status
 from ..payment_command import PaymentCommand, PaymentLogicError
 from ..business import BusinessForceAbort, BusinessValidationFailure
@@ -14,7 +15,6 @@ from ..utils import JSONFlag
 
 from .basic_business_context import TestBusinessContext
 
-import asyncio
 from unittest.mock import MagicMock
 from mock import AsyncMock
 import pytest
@@ -89,7 +89,7 @@ def test_check_new_update_receiver_modify_sender_state_fail(payment, processor):
         processor.check_new_update(payment, new_obj)
 
 
-def test_check_command(payment, processor, executor):
+def test_check_command(three_addresses, payment, processor):
     states = [
         (b'AAAA', b'BBBB', b'AAAA', True),
         (b'BBBB', b'AAAA', b'AAAA', True),
@@ -99,6 +99,11 @@ def test_check_command(payment, processor, executor):
         (b'AAAA', b'BBBB', b'BBBB', True),
         (b'BBBB', b'AAAA', b'DDDD', False),
     ]
+    a0, _, a1 = three_addresses
+    channel = MagicMock(spec=VASPPairChannel)
+    channel.get_my_address.return_value = a0
+    channel.get_other_address.return_value = a1
+
     for state in states:
         src_addr, dst_addr, origin_addr, res = state
 
@@ -106,7 +111,6 @@ def test_check_command(payment, processor, executor):
         a1 = LibraAddress.encode(dst_addr*4)
         origin = LibraAddress.encode(origin_addr*4)
 
-        vasp, channel, _ = executor.get_context()
         channel.get_my_address.return_value = a0
         channel.get_other_address.return_value = a1
 

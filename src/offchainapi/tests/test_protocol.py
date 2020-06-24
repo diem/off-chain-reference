@@ -150,12 +150,12 @@ class RandomRun(object):
 
                 print([server.would_retransmit(),
                        client.would_retransmit(),
-                       server.executor.commands_no,
-                       client.executor.commands_no])
+                       server.commands_no,
+                       client.commands_no])
 
             if not server.would_retransmit() and not client.would_retransmit() \
-                    and server.executor.commands_no + self.rejected == self.number \
-                    and client.executor.commands_no + self.rejected == self.number:
+                    and server.commands_no + self.rejected == self.number \
+                    and client.commands_no + self.rejected == self.number:
                 break
 
     def checks(self, NUMBER):
@@ -169,8 +169,8 @@ class RandomRun(object):
         assert set(client_seq) == set(server_seq)
         # assert set(range(NUMBER)) == set(client_seq)
 
-        client_exec_seq = [c.command.item() for c in client.executor.command_sequence]
-        server_exec_seq = [c.command.item() for c in server.executor.command_sequence]
+        client_exec_seq = [c.command.item() for c in client.command_sequence]
+        server_exec_seq = [c.command.item() for c in server.command_sequence]
         assert set(client_seq) == set(client_exec_seq)
         assert set(server_seq) == set(server_exec_seq)
 
@@ -232,13 +232,13 @@ def test_protocol_server_client_benign(two_channels):
     print(reply.pretty(JSONFlag.NET))
 
     # Pass the reply back to the server
-    assert server.executor.commands_no == 0
+    assert server.commands_no == 0
     server.handle_response(reply)
     msg_list = server.tap()
     assert len(msg_list) == 0  # No message expected
 
-    assert server.executor.commands_no > 0
-    assert client.executor.commands_no > 0
+    assert server.commands_no > 0
+    assert client.commands_no > 0
     assert client.get_final_sequence()[0].command.item() == 'Hello'
 
 
@@ -270,13 +270,13 @@ def test_protocol_server_conflicting_sequence(two_channels):
     print(reply_conflict.pretty(JSONFlag.NET))
 
     # Pass the reply back to the server
-    assert server.executor.commands_no == 0
+    assert server.commands_no == 0
     server.handle_response(reply)
     msg_list = server.tap()
     assert len(msg_list) == 0  # No message expected
 
-    assert server.executor.commands_no > 0
-    assert client.executor.commands_no > 0
+    assert server.commands_no > 0
+    assert client.commands_no > 0
     assert client.get_final_sequence()[0].command.item() == 'Hello'
 
 
@@ -301,7 +301,7 @@ def test_protocol_client_server_benign(two_channels):
     assert isinstance(reply, CommandResponseObject)
     assert len(server.other_request_index) == 1
     assert server.next_final_sequence() == 1
-    assert server.executor.commands_no > 0
+    assert server.commands_no > 0
 
     # Pass response back to client
     assert client.my_request_index[0].response is None
@@ -309,7 +309,7 @@ def test_protocol_client_server_benign(two_channels):
     msg_list = client.tap()
     assert len(msg_list) == 0  # No message expected
 
-    assert client.executor.commands_no > 0
+    assert client.commands_no > 0
     assert client.my_request_index[0].response is not None
     assert client.get_final_sequence()[0].command.item() == 'Hello'
     assert client.next_final_sequence() == 1

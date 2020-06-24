@@ -6,7 +6,6 @@ from ..business import BusinessContext, VASPInfo
 from ..storage import StorableFactory
 from ..payment_logic import Status, PaymentProcessor, PaymentCommand
 from ..protocol import OffChainVASP, VASPPairChannel
-from ..executor import ProtocolExecutor
 from ..command_processor import CommandProcessor
 from ..libra_address import LibraAddress
 from ..protocol_messages import CommandRequestObject
@@ -72,18 +71,6 @@ def store():
 def processor(store):
     bcm = AsyncMock(spec=BusinessContext)
     return PaymentProcessor(bcm, store)
-
-
-@pytest.fixture
-def executor(three_addresses, store):
-    a0, _, a1 = three_addresses
-    channel = MagicMock(spec=VASPPairChannel)
-    channel.get_my_address.return_value = a0
-    channel.get_other_address.return_value = a1
-    with store:
-        channel.storage = store
-        command_processor = MagicMock(spec=CommandProcessor)
-        return ProtocolExecutor(channel, command_processor)
 
 
 @pytest.fixture
