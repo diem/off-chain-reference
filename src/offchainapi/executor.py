@@ -4,6 +4,7 @@
 from .utils import JSONSerializable, JSONFlag
 from .command_processor import CommandProcessor
 from .libra_address import LibraAddress
+from .protocol_messages import CommandRequestObject
 
 import logging
 
@@ -174,21 +175,13 @@ class ProtocolExecutor:
         # The common sequence of commands & and their
         # status for those committed.
         self.command_sequence = storage_factory.make_list(
-            'command_sequence', ProtocolCommand, root=other_vasp
+            'command_sequence', CommandRequestObject, root=other_vasp
         )
-        self.command_status_sequence = storage_factory.make_list(
-            'command_status_sequence', bool, root=other_vasp
-        )
+        #self.command_status_sequence = storage_factory.make_list(
+        #    'command_status_sequence', bool, root=other_vasp
+        #)
 
-    @property
-    def last_confirmed(self):
-        """ The index of the last confirmed (success or fail)
-            command in the sequence.
-
-            Returns:
-                int: The index of the last confirmed command in the sequence.
-        """
-        return len(self.command_status_sequence)
+        self.commands_no = 0
 
     def set_outcome(self, command, is_success, seq, error=None):
         """ Execute successful commands, and notify of failed commands.
@@ -213,7 +206,7 @@ class ProtocolExecutor:
 
     def next_seq(self):
         ''' Returns the next sequence number in the common sequence.'''
-        return len(self.command_sequence)
+        return self.commands_no
 
     def get_context(self):
         """ Returns a (vasp, channel, executor) context.
@@ -223,8 +216,8 @@ class ProtocolExecutor:
         """
         return (self.channel.get_vasp(), self.channel, self)
 
-    def extend_sequence(self, command):
-        self.command_sequence += [command]
+    def extend_sequence(self, request):
+        self.command_sequence += [request]
 
     def set_success(self, command):
         ''' Sets the command at a specific sequence number to be a success.
@@ -236,16 +229,15 @@ class ProtocolExecutor:
                 seq_no (int): A specific sequence number.
         '''
 
-        self.command_status_sequence += [True]
-        seq_no = len(self.command_status_sequence)
+        self.commands_no += 1
 
         # Call the command processor.
         logger.info(
             f'(other:{self.other_name}) '
-            f'Confirm success of command #{seq_no}'
+            f'Confirm success of command #{self.commands_no}'
         )
 
-        self.set_outcome(command, is_success=True, seq=seq_no)
+        self.set_outcome(command, is_success=True, seq=self.commands_no)
 
     def set_fail(self, command, error=None):
         ''' Sets the command at a specific sequence number to be a failure.
@@ -257,13 +249,12 @@ class ProtocolExecutor:
                 seq_no (int): A specific sequence number.
         '''
         #assert seq_no == self.last_confirmed
-        self.command_status_sequence += [False]
-        seq_no = len(self.command_status_sequence)
+        self.commands_no += 1
 
         # Call the command processor.
         logger.info(
             f'(other:{self.other_name}) '
-            f'Confirm failure of command #{seq_no}'
+            f'Confirm failure of command #{self.commands_no}'
         )
         # command = self.command_sequence[seq_no]
-        self.set_outcome(command, is_success=False, seq=seq_no, error=error)
+        self.set_outcome(command, is_success=False, seq=self.commands_no, error=error)

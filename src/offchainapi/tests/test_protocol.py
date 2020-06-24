@@ -139,8 +139,8 @@ class RandomRun(object):
 
             # Retransmit
             if Case[4] and random.random() > 0.10:
-                client.retransmit()
-                server.retransmit()
+                client.package_retransmit()
+                server.package_retransmit()
 
             if self.VERBOSE:
                 print([to_server_requests,
@@ -150,27 +150,27 @@ class RandomRun(object):
 
                 print([server.would_retransmit(),
                        client.would_retransmit(),
-                       server.executor.last_confirmed,
-                       client.executor.last_confirmed])
+                       server.executor.commands_no,
+                       client.executor.commands_no])
 
             if not server.would_retransmit() and not client.would_retransmit() \
-                    and server.executor.last_confirmed + self.rejected == self.number \
-                    and client.executor.last_confirmed + self.rejected == self.number:
+                    and server.executor.commands_no + self.rejected == self.number \
+                    and client.executor.commands_no + self.rejected == self.number:
                 break
 
     def checks(self, NUMBER):
         client = self.client
         server = self.server
 
-        client_seq = [c.item() for c in client.get_final_sequence()]
-        server_seq = [c.item() for c in server.get_final_sequence()]
+        client_seq = [c.command.item() for c in client.get_final_sequence()]
+        server_seq = [c.command.item() for c in server.get_final_sequence()]
 
         assert len(client_seq) == NUMBER - self.rejected
         assert set(client_seq) == set(server_seq)
         # assert set(range(NUMBER)) == set(client_seq)
 
-        client_exec_seq = [c.item() for c in client.executor.command_sequence]
-        server_exec_seq = [c.item() for c in server.executor.command_sequence]
+        client_exec_seq = [c.command.item() for c in client.executor.command_sequence]
+        server_exec_seq = [c.command.item() for c in server.executor.command_sequence]
         assert set(client_seq) == set(client_exec_seq)
         assert set(server_seq) == set(server_exec_seq)
 
@@ -211,7 +211,6 @@ def test_protocol_server_client_benign(two_channels):
 
     # Create a server request for a command
     server.sequence_command_local(SampleCommand('Hello'))
-    assert len(server.get_final_sequence()) > 0
 
     msg_list = server.tap()
     assert len(msg_list) == 1
@@ -233,14 +232,14 @@ def test_protocol_server_client_benign(two_channels):
     print(reply.pretty(JSONFlag.NET))
 
     # Pass the reply back to the server
-    assert len(server.executor.command_status_sequence) == 0
+    assert server.executor.commands_no == 0
     server.handle_response(reply)
     msg_list = server.tap()
     assert len(msg_list) == 0  # No message expected
 
-    assert len(server.executor.command_status_sequence) > 0
-    assert len(client.executor.command_status_sequence) > 0
-    assert client.get_final_sequence()[0].item() == 'Hello'
+    assert server.executor.commands_no > 0
+    assert client.executor.commands_no > 0
+    assert client.get_final_sequence()[0].command.item() == 'Hello'
 
 
 def test_protocol_server_conflicting_sequence(two_channels):
@@ -252,7 +251,7 @@ def test_protocol_server_conflicting_sequence(two_channels):
 
     # Modilfy message to be a conflicting sequence number
     request_conflict = deepcopy(request)
-    assert request_conflict.seq == 0
+    assert request_conflict.cid == 0
     request_conflict.command = SampleCommand("Conflict")
 
     # Pass the request to the client
@@ -271,14 +270,14 @@ def test_protocol_server_conflicting_sequence(two_channels):
     print(reply_conflict.pretty(JSONFlag.NET))
 
     # Pass the reply back to the server
-    assert len(server.executor.command_status_sequence) == 0
+    assert server.executor.commands_no == 0
     server.handle_response(reply)
     msg_list = server.tap()
     assert len(msg_list) == 0  # No message expected
 
-    assert len(server.executor.command_status_sequence) > 0
-    assert len(client.executor.command_status_sequence) > 0
-    assert client.get_final_sequence()[0].item() == 'Hello'
+    assert server.executor.commands_no > 0
+    assert client.executor.commands_no > 0
+    assert client.get_final_sequence()[0].command.item() == 'Hello'
 
 
 def test_protocol_client_server_benign(two_channels):
@@ -302,17 +301,17 @@ def test_protocol_client_server_benign(two_channels):
     assert isinstance(reply, CommandResponseObject)
     assert len(server.other_request_index) == 1
     assert server.next_final_sequence() == 1
-    assert len(server.executor.command_status_sequence) > 0
+    assert server.executor.commands_no > 0
 
     # Pass response back to client
-    assert client.my_requests[0].response is None
+    assert client.my_request_index[0].response is None
     client.handle_response(reply)
     msg_list = client.tap()
     assert len(msg_list) == 0  # No message expected
 
-    assert len(client.executor.command_status_sequence) > 0
-    assert client.my_requests[0].response is not None
-    assert client.get_final_sequence()[0].item() == 'Hello'
+    assert client.executor.commands_no > 0
+    assert client.my_request_index[0].response is not None
+    assert client.get_final_sequence()[0].command.item() == 'Hello'
     assert client.next_final_sequence() == 1
     assert client.my_next_seq() == 1
     assert server.my_next_seq() == 0
@@ -337,14 +336,14 @@ def test_protocol_server_client_interleaved_benign(two_channels):
 
     client.handle_response(server_reply)
 
-    assert len(client.my_requests) == 1
+    assert len(client.my_request_index) == 1
     assert len(server.other_request_index) == 1
     assert len(client.get_final_sequence()) == 2
     assert len(server.get_final_sequence()) == 2
-    assert [c.item() for c in client.get_final_sequence()] == [
-        'World', 'Hello']
-    assert [c.item() for c in server.get_final_sequence()] == [
-        'World', 'Hello']
+    assert {c.command.item() for c in client.get_final_sequence()} == {
+        'World', 'Hello'}
+    assert {c.command.item() for c in server.get_final_sequence()} == {
+        'World', 'Hello'}
 
 
 def test_protocol_server_client_interleaved_swapped_request(two_channels):
@@ -364,14 +363,14 @@ def test_protocol_server_client_interleaved_swapped_request(two_channels):
 
     client.handle_response(server_reply)
 
-    assert len(client.my_requests) == 1
+    assert len(client.my_request_index) == 1
     assert len(server.other_request_index) == 1
     assert len(client.get_final_sequence()) == 2
     assert len(server.get_final_sequence()) == 2
-    assert [c.item() for c in client.get_final_sequence()] == [
-        'World', 'Hello']
-    assert [c.item() for c in server.get_final_sequence()] == [
-        'World', 'Hello']
+    assert {c.command.item() for c in client.get_final_sequence()} == {
+        'World', 'Hello'}
+    assert {c.command.item() for c in server.get_final_sequence()} == {
+        'World', 'Hello'}
 
 
 def test_protocol_server_client_interleaved_swapped_reply(two_channels):
@@ -394,14 +393,14 @@ def test_protocol_server_client_interleaved_swapped_reply(two_channels):
 
     client.handle_response(server_reply)
 
-    assert len(client.my_requests) == 1
+    assert len(client.my_request_index) == 1
     assert len(server.other_request_index) == 1
     assert len(client.get_final_sequence()) == 2
     assert len(server.get_final_sequence()) == 2
-    assert [c.item() for c in client.get_final_sequence()] == [
-        'World', 'Hello']
-    assert [c.item() for c in server.get_final_sequence()] == [
-        'World', 'Hello']
+    assert {c.command.item() for c in client.get_final_sequence()} == {
+        'World', 'Hello'}
+    assert {c.command.item() for c in server.get_final_sequence()} == {
+        'World', 'Hello'}
 
 
 def test_random_interleave_no_drop(two_channels):
@@ -466,8 +465,8 @@ def test_random_interleave_and_drop_and_invalid(two_channels):
     client = R.client
     server = R.server
 
-    client_seq = [c.item() for c in client.get_final_sequence()]
-    server_seq = [c.item() for c in server.get_final_sequence()]
+    client_seq = [c.command.item() for c in client.get_final_sequence()]
+    server_seq = [c.command.item() for c in server.get_final_sequence()]
 
     # Print stats:
     print()
@@ -508,7 +507,7 @@ def test_dependencies(two_channels):
     server = R.server
 
     mapcmd = {
-        c.item() for i, c in enumerate(
+        c.command.item() for i, c in enumerate(
             client.get_final_sequence()
         )
     }
@@ -530,8 +529,7 @@ def test_json_serlialize():
     # Test Request, Response
     req0 = CommandRequestObject(cmd)
     req2 = CommandRequestObject(cmd2)
-    req0.seq = 10
-    req0.command_seq = 15
+    req0.cid = 10
     req0.status = 'success'
 
     data = req0.get_json_data_dict(JSONFlag.STORE)
@@ -610,7 +608,7 @@ def test_parse_handle_request_to_future(signed_json_request, channel, key):
 
 def test_parse_handle_request_to_future_out_of_order(json_request, channel,
                                                      key):
-    json_request['seq'] = 100
+    json_request['cid'] = 100
     json_request = key.sign_message(json.dumps(json_request))
     loop = asyncio.new_event_loop()
     fut = channel.parse_handle_request(
@@ -623,7 +621,7 @@ def test_parse_handle_request_to_future_out_of_order(json_request, channel,
 
 def test_parse_handle_request_to_future_parsing_error(json_request, channel,
                                                       key):
-    json_request['seq'] = '"'  # Trigger a parsing error.
+    json_request['cid'] = '"'  # Trigger a parsing error.
     json_request = key.sign_message(json.dumps(json_request))
     loop = asyncio.new_event_loop()
     fut = channel.parse_handle_request(json_request)
@@ -638,18 +636,6 @@ def test_parse_handle_request_to_future_exception(json_request, channel):
             json_request  # json_request is not signed.
         )
 
-
-def test_handle_request_malformed(json_request, two_channels):
-    channel, _ = two_channels
-    request = CommandRequestObject.from_json_data_dict(
-        json_request, JSONFlag.NET
-    )
-    request.command_seq = 1  # Trigger error.
-    res = channel.handle_request(request)
-    json_response = res.get_json_data_dict(JSONFlag.NET)
-    assert json_response['error']['code'] == 'malformed'
-
-
 def test_parse_handle_response_to_future(signed_json_response, channel,
                                          command):
     _ = channel.sequence_command_local(command)
@@ -662,7 +648,7 @@ def test_parse_handle_response_to_future(signed_json_response, channel,
 def test_parse_handle_response_to_future_parsing_error(json_response, channel,
                                                        command, key):
     _ = channel.sequence_command_local(command)
-    json_response['seq'] = '"'  # Trigger a parsing error.
+    json_response['cid'] = '"'  # Trigger a parsing error.
     json_response = key.sign_message(json.dumps(json_response))
     with pytest.raises(Exception):
         _ = channel.parse_handle_response(json_response)
@@ -671,7 +657,6 @@ def test_parse_handle_response_to_future_parsing_error(json_response, channel,
 def test_parse_handle_response_to_future_out_of_order(json_response, channel,
                                                       command, key):
     _ = channel.sequence_command_local(command)
-    json_response['command_seq'] = 100  # Trigger OffChainOutOfOrder.
     json_response = key.sign_message(json.dumps(json_response))
     fut = channel.parse_handle_response(json_response)
     assert fut
@@ -682,7 +667,6 @@ def test_parse_handle_response_to_future_out_of_order_with_nowait(json_response,
                                                                   command, key):
     _ = channel.sequence_command_local(command)
 
-    json_response['command_seq'] = 100  # Trigger OffChainOutOfOrder.
     json_response = key.sign_message(json.dumps(json_response))
     fut = channel.parse_handle_response(json_response)
     assert fut

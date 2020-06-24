@@ -155,11 +155,6 @@ class VASPPairChannel:
 
         with self.storage.atomic_writes() as _:
 
-            # The list of requests I have initiated.
-            self.my_requests = self.storage.make_list(
-                'my_requests', CommandRequestObject, root=other_vasp
-            )
-
             # The final sequence
             self.executor = ProtocolExecutor(self, self.processor)
 
@@ -172,7 +167,7 @@ class VASPPairChannel:
 
         self.pending_response = {}
 
-        # Network handlerhhekhbebvccugkfbllkunijnunetrtdh
+        # Network handler
         self.net_queue = []
 
         logger.debug(f'(other:{self.other_address_str}) Created VASP channel')
@@ -352,24 +347,19 @@ class VASPPairChannel:
         # Ensure all storage operations are written atomically.
         with self.rlock:
             with self.storage.atomic_writes() as _:
-                request.seq = self.my_next_seq()
+                request.cid = self.my_next_seq()
 
                 my_address = self.get_my_address()
                 other_address = self.get_other_address()
                 self.processor.check_command(my_address, other_address, off_chain_command)
 
-                if self.is_server():
-                    request.command_seq = self.next_final_sequence()
-                    self.executor.extend_sequence(off_chain_command)
-
-                self.my_requests += [request]
-                self.my_request_index[request.seq] = request
+                self.my_request_index[request.cid] = request
 
                 # Add the request to those requiring a response.
-                self.pending_response[request.seq] = request.seq
+                self.pending_response[request.cid] = request.cid
 
                 for dv in depends_on_version:
-                    self.object_locks[dv] = request.seq
+                    self.object_locks[dv] = request.cid
                     # By definition nothing was waiting here, since
                     # we checked it was all True.
 
@@ -403,7 +393,7 @@ class VASPPairChannel:
                 # Going ahead to process the request.
                 logger.debug(
                     f'(other:{self.other_address_str}) '
-                    f'Processing request seq #{request.seq}',
+                    f'Processing request seq #{request.cid}',
                 )
                 response = self.handle_request(request)
 
@@ -460,8 +450,8 @@ class VASPPairChannel:
                            for dv in depends_on_version)
 
         # Always answer old requests.
-        if request.seq in self.other_request_index:
-            previous_request = self.other_request_index[request.seq]
+        if request.cid in self.other_request_index:
+            previous_request = self.other_request_index[request.cid]
             if previous_request.has_response():
                 if previous_request.is_same_command(request):
 
@@ -472,7 +462,7 @@ class VASPPairChannel:
                     logger.debug(
                         f'(other:{self.other_address_str}) '
                         f'Handle request that alerady has a response: '
-                        f'seq #{request.seq}, other next #XXX',
+                        f'seq #{request.cid}, other next #XXX',
                     )
                     return previous_request.response
                 else:
@@ -483,15 +473,10 @@ class VASPPairChannel:
                     response.previous_command = previous_request.command
                     logger.error(
                         f'(other:{self.other_address_str}) '
-                        f'Conflicting requests for seq {request.seq}',
+                        f'Conflicting requests for seq {request.cid}',
                     )
                     return response
 
-
-        # Clients are not to suggest sequence numbers.
-        if self.is_server() and request.command_seq is not None:
-            response = make_protocol_error(request, code='malformed')
-            return response
 
         # If one of the dependency is locked then wait.
         if has_all_deps:
@@ -506,13 +491,6 @@ class VASPPairChannel:
                     # A client yields the locks to the server.
                     pass
 
-
-        # What is the sequence of this request.
-        if self.is_server():
-            seq = self.next_final_sequence()
-        else:
-            seq = request.command_seq
-
         try:
             if not has_all_deps:
                 raise Exception('Missing dependencies')
@@ -523,17 +501,16 @@ class VASPPairChannel:
             self.processor.check_command(
                 my_address, other_address, command)
 
-            self.executor.extend_sequence(request.command)
+            self.executor.extend_sequence(request)
             response = make_success_response(request)
         except Exception as e:
             response = make_command_error(request, str(e))
 
         # Write back to storage
         request.response = response
-        request.response.command_seq = seq
 
         # Update the index of others' requests
-        self.other_request_index[request.seq] = request
+        self.other_request_index[request.cid] = request
         self.register_dependencies(request)
         self.apply_response_to_executor(request)
 
@@ -563,7 +540,7 @@ class VASPPairChannel:
             assert all(v in self.object_locks for v in depends_on_version)
 
             for dv in depends_on_version:
-                if depends_on_version[dv] == request.seq:
+                if depends_on_version[dv] == request.cid:
                     self.object_locks[dv] = True
 
 
@@ -643,9 +620,9 @@ class VASPPairChannel:
         if response.is_protocol_failure():
             raise OffChainProtocolError.make(response.error)
 
-        request_seq = response.seq
+        request_seq = response.cid
 
-        if response.seq not in self.my_request_index:
+        if request_seq not in self.my_request_index:
             raise OffChainException(
                 f'Response for seq {request_seq} received, '
                 f'but has requests only up to seq < xxx'
@@ -668,41 +645,37 @@ class VASPPairChannel:
 
         # Read and write back response into request.
         request.response = response
-        self.my_requests[request_seq] = request
         self.my_request_index[request_seq] = request
-        del self.pending_response[request.seq]
+        del self.pending_response[request.cid]
 
         # Add the next command to the common sequence.
-        if self.is_client():
-            self.executor.extend_sequence(request.command)
+        # if self.is_client():
+        self.executor.extend_sequence(request)
 
         self.apply_response_to_executor(request)
         self.register_dependencies(request)
         return request.is_success()
 
-    def retransmit(self):
+    def package_retransmit(self, number=1):
         """ Re-sends the earlierst request that has not yet got a response,
         if any """
-        self.would_retransmit(do_retransmit=True)
 
-    def would_retransmit(self, do_retransmit=False):
+        net_messages = []
+        for num, next_retransmit in enumerate(self.pending_response):
+            request_to_send = self.my_request_index[next_retransmit]
+            net_messages += [ self.package_request(request_to_send) ]
+            if num == number:
+                break
+
+        return net_messages
+
+    def would_retransmit(self):
         """ Returns true if there are any pending re-transmits, namely
             requests for which the response has not yet been received.
             Note that this function re-transmits at most one request
             at a time.
         """
-
-        request_to_send = None
-
-        if not do_retransmit:
-            return len(self.pending_response) > 0
-        else:
-            if len(self.pending_response) > 0:
-                next_retransmit = list(self.pending_response.keys())[0]
-                request_to_send = self.my_request_index[next_retransmit]
-                return self.package_request(request_to_send)
-            else:
-                return None
+        return len(self.pending_response) > 0
 
     def pending_retransmit_number(self):
         '''

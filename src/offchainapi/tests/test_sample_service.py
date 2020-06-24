@@ -103,8 +103,7 @@ def json_request(my_addr, other_addr, payment_action):
     )
     command = PaymentCommand(payment)
     request = CommandRequestObject(command)
-    request.seq = 0
-    request.command_seq = 0
+    request.cid = 0
     return request.get_json_data_dict(JSONFlag.NET)
 
 
@@ -115,11 +114,10 @@ def json_request(my_addr, other_addr, payment_action):
     (10, 10, 'success', None, None),
 ])
 def simple_response_json_error(request, key):
-    seq, cmd_seq, status, protoerr, errcode = request.param
+    cid, cmd_seq, status, protoerr, errcode = request.param
     resp = CommandResponseObject()
     resp.status = status
-    resp.seq = seq
-    resp.command_seq = cmd_seq
+    resp.cid = cid
     if status == 'failure':
         resp.error = OffChainError(protoerr, errcode)
     json_obj = resp.get_json_data_dict(JSONFlag.NET)

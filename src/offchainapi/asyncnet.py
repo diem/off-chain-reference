@@ -90,7 +90,7 @@ class Aionet:
                     other = channel.get_other_address().as_str()
                     # TODO: Retransmit a few of the requests here.
 
-                    len_my = len(channel.my_requests)
+                    len_my = len(channel.my_request_index)
                     len_oth = 'XXXX'
 
                     logger.info(
