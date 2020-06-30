@@ -1,7 +1,6 @@
 # Copyright (c) The Libra Core Contributors
 # SPDX-License-Identifier: Apache-2.0
 
-
 from .command_processor import CommandProcessor
 from .protocol_messages import CommandRequestObject, CommandResponseObject, \
     OffChainProtocolError, OffChainOutOfOrder, OffChainException, \
@@ -191,7 +190,7 @@ class VASPPairChannel:
         Returns:
             int: The next request sequence number for this VASP.
         """
-        return 'SEQ_' + str(len(self.my_request_index))
+        return f'{self.myself.as_str()}_{str(len(self.my_request_index))}'
 
     def get_my_address(self):
         """
@@ -352,10 +351,10 @@ class VASPPairChannel:
         depends_on_version = request.command.get_dependencies()
 
         if any(dv not in self.object_locks for dv in depends_on_version):
-            raise DependencyException('Depends not present.')
+            raise DependencyException('Dependencies not present.')
 
         if any(self.object_locks[dv] == 'False' for dv in depends_on_version):
-            raise DependencyException('Depends used.')
+            raise DependencyException('Dependencies used.')
 
         if any(cv in self.object_locks for cv in create_versions):
             raise DependencyException('Object version already exists.')
@@ -363,21 +362,20 @@ class VASPPairChannel:
         is_locked = any(self.object_locks[dv] != 'True'
                         for dv in depends_on_version)
         if is_locked:
-            raise DependencyException('Depends locked.')
+            raise DependencyException('Dependencies locked.')
 
         # Ensure all storage operations are written atomically.
         with self.rlock:
             with self.storage.atomic_writes() as _:
                 request.cid = self.my_next_seq()
 
-                my_address = self.get_my_address()
-                other_address = self.get_other_address()
                 self.processor.check_command(
-                    my_address, other_address, off_chain_command)
-
-                self.my_request_index[request.cid] = request
+                    self.get_my_address(),
+                    self.get_other_address(),
+                    off_chain_command)
 
                 # Add the request to those requiring a response.
+                self.my_request_index[request.cid] = request
                 self.pending_response[request.cid] = True
 
                 for dv in depends_on_version:
@@ -468,7 +466,9 @@ class VASPPairChannel:
         create_versions = request.command.new_object_versions()
         depends_on_version = request.command.get_dependencies()
 
-        has_all_deps = all(dv in self.object_locks
+        # Check all dependencies are here and not used.
+        has_all_deps = all(dv in self.object_locks and
+                           self.object_locks[dv] != 'False'
                            for dv in depends_on_version)
 
         # Always answer old requests.
@@ -502,6 +502,7 @@ class VASPPairChannel:
 
         # If one of the dependency is locked then wait.
         if has_all_deps:
+            locks = [self.object_locks[dv] for dv in depends_on_version]
             is_locked = any(self.object_locks[dv] != 'True'
                             for dv in depends_on_version)
             if is_locked:
@@ -560,10 +561,10 @@ class VASPPairChannel:
                 self.object_locks[cv] = 'True'
 
         else:
-            assert all(v in self.object_locks for v in depends_on_version)
+            # assert all(v in self.object_locks for v in depends_on_version)
 
             for dv in depends_on_version:
-                if depends_on_version[dv] == request.cid:
+                if dv in self.object_locks and self.object_locks[dv] == request.cid:
                     self.object_locks[dv] = 'True'
 
     def parse_handle_response(self, json_response):

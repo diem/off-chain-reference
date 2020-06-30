@@ -126,6 +126,19 @@ def two_channels(three_addresses, vasp, store):
     server, client = monkey_tap(server), monkey_tap(client)
     return (server, client)
 
+@pytest.fixture
+def two_channels_notap(three_addresses, vasp, store):
+
+    a0, a1, _ = three_addresses
+    command_processor = MagicMock(spec=CommandProcessor)
+    server = VASPPairChannel(
+        a0, a1, vasp, store, command_processor
+    )
+    client = VASPPairChannel(
+        a1, a0, vasp, store, command_processor
+    )
+    return (server, client)
+
 
 @pytest.fixture
 def db(tmp_path):

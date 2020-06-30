@@ -369,6 +369,65 @@ def test_protocol_server_client_interleaved_swapped_request(two_channels):
     assert {c.command.item() for c in server.get_final_sequence()} == {
         'World', 'Hello'}
 
+def test_protocol_conflict1(two_channels_notap):
+    server, client = two_channels_notap
+
+    msg = client.sequence_command_local(SampleCommand('Hello'))
+    msg = msg.content
+
+    msg2 = server.parse_handle_request(msg).content
+
+    # Since this is not yet confirmed, reject the command
+    with pytest.raises(DependencyException):
+        client.sequence_command_local(SampleCommand('World1', deps=['Hello']))
+
+    msg3 = server.sequence_command_local(SampleCommand('World2', deps=['Hello']))
+    msg3 = msg3.content
+
+    # Since this is not yet confirmed, reject the command
+    msg4 = client.parse_handle_request(msg3).content
+    succ = server.parse_handle_response(msg4)
+    assert not succ  # Fails
+
+    # Now add the response that creates 'hello'
+    succ = client.parse_handle_response(msg2)
+    assert succ  # success
+
+
+def test_protocol_conflict2(two_channels_notap):
+    server, client = two_channels_notap
+
+    msg = client.sequence_command_local(SampleCommand('Hello'))
+    msg = msg.content
+
+    msg2 = server.parse_handle_request(msg).content
+    succ = client.parse_handle_response(msg2)
+    assert succ  # success
+
+    # Two concurrent requests
+    creq = client.sequence_command_local(SampleCommand('cW', deps=['Hello'])).content
+    sreq = server.sequence_command_local(SampleCommand('sW', deps=['Hello'])).content
+
+    # Server gets client request
+    sresp = server.parse_handle_request(creq).content
+    # Client is told to wait
+    with pytest.raises(OffChainProtocolError):
+        _ = client.parse_handle_response(sresp)
+
+    # Client gets server request
+    cresp = client.parse_handle_request(sreq).content
+    succ = server.parse_handle_response(cresp)
+    assert succ  # Success
+
+    assert 'Hello' in server.object_locks
+    assert server.object_locks['Hello'] == 'False'
+
+    # Now try again the client request
+    sresp = server.parse_handle_request(creq).content
+    succ = client.parse_handle_response(sresp)
+    assert not succ
+
+
 
 def test_protocol_server_client_interleaved_swapped_reply(two_channels):
     server, client = two_channels
@@ -607,7 +666,6 @@ def test_parse_handle_request_to_future_out_of_order(json_request, channel,
                                                      key):
     json_request['cid'] = '100'
     json_request = key.sign_message(json.dumps(json_request))
-    loop = asyncio.new_event_loop()
     fut = channel.parse_handle_request(
         json_request
     )
@@ -622,14 +680,6 @@ def test_parse_handle_request_to_future_exception(json_request, channel):
             json_request  # json_request is not signed.
         )
 
-def test_parse_handle_response_to_future(signed_json_response, channel,
-                                         command):
-    _ = channel.sequence_command_local(command)
-    loop = asyncio.new_event_loop()
-    fut = channel.parse_handle_response(signed_json_response)
-    res = fut
-    assert res
-
 
 def test_parse_handle_response_to_future_parsing_error(json_response, channel,
                                                        command, key):
@@ -638,46 +688,6 @@ def test_parse_handle_response_to_future_parsing_error(json_response, channel,
     json_response = key.sign_message(json.dumps(json_response))
     with pytest.raises(Exception):
         _ = channel.parse_handle_response(json_response)
-
-
-def test_parse_handle_response_to_future_out_of_order(json_response, channel,
-                                                      command, key):
-    _ = channel.sequence_command_local(command)
-    json_response = key.sign_message(json.dumps(json_response))
-    fut = channel.parse_handle_response(json_response)
-    assert fut
-
-
-def test_parse_handle_response_to_future_out_of_order_with_nowait(json_response,
-                                                                  channel,
-                                                                  command, key):
-    _ = channel.sequence_command_local(command)
-
-    json_response = key.sign_message(json.dumps(json_response))
-    fut = channel.parse_handle_response(json_response)
-    assert fut
-
-
-def test_parse_handle_response_wrong_type(json_response, channel):
-    response = CommandResponseObject.from_json_data_dict(
-        json_response, JSONFlag.NET
-    )
-    response.seq = 'A'  # Raises OffChainException because it is not an int.
-    with pytest.raises(OffChainException):
-        channel.handle_response(response)
-
-
-def test_parse_handle_response_bad_duplicate(json_response, channel, command):
-    _ = channel.sequence_command_local(command)
-    response = CommandResponseObject.from_json_data_dict(
-        json_response, JSONFlag.NET
-    )
-
-    from copy import deepcopy
-    channel.handle_response(deepcopy(response))
-    response.status = '1234'
-    with pytest.raises(OffChainException):
-        channel.handle_response(response)
 
 
 def test_get_storage_factory(vasp):
