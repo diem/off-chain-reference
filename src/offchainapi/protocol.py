@@ -676,6 +676,8 @@ class VASPPairChannel:
         return request.is_success()
 
     def get_retransmit(self, number=1):
+        ''' Returns up to a `number` (int) of pending requests
+        (CommandRequestObject)'''
         net_messages = []
         for num, next_retransmit in enumerate(self.pending_response.keys()):
             request_to_send = self.my_request_index[next_retransmit]
@@ -686,9 +688,10 @@ class VASPPairChannel:
         return net_messages
 
     def package_retransmit(self, number=1):
-        """ Re-sends the earlierst request that has not yet got a response,
-        if any """
-
+        """ Packages up to a `number` (int) of earlier requests without a
+        reply to send to the the  other party. Returns a list of `NetMessage`
+        instances.
+        """
         return [self.package_request(m) for m in self.get_retransmit(number)]
 
     def would_retransmit(self):
