@@ -17,35 +17,6 @@ import pytest
 import asyncio
 import json
 
-
-def monkey_tap_to_list(pair, requests_sent, replies_sent):
-    pair.msg = []
-    pair.xx_requests_sent = requests_sent
-    pair.xx_replies_sent = replies_sent
-    pair.xx_requests_stats = 0
-    pair.xx_replies_stats = 0
-
-    def to_tap_requests(self, msg):
-        assert msg is not None
-        assert isinstance(msg, CommandRequestObject)
-        self.xx_requests_stats += 1
-        msg = deepcopy(msg)
-        self.xx_requests_sent += [msg]
-        return msg
-
-    def to_tap_reply(self, msg):
-        assert isinstance(msg, CommandResponseObject)
-        assert msg is not None
-        self.xx_replies_stats += 1A
-        msg = deepcopy(msg)
-        self.xx_replies_sent += [msg]
-        return msg
-
-    pair.package_request = types.MethodType(to_tap_requests, pair)
-    pair.package_response = types.MethodType(to_tap_reply, pair)
-    return pair
-
-
 class RandomRun(object):
     def __init__(self, server, client, commands, seed='fixed seed'):
         # MESSAGE QUEUES
@@ -54,12 +25,8 @@ class RandomRun(object):
         self.to_client_requests = []
         self.to_server_response = []
 
-        self.server = monkey_tap_to_list(
-            server, self.to_client_requests, self.to_client_response
-        )
-        self.client = monkey_tap_to_list(
-            client, self.to_server_requests, self.to_server_response
-        )
+        self.server = server
+        self.client = client
 
         self.commands = commands
         self.number = len(commands)
@@ -88,9 +55,11 @@ class RandomRun(object):
                     c = commands.pop(0)
                     try:
                         if random.random() > 0.5:
-                            client.sequence_command_local(c)
+                            req = client.sequence_command_local(c)
+                            to_server_requests += [req]
                         else:
-                            server.sequence_command_local(c)
+                            req = server.sequence_command_local(c)
+                            to_client_requests += [req]
                     except DependencyException:
                         self.rejected += 1
 
@@ -109,11 +78,13 @@ class RandomRun(object):
             # Make progress by delivering a random queue
             if Case[0] and len(to_server_requests) > 0:
                 client_request = to_server_requests.pop(0)
-                server.package_response(server.handle_request(client_request))
+                resp = server.handle_request(client_request)
+                to_client_response += [resp]
 
             if Case[1] and len(to_client_requests) > 0:
                 server_request = to_client_requests.pop(0)
-                client.package_response(client.handle_request(server_request))
+                resp = client.handle_request(server_request)
+                to_server_response += [resp]
 
             if Case[2] and len(to_client_response) > 0:
                 rep = to_client_response.pop(0)
@@ -140,8 +111,10 @@ class RandomRun(object):
 
             # Retransmit
             if Case[4] and random.random() > 0.10:
-                client.package_retransmit()
-                server.package_retransmit()
+                cr = client.get_retransmit()
+                to_server_requests += cr
+                sr = server.get_retransmit()
+                to_client_requests += sr
 
             if self.VERBOSE:
                 print([to_server_requests,
@@ -210,11 +183,7 @@ def test_protocol_server_client_benign(two_channels):
     server, client = two_channels
 
     # Create a server request for a command
-    server.sequence_command_local(SampleCommand('Hello'))
-
-    msg_list = server.tap()
-    assert len(msg_list) == 1
-    request = msg_list.pop()
+    request = server.sequence_command_local(SampleCommand('Hello'))
     assert isinstance(request, CommandRequestObject)
 
     print()
@@ -232,9 +201,8 @@ def test_protocol_server_client_benign(two_channels):
 
     # Pass the reply back to the server
     assert server.next_final_sequence() == 0
-    server.handle_response(reply)
-    msg_list = server.tap()
-    assert len(msg_list) == 0  # No message expected
+    succ = server.handle_response(reply)
+    assert succ
 
     assert server.next_final_sequence() > 0
     assert client.next_final_sequence() > 0
@@ -245,8 +213,7 @@ def test_protocol_server_conflicting_sequence(two_channels):
     server, client = two_channels
 
     # Create a server request for a command
-    server.sequence_command_local(SampleCommand('Hello'))
-    request = server.tap()[0]
+    request = server.sequence_command_local(SampleCommand('Hello'))
 
     # Modilfy message to be a conflicting sequence number
     request_conflict = deepcopy(request)
@@ -266,9 +233,8 @@ def test_protocol_server_conflicting_sequence(two_channels):
 
     # Pass the reply back to the server
     assert server.next_final_sequence() == 0
-    server.handle_response(reply)
-    msg_list = server.tap()
-    assert len(msg_list) == 0  # No message expected
+    succ = server.handle_response(reply)
+    assert succ
 
     assert server.next_final_sequence() > 0
     assert client.next_final_sequence() > 0
@@ -279,10 +245,7 @@ def test_protocol_client_server_benign(two_channels):
     server, client = two_channels
 
     # Create a server request for a command
-    client.sequence_command_local(SampleCommand('Hello'))
-    msg_list = client.tap()
-    assert len(msg_list) == 1
-    request = msg_list.pop()
+    request = client.sequence_command_local(SampleCommand('Hello'))
     assert isinstance(request, CommandRequestObject)
     assert len(client.other_request_index) == 0
 
@@ -296,9 +259,8 @@ def test_protocol_client_server_benign(two_channels):
 
     # Pass response back to client
     assert client.my_request_index[request.cid].response is None
-    client.handle_response(reply)
-    msg_list = client.tap()
-    assert len(msg_list) == 0  # No message expected
+    succ = client.handle_response(reply)
+    assert succ
 
     assert client.next_final_sequence() > 0
     assert client.my_request_index[request.cid].response is not None
@@ -309,10 +271,8 @@ def test_protocol_client_server_benign(two_channels):
 def test_protocol_server_client_interleaved_benign(two_channels):
     server, client = two_channels
 
-    client.sequence_command_local(SampleCommand('Hello'))
-    client_request = client.tap()[0]
-    server.sequence_command_local(SampleCommand('World'))
-    server_request = server.tap()[0]
+    client_request = client.sequence_command_local(SampleCommand('Hello'))
+    server_request = server.sequence_command_local(SampleCommand('World'))
 
     # The server waits until all own requests are done
     server_reply = server.handle_request(client_request)
@@ -337,10 +297,8 @@ def test_protocol_server_client_interleaved_benign(two_channels):
 def test_protocol_server_client_interleaved_swapped_request(two_channels):
     server, client = two_channels
 
-    client.sequence_command_local(SampleCommand('Hello'))
-    client_request = client.tap()[0]
-    server.sequence_command_local(SampleCommand('World'))
-    server_request = server.tap()[0]
+    client_request = client.sequence_command_local(SampleCommand('Hello'))
+    server_request = server.sequence_command_local(SampleCommand('World'))
 
     client_reply = client.handle_request(server_request)
     server_reply = server.handle_request(client_request)
@@ -360,11 +318,11 @@ def test_protocol_server_client_interleaved_swapped_request(two_channels):
     assert {c.command.item() for c in server.get_final_sequence()} == {
         'World', 'Hello'}
 
-def test_protocol_conflict1(two_channels_notap):
-    server, client = two_channels_notap
+def test_protocol_conflict1(two_channels):
+    server, client = two_channels
 
     msg = client.sequence_command_local(SampleCommand('Hello'))
-    msg = msg.content
+    msg = client.package_request(msg).content
 
     msg2 = server.parse_handle_request(msg).content
 
@@ -373,7 +331,7 @@ def test_protocol_conflict1(two_channels_notap):
         client.sequence_command_local(SampleCommand('World1', deps=['Hello']))
 
     msg3 = server.sequence_command_local(SampleCommand('World2', deps=['Hello']))
-    msg3 = msg3.content
+    msg3 = server.package_request(msg3).content
 
     # Since this is not yet confirmed, reject the command
     msg4 = client.parse_handle_request(msg3).content
@@ -385,19 +343,21 @@ def test_protocol_conflict1(two_channels_notap):
     assert succ  # success
 
 
-def test_protocol_conflict2(two_channels_notap):
-    server, client = two_channels_notap
+def test_protocol_conflict2(two_channels):
+    server, client = two_channels
 
     msg = client.sequence_command_local(SampleCommand('Hello'))
-    msg = msg.content
+    msg = client.package_request(msg).content
 
     msg2 = server.parse_handle_request(msg).content
     succ = client.parse_handle_response(msg2)
     assert succ  # success
 
     # Two concurrent requests
-    creq = client.sequence_command_local(SampleCommand('cW', deps=['Hello'])).content
-    sreq = server.sequence_command_local(SampleCommand('sW', deps=['Hello'])).content
+    creq = client.sequence_command_local(SampleCommand('cW', deps=['Hello']))
+    creq = client.package_request(creq).content
+    sreq = server.sequence_command_local(SampleCommand('sW', deps=['Hello']))
+    sreq = server.package_request(sreq).content
 
     # Server gets client request
     sresp = server.parse_handle_request(creq).content
@@ -423,17 +383,13 @@ def test_protocol_conflict2(two_channels_notap):
 def test_protocol_server_client_interleaved_swapped_reply(two_channels):
     server, client = two_channels
 
-    client.sequence_command_local(SampleCommand('Hello'))
-    client_request = client.tap()[0]
-    server.sequence_command_local(SampleCommand('World'))
-    server_request = server.tap()[0]
+    client_request = client.sequence_command_local(SampleCommand('Hello'))
+    server_request = server.sequence_command_local(SampleCommand('World'))
 
     server_reply = server.handle_request(client_request)
-    # server_reply = server.tap()[0]
     assert server_reply.status == 'success'
 
     client_reply = client.handle_request(server_request)
-    # client_reply = client.tap()[0]
 
     server.handle_response(client_reply)
     server_reply = server.handle_request(client_request)
@@ -463,17 +419,6 @@ def test_random_interleave_no_drop(two_channels):
 
     R.checks(NUMBER)
 
-    client = R.client
-    server = R.server
-
-    # Print stats:
-    print()
-    print("Client: Requests #%d  Responses #%d" %
-          (client.xx_requests_stats, client.xx_replies_stats))
-    print("Server: Requests #%d  Responses #%d" %
-          (server.xx_requests_stats, server.xx_replies_stats))
-
-
 def test_random_interleave_and_drop(two_channels):
     server, client = two_channels
 
@@ -485,15 +430,6 @@ def test_random_interleave_and_drop(two_channels):
     R.run()
     R.checks(NUMBER)
 
-    client = R.client
-    server = R.server
-
-    # Print stats:
-    print()
-    print("Client: Requests #%d  Responses #%d" %
-          (client.xx_requests_stats, client.xx_replies_stats))
-    print("Server: Requests #%d  Responses #%d" %
-          (server.xx_requests_stats, server.xx_replies_stats))
 
 
 def test_random_interleave_and_drop_and_invalid(two_channels):
@@ -514,13 +450,6 @@ def test_random_interleave_and_drop_and_invalid(two_channels):
 
     client_seq = [c.command.item() for c in client.get_final_sequence()]
     server_seq = [c.command.item() for c in server.get_final_sequence()]
-
-    # Print stats:
-    print()
-    print("Client: Requests #%d  Responses #%d" %
-          (client.xx_requests_stats, client.xx_replies_stats))
-    print("Server: Requests #%d  Responses #%d" %
-          (server.xx_requests_stats, server.xx_replies_stats))
 
     server_store_keys = server.object_locks.keys()
     client_store_keys = client.object_locks.keys()

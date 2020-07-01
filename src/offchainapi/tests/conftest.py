@@ -97,22 +97,6 @@ def channel(three_addresses, vasp, store):
 
 @pytest.fixture
 def two_channels(three_addresses, vasp, store):
-    def monkey_tap(pair):
-        pair.msg = []
-
-        def to_tap(self, msg):
-            assert msg is not None
-            self.msg += [deepcopy(msg)]
-
-        def tap(self):
-            msg = self.msg
-            self.msg = []
-            return msg
-
-        pair.tap = types.MethodType(tap, pair)
-        pair.package_request = types.MethodType(to_tap, pair)
-        pair.package_response = types.MethodType(to_tap, pair)
-        return pair
 
     a0, a1, _ = three_addresses
     command_processor = MagicMock(spec=CommandProcessor)
@@ -123,22 +107,7 @@ def two_channels(three_addresses, vasp, store):
         a1, a0, vasp, store, command_processor
     )
 
-    server, client = monkey_tap(server), monkey_tap(client)
     return (server, client)
-
-@pytest.fixture
-def two_channels_notap(three_addresses, vasp, store):
-
-    a0, a1, _ = three_addresses
-    command_processor = MagicMock(spec=CommandProcessor)
-    server = VASPPairChannel(
-        a0, a1, vasp, store, command_processor
-    )
-    client = VASPPairChannel(
-        a1, a0, vasp, store, command_processor
-    )
-    return (server, client)
-
 
 @pytest.fixture
 def db(tmp_path):

@@ -268,6 +268,7 @@ class Aionet:
 
         channel = self.vasp.get_channel(other_addr)
         request = channel.sequence_command_local(command)
+        request = channel.package_request(request)
         request = request.content
         return request
 

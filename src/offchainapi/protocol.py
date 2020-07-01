@@ -393,7 +393,7 @@ class VASPPairChannel:
 
         # Send the requests outside the locks to allow
         # for an asyncronous implementation.
-        return self.package_request(request)
+        return request
 
     def parse_handle_request(self, json_command):
         """ Handles a request provided as a json string or dict.
@@ -675,18 +675,21 @@ class VASPPairChannel:
 
         return request.is_success()
 
-    def package_retransmit(self, number=1):
-        """ Re-sends the earlierst request that has not yet got a response,
-        if any """
-
+    def get_retransmit(self, number=1):
         net_messages = []
         for num, next_retransmit in enumerate(self.pending_response.keys()):
             request_to_send = self.my_request_index[next_retransmit]
-            net_messages += [self.package_request(request_to_send)]
+            net_messages += [request_to_send]
             if num == number:
                 break
 
         return net_messages
+
+    def package_retransmit(self, number=1):
+        """ Re-sends the earlierst request that has not yet got a response,
+        if any """
+
+        return [self.package_request(m) for m in self.get_retransmit(number)]
 
     def would_retransmit(self):
         """ Returns true if there are any pending re-transmits, namely
