@@ -29,13 +29,17 @@ def monkey_tap_to_list(pair, requests_sent, replies_sent):
         assert msg is not None
         assert isinstance(msg, CommandRequestObject)
         self.xx_requests_stats += 1
-        self.xx_requests_sent += [deepcopy(msg)]
+        msg = deepcopy(msg)
+        self.xx_requests_sent += [msg]
+        return msg
 
     def to_tap_reply(self, msg):
         assert isinstance(msg, CommandResponseObject)
         assert msg is not None
-        self.xx_replies_stats += 1
-        self.xx_replies_sent += [deepcopy(msg)]
+        self.xx_replies_stats += 1A
+        msg = deepcopy(msg)
+        self.xx_replies_sent += [msg]
+        return msg
 
     pair.package_request = types.MethodType(to_tap_requests, pair)
     pair.package_response = types.MethodType(to_tap_reply, pair)
@@ -164,7 +168,6 @@ class RandomRun(object):
 
         assert len(client_seq) == NUMBER - self.rejected
         assert set(client_seq) == set(server_seq)
-        # assert set(range(NUMBER)) == set(client_seq)
 
         client_exec_seq = [c.command.item() for c in client.command_sequence]
         server_exec_seq = [c.command.item() for c in server.command_sequence]
@@ -213,7 +216,6 @@ def test_protocol_server_client_benign(two_channels):
     assert len(msg_list) == 1
     request = msg_list.pop()
     assert isinstance(request, CommandRequestObject)
-    # assert server.my_next_seq() == 1
 
     print()
     print(request.pretty(JSONFlag.NET))
@@ -248,7 +250,6 @@ def test_protocol_server_conflicting_sequence(two_channels):
 
     # Modilfy message to be a conflicting sequence number
     request_conflict = deepcopy(request)
-    # assert request_conflict.cid == request_conflict
     request_conflict.command = SampleCommand("Conflict")
 
     # Pass the request to the client
@@ -262,9 +263,6 @@ def test_protocol_server_conflicting_sequence(two_channels):
     # The response to the second command is a failure
     assert reply_conflict.status == 'failure'
     assert reply_conflict.error.code == 'conflict'
-
-    print()
-    print(reply_conflict.pretty(JSONFlag.NET))
 
     # Pass the reply back to the server
     assert server.next_final_sequence() == 0
@@ -287,14 +285,10 @@ def test_protocol_client_server_benign(two_channels):
     request = msg_list.pop()
     assert isinstance(request, CommandRequestObject)
     assert len(client.other_request_index) == 0
-    # assert client.my_next_seq() == 'SEQ_1'
 
     # Send to server
     assert len(client.other_request_index) == 0
     reply = server.handle_request(request)
-    # msg_list = server.tap()
-    # assert len(msg_list) == 1
-    # reply = msg_list.pop()
     assert isinstance(reply, CommandResponseObject)
     assert len(server.other_request_index) == 1
     assert server.next_final_sequence() == 1
@@ -310,8 +304,6 @@ def test_protocol_client_server_benign(two_channels):
     assert client.my_request_index[request.cid].response is not None
     assert client.get_final_sequence()[0].command.item() == 'Hello'
     assert client.next_final_sequence() == 1
-    #assert client.my_next_seq() == 1
-    #assert server.my_next_seq() == 0
 
 
 def test_protocol_server_client_interleaved_benign(two_channels):
@@ -324,7 +316,6 @@ def test_protocol_server_client_interleaved_benign(two_channels):
 
     # The server waits until all own requests are done
     server_reply = server.handle_request(client_request)
-    # server_reply = server.tap()[0]
     assert server_reply.status == 'success'
 
     client_reply = client.handle_request(server_request)
