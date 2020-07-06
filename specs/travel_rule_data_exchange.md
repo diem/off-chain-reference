@@ -303,5 +303,3 @@ A state of `soft_match` requires that the VASP associated with this actor must s
 Previous: [Command Sequencing](command_sequencing.md)
 
 Next: [Open source implementation of off-chain APIs](https://github.com/calibra/off-chain-api)
-
-

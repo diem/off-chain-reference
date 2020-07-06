@@ -16,6 +16,14 @@ import logging
 import json
 
 
+class PaymentProcessorNoProgress(Exception):
+    pass
+
+
+class PaymentProcessorRemoteError(Exception):
+    pass
+
+
 logger = logging.getLogger(name='libra_off_chain_api.payment_logic')
 
 
@@ -58,11 +66,19 @@ class PaymentProcessor(CommandProcessor):
             self.object_store = storage_factory.make_dict(
                 'object_store', SharedObject, root=root)
 
-            # TODO: how much of this do we want to persist?
+            # Persist those to enable crash-recovery
             self.pending_commands = storage_factory.make_dict(
                 'pending_commands', str, root)
             self.command_cache = storage_factory.make_dict(
                 'command_cache', ProtocolCommand, root)
+
+        # Allow mapping a set of future to payment reference_id outcomes
+        # Once a payment has an outcome (settled, abort, or command exception)
+        # notify the appropriate futures of the result. These do not persist
+        # crashes since they are run-time objects.
+
+        # Mapping: payment reference_id -> List of futures.
+        self.outcome_futures = {}
 
         # Storage for debug futures list
         self.futs = []
@@ -137,6 +153,31 @@ class PaymentProcessor(CommandProcessor):
             f'(other:{other_address.as_str()}) Command #{seq} Failure: {error}'
         )
 
+        # If this is our own command, that just failed, we should update
+        # the outcome:
+        try:
+            if command.origin != other_address:
+                logger.error(
+                    f'Command with {other_address.as_str()}.#{seq}'
+                    f' Trigger outcome.')
+
+                # try to constuct a payment.
+                payment = command.get_payment(self.object_store)
+                self.set_payment_outcome_exception(
+                                payment.reference_id,
+                                PaymentProcessorRemoteError(error))
+            else:
+                logger.error(
+                    f'Command with {other_address.as_str()}.#{seq}'
+                    f' Error on other VASPs command.')
+        except Exception:
+            logger.error(
+                f'Command with {other_address.as_str()}.#{seq}'
+                f' Cannot recover payment or reference_id'
+            )
+
+        return
+
     async def process_command_success_async(self, other_address, command, seq):
         """ The asyncronous command processing logic.
 
@@ -168,13 +209,22 @@ class PaymentProcessor(CommandProcessor):
 
         logger.info(f'(other:{other_address_str}) Process Command #{seq}')
 
+        # Update the outcome of the payment
+        payment = command.get_payment(self.object_store)
+        self.set_payment_outcome(payment)
+
         try:
+            # Notify the business context about the new payment.
+            # This allows the business to do any custom record-keeping
+            command_ctx = await self.business.notify_payment_update(
+                other_address, seq, command, payment)
+
             # Only respond to commands by other side.
             if command.origin == other_address:
 
                 # Determine if we should inject a new command.
-                payment = command.get_payment(self.object_store)
-                new_payment = await self.payment_process_async(payment)
+                new_payment = await self.payment_process_async(
+                    payment, ctx=command_ctx)
 
                 if new_payment.has_changed():
                     new_cmd = PaymentCommand(new_payment)
@@ -197,6 +247,15 @@ class PaymentProcessor(CommandProcessor):
                     # Attempt to send it to the other VASP.
                     await self.net.send_request(other_address, request)
                 else:
+                    # Signal to anyone waiting that progress was not made
+                    # despite being our turn to make progress. As a result
+                    # some extra processing should be done until progress
+                    # can be made. Note that if the payment is already done
+                    # (as in settled/abort) we have set an outcome for it,
+                    # and this will be a no-op.
+                    self.set_payment_outcome_exception(
+                        payment.reference_id,
+                        PaymentProcessorNoProgress())
                     logger.debug(
                         f'(other:{other_address_str}) No more commands '
                         f'created for Payment lastly with seq num #{seq}'
@@ -222,13 +281,76 @@ class PaymentProcessor(CommandProcessor):
                 exc_info=True,
             )
 
+    # -------- Machinery for notification for outcomes -------
+
+    async def wait_for_payment_outcome(self, reference_id):
+        ''' Returns the payment object with the given a reference_id once the
+        object has the sender or receiver status set to either 'settled' or
+        'abort'.
+        '''
+        fut = self.loop.create_future()
+
+        if reference_id not in self.outcome_futures:
+            self.outcome_futures[reference_id] = []
+
+        # Register this future to call later.
+        self.outcome_futures[reference_id] += [fut]
+
+        # Check to see if the payment is already resolved.
+        if reference_id in self.reference_id_index:
+            payment = self.get_latest_payment_by_ref_id(reference_id)
+            self.set_payment_outcome(payment)
+
+        return (await fut)
+
+    def set_payment_outcome(self, payment):
+        ''' Updates the list of futures waiting for payment outcomes
+            based on the new payment object provided. If sender or receiver
+            of the payment object are in settled or abort states, then
+            the result is passed on to any waiting futures.
+        '''
+
+        # Check if payment is in a final state
+        if not (payment.sender.status == Status.settled or \
+                payment.receiver.status == Status.settled or \
+                payment.sender.status == Status.abort or \
+                payment.receiver.status == Status.abort):
+            return
+
+        # Check if anyone is waiting for this payment.
+        if payment.reference_id not in self.outcome_futures:
+            return
+
+        # Get the futures waiting for an outcome, and delete them
+        # from the list of pending futures.
+        outcome_futures = self.outcome_futures[payment.reference_id]
+        del self.outcome_futures[payment.reference_id]
+
+        # Update the outcome for each of the futures.
+        for fut in outcome_futures:
+            fut.set_result(payment)
+
+    def set_payment_outcome_exception(self, reference_id, payment_exception):
+        # Check if anyone is waiting for this payment.
+        if reference_id not in self.outcome_futures:
+            return
+
+        # Get the futures waiting for an outcome, and delete them
+        # from the list of pending futures.
+        outcome_futures = self.outcome_futures[reference_id]
+        del self.outcome_futures[reference_id]
+
+        # Update the outcome for each of the futures.
+        for fut in outcome_futures:
+            fut.set_exception(payment_exception)
+
     # -------- Implements CommandProcessor interface ---------
 
     def business_context(self):
         ''' Overrides CommandProcessor. '''
         return self.business
 
-    def check_command(self, channel, command):
+    def check_command(self, my_address, other_address, command):
         ''' Overrides CommandProcessor. '''
 
         dependencies = self.object_store
@@ -242,8 +364,8 @@ class PaymentProcessor(CommandProcessor):
         ])
 
         needed_parties = set([
-            channel.get_my_address().as_str(),
-            channel.get_other_address().as_str()
+            my_address.as_str(),
+            other_address.as_str()
         ])
 
         if parties != needed_parties:
@@ -252,7 +374,7 @@ class PaymentProcessor(CommandProcessor):
                 f'but got {str(parties)}'
             )
 
-        other_addr = channel.get_other_address().as_str()
+        other_addr = other_address.as_str()
 
         # Ensure the originator is one of the VASPs in the channel.
         origin = command.get_origin().as_str()
@@ -280,11 +402,11 @@ class PaymentProcessor(CommandProcessor):
                 old_payment = dependencies[old_version]
                 self.check_new_update(old_payment, new_payment)
 
-    def process_command(self, vasp, channel, executor, command,
+    def process_command(self, other_addr, command,
                         seq, status_success, error=None):
         ''' Overrides CommandProcessor. '''
 
-        other_addr = channel.get_other_address()
+        #other_addr = channel.get_other_address()
         other_str = other_addr.as_str()
 
         # Call the failure handler and exit.
@@ -506,22 +628,31 @@ class PaymentProcessor(CommandProcessor):
         receiver_st = payment.receiver.status
         return is_valid_initial(sender_st, receiver_st, actor_is_sender)
 
-    async def payment_process_async(self, payment):
+    async def payment_process_async(self, payment, ctx=None):
         ''' Processes a payment that was just updated, and returns a
             new payment with potential updates. This function may be
             called multiple times for the same payment to support
             async business operations and recovery.
 
-            If there is no update to the payment simply return None.
+            Must always return a new payment but,
+            if there is no update to the new payment
+            no new command will be emiited.
         '''
         business = self.business
 
-        is_receiver = business.is_recipient(payment)
+        is_receiver = business.is_recipient(payment, ctx)
         is_sender = not is_receiver
         role = ['sender', 'receiver'][is_receiver]
         other_role = ['sender', 'receiver'][not is_receiver]
 
         status = payment.data[role].status
+
+        if status in {Status.settled, Status.abort}:
+            # Nothing more to be done with this payment
+            # Return a new payment version with no modification
+            # To singnal no changes, and therefore no new command.
+            return payment.new_version()
+
         current_status = status
         other_status = payment.data[other_role].status
 
@@ -533,7 +664,7 @@ class PaymentProcessor(CommandProcessor):
                 current_status = Status.abort
 
             if current_status == Status.none:
-                await business.check_account_existence(new_payment)
+                await business.check_account_existence(new_payment, ctx)
 
             if current_status in {Status.none,
                                   Status.needs_kyc_data,
@@ -542,38 +673,39 @@ class PaymentProcessor(CommandProcessor):
                 # Request KYC -- this may be async in case
                 # of need for user input
                 next_kyc = await business.next_kyc_level_to_request(
-                    new_payment)
+                    new_payment, ctx)
                 if next_kyc != Status.none:
                     current_status = next_kyc
 
                 # Provide KYC -- this may be async in case
                 # of need for user input
                 kyc_to_provide = await business.next_kyc_to_provide(
-                    new_payment)
+                    new_payment, ctx)
 
                 myself_new_actor = new_payment.data[role]
 
                 if Status.needs_kyc_data in kyc_to_provide:
-                    extended_kyc = await business.get_extended_kyc(new_payment)
+                    extended_kyc = await business.get_extended_kyc(new_payment, ctx)
                     myself_new_actor.add_kyc_data(extended_kyc)
 
                 if Status.needs_recipient_signature in kyc_to_provide:
                     signature = await business.get_recipient_signature(
-                        new_payment)
+                        new_payment, ctx)
                     new_payment.add_recipient_signature(signature)
 
             # Check if we have all the KYC we need
             if current_status not in {
                     Status.ready_for_settlement,
-                    Status.settled}:
-                ready = await business.ready_for_settlement(new_payment)
+                    Status.settled,
+                    Status.abort}:
+                ready = await business.ready_for_settlement(new_payment, ctx)
                 if ready:
                     current_status = Status.ready_for_settlement
 
             # Ensure both sides are past the finality barrier
             if current_status == Status.ready_for_settlement \
                     and self.can_change_status(payment, Status.settled, is_sender):
-                if await business.has_settled(new_payment):
+                if await business.has_settled(new_payment, ctx):
                     current_status = Status.settled
 
         except BusinessForceAbort:
@@ -581,8 +713,20 @@ class PaymentProcessor(CommandProcessor):
             # We cannot abort once we said we are ready_for_settlement
             # or beyond. However we will catch a wrong change in the
             # check when we change status.
-            if self.can_change_status(payment, Status.abort, is_sender):
-                current_status = Status.abort
+            new_payment = payment.new_version(new_payment.version)
+            current_status = Status.abort
+
+        except Exception as e:
+            logger.error(
+                f'Error while processing payment {payment.reference_id}'
+                ' return error in metadata & abort.')
+            logger.exception(e)
+
+            # Only report the error in meta-data
+            # & Abort the payment.
+            new_payment = payment.new_version(new_payment.version)
+            new_payment.data[role].add_metadata(f'Error: ({role}): {str(e)}')
+            current_status = Status.abort
 
         # Do an internal consistency check:
         if not self.can_change_status(payment, current_status, is_sender):
@@ -596,5 +740,4 @@ class PaymentProcessor(CommandProcessor):
             )
 
         new_payment.data[role].change_status(current_status)
-
         return new_payment

@@ -12,7 +12,7 @@ from ..storage import StorableFactory
 from ..payment_logic import PaymentProcessor
 from ..utils import JSONFlag
 
-from .basic_business_context import BasicBusinessContext
+from .basic_business_context import TestBusinessContext
 
 import asyncio
 from unittest.mock import MagicMock
@@ -115,10 +115,14 @@ def test_check_command(payment, processor, executor):
         command.set_origin(origin)
 
         if res:
-            processor.check_command(channel, command)
+            my_address = channel.get_my_address()
+            other_address = channel.get_other_address()
+            processor.check_command(my_address, other_address, command)
         else:
             with pytest.raises(PaymentLogicError):
-                processor.check_command(channel, command)
+                my_address = channel.get_my_address()
+                other_address = channel.get_other_address()
+                processor.check_command(my_address, other_address, command)
 
 
 def test_payment_process_receiver_new_payment(payment, processor):
@@ -184,7 +188,7 @@ def test_persist(payment):
 
     my_addr = LibraAddress.encode(b'A'*16)
     my_addr_str = my_addr.as_str()
-    bcm = BasicBusinessContext(my_addr)
+    bcm = TestBusinessContext(my_addr)
     processor = PaymentProcessor(bcm, store)
 
     net = AsyncMock(Aionet)
@@ -222,7 +226,7 @@ def test_reprocess(payment,  loop):
 
     my_addr = LibraAddress.encode(b'A'*16)
     my_addr_str = my_addr.as_str()
-    bcm = BasicBusinessContext(my_addr)
+    bcm = TestBusinessContext(my_addr)
     processor = PaymentProcessor(bcm, store, loop)
 
     net = AsyncMock(Aionet)
@@ -253,7 +257,7 @@ def test_process_command_success_no_proc(payment, loop):
 
     my_addr = LibraAddress.encode(b'B'*16)
     other_addr = LibraAddress.encode(b'A'*16)
-    bcm = BasicBusinessContext(my_addr)
+    bcm = TestBusinessContext(my_addr)
     processor = PaymentProcessor(bcm, store, loop)
 
     net = AsyncMock(Aionet)
@@ -271,7 +275,7 @@ def test_process_command_success_vanilla(payment, loop):
 
     my_addr = LibraAddress.encode(b'B'*16)
     other_addr = LibraAddress.encode(b'A'*16)
-    bcm = BasicBusinessContext(my_addr)
+    bcm = TestBusinessContext(my_addr)
     processor = PaymentProcessor(bcm, store, loop)
 
     net = AsyncMock(Aionet)

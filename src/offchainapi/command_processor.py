@@ -12,7 +12,7 @@ class CommandProcessor:
         '''
         raise NotImplementedError()  # pragma: no cover
 
-    def check_command(self, channel, command):
+    def check_command(self, my_address, other_address, command):
         ''' Called when receiving a new payment command to validate it.
 
             All checks here are blocking subsequent comments, and therefore they
@@ -21,20 +21,19 @@ class CommandProcessor:
             remote stores or accounts.
 
             Args:
-                channel (VASPPairChannel):  A VASP channel.
+                my_address (LibraAddress): own address.
+                other_address (LibraAddress): other party address.
                 command (PaymentCommand): The current payment.
         '''
         raise NotImplementedError()  # pragma: no cover
 
-    def process_command(self, vasp, channel, executor,
+    def process_command(self, other_addr,
                         command, seq, status, error=None):
         """Processes a command to generate more subsequent commands.
             This schedules a task that will be executed later.
 
             Args:
-                vasp (OffChainVASP): The current VASP.
-                channel (VASPPairChannel):  A VASP channel.
-                executor (ProtocolExecutor): The protocol executor.
+                other_addr (LibraAddress): the address of the other party.
                 command (PaymentCommand): The current payment command.
                 seq (int): The sequence number of the payment command.
                 status (bool): Whether the command is a success or failure.

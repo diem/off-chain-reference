@@ -12,7 +12,7 @@ from ..payment_logic import PaymentCommand
 from ..status_logic import Status
 from ..payment import PaymentAction, PaymentActor, PaymentObject
 from ..core import Vasp
-from .basic_business_context import BasicBusinessContext
+from .basic_business_context import TestBusinessContext
 from ..crypto import ComplianceKey
 
 from threading import Thread
@@ -55,19 +55,9 @@ class SimpleVASPInfo(VASPInfo):
         return True
 
 
-global_dir = {}
-
-
-async def update_dir(vasp):
-    global_dir[vasp.vasp.get_vasp_address().as_str()] = vasp
-
-
 def start_thread_main(vasp, loop):
     # Initialize the VASP services.
-    vasp.start_services(loop)
-
-    # Run this once the loop is running
-    loop.create_task(update_dir(vasp))
+    vasp.start_services()
 
     try:
         # Start the loop
@@ -80,30 +70,32 @@ def start_thread_main(vasp, loop):
     print('VASP loop exit...')
 
 
-def make_new_VASP(Peer_addr, port):
+def make_new_VASP(Peer_addr, port, reliable=True):
     VASPx = Vasp(
         Peer_addr,
         host='localhost',
         port=port,
-        business_context=BasicBusinessContext(Peer_addr),
+        business_context=TestBusinessContext(Peer_addr, reliable=reliable),
         info_context=SimpleVASPInfo(Peer_addr),
         database={})
 
     loop = asyncio.new_event_loop()
+    VASPx.set_loop(loop)
+
+    # Create and launch a thread with the VASP event loop
     t = Thread(target=start_thread_main, args=(VASPx, loop))
     t.start()
     print(f'Start Node {port}')
+
+    # Block until the event loop in the thread is running.
+    VASPx.wait_for_start()
+
     return (VASPx, loop, t)
 
 
 async def main_perf(messages_num=10, wait_num=0, verbose=False):
     VASPa, loopA, tA = make_new_VASP(PeerA_addr, port=8091)
-    VASPb, loopB, tB = make_new_VASP(PeerB_addr, port=8092)
-
-    await asyncio.sleep(2.0)
-    while len(global_dir) != 2:
-        await asyncio.sleep(0.1)
-    print(global_dir)
+    VASPb, loopB, tB = make_new_VASP(PeerB_addr, port=8092, reliable=False)
 
     # Get the channel from A -> B
     channelAB = VASPa.vasp.get_channel(PeerB_addr)
@@ -132,18 +124,48 @@ async def main_perf(messages_num=10, wait_num=0, verbose=False):
     async def send100(nodeA, commands):
         res = await asyncio.gather(
             *[nodeA.new_command_async(VASPb.my_addr, cmd) for cmd in commands],
-            return_exceptions=False)
+            return_exceptions=True)
+        return res
+
+    async def wait_for_all_payment_outcome(nodeA, payments, results):
+        fut_list = [nodeA.wait_for_payment_outcome_async(p.reference_id) for p,r in zip(payments, results)]
+
+        res = await asyncio.gather(
+                *fut_list,
+                return_exceptions=True)
+
         return res
 
     # Execute 100 requests
     print('Inject commands')
     s = time.perf_counter()
-    res = asyncio.run_coroutine_threadsafe(send100(VASPa, commands), loopA)
-    res = res.result()
+    results = asyncio.run_coroutine_threadsafe(send100(VASPa, commands), loopA)
+    results = results.result()
+
+    # Print the result for all initial commands
+    if verbose: # verbose:
+        for res in results:
+            print('RES:', res)
+
     elapsed = (time.perf_counter() - s)
 
+    print('Wait for all payments to have an outcome')
+    outcomes = asyncio.run_coroutine_threadsafe(
+        wait_for_all_payment_outcome(VASPa, payments, results), loopA)
+    outcomes = outcomes.result()
+
+    # Print the result for all requests
+    if verbose:
+        for out, res in zip(outcomes, results):
+            if not isinstance(out, Exception):
+                print('OUT OK:', out.sender.status, out.receiver.status)
+            else:
+                print('OUT NOTOK:', str(out))
+
+    print('All payments done.')
+
     # Print some statistics
-    success_number = sum([1 for r in res if r])
+    success_number = sum([1 for r in results if type(r) == bool and r])
     print(f'Commands executed in {elapsed:0.2f} seconds.')
     print(f'Success #: {success_number}/{len(commands)}')
 

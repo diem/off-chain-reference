@@ -91,7 +91,7 @@ class sample_business(BusinessContext):
     def close_channel_to(self, other_vasp_info):
         return
 
-    async def check_account_existence(self, payment):
+    async def check_account_existence(self, payment, ctx=None):
         self.assert_payment_for_vasp(payment)
         accounts = {acc['account'] for acc in self.accounts_db}
 
@@ -105,19 +105,19 @@ class sample_business(BusinessContext):
                 return
         raise BusinessForceAbort('Subaccount does not exist.')
 
-    def is_sender(self, payment):
+    def is_sender(self, payment, ctx=None):
         self.assert_payment_for_vasp(payment)
         return payment.sender.get_address().as_str() == self.get_address()
 
 
-    def validate_recipient_signature(self, payment):
+    def validate_recipient_signature(self, payment, ctx=None):
         if 'recipient_signature' in payment.data:
             if payment.recipient_signature == 'VALID':
                 return
             sig = payment.data.get('recipient_signature', 'Not present')
             raise BusinessValidationFailure(f'Invalid signature: {sig}')
 
-    async def get_recipient_signature(self, payment):
+    async def get_recipient_signature(self, payment, ctx=None):
         return 'VALID'
 
     def get_my_role(self, payment):
@@ -128,7 +128,7 @@ class sample_business(BusinessContext):
         other_role = ['sender', 'receiver'][self.is_sender(payment)]
         return other_role
 
-    async def next_kyc_to_provide(self, payment):
+    async def next_kyc_to_provide(self, payment, ctx=None):
         my_role = self.get_my_role(payment)
         other_role = self.get_other_role(payment)
 
@@ -152,7 +152,7 @@ class sample_business(BusinessContext):
         return to_provide
 
 
-    async def next_kyc_level_to_request(self, payment):
+    async def next_kyc_level_to_request(self, payment, ctx=None):
         my_role = self.get_my_role(payment)
         other_role = self.get_other_role(payment)
         subaddress = payment.data[my_role].address
@@ -172,7 +172,7 @@ class sample_business(BusinessContext):
 
         return payment.data[my_role].status
 
-    async def get_extended_kyc(self, payment):
+    async def get_extended_kyc(self, payment, ctx=None):
         ''' Gets the extended KYC information for this payment.
 
             Can raise:
@@ -185,7 +185,7 @@ class sample_business(BusinessContext):
         account = self.get_account(sub)
         return account["kyc_data"]
 
-    async def ready_for_settlement(self, payment):
+    async def ready_for_settlement(self, payment, ctx=None):
         my_role = self.get_my_role(payment)
         other_role = self.get_other_role(payment)
         subaddress = payment.data[my_role].address
@@ -229,7 +229,7 @@ class sample_business(BusinessContext):
         # We are not ready to settle yet!
         return False
 
-    async def has_settled(self, payment):
+    async def has_settled(self, payment, ctx=None):
         if payment.sender.status == Status.settled:
             # In this VASP we consider we are ready to settle when the sender
             # says so (in reality we would check on-chain as well.)

@@ -209,10 +209,10 @@ class ProtocolExecutor:
                                          failure. Defaults to None.
         """
         vasp, channel, executor = self.get_context()
+        other_addr = channel.get_other_address()
+
         self.processor.process_command(
-            vasp=vasp,
-            channel=channel,
-            executor=executor,
+            other_addr=other_addr,
             command=command,
             seq=seq,
             status_success=is_success,
@@ -262,7 +262,9 @@ class ProtocolExecutor:
 
             # Check the command is well formed.
             vasp, channel, executor = self.get_context()
-            self.processor.check_command(channel, command)
+            my_address = channel.get_my_address()
+            other_address = channel.get_other_address()
+            self.processor.check_command(my_address, other_address, command)
 
         except Exception as e:
             all_good = False

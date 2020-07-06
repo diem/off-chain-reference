@@ -11,7 +11,7 @@ from ..payment import PaymentAction, PaymentActor, PaymentObject
 from ..asyncnet import Aionet
 from ..core import Vasp
 from ..crypto import ComplianceKey
-from .basic_business_context import BasicBusinessContext
+from .basic_business_context import TestBusinessContext
 
 import logging
 import json
@@ -104,7 +104,9 @@ def run_server(my_configs_path, other_configs_path, num_of_commands=10, loop=Non
     # Run VASP services.
     VASP_LOGGER.info(f'Running VASP {my_addr.as_str()}.')
     loop = asyncio.get_event_loop() if loop is None else loop
-    vasp.start_services(loop)
+
+    vasp.set_loop(loop)
+    vasp.start_services()
     VASP_LOGGER.info(f'VASP services are running on port {vasp.port}.')
 
     def stop_server(vasp):
@@ -153,7 +155,7 @@ def run_client(my_configs_path, other_configs_path, num_of_commands=10, port=0):
         my_addr,
         host='0.0.0.0',
         port=my_configs['port'],
-        business_context=BasicBusinessContext(my_addr),
+        business_context=TestBusinessContext(my_addr),
         info_context=SimpleVASPInfo(my_configs, other_configs, port),
         database={}
     )
@@ -163,7 +165,7 @@ def run_client(my_configs_path, other_configs_path, num_of_commands=10, port=0):
 
     # Run VASP services.
     def start_services(vasp, loop):
-        vasp.start_services(loop)
+        vasp.start_services()
         VASP_LOGGER.debug('Start main loop.')
         try:
             loop.run_forever()
@@ -172,6 +174,7 @@ def run_client(my_configs_path, other_configs_path, num_of_commands=10, port=0):
             loop.close()
 
     loop = asyncio.new_event_loop()
+    vasp.set_loop(loop)
     t = Thread(target=start_services, args=(vasp, loop), daemon=True)
     t.start()
     VASP_LOGGER.info(f'VASP services are running on port {vasp.port}.')

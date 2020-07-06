@@ -34,8 +34,10 @@ if __name__ == '__main__':
 
     # When verbose print all information
     if args.verb:
+        print('Full logging...')
         logging.basicConfig(level=logging.DEBUG)
     else:
+        print('Error only logging...')
         logging.basicConfig(level=logging.ERROR)
 
     asyncio.run(local_benchmark.main_perf(

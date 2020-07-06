@@ -62,9 +62,22 @@ class Vasp:
         self.site = None
         self.loop = None
         self.runner = None
+        self.all_started_future = None
 
 
-    def start_services(self, loop, watch_period=10.0):
+    def set_loop(self, loop):
+        ''' Set the asyncio event loop associated with this VASP.'''
+        if self.loop is None:
+            self.loop = loop
+            self.all_started_future = self.loop.create_future()
+
+    async def _set_start_notifier(self):
+        self.all_started_future.set_result(True)
+
+    async def _await_start_notifier(self):
+        return await self.all_started_future
+
+    def start_services(self, *, watch_period=10.0):
         ''' Registers services with the even loop provided.
 
         Parameters:
@@ -75,23 +88,62 @@ class Vasp:
                 retransmits. Defaults to 10.0.
 
         '''
-        asyncio.set_event_loop(loop)
+        if self.loop is None:
+            raise Exception('Missing event loop: set with "set_loop".')
+
+        asyncio.set_event_loop(self.loop)
 
         # Assign a loop  to the processor.
-        self.pp.loop = loop
-        self.loop = loop
+        self.pp.loop = self.loop
 
         # Start the http server.
         self.runner = self.net_handler.get_runner()
-        loop.run_until_complete(self.runner.setup())
+        self.loop.run_until_complete(self.runner.setup())
         self.site = web.TCPSite(self.runner, self.host, self.port)
-        loop.run_until_complete(self.site.start())
+        self.loop.run_until_complete(self.site.start())
 
         # Run the watchdor task to log statistics.
-        self.net_handler.schedule_watchdog(loop, period=watch_period)
+        self.net_handler.schedule_watchdog(self.loop, period=watch_period)
 
         # Reschedule commands to be processed, when the loop starts.
         self.loop.create_task(self.pp.retry_process_commands())
+
+        # Mechanism to notify the running of loop
+        self.loop.create_task(self._set_start_notifier())
+
+    def wait_for_start(self):
+        ''' A syncronous function that blocks until the asyncio loop serving the VASP
+        is running. It is thread safe, and can therefore be called from another thread
+        than the one where the asyncio loop is running.'''
+        result = asyncio.run_coroutine_threadsafe(
+            self._await_start_notifier(), self.loop)
+        return result.result()
+
+    async def wait_for_payment_outcome_async(self, payment_reference_id):
+        ''' Awaits until the payment with the given reference_id is either
+        settled or aborted and returns the payment object at that version.
+
+        Parameters:
+            payment_reference_id (str): the reference_id of the payment
+                of interest.
+
+        Returns a PaymentObject with the given reference_id that is ether
+        settled or aborted by one of the parties.
+
+        '''
+        payment = await self.pp.wait_for_payment_outcome(payment_reference_id)
+        return payment
+
+    def wait_for_payment_outcome(self, payment_reference_id):
+        ''' A non-async variant of wait_for_payment_outcome_async that returns
+        a concurrent.futures Future with the result. You may call `.result()`
+        on it to block or register a call-back. '''
+        if self.loop is not None:
+            res = asyncio.run_coroutine_threadsafe(
+                self.wait_for_payment_outcome_async(payment_reference_id), self.loop)
+            return res
+        else:
+            raise RuntimeError('Event loop is None.')
 
     async def new_command_async(self, addr, cmd):
         ''' Sends a new command to the other VASP and returns a
