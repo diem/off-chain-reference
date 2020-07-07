@@ -722,8 +722,8 @@ class PaymentProcessor(CommandProcessor):
             new_payment = payment.new_version(new_payment.version)
             current_status = Status.abort
 
-            abort_code = 'BUSINESS_ABORT'
-            abort_msg = str(e)
+            abort_code = e.code
+            abort_msg = e.message
 
         except Exception as e:
             logger.error(
