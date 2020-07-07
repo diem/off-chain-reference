@@ -70,11 +70,12 @@ def test_payment_action_creation():
 
 
 def test_payment_actor_creation():
-    actor = PaymentActor('XYZ', Status.none, [])
+    snone = StatusObject(Status.none)
+    actor = PaymentActor('XYZ', snone, [])
 
     with pytest.raises(StructureException):
         # Bad subaddress type
-        _ = PaymentActor(0, Status.none, [])
+        _ = PaymentActor(0, snone, [])
 
     with pytest.raises(StructureException):
         # Bad status type
@@ -82,12 +83,12 @@ def test_payment_actor_creation():
 
     with pytest.raises(StructureException):
         # Bad metadata type
-        _ = PaymentActor('XYZ', Status.none, 0)
+        _ = PaymentActor('XYZ', snone, 0)
 
 
 def test_payment_actor_update_status(sender_actor):
-    sender_actor.change_status(Status.needs_kyc_data)
-    sender_actor.change_status(Status.ready_for_settlement)
+    sender_actor.change_status(StatusObject(Status.needs_kyc_data))
+    sender_actor.change_status(StatusObject(Status.ready_for_settlement))
 
     with pytest.raises(StructureException):
         sender_actor.change_status(0)
@@ -155,7 +156,7 @@ def test_specific():
     json_struct = {
                     'sender': {
                         'address': 'aaaa',
-                        'status': 'settled',
+                        'status': {'status': 'settled'},
                         'metadata': [],
                         'kyc_data': {
                             "payload_type": "KYC_DATA",
@@ -165,7 +166,7 @@ def test_specific():
                     },
                     'receiver': {
                         'address': 'bbbb',
-                        'status': 'needs_kyc_data',
+                        'status': {'status': 'needs_kyc_data'},
                         'metadata': [],
                         'kyc_data': {
                             "payload_type": "KYC_DATA",
@@ -214,12 +215,6 @@ def test_to_json(kyc_data, sender_actor, receiver_actor, payment_action):
     json_payment = json.dumps(payment.get_full_diff_record())
     new_payment = PaymentObject.create_from_record(json.loads(json_payment))
     assert payment == new_payment
-
-
-def test_payment_actor_update_bad_status_fails(sender_actor):
-    diff = {'status': 'wrong_status'}
-    with pytest.raises(StructureException):
-        sender_actor.custom_update_checks(diff)
 
 
 def test_payment_actor_update_bad_metadata_fails(sender_actor):

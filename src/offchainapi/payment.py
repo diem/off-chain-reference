@@ -57,6 +57,7 @@ class KYCData(StructureChecker):
         if diff['type'] not in types:
             raise StructureException(f'Wrong KYC "type": {diff["type"]}')
 
+
 class StatusObject(StructureChecker):
     fields = [
         ('status', str, REQUIRED, UPDATABLE),
@@ -106,7 +107,8 @@ class PaymentActor(StructureChecker):
     fields = [
         ('address', str, REQUIRED, WRITE_ONCE),
         ('kyc_data', KYCData, OPTIONAL, WRITE_ONCE),
-        ('status', Status, REQUIRED, UPDATABLE),
+        # ('status', Status, REQUIRED, UPDATABLE),
+        ('status', StatusObject, REQUIRED, UPDATABLE),
         ('metadata', list, REQUIRED, UPDATABLE)
     ]
 
@@ -124,8 +126,8 @@ class PaymentActor(StructureChecker):
     def custom_update_checks(self, diff):
         """ Override StructureChecker. """
 
-        if 'status' in diff and not isinstance(diff['status'], Status):
-            raise StructureException('Wrong status: %s' % diff['status'])
+        # if 'status' in diff and not isinstance(diff['status'], Status):
+        #    raise StructureException('Wrong status: %s' % diff['status'])
 
         # Metadata can only be strings
         if 'metadata' in diff:
