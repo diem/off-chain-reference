@@ -5,7 +5,6 @@ from .business import BusinessForceAbort
 from .protocol_command import ProtocolCommand
 from .command_processor import CommandProcessor
 from .payment import Status, PaymentObject, StatusObject
-from .status_logic import is_valid_status_transition, is_valid_initial
 from .payment_command import PaymentCommand, PaymentLogicError
 from .asyncnet import NetworkException
 from .shared_object import SharedObject
@@ -613,10 +612,39 @@ class PaymentProcessor(CommandProcessor):
         else:
             new_receiver = new_status
 
-        valid = is_valid_status_transition(
-            old_sender, old_receiver,
-            new_sender, new_receiver,
-            actor_is_sender)
+        valid = True
+
+        # Ensure other side stays the same.
+        if actor_is_sender:
+            valid &= new_receiver == old_receiver
+            changed_old, changed_new = old_sender, new_sender
+        else:
+            valid &= new_sender == old_sender
+            changed_old, changed_new = old_receiver, new_receiver
+
+        # Terminal states remain terminal
+        if changed_old in {Status.abort, Status.settled}:
+            valid &= changed_old == changed_new
+            return valid
+
+        # Respect ordering of status
+        status_heights = {
+            Status.none: 100,
+            Status.needs_kyc_data: 200,
+            Status.needs_recipient_signature: 200,
+            Status.ready_for_settlement: 400,
+            Status.settled: 800,
+            Status.abort: 1000
+        }
+
+        valid &= status_heights[changed_new] >= status_heights[changed_old]
+
+        # We only settle after both sides agree to settle
+        ready_level = status_heights[Status.ready_for_settlement]
+        if changed_new in {Status.settled}:
+            valid &= (status_heights[new_sender] >= ready_level and
+                      status_heights[new_receiver] >= ready_level)
+
         return valid
 
     def good_initial_status(self, payment, actor_is_sender):
@@ -626,7 +654,11 @@ class PaymentProcessor(CommandProcessor):
 
         sender_st = payment.sender.status.as_status()
         receiver_st = payment.receiver.status.as_status()
-        return is_valid_initial(sender_st, receiver_st, actor_is_sender)
+
+        if actor_is_sender:
+            return (receiver_st == Status.none)
+        else:
+            return (sender_st == Status.none)
 
     async def payment_process_async(self, payment, ctx=None):
         ''' Processes a payment that was just updated, and returns a
