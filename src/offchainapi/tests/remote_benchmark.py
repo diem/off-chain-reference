@@ -7,7 +7,7 @@ from ..libra_address import LibraAddress
 from ..payment_logic import PaymentCommand, PaymentProcessor
 from ..status_logic import Status
 from ..storage import StorableFactory
-from ..payment import PaymentAction, PaymentActor, PaymentObject
+from ..payment import PaymentAction, PaymentActor, PaymentObject, StatusObject
 from ..asyncnet import Aionet
 from ..core import Vasp
 from ..crypto import ComplianceKey
@@ -184,8 +184,8 @@ def run_client(my_configs_path, other_configs_path, num_of_commands=10, port=0):
     for cid in range(num_of_commands):
         sub_a = LibraAddress.encode(b'A'*16, b'a'*8).as_str()
         sub_b = LibraAddress.encode(b'B'*16, b'b'*8).as_str()
-        sender = PaymentActor(sub_b, Status.none, [])
-        receiver = PaymentActor(sub_a, Status.none, [])
+        sender = PaymentActor(sub_b, StatusObject(Status.none), [])
+        receiver = PaymentActor(sub_a, StatusObject(Status.none), [])
         action = PaymentAction(10, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
         reference = f'{my_addr.as_str()}_{cid}'
         payment = PaymentObject(
