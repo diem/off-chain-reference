@@ -57,7 +57,42 @@ class KYCData(StructureChecker):
         if diff['type'] not in types:
             raise StructureException(f'Wrong KYC "type": {diff["type"]}')
 
+class StatusObject(StructureChecker):
+    fields = [
+        ('status', str, REQUIRED, UPDATABLE),
+        ('abort_code', str, OPTIONAL, UPDATABLE),
+        ('abort_message', str, OPTIONAL, UPDATABLE)
+    ]
 
+    def __init__(self, status, abort_code=None, abort_message=None):
+        StructureChecker.__init__(self)
+
+        if isinstance(status, Status):
+            status = str(status)
+
+        if abort_code is None:
+            self.update({
+                'status': status,
+            })
+        else:
+            self.update({
+                'status': status,
+                'abort_code': abort_code,
+                'abort_message': abort_message
+            })
+
+    def as_status(self):
+        ''' Returns a Status enum object. '''
+        return Status[self.status]
+
+    def custom_update_checks(self, diff):
+        """ Override StructureChecker. """
+
+        # Ensure we  have a valid status:
+        status = Status[diff['status']]
+
+        if status == Status.abort and not ('abort_code' in diff and 'abort_message' in diff):
+            raise StructureException('Abort code and message is required.')
 
 class PaymentActor(StructureChecker):
     """ Represents a payment actor.

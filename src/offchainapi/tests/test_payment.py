@@ -1,7 +1,7 @@
 # Copyright (c) The Libra Core Contributors
 # SPDX-License-Identifier: Apache-2.0
 
-from ..payment import PaymentActor, PaymentAction, PaymentObject, KYCData
+from ..payment import PaymentActor, PaymentAction, PaymentObject, KYCData, StatusObject
 from ..utils import StructureException, JSONFlag
 from ..payment_logic import Status
 
@@ -231,3 +231,21 @@ def test_payment_actor_update_bad_metadata_fails(sender_actor):
 def test_payment_actor_add_metadata(sender_actor):
     sender_actor.add_metadata('abcd')
     assert sender_actor.metadata == ['abcd']
+
+
+def test_status_object():
+    so0 = StatusObject('needs_kyc_data')
+    assert so0.data['status'] == 'needs_kyc_data'
+    assert 'abort_code' not in so0.data
+
+    so1 = StatusObject(Status.ready_for_settlement)
+    assert so1.status == "ready_for_settlement"
+    assert Status.ready_for_settlement == so1.as_status()
+
+    with pytest.raises(StructureException):
+        _ = StatusObject(Status.abort)
+
+    _ = StatusObject(
+            Status.abort,
+            abort_code='XYZ',
+            abort_message='Explain XYZ')
