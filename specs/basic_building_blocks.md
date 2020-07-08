@@ -12,7 +12,7 @@ The basic protocol interaction consists of:
 * The responding VASP listens for requests, and when received, processes them to generate and send `CommandResponseObject` responses, with a success or failure status, through the HTTP response body.
 * The initiating VASP receives the response and processes it to assess whether it was successful or not.
 
-Both VASPs in a channel can asynchronously attempt to initiate and execute commands on shared objects. 
+All objects contained within a command - for example `PaymentObject`, are considered as "shared objects" - meaning that either VASP may create a new command to modify the object, and will do so during the typical life-cycle of an object - an example being the addition of KYC data from both VASPs to a payment object. Both VASPs in a channel can asynchronously attempt to initiate and execute commands on shared objects. 
 
 As a reminder, all `CommandRequestObject` and `CommandResponseObject` objects sent are signed using JWS Signatures, using EdDSA and compact encoding. Recipients must verify the signatures when receiving any objects.
 
@@ -25,7 +25,6 @@ All requests between VASPs are structured as [`CommandRequestObject`s](#commandr
 {
     "_ObjectType": "CommandRequestObject",
     "command_type": "PaymentCommand", // Command type
-    "seq": 1,
     "command": CommandObject(), // Object of type as specified by command_type
 }
 </pre>
@@ -37,8 +36,6 @@ A response would look like the following:
 <pre>
 {
     "_ObjectType": "CommandResponseObject",
-    "seq": 1,
-    "command_seq": 1,
     "status": "success",
 }
 </pre>
@@ -51,9 +48,7 @@ All requests between VASPs are structured as `CommandRequestObject`s.
 |-------	|------	|-----------	|-------------	|
 | _ObjectType| str| Y | Fixed value: `CommandRequestObject`|
 |command_type | str| Y |A string representing the type of command contained in the request. |
-|seq | int  | Y | The sequence of this request in the sender local sequence. |
 | command | Command object | Y | The command to sequence. |
-|command_seq    | int | Server   | The sequence of this command in the joint command sequence. Only set if the server is the sender. See [Command Sequencing](command_sequencing.md) |
 
 <details>
 <summary> CommandRequestObject example </summary>
@@ -61,9 +56,7 @@ All requests between VASPs are structured as `CommandRequestObject`s.
 {
     "_ObjectType": "CommandRequestObject",
     "command_type": CommandType,
-    "seq": 1,
     "command": CommandObject(),
-    "command_seq": 1,
 }
 </pre>
 </details>
@@ -74,8 +67,6 @@ All responses to a CommandRequestObject are in the form of a CommandResponseObje
 | Field 	     | Type 	| Required? 	| Description 	|
 |-------	     |------	|-----------	|-------------	|
 | _ObjectType    | str      | Y             | The fixed string `CommandResponseObject`. |
-| seq            | int       | Y             | The sequence number of the request responded to in the local sender request sequence. |
-| command_seq    | int or str=`null` | Y    | The sequence of the command responded to in the joint command sequence |
 | status         | str      | Y             | Either `success` or `failure`. |
 | error          | List of [OffChainErrorObject](#offchainerrorobject) | N | Details on errors when status == "failure"
 
@@ -84,9 +75,7 @@ All responses to a CommandRequestObject are in the form of a CommandResponseObje
 <pre>
 {
     "_ObjectType": "CommandResponseObject",
-    "command_seq": null,
     "error": [OffChainErrorObject()],
-    "seq": 0,
     "status": "failure"
 }
 </pre>
