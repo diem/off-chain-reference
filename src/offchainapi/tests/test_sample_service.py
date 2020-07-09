@@ -48,7 +48,7 @@ def kyc_payment_as_receiver(payment_as_receiver, kyc_data):
 def settled_payment_as_receiver(kyc_payment_as_receiver):
     payment = kyc_payment_as_receiver
     payment.add_recipient_signature('SIG')
-    payment.sender.change_status(Status.settled)
+    payment.sender.change_status(Status.ready_for_settlement)
     return payment
 
 

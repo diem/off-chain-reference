@@ -70,7 +70,7 @@ def test_payment_update_from_sender(payment, processor):
 def test_check_new_update_sender_modify_receiver_state_fail(payment, processor):
     bcm = processor.business_context()
     bcm.is_recipient.side_effect = [True]*5
-    diff = {'receiver': {'status': { 'status': "settled"}}}
+    diff = {'receiver': {'status': { 'status': "ready_for_settlement"}}}
     new_obj = payment.new_version()
     new_obj = PaymentObject.from_full_record(diff, base_instance=new_obj)
     assert new_obj.receiver.data['status'] != payment.receiver.data['status']
@@ -81,7 +81,7 @@ def test_check_new_update_sender_modify_receiver_state_fail(payment, processor):
 def test_check_new_update_receiver_modify_sender_state_fail(payment, processor):
     bcm = processor.business_context()
     bcm.is_recipient.side_effect = [False]*5
-    diff = {'sender': {'status': { 'status': "settled"}}}
+    diff = {'sender': {'status': { 'status': "ready_for_settlement"}}}
     new_obj = payment.new_version()
     new_obj = PaymentObject.from_full_record(diff, base_instance=new_obj)
     assert new_obj.sender.data['status'] != payment.sender.data['status']
@@ -145,7 +145,6 @@ def test_payment_process_receiver_new_payment(payment, processor):
     bcm.next_kyc_level_to_request.side_effect = [Status.none]
     bcm.next_kyc_to_provide.side_effect = [{Status.none}]
     bcm.ready_for_settlement.side_effect = [ True ]
-    bcm.has_settled.side_effect = [False]
     new_payment2 = processor.payment_process(new_payment)
     assert new_payment2.receiver.status.as_status() == Status.ready_for_settlement
 
@@ -154,7 +153,6 @@ def test_payment_process_receiver_new_payment(payment, processor):
     bcm.next_kyc_level_to_request.side_effect = [Status.none]
     bcm.next_kyc_to_provide.side_effect = [{Status.none}]
     bcm.ready_for_settlement.side_effect = [ True ]
-    bcm.has_settled.side_effect = [True]
     new_payment3 = processor.payment_process(new_payment2)
     assert new_payment3.receiver.status.as_status() == Status.ready_for_settlement
 

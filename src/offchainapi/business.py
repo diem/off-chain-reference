@@ -218,26 +218,6 @@ class BusinessContext:
             '''
         raise NotImplementedError()  # pragma: no cover
 
-    async def has_settled(self, payment, ctx=None):
-        ''' Returns whether the payment was settled on chain. If the payment can
-            be settled also package it and settle it on chain. This function
-            may be called multiple times for the same payment, but any on-chain
-            operation should be performed only once per payment.
-
-            Cannot raise:
-                BusinessForceAbort
-
-            since this is called past the finality barrier.
-
-            Args:
-                payment (PaymentCommand): The concerned payment.
-
-            Returns:
-                bool: Whether the payment was settled on chain.
-        '''
-        raise NotImplementedError()  # pragma: no cover
-
-
 class VASPInfo:
     """Contains information about VASPs"""
 

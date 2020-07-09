@@ -156,7 +156,7 @@ def test_specific():
     json_struct = {
                     'sender': {
                         'address': 'aaaa',
-                        'status': {'status': 'settled'},
+                        'status': {'status': 'ready_for_settlement'},
                         'metadata': [],
                         'kyc_data': {
                             "payload_type": "KYC_DATA",

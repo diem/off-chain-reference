@@ -15,7 +15,6 @@ V0 States
       the transaction.
     * needs_recipient_signature -- requests the recipient VASP to sign the
       identifier for this transaction to put it on chain.
-    * settled -- a Libra transaction settles this transaction
     * abort - signals that the transactions is to be aborted.
 
 """
@@ -30,7 +29,6 @@ class Status(Enum):
     needs_recipient_signature = 'needs_recipient_signature',
     # Receiver only: this is a virtual flag
     ready_for_settlement = 'ready_for_settlement',
-    settled = 'settled',
     abort = 'abort'
 
     def __str__(self):

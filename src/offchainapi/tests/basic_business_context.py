@@ -114,6 +114,3 @@ class TestBusinessContext(BusinessContext):
             self.cause_error()
 
         return (await self.next_kyc_level_to_request(payment)) is None
-
-    async def has_settled(self, payment, ctx=None):
-        return True

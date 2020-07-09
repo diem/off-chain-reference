@@ -229,27 +229,22 @@ class sample_business(BusinessContext):
         # We are not ready to settle yet!
         return False
 
-    async def has_settled(self, payment, ctx=None):
-        if payment.sender.as_status() == Status.settled:
-            # In this VASP we consider we are ready to settle when the sender
-            # says so (in reality we would check on-chain as well.)
-            my_role = self.get_my_role(payment)
-            subaddress = payment.data[my_role].address
+    async def do_has_settled(self, payment, ctx=None):
+        # In this VASP we consider we are ready to settle when the sender
+        # says so (in reality we would check on-chain as well.)
+        my_role = self.get_my_role(payment)
+        subaddress = payment.data[my_role].address
 
-            sub = LibraAddress(subaddress).get_subaddress_bytes().decode('ascii')
-            account = self.get_account(sub)
-            reference = payment.reference_id
+        sub = LibraAddress(subaddress).get_subaddress_bytes().decode('ascii')
+        account = self.get_account(sub)
+        reference = payment.reference_id
 
-            if reference not in account['pending_transactions']:
-                account['pending_transactions'][reference] = { 'settled':False }
+        if reference not in account['pending_transactions']:
+            account['pending_transactions'][reference] = { 'settled':False }
 
-            if not account['pending_transactions'][reference]['settled']:
-                account["balance"] += payment.action.amount
-                account['pending_transactions'][reference]['settled'] = True
-
-            return True
-        else:
-            return False
+        if not account['pending_transactions'][reference]['settled']:
+            account["balance"] += payment.action.amount
+            account['pending_transactions'][reference]['settled'] = True
 
 
 class sample_vasp:
