@@ -6,7 +6,7 @@ from ..business import BusinessContext, BusinessForceAbort, \
 from ..protocol import OffChainVASP
 from ..libra_address import LibraAddress
 from ..protocol_messages import CommandRequestObject, OffChainProtocolError, \
-    OffChainException, OffChainOutOfOrder
+    OffChainException
 from ..payment_logic import PaymentCommand, PaymentProcessor
 from ..status_logic import Status
 from ..storage import StorableFactory
@@ -265,13 +265,6 @@ class sample_vasp:
             self.my_addr, self.pp, self.store, self.info_context
         )
 
-    def collect_messages(self):
-        messages = []
-        for channel in self.vasp.channel_store.values():
-            messages += channel.net_queue
-            del channel.net_queue[:]
-        return messages
-
     def get_channel(self, other_vasp):
         channel = self.vasp.get_channel(other_vasp)
         return channel
@@ -279,11 +272,13 @@ class sample_vasp:
     def process_request(self, other_vasp, request_json):
         # Get the channel
         channel = self.get_channel(other_vasp)
-        channel.parse_handle_request(request_json)
+        resp = channel.parse_handle_request(request_json)
+        return resp
 
     def insert_local_command(self, other_vasp, command):
         channel = self.get_channel(other_vasp)
-        channel.sequence_command_local(command)
+        req = channel.sequence_command_local(command)
+        return req
 
     def process_response(self, other_vasp, response_json):
         channel = self.get_channel(other_vasp)
@@ -292,6 +287,4 @@ class sample_vasp:
         except OffChainProtocolError:
             pass
         except OffChainException:
-            pass
-        except OffChainOutOfOrder:
             pass

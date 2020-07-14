@@ -3,7 +3,7 @@
 
 from ..protocol import VASPPairChannel, make_protocol_error, DependencyException
 from ..protocol_messages import CommandRequestObject, CommandResponseObject, \
-    OffChainProtocolError, OffChainException, OffChainOutOfOrder
+    OffChainProtocolError, OffChainException
 from ..sample.sample_command import SampleCommand
 from ..command_processor import CommandProcessor
 from ..utils import JSONSerializable, JSONFlag
@@ -95,8 +95,6 @@ class RandomRun(object):
                     pass
                 except OffChainException:
                     raise
-                except OffChainOutOfOrder:
-                    pass
 
             if Case[3] and len(to_server_response) > 0:
                 rep = to_server_response.pop(0)
@@ -106,8 +104,6 @@ class RandomRun(object):
                     pass
                 except OffChainException:
                     raise
-                except OffChainOutOfOrder:
-                    pass
 
             # Retransmit
             if Case[4] and random.random() > 0.10:

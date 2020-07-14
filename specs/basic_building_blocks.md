@@ -58,6 +58,7 @@ All requests between VASPs are structured as `CommandRequestObject`s.
 <pre>
 {
     "_ObjectType": "CommandRequestObject",
+    "command_type": "PaymentCommand",
     "cid": "VASP1_12345",
     "command": CommandObject(),
 }
