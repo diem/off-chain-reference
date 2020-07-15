@@ -2,10 +2,10 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import pytest
+from uuid import uuid4
 
 from ..bech32 import Bech32Error, bech32_address_decode, bech32_address_encode, LBR, TLB
 from ..libra_address2 import LibraAddress, LibraAddressError
-from uuid import uuid4
 
 
 def test_onchain_address_only_OK():
@@ -40,11 +40,13 @@ def test_non_none_subaddress_OK():
     )
     assert libra_addr.encoded_address_bytes == expected_encoded_bytes
 
+
 def test_invalid_onchain_address_length():
     onchain_address_bytes = uuid4().bytes[:10]  # 10 bytes
     with pytest.raises(LibraAddressError) as excinfo:
         libra_addr = LibraAddress.from_bytes(onchain_address_bytes)
     assert "Bech32Error" in str(excinfo.value)
+
 
 def test_invalid_subaddress_length():
     onchain_address_bytes = uuid4().bytes  # 16 bytes
@@ -53,11 +55,25 @@ def test_invalid_subaddress_length():
         libra_addr = LibraAddress.from_bytes(onchain_address_bytes, subaddr_bytes)
     assert "Bech32Error" in str(excinfo.value)
 
+
+def test_from_bytes():
+    onchain_address_hex = uuid4().hex
+    subaddress_hex = uuid4().hex[16:]
+    libra_addr = LibraAddress.from_hex(onchain_address_hex, subaddress_hex)
+    assert libra_addr.onchain_address_bytes == bytes.fromhex(onchain_address_hex)
+    assert libra_addr.subaddress_bytes == bytes.fromhex(subaddress_hex)
+
+    libra_addr = LibraAddress.from_hex(onchain_address_hex, None)
+    assert libra_addr.onchain_address_bytes == bytes.fromhex(onchain_address_hex)
+    assert libra_addr.subaddress_bytes == None
+
+
 def test_invalid_hrp():
     onchain_address_bytes = uuid4().bytes  # 16 bytes
     with pytest.raises(LibraAddressError) as excinfo:
         libra_addr = LibraAddress.from_bytes(onchain_address_bytes, None, "haha")
     assert "Bech32Error" in str(excinfo.value)
+
 
 def test_last_bit():
     onchain_address_bytes = uuid4().bytes  # 16 bytes
