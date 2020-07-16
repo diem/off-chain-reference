@@ -3,7 +3,7 @@
 
 from binascii import unhexlify, hexlify
 # from bech32 import bech32_encode, bech32_decode, convertbits
-from .bech32 import bech32_address_encode, Bech32Error, LBR, TLB
+from .bech32 import bech32_address_encode, bech32_address_decode, Bech32Error, LBR, TLB, __LIBRA_HRP
 
 # Helper classes
 class LibraAddressError(Exception):
@@ -30,7 +30,12 @@ class LibraAddress:
                 subaddress_bytes
             )
         except Bech32Error as e:
-            raise LibraAddressError(f"Bech32Error: {e}")
+            raise LibraAddressError(
+                f"Can't create LibraAddress from "
+                f"onchain_address_bytes: {onchain_address_bytes}, "
+                f"subaddress_bytes: {subaddress_bytes}, "
+                f"hrp: {hrp}, got Bech32Error: {e}"
+            )
         return cls(encoded_address, onchain_address_bytes, subaddress_bytes, hrp)
 
     @classmethod
@@ -38,6 +43,23 @@ class LibraAddress:
         onchain_address_bytes = bytes.fromhex(onchain_address_hex)
         subaddress_bytes = bytes.fromhex(subaddress_hex) if subaddress_hex else None
         return cls.from_bytes(onchain_address_bytes, subaddress_bytes, hrp)
+
+    @classmethod
+    def from_encoded_str(cls, encoded_str):
+        try:
+            hrp, _version, onchain_address_bytes, subaddress_bytes = bech32_address_decode(encoded_str)
+        except Bech32Error as e:
+            raise LibraAddressError(
+                f"Can't create LibraAddress from encoded str {encoded_str}, "
+                f"got Bech32Error: {e}"
+            )
+        # If subaddress is absent, subaddress_bytes is a list of 0
+        subaddrss_ints = list(subaddress_bytes)
+        none_zero = [i for i in subaddrss_ints if i]
+        if none_zero:
+            return cls(encoded_str, onchain_address_bytes, subaddress_bytes, hrp)
+        return cls(encoded_str, onchain_address_bytes, None, hrp)
+
 
     def __init__(self, encoded_address_bytes, onchain_address_bytes, subaddress_bytes, hrp):
         """ DO NOT CALL THIS DIRECTLY!! use factory mtheods instead."""
@@ -47,14 +69,14 @@ class LibraAddress:
         self.subaddress_bytes = subaddress_bytes
         self.hrp = hrp
 
-    # FIXME what is this for?
-    def as_str(self):
-        ''' Returns a string representation of the LibraAddress.
+    def __repr__(self):
+        return (
+            f"LibraAddress with onchain_address_bytes: {self.onchain_address_bytes}, "
+            f"subaddress_bytes: {self.subaddress_bytes}, hrp: {self.hrp}"
+        )
 
-            Returns:
-                str: String representation of the LibraAddress.
-        '''
-        return str(self.encoded_address_bytes)
+    def as_str(self):
+        return self.encoded_address_bytes
 
     def last_bit(self):
         """ Get the last bit of the decoded libra address.

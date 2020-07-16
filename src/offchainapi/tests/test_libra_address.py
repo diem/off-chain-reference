@@ -13,16 +13,16 @@ def test_onchain_address_only_OK():
 
     libra_addr = LibraAddress.from_bytes(onchain_address_bytes)
     assert libra_addr.onchain_address_bytes == onchain_address_bytes
-    # assert libra_addr.get_onchain_bytes() == onchain_address_bytes
     assert libra_addr.subaddress_bytes == None
-    # assert libra_addr.get_subaddress_bytes() == None
     expected_encoded_bytes = bech32_address_encode(
         LBR,
         onchain_address_bytes,
         None
     )
     assert libra_addr.encoded_address_bytes == expected_encoded_bytes
-
+    assert libra_addr.as_str() == expected_encoded_bytes
+    print(f"!!!!!!!!!!! as_str: {libra_addr.as_str()}")
+    print(f"!!!!!!!!!!! expected_encoded_bytes: {expected_encoded_bytes}")
 
 def test_non_none_subaddress_OK():
     onchain_address_bytes = uuid4().bytes  # 16 bytes
@@ -30,15 +30,14 @@ def test_non_none_subaddress_OK():
 
     libra_addr = LibraAddress.from_bytes(onchain_address_bytes, subaddr_bytes)
     assert libra_addr.onchain_address_bytes == onchain_address_bytes
-    # assert libra_addr.get_onchain_bytes() == onchain_address_bytes
     assert libra_addr.subaddress_bytes == subaddr_bytes
-    # assert libra_addr.get_subaddress_bytes() == subaddr_bytes
     expected_encoded_bytes = bech32_address_encode(
         LBR,
         onchain_address_bytes,
         subaddr_bytes
     )
     assert libra_addr.encoded_address_bytes == expected_encoded_bytes
+    assert libra_addr.as_str() == expected_encoded_bytes
 
 
 def test_invalid_onchain_address_length():
@@ -66,6 +65,24 @@ def test_from_bytes():
     libra_addr = LibraAddress.from_hex(onchain_address_hex, None)
     assert libra_addr.onchain_address_bytes == bytes.fromhex(onchain_address_hex)
     assert libra_addr.subaddress_bytes == None
+
+
+def test_from_encoded_str():
+    onchain_address_bytes = uuid4().bytes
+    subaddress_bytes = uuid4().bytes[8:]
+    libra_addr_one = LibraAddress.from_bytes(onchain_address_bytes, subaddress_bytes, TLB)
+    libra_addr_two = LibraAddress.from_encoded_str(libra_addr_one.encoded_address_bytes)
+    assert libra_addr_one == libra_addr_two
+    assert libra_addr_two.hrp == TLB
+    assert libra_addr_two.onchain_address_bytes == onchain_address_bytes
+    assert libra_addr_two.subaddress_bytes == subaddress_bytes
+
+    libra_addr_three = LibraAddress.from_bytes(onchain_address_bytes, None, LBR)
+    libra_addr_four = LibraAddress.from_encoded_str(libra_addr_three.encoded_address_bytes)
+    assert libra_addr_three == libra_addr_four
+    assert libra_addr_four.hrp == LBR
+    assert libra_addr_four.onchain_address_bytes == onchain_address_bytes
+    assert libra_addr_four.subaddress_bytes == None
 
 
 def test_invalid_hrp():

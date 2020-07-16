@@ -76,7 +76,7 @@ def bech32_address_encode(
     return __bech32_encode(hrp, [encoding_version] + five_bit_data)
 
 
-def bech32_address_decode(expected_hrp: str, bech32: str) -> Tuple[int, bytes, bytes]:
+def bech32_address_decode(bech32: str, expected_hrp: Optional[str] = None) -> Tuple[str, int, bytes, bytes]:
     """Validate a Bech32 Libra address Bech32 string, and split between version, address and sub-address."""
     len_bech32 = len(bech32)
     # check expected length
@@ -90,17 +90,18 @@ def bech32_address_decode(expected_hrp: str, bech32: str) -> Tuple[int, bytes, b
         raise Bech32Error(f"Mixed case Bech32 addresses are not allowed, got: {bech32}")
     bech32 = bech32.lower()
 
-    # check expected hrp
-    if expected_hrp not in __LIBRA_HRP:
+    # check hrp
+    hrp = bech32[:3]
+    if hrp not in __LIBRA_HRP:
         raise Bech32Error(
             f'Wrong Libra address Bech32 human readable part (prefix): expected "{LBR}" '
-            f'for mainnet or "{TLB}" for testnet but got "{bech32[:3]}"'
+            f'for mainnet or "{TLB}" for testnet but got "{hrp}"'
         )
 
-    if bech32[:3] != expected_hrp:
+    if expected_hrp and expected_hrp != hrp:
         raise Bech32Error(
             f'Wrong Libra address Bech32 human readable part (prefix): requested "{expected_hrp}" but '
-            f'got "{bech32[:3]}"'
+            f'got "{hrp}"'
         )
 
     # check separator
@@ -142,6 +143,7 @@ def bech32_address_decode(expected_hrp: str, bech32: str) -> Tuple[int, bytes, b
         )
 
     return (
+        hrp,
         address_version,
         bytes(decoded_data[:__LIBRA_ADDRESS_SIZE]),
         bytes(decoded_data[-__LIBRA_SUBADDRESS_SIZE:]),
