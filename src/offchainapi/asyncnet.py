@@ -149,7 +149,7 @@ class Aionet:
             'application/json' content type and data encoded by json.dumps.
         """
 
-        other_addr = LibraAddress(request.match_info['other_addr'])
+        other_addr = LibraAddress.from_encoded_str(request.match_info['other_addr'])
         logger.debug(f'Request Received from {other_addr.as_str()}')
 
         # Check and extract '
