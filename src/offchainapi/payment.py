@@ -89,11 +89,17 @@ class StatusObject(StructureChecker):
     def custom_update_checks(self, diff):
         """ Override StructureChecker. """
 
-        # Ensure we  have a valid status:
-        status = Status[diff['status']]
+        # Ensure we have a valid status:
+        try:
+            status = Status[diff['status']]
+        except KeyError:
+            raise StructureException(f'Unknown status type: {diff["status"]}.')
 
         if status == Status.abort and not ('abort_code' in diff and 'abort_message' in diff):
             raise StructureException('Abort code and message is required.')
+
+        if status != Status.abort and ('abort_code' in diff or 'abort_message' in diff):
+            raise StructureException(f'Status {diff["status"]} cannot have a abort code or message.')
 
 class PaymentActor(StructureChecker):
     """ Represents a payment actor.
@@ -107,7 +113,6 @@ class PaymentActor(StructureChecker):
     fields = [
         ('address', str, REQUIRED, WRITE_ONCE),
         ('kyc_data', KYCData, OPTIONAL, WRITE_ONCE),
-        # ('status', Status, REQUIRED, UPDATABLE),
         ('status', StatusObject, REQUIRED, UPDATABLE),
         ('metadata', list, REQUIRED, UPDATABLE)
     ]
@@ -125,9 +130,6 @@ class PaymentActor(StructureChecker):
 
     def custom_update_checks(self, diff):
         """ Override StructureChecker. """
-
-        # if 'status' in diff and not isinstance(diff['status'], Status):
-        #    raise StructureException('Wrong status: %s' % diff['status'])
 
         # Metadata can only be strings
         if 'metadata' in diff:

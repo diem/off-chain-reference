@@ -69,6 +69,28 @@ def test_payment_action_creation():
         _ = PaymentAction(10, 'LBT', 'charge', 0)
 
 
+def test_status_valdation():
+    snone1 = StatusObject(Status.none)
+    snone2 = StatusObject('none')
+    sabort1 = StatusObject('needs_kyc_data')
+    assert snone1 == snone2
+    assert snone1 != sabort1
+
+    with pytest.raises(StructureException):
+        _ = StatusObject('UNKNOWN')
+
+    # check the aborts
+    abort2 = StatusObject('abort', 'code', 'message')
+    with pytest.raises(StructureException):
+        _ = StatusObject('abort', 'code')
+
+    with pytest.raises(StructureException):
+        _ = StatusObject('none', 'code')
+    with pytest.raises(StructureException):
+        _ = StatusObject('none', 'code', 'message')
+
+
+
 def test_payment_actor_creation():
     snone = StatusObject(Status.none)
     actor = PaymentActor('XYZ', snone, [])

@@ -105,7 +105,7 @@ For a travel rule data exchange, the [command_type](basic_building_blocks.md#com
 </pre>
 </details>
 
-The __creates_versions_ and __dependencies_ lists track the objects that are necessary for a command to succeed, and allow server and client to detect commands that may conflict. In particular, only one command with should commit per object version (contained in the __dependencies_ list). Only when a command commits, the objects with versions in the __create_versions_ list are created and ready for commands to use them.
+The __dependencies_ list tracks the object versions that are necessary for a command to succeed. It allows server and client to detect commands that conflict, since they would list the same object version in their __dependencies_ lists. In such cases only one of the conflicting commands should proceed and be 'successful', and the other one should be a 'failure'. When a command status is successful, the objects with versions in the __create_versions_ list are created and may be used by subsequent commands. All object versions listed in the __dependencies_ list of a successful command become unavailable to subsequent commands.
 
 ### PaymentObject
 

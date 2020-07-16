@@ -297,5 +297,5 @@ class JSONSerializable:
 
 # Utilities
 def get_unique_string():
-    ''' Returns a strong random 16 byte string encoded in base64. '''
-    return hexlify(urandom(16)).decode('ascii')
+    ''' Returns a strong random 16 byte string encoded in hex. '''
+    return urandom(16).hex()
