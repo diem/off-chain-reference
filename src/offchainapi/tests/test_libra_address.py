@@ -21,8 +21,8 @@ def test_onchain_address_only_OK():
     )
     assert libra_addr.encoded_address_bytes == expected_encoded_bytes
     assert libra_addr.as_str() == expected_encoded_bytes
-    print(f"!!!!!!!!!!! as_str: {libra_addr.as_str()}")
-    print(f"!!!!!!!!!!! expected_encoded_bytes: {expected_encoded_bytes}")
+    assert libra_addr.get_onchain_address_hex() == bytes.hex(onchain_address_bytes)
+    assert libra_addr.get_subaddress_hex() == None
 
 
 def test_non_none_subaddress_OK():
@@ -39,6 +39,8 @@ def test_non_none_subaddress_OK():
     )
     assert libra_addr.encoded_address_bytes == expected_encoded_bytes
     assert libra_addr.as_str() == expected_encoded_bytes
+    assert libra_addr.get_onchain_address_hex() == bytes.hex(onchain_address_bytes)
+    assert libra_addr.get_subaddress_hex() == bytes.hex(subaddr_bytes)
 
 
 def test_invalid_onchain_address_length():

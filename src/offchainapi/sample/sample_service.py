@@ -74,8 +74,8 @@ class sample_business(BusinessContext):
         sender = payment.sender
         receiver = payment.receiver
 
-        if sender.get_onchain_encoded_address_str() == self.get_address() or \
-            receiver.get_onchain_encoded_address_str() == self.get_address():
+        if sender.get_onchain_address_encoded_str() == self.get_address() or \
+            receiver.get_onchain_address_encoded_str() == self.get_address():
             return
         raise BusinessValidationFailure()
 
@@ -107,7 +107,7 @@ class sample_business(BusinessContext):
 
     def is_sender(self, payment, ctx=None):
         self.assert_payment_for_vasp(payment)
-        return payment.sender.get_onchain_encoded_address_str() == self.get_address()
+        return payment.sender.get_onchain_address_encoded_str() == self.get_address()
 
 
     def validate_recipient_signature(self, payment, ctx=None):

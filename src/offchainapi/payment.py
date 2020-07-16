@@ -83,10 +83,7 @@ class PaymentActor(StructureChecker):
             'metadata': metadata
         })
 
-    # def get_address(self):
-    #     return LibraAddress(self.address).onchain()
-
-    def get_onchain_encoded_address_str(self):
+    def get_onchain_address_encoded_str(self):
         """
         Returns an encoded str representation of LibraAddress containing
         only the onchain address

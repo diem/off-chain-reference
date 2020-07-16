@@ -1,4 +1,5 @@
-#!/usr/bin/env python3
+# Copyright (c) The Libra Core Contributors
+# SPDX-License-Identifier: Apache-2.0
 
 # Bech32 implementation for Libra human readable addresses based on
 # Bitcoin's segwit python lib https://github.com/fiatjaf/bech32 modified to support the

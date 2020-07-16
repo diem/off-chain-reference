@@ -359,8 +359,8 @@ class PaymentProcessor(CommandProcessor):
 
         # Ensure that the two parties involved are in the VASP channel
         parties = set([
-            new_payment.sender.get_onchain_encoded_address_str(),
-            new_payment.receiver.get_onchain_encoded_address_str()
+            new_payment.sender.get_onchain_address_encoded_str(),
+            new_payment.receiver.get_onchain_address_encoded_str()
         ])
 
         other_addr_str = other_address.as_str()

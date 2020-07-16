@@ -2,12 +2,18 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from binascii import unhexlify, hexlify
-# from bech32 import bech32_encode, bech32_decode, convertbits
-from .bech32 import bech32_address_encode, bech32_address_decode, Bech32Error, LBR, TLB, __LIBRA_HRP
+from .bech32 import (
+    bech32_address_encode,
+    bech32_address_decode,
+    Bech32Error,
+    LBR,
+    TLB,
+    __LIBRA_HRP
+)
 
-# Helper classes
+
 class LibraAddressError(Exception):
-    ''' Represents an error when creating a Libra address. '''
+    ''' Represents an error when creating a LibraAddress. '''
     pass
 
 
@@ -23,6 +29,9 @@ class LibraAddress:
 
     @classmethod
     def from_bytes(cls, onchain_address_bytes, subaddress_bytes=None, hrp=LBR):
+        """ Return a LibraAddress given onchain address in bytes, subaddress
+        in bytes (optional), and hrp (Human Readable Part)
+        """
         try:
             encoded_address = bech32_address_encode(
                 hrp,
@@ -40,12 +49,16 @@ class LibraAddress:
 
     @classmethod
     def from_hex(cls, onchain_address_hex, subaddress_hex=None, hrp=LBR):
+        """ Return a LibraAddress given onchain address in hex, subaddress
+        in hex (optional), and hrp (Human Readable Part)
+        """
         onchain_address_bytes = bytes.fromhex(onchain_address_hex)
         subaddress_bytes = bytes.fromhex(subaddress_hex) if subaddress_hex else None
         return cls.from_bytes(onchain_address_bytes, subaddress_bytes, hrp)
 
     @classmethod
     def from_encoded_str(cls, encoded_str):
+        """ Return a LibraAddress given an bech32 encoded str """
         try:
             hrp, _version, onchain_address_bytes, subaddress_bytes = bech32_address_decode(encoded_str)
         except Bech32Error as e:
@@ -79,10 +92,7 @@ class LibraAddress:
         return self.encoded_address_bytes
 
     def last_bit(self):
-        """ Get the last bit of the decoded libra address.
-
-        Returns:
-            bool: The last bit of the decoded libra address.
+        """ Get the last bit of the decoded onchain address.
         """
         return self.onchain_address_bytes[-1] & 1
 
@@ -98,7 +108,7 @@ class LibraAddress:
         return self.onchain_address_bytes >= other.onchain_address_bytes
 
     def equal(self, other):
-        """ Defines equality for Libra addresses.
+        """ Define equality for LibraAddresses.
 
         Args:
             other (LibraAddress): An other Libra address.
@@ -118,23 +128,23 @@ class LibraAddress:
         return self.encoded_address_bytes.__hash__()
 
     def get_onchain(self):
-        ''' Returns a LibraAddress representing only the onchain address
-            without any subaddress information. '''
+        """ Return a LibraAddress representing only the onchain address
+            without any subaddress information. """
         if self.subaddress_bytes is None:
             return self
         return LibraAddress.from_bytes(self.onchain_address_bytes, None, self.hrp)
 
     def get_onchain_encoded_str(self):
-        ''' Returns an encoded str representation of LibraAddress containing
-        only the onchain address '''
+        """ Return an encoded str representation of LibraAddress containing
+        only the onchain address """
         return self.get_onchain().as_str()
 
-    # # FIXME? what for?
-    # def get_onchain_address_bytes(self):
-    #     ''' Returns the decoded 16 bytes onchain address of the VASP.'''
-    #     return self.onchain_address_bytes
+    def get_onchain_address_hex(self):
+        """ Return onchain address in hex """
+        return bytes.hex(self.onchain_address_bytes)
 
-    # def get_subaddress_bytes(self):
-    #     ''' Returns the decoded bytes of the subaddress at the VASP
-    #     if it is not None'''
-    #     return self.subaddress_bytes
+    def get_subaddress_hex(self):
+        """ Return subaddress in hex, if not None"""
+        if self.subaddress_bytes:
+            return bytes.hex(self.subaddress_bytes)
+        return None
