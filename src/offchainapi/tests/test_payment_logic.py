@@ -6,7 +6,7 @@ from ..payment_command import PaymentCommand, PaymentLogicError
 from ..business import BusinessForceAbort, BusinessValidationFailure
 
 from ..payment import PaymentObject
-from ..libra_address2 import LibraAddress
+from ..libra_address import LibraAddress
 from ..asyncnet import Aionet
 from ..storage import StorableFactory
 from ..payment_logic import PaymentProcessor

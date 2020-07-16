@@ -4,7 +4,7 @@
 from ..business import BusinessContext, BusinessForceAbort, \
     BusinessValidationFailure, VASPInfo
 from ..protocol import OffChainVASP
-from ..libra_address2 import LibraAddress
+from ..libra_address import LibraAddress
 from ..protocol_messages import CommandRequestObject, OffChainProtocolError, \
     OffChainException, OffChainOutOfOrder
 from ..payment_logic import PaymentCommand, PaymentProcessor

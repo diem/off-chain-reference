@@ -7,7 +7,7 @@
 # $ python -m cProfile -s tottime src/scripts/run_perf.py > report.txt
 #
 from ..business import VASPInfo
-from ..libra_address2 import LibraAddress
+from ..libra_address import LibraAddress
 from ..payment_logic import PaymentCommand
 from ..status_logic import Status
 from ..payment import PaymentAction, PaymentActor, PaymentObject

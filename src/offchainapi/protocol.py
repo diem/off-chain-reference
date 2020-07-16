@@ -7,7 +7,7 @@ from .protocol_messages import CommandRequestObject, CommandResponseObject, \
     make_success_response, make_protocol_error, \
     make_parsing_error, make_command_error
 from .utils import JSONParsingError, JSONFlag
-from .libra_address2 import LibraAddress
+from .libra_address import LibraAddress
 from .crypto import OffChainInvalidSignature
 
 import json

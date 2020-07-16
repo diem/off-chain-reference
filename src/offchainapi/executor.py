@@ -3,7 +3,7 @@
 
 from .utils import JSONSerializable, JSONFlag
 from .command_processor import CommandProcessor
-from .libra_address2 import LibraAddress
+from .libra_address import LibraAddress
 
 import logging
 

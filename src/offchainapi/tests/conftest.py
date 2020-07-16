@@ -8,7 +8,7 @@ from ..payment_logic import Status, PaymentProcessor, PaymentCommand
 from ..protocol import OffChainVASP, VASPPairChannel
 from ..executor import ProtocolExecutor
 from ..command_processor import CommandProcessor
-from ..libra_address2 import LibraAddress
+from ..libra_address import LibraAddress
 from ..protocol_messages import CommandRequestObject
 from ..utils import JSONFlag
 from ..crypto import ComplianceKey

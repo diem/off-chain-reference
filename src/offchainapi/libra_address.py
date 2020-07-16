@@ -2,7 +2,8 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from binascii import unhexlify, hexlify
-from bech32 import bech32_encode, bech32_decode, convertbits
+# from bech32 import bech32_encode, bech32_decode, convertbits
+from .bech32 import bech32_address_encode, bech32_address_decode, Bech32Error, LBR, TLB, __LIBRA_HRP
 
 # Helper classes
 class LibraAddressError(Exception):
@@ -11,108 +12,82 @@ class LibraAddressError(Exception):
 
 
 class LibraAddress:
-
-    def __init__(self, encoded_address):
-        """ An interface that abstracts a Libra Address
-            and bit manipulations on it.
-
-        Args:
-            encoded_address (str or bytes): Representation of a Libra address in bech32.
-
-        Raises:
-            LibraAddressError: If the provided encoded address cannot be parsed
-                               to a Libra Address.
-        """
-
-        # First extract the hrp:
-        hrp = encoded_address.split('1')[0]
-        assert hrp in ('lbr', 'tlb')
-
-        self.hrp = hrp
-        self.encoded_address = encoded_address
-
-        # Do basic bech32 decoding
-        ver, self.decoded_address = decode(self.hrp, self.encoded_address)
-        if self.decoded_address is None:
-            raise LibraAddressError(
-                f'Incorrect version or bech32 encoding: "{encoded_address}"')
-
-        # Set the version
-        self.version = ver
-        if self.version == 0:
-            # This is a libra network address without subaddress.
-            if len(self.decoded_address) != 16:
-                raise LibraAddressError(
-                    f'Libra network address must be 16'
-                    f' bytes, found: "{len(self.decoded_address)}"')
-            self.decoded_address = bytes(self.decoded_address)
-            self.decoded_sub_address = None
-
-        elif self.version == 1:
-            # This is a libra network sub-address
-            if len(self.decoded_address) < 16 + 8:
-                raise LibraAddressError(
-                    f'Libra network sub-address must be > 16+8'
-                    f' bytes, found: "{len(self.decoded_address)}"')
-
-            addr_bytes = bytes(self.decoded_address)
-            self.decoded_address = addr_bytes[:16]
-            self.decoded_sub_address = addr_bytes[16:]
-        else:
-            raise LibraAddressError(
-                f'Unknown Address version number: "{ver}"')
-
-
-    def as_str(self):
-        ''' Returns a string representation of the LibraAddress.
-
-            Returns:
-                str: String representation of the LibraAddress.
-        '''
-        return str(self.encoded_address)
+    """
+    A representation of address used in this protocol that consists of three parts:
+    1. onchain_address: a 16 bytes address on chain, for example a VASP address
+    2. subaddress: a subaddress in bytes
+    3. hrp: Human Readable Part, indicating the network version:
+        * "lbr" for Mainnet addresses
+        * "tlb" for Testnet addresses
+    """
 
     @classmethod
-    def encode(cls, raw_bytes_address, raw_bytes_subaddr=None, hrp='lbr'):
-        """ Make a Libra address from bytes.
-
-        Args:
-            raw_bytes (bytes): The bytes from which to create a Libra address.
-
-        Returns:
-            LibraAddress: The Libra address.
-        """
-        if len(raw_bytes_address) != 16:
-            raise LibraAddressError(f'Libra address must be 16 bytes, not: {len(raw_bytes_address)}')
-        if not (raw_bytes_subaddr is None or len(raw_bytes_subaddr) >= 8):
-            raise LibraAddressError(f'Invalid subaddress: {raw_bytes_subaddr}')
-
-        # Check id we encode on-chain or subaddress
-        if raw_bytes_subaddr is None:
-            version = 0
-            raw_bytes = raw_bytes_address
-        else:
-            version = 1
-            raw_bytes = raw_bytes_address + raw_bytes_subaddr
-
-        # Encode using bech32
-        enc = encode(hrp, version, raw_bytes)
-        if enc is None:
+    def from_bytes(cls, onchain_address_bytes, subaddress_bytes=None, hrp=LBR):
+        try:
+            encoded_address = bech32_address_encode(
+                hrp,
+                onchain_address_bytes,
+                subaddress_bytes
+            )
+        except Bech32Error as e:
             raise LibraAddressError(
-                f'Cannot convert to LibraAddress: "{raw_bytes}"')
+                f"Can't create LibraAddress from "
+                f"onchain_address_bytes: {onchain_address_bytes}, "
+                f"subaddress_bytes: {subaddress_bytes}, "
+                f"hrp: {hrp}, got Bech32Error: {e}"
+            )
+        return cls(encoded_address, onchain_address_bytes, subaddress_bytes, hrp)
 
-        addr = cls(enc)
-        return addr
+    @classmethod
+    def from_hex(cls, onchain_address_hex, subaddress_hex=None, hrp=LBR):
+        onchain_address_bytes = bytes.fromhex(onchain_address_hex)
+        subaddress_bytes = bytes.fromhex(subaddress_hex) if subaddress_hex else None
+        return cls.from_bytes(onchain_address_bytes, subaddress_bytes, hrp)
+
+    @classmethod
+    def from_encoded_str(cls, encoded_str):
+        try:
+            hrp, _version, onchain_address_bytes, subaddress_bytes = bech32_address_decode(encoded_str)
+        except Bech32Error as e:
+            raise LibraAddressError(
+                f"Can't create LibraAddress from encoded str {encoded_str}, "
+                f"got Bech32Error: {e}"
+            )
+        # If subaddress is absent, subaddress_bytes is a list of 0
+        subaddrss_ints = list(subaddress_bytes)
+        none_zero = [i for i in subaddrss_ints if i]
+        if none_zero:
+            return cls(encoded_str, onchain_address_bytes, subaddress_bytes, hrp)
+        return cls(encoded_str, onchain_address_bytes, None, hrp)
+
+
+    def __init__(self, encoded_address_bytes, onchain_address_bytes, subaddress_bytes, hrp):
+        """ DO NOT CALL THIS DIRECTLY!! use factory mtheods instead."""
+
+        self.encoded_address_bytes = encoded_address_bytes
+        self.onchain_address_bytes = onchain_address_bytes
+        self.subaddress_bytes = subaddress_bytes
+        self.hrp = hrp
+
+    def __repr__(self):
+        return (
+            f"LibraAddress with onchain_address_bytes: {self.onchain_address_bytes}, "
+            f"subaddress_bytes: {self.subaddress_bytes}, hrp: {self.hrp}"
+        )
+
+    def as_str(self):
+        return self.encoded_address_bytes
 
     def last_bit(self):
-        """ Get the last bit of the Libra address.
+        """ Get the last bit of the decoded libra address.
 
         Returns:
-            bool: The last bit of the Libra address.
+            bool: The last bit of the decoded libra address.
         """
-        return self.decoded_address[-1] & 1
+        return self.onchain_address_bytes[-1] & 1
 
     def greater_than_or_equal(self, other):
-        """ Compare two Libra addresses.
+        """ Compare two Libra addresses in term of their on-chain part
 
         Args:
             other (LibraAddress): The Libra address to compare against.
@@ -120,7 +95,7 @@ class LibraAddress:
         Returns:
             bool: If the current address is greater (or equal) than other.
         """
-        return self.decoded_address >= other.decoded_address
+        return self.onchain_address_bytes >= other.onchain_address_bytes
 
     def equal(self, other):
         """ Defines equality for Libra addresses.
@@ -132,50 +107,34 @@ class LibraAddress:
             bool: Whether this address equals the other address.
         """
         return isinstance(other, LibraAddress) \
-            and self.decoded_address == other.decoded_address \
-            and self.decoded_sub_address == other.decoded_sub_address
+            and self.onchain_address_bytes == other.onchain_address_bytes \
+            and self.subaddress_bytes == other.subaddress_bytes \
+            and self.hrp == other.hrp
 
     def __eq__(self, other):
         return self.equal(other)
 
     def __hash__(self):
-        return self.encoded_address.__hash__()
+        return self.encoded_address_bytes.__hash__()
 
-    def onchain(self):
-        ''' Returns a Libra Address representing only the onchain address
+    def get_onchain(self):
+        ''' Returns a LibraAddress representing only the onchain address
             without any subaddress information. '''
-        if self.decoded_sub_address is None:
+        if self.subaddress_bytes is None:
             return self
-        return LibraAddress.encode(self.decoded_address, hrp=self.hrp)
+        return LibraAddress.from_bytes(self.onchain_address_bytes, None, self.hrp)
 
-    def get_onchain_bytes(self):
-        ''' Returns the decoded 16 bytes onchain address of the VASP.'''
-        return self.decoded_address
+    def get_onchain_encoded_str(self):
+        ''' Returns an encoded str representation of LibraAddress containing
+        only the onchain address '''
+        return self.get_onchain().as_str()
 
-    def get_subaddress_bytes(self):
-        ''' Returns the decoded 8+ bytes of the subaddress at the VASP.'''
-        return self.decoded_sub_address
+    # # FIXME? what for?
+    # def get_onchain_address_bytes(self):
+    #     ''' Returns the decoded 16 bytes onchain address of the VASP.'''
+    #     return self.onchain_address_bytes
 
-# Adapted from : https://github.com/fiatjaf/bech32/blob/master/bech32/__init__.py
-# MIT Licence here: https://github.com/fiatjaf/bech32/blob/master/LICENSE
-# Copyright (c) 2017 Pieter Wuille
-
-def encode(hrp, witver, witprog):
-    """Encode a segwit address."""
-    five_bit_witprog = convertbits(witprog, 8, 5)
-    if five_bit_witprog is None:
-        return None
-    ret = bech32_encode(hrp, [witver] + five_bit_witprog)
-    decoded = decode(hrp, ret)
-    if decoded == (None, None):
-        return None
-    return ret
-
-def decode(hrp, addr):
-    """Decode a segwit address."""
-    hrpgot, data = bech32_decode(addr)
-    if hrpgot != hrp:
-        return (None, None)
-    assert data is not None
-    decoded = convertbits(data[1:], 5, 8, False)
-    return (data[0], decoded)
+    # def get_subaddress_bytes(self):
+    #     ''' Returns the decoded bytes of the subaddress at the VASP
+    #     if it is not None'''
+    #     return self.subaddress_bytes

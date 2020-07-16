@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from .business import BusinessNotAuthorized
-from .libra_address2 import LibraAddress
+from .libra_address import LibraAddress
 from .utils import get_unique_string
 
 import aiohttp

@@ -6,7 +6,7 @@ from .utils import StructureException, StructureChecker, \
     JSONSerializable
 from .shared_object import SharedObject
 from .status_logic import Status
-from .libra_address2 import LibraAddress
+from .libra_address import LibraAddress
 
 import json
 

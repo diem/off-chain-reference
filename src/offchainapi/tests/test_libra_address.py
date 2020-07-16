@@ -4,8 +4,8 @@
 import pytest
 from uuid import uuid4
 
-from ..bech32 import Bech32Error, bech32_address_decode, bech32_address_encode, LBR, TLB
-from ..libra_address2 import LibraAddress, LibraAddressError
+from ..bech32 import Bech32Error, bech32_address_encode, LBR, TLB
+from ..libra_address import LibraAddress, LibraAddressError
 
 
 def test_onchain_address_only_OK():
@@ -23,6 +23,7 @@ def test_onchain_address_only_OK():
     assert libra_addr.as_str() == expected_encoded_bytes
     print(f"!!!!!!!!!!! as_str: {libra_addr.as_str()}")
     print(f"!!!!!!!!!!! expected_encoded_bytes: {expected_encoded_bytes}")
+
 
 def test_non_none_subaddress_OK():
     onchain_address_bytes = uuid4().bytes  # 16 bytes

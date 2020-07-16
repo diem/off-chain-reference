@@ -3,7 +3,7 @@
 
 from ..business import VASPInfo, BusinessContext
 from ..protocol import OffChainVASP
-from ..libra_address2 import LibraAddress
+from ..libra_address import LibraAddress
 from ..payment_logic import PaymentCommand, PaymentProcessor
 from ..status_logic import Status
 from ..storage import StorableFactory

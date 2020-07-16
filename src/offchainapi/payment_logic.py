@@ -9,7 +9,7 @@ from .status_logic import status_heights_MUST, \
 from .payment_command import PaymentCommand, PaymentLogicError
 from .asyncnet import NetworkException
 from .shared_object import SharedObject
-from .libra_address2 import LibraAddress
+from .libra_address import LibraAddress
 
 import asyncio
 import logging

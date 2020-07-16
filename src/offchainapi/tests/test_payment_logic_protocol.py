@@ -4,7 +4,7 @@
 
 from ..asyncnet import Aionet
 from ..storage import StorableFactory
-from ..libra_address2 import LibraAddress
+from ..libra_address import LibraAddress
 from ..payment_logic import PaymentProcessor, PaymentCommand
 from ..payment import PaymentAction, PaymentActor, PaymentObject
 from ..status_logic import Status
