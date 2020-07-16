@@ -528,8 +528,7 @@ class PaymentProcessor(CommandProcessor):
             )
 
         role = ['sender', 'receiver'][is_receipient]
-        other_role = ['sender', 'receiver'][is_sender]
-        # other_status = new_payment.data[other_role].status.as_status()
+
         if new_payment.data[role].status.as_status() != Status.none:
             raise PaymentLogicError(
                 'Sender set receiver status or vice-versa.'
@@ -652,13 +651,9 @@ class PaymentProcessor(CommandProcessor):
             the role of the actor that created it. Returns a bool set
             to true if it is valid."""
 
-        sender_st = payment.sender.status.as_status()
-        receiver_st = payment.receiver.status.as_status()
-
         if actor_is_sender:
-            return (receiver_st == Status.none)
-        else:
-            return (sender_st == Status.none)
+            return payment.receiver.status.as_status() == Status.none
+        return payment.sender.status.as_status() == Status.none
 
     async def payment_process_async(self, payment, ctx=None):
         ''' Processes a payment that was just updated, and returns a
@@ -769,8 +764,9 @@ class PaymentProcessor(CommandProcessor):
             new_payment.data[role].add_metadata(f'Error: ({role}): {str(e)}')
             current_status = Status.abort
 
+            # TODO: use proper codes and messages on abort.
             abort_code = 'EXCEPTION_ABORT'
-            abort_msg = str(e)
+            abort_msg = str(e)  # TODO: do not leak raw exceptions.
 
         # Do an internal consistency check:
         if not self.can_change_status(payment, current_status, is_sender):
