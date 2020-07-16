@@ -25,9 +25,10 @@ __BECH32_CHECKSUM_CHAR_SIZE = 6
 __LIBRA_HRP = [LBR, TLB]
 __LIBRA_ADDRESS_SIZE = 16  # in bytes
 __LIBRA_SUBADDRESS_SIZE = 8  # in bytes (for V1)
-__LIBRA_ZERO_SUBADDRESS = b"\0" * __LIBRA_SUBADDRESS_SIZE
 __LIBRA_BECH32_VERSION = 1
 __LIBRA_BECH32_SIZE = 50  # in characters
+
+LIBRA_ZERO_SUBADDRESS = b"\0" * __LIBRA_SUBADDRESS_SIZE
 
 
 class Bech32Error(Exception):
@@ -66,7 +67,7 @@ def bech32_address_encode(
 
     # if subaddress has not been provided it's set to 8 zero bytes.
     subaddress_final_bytes = (
-        subaddress_bytes if subaddress_bytes is not None else __LIBRA_ZERO_SUBADDRESS
+        subaddress_bytes if subaddress_bytes is not None else LIBRA_ZERO_SUBADDRESS
     )
     total_bytes = address_bytes + subaddress_final_bytes
 

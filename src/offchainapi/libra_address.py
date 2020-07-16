@@ -8,7 +8,7 @@ from .bech32 import (
     Bech32Error,
     LBR,
     TLB,
-    __LIBRA_HRP
+    LIBRA_ZERO_SUBADDRESS,
 )
 
 
@@ -67,15 +67,13 @@ class LibraAddress:
                 f"got Bech32Error: {e}"
             )
         # If subaddress is absent, subaddress_bytes is a list of 0
-        subaddrss_ints = list(subaddress_bytes)
-        none_zero = [i for i in subaddrss_ints if i]
-        if none_zero:
+        if subaddress_bytes != LIBRA_ZERO_SUBADDRESS:
             return cls(encoded_str, onchain_address_bytes, subaddress_bytes, hrp)
         return cls(encoded_str, onchain_address_bytes, None, hrp)
 
 
     def __init__(self, encoded_address_bytes, onchain_address_bytes, subaddress_bytes, hrp):
-        """ DO NOT CALL THIS DIRECTLY!! use factory mtheods instead."""
+        """ DO NOT CALL THIS DIRECTLY!! use factory methods instead."""
 
         self.encoded_address_bytes = encoded_address_bytes
         self.onchain_address_bytes = onchain_address_bytes
