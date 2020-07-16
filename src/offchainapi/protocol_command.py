@@ -45,7 +45,7 @@ class ProtocolCommand(JSONSerializable):
         '''
         return set(self.dependencies)
 
-    def new_object_versions(self):
+    def get_new_object_versions(self):
         ''' Get the list of version numbers created by this command.
 
             Returns:

@@ -80,8 +80,6 @@ class Aionet:
             while True:
                 for k in self.vasp.channel_store:
                     channel = self.vasp.channel_store[k]
-                    len_req = 0
-                    len_resp = 0
 
                     role = ['Client', 'Server'][channel.is_server()]
                     waiting = channel.is_server() \
@@ -91,14 +89,12 @@ class Aionet:
                     # TODO: Retransmit a few of the requests here.
 
                     len_my = len(channel.my_request_index)
-                    len_oth = 'XXXX'
 
                     logger.info(
                         f'''
                         Channel: {me} [{role}] <-> {other}
-                        Queues: my: {len_my} (Wait: {waiting}) other: {len_oth}
-                        Retransmit: {channel.would_retransmit()}
-                        Wait-Req: {len_req} Wait-Resp: {len_resp}'''
+                        Queues: my: {len_my} (Wait: {waiting})
+                        Retransmit: {channel.would_retransmit()}'''
                     )
                 await asyncio.sleep(self.watchdog_period)
         except asyncio.CancelledError:
@@ -257,10 +253,6 @@ class Aionet:
     def sequence_command(self, other_addr, command):
         ''' Sequences a new command to the local queue, ready to be
             sent to the other VASP.
-
-            Parameters:
-                other_addr (LibraAddress) : the LibraAddress of the other VASP.
-                command (ProtocolCommand) : A ProtocolCommand instance.
 
             Returns:
                 str: json str of the net message

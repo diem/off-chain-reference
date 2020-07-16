@@ -1,6 +1,6 @@
 # Command Sequencing
 
-The low-level Off-Chain protocol allows two VASPs to commit request-responses for commands originating from either VASP, in order to maintain a consistent database of shared objects. Committing a command requires both VAPSs to confirm it is valid, as well as sequence it in relation to conflicting commands.  Both VASPs in a channel can asynchronously attempt to initiate and execute commands on shared objects. The purpose of the command commit protocols is to ensure that such concurrent requests are applied consistently at both VASPs to ensure that the state of shared objects remains consistent.
+The low-level Off-Chain protocol allows two VASPs to commit request-responses for commands originating from either VASP, in order to maintain a consistent database of shared objects. Committing a command requires both VAPSs to confirm it is valid, as well as sequence it in relation to conflicting commands. Both VASPs in a channel can asynchronously attempt to initiate and execute commands on shared objects. The purpose of the command commit protocols is to ensure that such concurrent requests are applied consistently at both VASPs to ensure that the state of shared objects remains consistent.
 
 ## Protocol Server and Client roles
 

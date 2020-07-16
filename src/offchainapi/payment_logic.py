@@ -418,7 +418,7 @@ class PaymentProcessor(CommandProcessor):
             return fut
 
         # Creates new objects.
-        new_versions = command.new_object_versions()
+        new_versions = command.get_new_object_versions()
         for version in new_versions:
             obj = command.get_object(version, self.object_store)
             self.object_store[version] = obj

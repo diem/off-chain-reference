@@ -8,10 +8,6 @@ class OffChainException(Exception):
     pass
 
 
-class OffChainOutOfOrder(Exception):
-    pass
-
-
 class OffChainProtocolError(Exception):
     ''' This class denotes protocol errors, namely errors at the
         OffChain protocols level rather than the command sequencing level. '''

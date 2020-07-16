@@ -99,9 +99,10 @@ async def test_send_request(net_handler, tester_addr, server, signed_json_reques
     # not expect a response.
 
 
-#async def test_send_command(net_handler, tester_addr, server, command):
-#    base_url = f'http://{server.host}:{server.port}'
-#    net_handler.vasp.info_context.get_peer_base_url.return_value = base_url
-#    req = net_handler.sequence_command(tester_addr, command)
-#    ret = await net_handler.send_request(tester_addr, req)
-#    assert ret
+@pytest.mark.skip(reason="Currently cannot extract the fixed cid.")
+async def test_send_command(net_handler, tester_addr, server, command):
+    base_url = f'http://{server.host}:{server.port}'
+    net_handler.vasp.info_context.get_peer_base_url.return_value = base_url
+    req = net_handler.sequence_command(tester_addr, command)
+    ret = await net_handler.send_request(tester_addr, req)
+    assert ret
