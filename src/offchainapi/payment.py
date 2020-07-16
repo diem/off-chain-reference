@@ -63,7 +63,7 @@ class PaymentActor(StructureChecker):
     """ Represents a payment actor.
 
         Args:
-            address (str): The subaddress of the account on the VASP.
+            address (str): The bech32 encoded str format of LibraAddress
             status (utils.Status): The payment status for this actor.
             metadata (list): Arbitrary metadata.
     """
@@ -83,8 +83,12 @@ class PaymentActor(StructureChecker):
             'metadata': metadata
         })
 
-    def get_address(self):
-        return LibraAddress(self.address).onchain()
+    def get_onchain_address_encoded_str(self):
+        """
+        Returns an encoded str representation of LibraAddress containing
+        only the onchain address
+        """
+        return LibraAddress.from_encoded_str(self.address).get_onchain_encoded_str()
 
     def custom_update_checks(self, diff):
         """ Override StructureChecker. """
