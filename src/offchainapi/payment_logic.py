@@ -626,6 +626,11 @@ class PaymentProcessor(CommandProcessor):
             valid &= changed_old == changed_new
             return valid
 
+        if old_sender == Status.ready_for_settlement and \
+                old_receiver == Status.ready_for_settlement:
+            valid &= new_sender == old_sender
+            return valid
+
         # Respect ordering of status
         status_heights = {
             Status.none: 100,
