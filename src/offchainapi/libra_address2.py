@@ -124,13 +124,17 @@ class LibraAddress:
             return self
         return LibraAddress.from_bytes(self.onchain_address_bytes, None, self.hrp)
 
-    # FIXME? what for?
-    def get_onchain_bytes(self):
-        ''' Returns the decoded 16 bytes onchain address of the VASP.'''
-        return self.onchain_address_bytes
+    def get_onchain_encoded_str(self):
+        ''' Returns an encoded str representation of LibraAddress containing
+        only the onchain address '''
+        return self.get_onchain().as_str()
 
-    # FIXME? what for?
-    def get_subaddress_bytes(self):
-        ''' Returns the decoded bytes of the subaddress at the VASP
-        if it is not None'''
-        return self.subaddress_bytes
+    # # FIXME? what for?
+    # def get_onchain_address_bytes(self):
+    #     ''' Returns the decoded 16 bytes onchain address of the VASP.'''
+    #     return self.onchain_address_bytes
+
+    # def get_subaddress_bytes(self):
+    #     ''' Returns the decoded bytes of the subaddress at the VASP
+    #     if it is not None'''
+    #     return self.subaddress_bytes

@@ -4,7 +4,7 @@
 
 from ..asyncnet import Aionet
 from ..storage import StorableFactory
-from ..libra_address import LibraAddress
+from ..libra_address2 import LibraAddress
 from ..payment_logic import PaymentProcessor, PaymentCommand
 from ..payment import PaymentAction, PaymentActor, PaymentObject
 from ..status_logic import Status
@@ -17,14 +17,14 @@ import asyncio
 
 @pytest.fixture
 def payment_sender_init():
-    my_addr = LibraAddress.encode(b'B'*16)
-    other_addr = LibraAddress.encode(b'A'*16)
+    my_addr = LibraAddress.from_bytes(b'B'*16)
+    other_addr = LibraAddress.from_bytes(b'A'*16)
 
     action = PaymentAction(5, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
 
-    s_addr = LibraAddress.encode(b'A'*16, b'a'*8).as_str()
+    s_addr = LibraAddress.from_bytes(b'A'*16, b'a'*8).as_str()
     sender =  PaymentActor(s_addr, Status.needs_kyc_data, [])
-    r_addr = LibraAddress.encode(b'B'*16, b'b'*8).as_str()
+    r_addr = LibraAddress.from_bytes(b'B'*16, b'b'*8).as_str()
     receiver =  PaymentActor(r_addr, Status.none, [])
 
     ref = f'{other_addr.as_str()}_XGGXHSHHSJ'
@@ -37,8 +37,8 @@ def test_logic_protocol_check(payment_sender_init, loop):
 
     store = StorableFactory({})
 
-    my_addr = LibraAddress.encode(b'B'*16)
-    other_addr = LibraAddress.encode(b'A'*16)
+    my_addr = LibraAddress.from_bytes(b'B'*16)
+    other_addr = LibraAddress.from_bytes(b'A'*16)
     bcm = TestBusinessContext(my_addr)
     processor = PaymentProcessor(bcm, store, loop)
 
@@ -56,8 +56,8 @@ def test_logic_protocol_process_start(payment_sender_init, loop):
 
     store = StorableFactory({})
 
-    my_addr = LibraAddress.encode(b'B'*16)
-    other_addr = LibraAddress.encode(b'A'*16)
+    my_addr = LibraAddress.from_bytes(b'B'*16)
+    other_addr = LibraAddress.from_bytes(b'A'*16)
     bcm = TestBusinessContext(my_addr)
     processor = PaymentProcessor(bcm, store, loop)
 

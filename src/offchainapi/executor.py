@@ -3,7 +3,7 @@
 
 from .utils import JSONSerializable, JSONFlag
 from .command_processor import CommandProcessor
-from .libra_address import LibraAddress
+from .libra_address2 import LibraAddress
 
 import logging
 
@@ -110,7 +110,7 @@ class ProtocolCommand(JSONSerializable):
         self.creates_versions = list(data['_creates_versions'])
         if flag == JSONFlag.STORE:
             if "_origin" in data:
-                self.origin = LibraAddress(data["_origin"])
+                self.origin = LibraAddress.from_encoded_str(data["_origin"])
         return self
 
 

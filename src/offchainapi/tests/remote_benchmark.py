@@ -3,7 +3,7 @@
 
 from ..business import VASPInfo, BusinessContext
 from ..protocol import OffChainVASP
-from ..libra_address import LibraAddress
+from ..libra_address2 import LibraAddress
 from ..payment_logic import PaymentCommand, PaymentProcessor
 from ..status_logic import Status
 from ..storage import StorableFactory
@@ -65,7 +65,7 @@ def load_configs(configs_path):
     assert 'key' in configs
 
     bytes_addr = configs['addr'].encode()
-    configs['addr'] = LibraAddress.encode(bytes_addr)
+    configs['addr'] = LibraAddress.from_bytes(bytes_addr)
     configs['port'] = int(configs['port'])
     configs['key'] = ComplianceKey.from_str(dumps(configs['key']))
     return configs
@@ -182,8 +182,8 @@ def run_client(my_configs_path, other_configs_path, num_of_commands=10, port=0):
     # Make a payment commands.
     commands = []
     for cid in range(num_of_commands):
-        sub_a = LibraAddress.encode(b'A'*16, b'a'*8).as_str()
-        sub_b = LibraAddress.encode(b'B'*16, b'b'*8).as_str()
+        sub_a = LibraAddress.from_bytes(b'A'*16, b'a'*8).as_str()
+        sub_b = LibraAddress.from_bytes(b'B'*16, b'b'*8).as_str()
         sender = PaymentActor(sub_b, Status.none, [])
         receiver = PaymentActor(sub_a, Status.none, [])
         action = PaymentAction(10, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')

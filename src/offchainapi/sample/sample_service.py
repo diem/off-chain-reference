@@ -4,7 +4,7 @@
 from ..business import BusinessContext, BusinessForceAbort, \
     BusinessValidationFailure, VASPInfo
 from ..protocol import OffChainVASP
-from ..libra_address import LibraAddress
+from ..libra_address2 import LibraAddress
 from ..protocol_messages import CommandRequestObject, OffChainProtocolError, \
     OffChainException, OffChainOutOfOrder
 from ..payment_logic import PaymentCommand, PaymentProcessor
@@ -34,7 +34,7 @@ business_config = """[
 
 class sample_vasp_info(VASPInfo):
     def __init__(self):
-        peerA_addr = LibraAddress.encode(b'A'*16).as_str()
+        peerA_addr = LibraAddress.from_bytes(b'A'*16).as_str()
         each_peer_base_url = {
             peerA_addr: 'https://peerA.com',
         }
@@ -62,7 +62,7 @@ class sample_business(BusinessContext):
     # Helper functions for the business
 
     def get_address(self):
-        return self.my_addr.encoded_address
+        return self.my_addr.as_str()
 
     def get_account(self, subaddress):
         for acc in self.accounts_db:
@@ -74,8 +74,8 @@ class sample_business(BusinessContext):
         sender = payment.sender
         receiver = payment.receiver
 
-        if sender.get_address().as_str() == self.get_address() or \
-            receiver.get_address().as_str() == self.get_address():
+        if sender.get_onchain_encoded_address_str() == self.get_address() or \
+            receiver.get_onchain_encoded_address_str() == self.get_address():
             return
         raise BusinessValidationFailure()
 
@@ -96,18 +96,18 @@ class sample_business(BusinessContext):
         accounts = {acc['account'] for acc in self.accounts_db}
 
         if self.is_sender(payment):
-            sub = LibraAddress(payment.sender.address).get_subaddress_bytes().decode('ascii')
+            sub = LibraAddress.from_encoded_str(payment.sender.address).subaddress_bytes.decode('ascii')
             if sub in accounts:
                 return
         else:
-            sub = LibraAddress(payment.receiver.address).get_subaddress_bytes().decode('ascii')
+            sub = LibraAddress.from_encoded_str(payment.receiver.address).subaddress_bytes.decode('ascii')
             if sub in accounts:
                 return
         raise BusinessForceAbort('Subaccount does not exist.')
 
     def is_sender(self, payment, ctx=None):
         self.assert_payment_for_vasp(payment)
-        return payment.sender.get_address().as_str() == self.get_address()
+        return payment.sender.get_onchain_encoded_address_str() == self.get_address()
 
 
     def validate_recipient_signature(self, payment, ctx=None):
@@ -134,7 +134,7 @@ class sample_business(BusinessContext):
 
         subaddress = payment.data[my_role].address
 
-        sub = LibraAddress(subaddress).get_subaddress_bytes().decode('ascii')
+        sub = LibraAddress.from_encoded_str(subaddress).subaddress_bytes.decode('ascii')
         account = self.get_account(sub)
 
         if account['entity']:
@@ -157,7 +157,7 @@ class sample_business(BusinessContext):
         other_role = self.get_other_role(payment)
         subaddress = payment.data[my_role].address
 
-        sub = LibraAddress(subaddress).get_subaddress_bytes().decode('ascii')
+        sub = LibraAddress.from_encoded_str(subaddress).subaddress_bytes.decode('ascii')
         account = self.get_account(sub)
 
         if account['entity']:
@@ -181,7 +181,7 @@ class sample_business(BusinessContext):
         my_role = self.get_my_role(payment)
         subaddress = payment.data[my_role].address
 
-        sub = LibraAddress(subaddress).get_subaddress_bytes().decode('ascii')
+        sub = LibraAddress.from_encoded_str(subaddress).subaddress_bytes.decode('ascii')
         account = self.get_account(sub)
         return account["kyc_data"]
 
@@ -190,7 +190,7 @@ class sample_business(BusinessContext):
         other_role = self.get_other_role(payment)
         subaddress = payment.data[my_role].address
 
-        sub = LibraAddress(subaddress).get_subaddress_bytes().decode('ascii')
+        sub = LibraAddress.from_encoded_str(subaddress).subaddress_bytes.decode('ascii')
         account = self.get_account(sub)
 
         if my_role == 'sender':
@@ -236,7 +236,7 @@ class sample_business(BusinessContext):
             my_role = self.get_my_role(payment)
             subaddress = payment.data[my_role].address
 
-            sub = LibraAddress(subaddress).get_subaddress_bytes().decode('ascii')
+            sub = LibraAddress.from_encoded_str(subaddress).subaddress_bytes.decode('ascii')
             account = self.get_account(sub)
             reference = payment.reference_id
 

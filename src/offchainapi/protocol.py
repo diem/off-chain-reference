@@ -7,7 +7,7 @@ from .protocol_messages import CommandRequestObject, CommandResponseObject, \
     make_success_response, make_protocol_error, \
     make_parsing_error, make_command_error
 from .utils import JSONParsingError, JSONFlag
-from .libra_address import LibraAddress
+from .libra_address2 import LibraAddress
 from .crypto import OffChainInvalidSignature
 
 import json
@@ -484,7 +484,7 @@ class VASPPairChannel:
             # Check signature
             vasp = self.get_vasp()
             other_key = vasp.info_context.get_peer_compliance_verification_key(
-                self.get_other_address().as_str()
+                self.other_address_str
             )
             request = json.loads(other_key.verify_message(json_command))
 
@@ -699,7 +699,7 @@ class VASPPairChannel:
         try:
             vasp = self.get_vasp()
             other_key = vasp.info_context.get_peer_compliance_verification_key(
-                self.get_other_address().as_str()
+                self.other_address_str
             )
             response = json.loads(other_key.verify_message(json_response))
             response = CommandResponseObject.from_json_data_dict(
