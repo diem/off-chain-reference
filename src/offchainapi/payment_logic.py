@@ -638,19 +638,20 @@ class PaymentProcessor(CommandProcessor):
         other_role = ['sender', 'receiver'][not is_receiver]
 
         status = payment.data[role].status
-
-        if status in {Status.settled, Status.abort}:
-            # Nothing more to be done with this payment
-            # Return a new payment version with no modification
-            # To singnal no changes, and therefore no new command.
-            return payment.new_version()
-
         current_status = status
         other_status = payment.data[other_role].status
 
         new_payment = payment.new_version()
 
         try:
+            ctx = await business.payment_pre_processing(payment, ctx)
+
+            if status in {Status.settled, Status.abort}:
+                # Nothing more to be done with this payment
+                # Return a new payment version with no modification
+                # To signal no changes, and therefore no new command.
+                return new_payment
+
             # We set our status as abort.
             if other_status == Status.abort:
                 current_status = Status.abort
@@ -699,6 +700,13 @@ class PaymentProcessor(CommandProcessor):
                     and self.can_change_status(payment, Status.settled, is_sender):
                 if await business.has_settled(new_payment, ctx):
                     current_status = Status.settled
+
+            await business.payment_post_processing(
+                payment,
+                current_status,
+                other_status,
+                ctx
+            )
 
         except BusinessForceAbort:
 

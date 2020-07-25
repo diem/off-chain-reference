@@ -67,6 +67,7 @@ class BusinessContext:
 
         Args:
             payment (PaymentCommand): The concerned payment.
+            ctx (Any): Optional context object that business can store custom data
 
         Returns:
             bool: Whether the VASP is the sender of the payment.
@@ -78,6 +79,7 @@ class BusinessContext:
 
         Args:
             payment (PaymentCommand): The concerned payment.
+            ctx (Any): Optional context object that business can store custom data
 
         Returns:
             bool: Whether the VASP is the recipient of the payment.
@@ -92,6 +94,7 @@ class BusinessContext:
         Args:
             payment (PaymentCommand): The payment command containing the actors
                 to check.
+            ctx (Any): Optional context object that business can store custom data
 
         Raises:
             BusinessValidationFailure: If the account does not exist.
@@ -108,6 +111,7 @@ class BusinessContext:
         Args:
             payment (PaymentCommand): The payment command containing the
                 signature to check.
+            ctx (Any): Optional context object that business can store custom data
 
         Raises:
             BusinessValidationFailure: If the signature is invalid
@@ -120,6 +124,7 @@ class BusinessContext:
 
         Args:
             payment (PaymentCommand): The payment to sign.
+            ctx (Any): Optional context object that business can store custom data
         """
         raise NotImplementedError()  # pragma: no cover
 
@@ -131,6 +136,7 @@ class BusinessContext:
 
             Args:
                 payment (PaymentCommand): The concerned payment.
+                ctx (Any): Optional context object that business can store custom data
 
             Returns:
                 Status: A set of status indicating to level of kyc to provide,
@@ -151,6 +157,7 @@ class BusinessContext:
 
             Args:
                 payment (PaymentCommand): The concerned payment.
+                ctx (Any): Optional context object that business can store custom data
 
             Returns:
                 Status: Returns Status.none or the current status
@@ -170,6 +177,7 @@ class BusinessContext:
 
             Args:
                 payment (PaymentCommand): The concerned payment.
+                ctx (Any): Optional context object that business can store custom data
 
             Raises:
                    BusinessNotAuthorized: If the other VASP is not authorized to
@@ -181,7 +189,32 @@ class BusinessContext:
         '''
         raise NotImplementedError()  # pragma: no cover
 
-# ----- Settlement -----
+# ----- Payment Processing -----
+    async def payment_pre_processing(self, payment, ctx=None):
+        '''
+        Allow business to do custom pre-processing to a payment
+        Args:
+            payment (PaymentCommand): The concerned payment.
+            ctx (Any): Optional context object that business can store custom data
+        Returns: Optional context objext that will be passed on the
+            other business context functions.
+        Raises:
+            BusinessForceAbort: When business wants to abort a payment
+        '''
+        return ctx
+
+    async def payment_post_processing(self, payment, current_status, other_status, ctx=None):
+        '''
+        Allow business to do custom post-processing to a payment
+        Args:
+            payment (PaymentCommand): The concerned payment
+            current_status (Status): our latest status
+            other_status (Status): other status (set in payment)
+            ctx (Any): Optional context object that business can store custom data
+        Raises:
+            BusinessForceAbort: When business wants to abort a payment
+        '''
+        pass
 
     async def ready_for_settlement(self, payment, ctx=None):
         ''' Indicates whether a payment is ready for settlement as far as this
