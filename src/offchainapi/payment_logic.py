@@ -214,9 +214,10 @@ class PaymentProcessor(CommandProcessor):
         self.set_payment_outcome(payment)
 
         try:
+            new_payment = None
             # Notify the business context about the new payment.
             # This allows the business to do any custom record-keeping
-            command_ctx = await self.business.notify_payment_update(
+            command_ctx = await self.business.payment_pre_processing(
                 other_address, seq, command, payment)
 
             # Only respond to commands by other side.
@@ -260,6 +261,11 @@ class PaymentProcessor(CommandProcessor):
                         f'(other:{other_address_str}) No more commands '
                         f'created for Payment lastly with seq num #{seq}'
                     )
+
+            # Notify the business context about the new payment.
+            # This allows the business to do any custom record-keeping
+            await self.business.payment_post_processing(
+                other_address, seq, command, payment, new_payment, command_ctx)
 
             # If we are here we are done with this obligation.
             with self.storage_factory.atomic_writes():
@@ -644,7 +650,7 @@ class PaymentProcessor(CommandProcessor):
         new_payment = payment.new_version()
 
         try:
-            ctx = await business.payment_pre_processing(payment, ctx)
+            ctx = await business.payment_initial_processing(payment, ctx)
 
             if status in {Status.settled, Status.abort}:
                 # Nothing more to be done with this payment
@@ -700,13 +706,6 @@ class PaymentProcessor(CommandProcessor):
                     and self.can_change_status(payment, Status.settled, is_sender):
                 if await business.has_settled(new_payment, ctx):
                     current_status = Status.settled
-
-            await business.payment_post_processing(
-                payment,
-                current_status,
-                other_status,
-                ctx
-            )
 
         except BusinessForceAbort:
 
