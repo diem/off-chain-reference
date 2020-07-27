@@ -315,7 +315,7 @@ class VASPPairChannel:
 
     def apply_response(self, request):
         """Updates all structures according to the success or failure of
-        a given command. The given request must also contains a response
+        a given command. The given request must also contain a response
         (not None).
 
         Args:
@@ -401,7 +401,7 @@ class VASPPairChannel:
             # Check signature
             vasp = self.get_vasp()
             other_key = vasp.info_context.get_peer_compliance_verification_key(
-                self.get_other_address().as_str()
+                self.other_address_str
             )
             request = json.loads(other_key.verify_message(json_command))
 
@@ -581,7 +581,7 @@ class VASPPairChannel:
         try:
             vasp = self.get_vasp()
             other_key = vasp.info_context.get_peer_compliance_verification_key(
-                self.get_other_address().as_str()
+                self.other_address_str
             )
             response = json.loads(other_key.verify_message(json_response))
             response = CommandResponseObject.from_json_data_dict(

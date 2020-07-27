@@ -107,9 +107,9 @@ def test_check_command(three_addresses, payment, processor):
     for state in states:
         src_addr, dst_addr, origin_addr, res = state
 
-        a0 = LibraAddress.encode(src_addr*4)
-        a1 = LibraAddress.encode(dst_addr*4)
-        origin = LibraAddress.encode(origin_addr*4)
+        a0 = LibraAddress.from_bytes(src_addr*4)
+        a1 = LibraAddress.from_bytes(dst_addr*4)
+        origin = LibraAddress.from_bytes(origin_addr*4)
 
         channel.get_my_address.return_value = a0
         channel.get_other_address.return_value = a1
@@ -188,7 +188,7 @@ def test_payment_process_get_extended_kyc(payment, processor, kyc_data):
 def test_persist(payment):
     store = StorableFactory({})
 
-    my_addr = LibraAddress.encode(b'A'*16)
+    my_addr = LibraAddress.from_bytes(b'A'*16)
     my_addr_str = my_addr.as_str()
     bcm = TestBusinessContext(my_addr)
     processor = PaymentProcessor(bcm, store)
@@ -226,7 +226,7 @@ def test_persist(payment):
 def test_reprocess(payment,  loop):
     store = StorableFactory({})
 
-    my_addr = LibraAddress.encode(b'A'*16)
+    my_addr = LibraAddress.from_bytes(b'A'*16)
     my_addr_str = my_addr.as_str()
     bcm = TestBusinessContext(my_addr)
     processor = PaymentProcessor(bcm, store, loop)
@@ -257,8 +257,8 @@ def test_reprocess(payment,  loop):
 def test_process_command_success_no_proc(payment, loop):
     store = StorableFactory({})
 
-    my_addr = LibraAddress.encode(b'B'*16)
-    other_addr = LibraAddress.encode(b'A'*16)
+    my_addr = LibraAddress.from_bytes(b'B'*16)
+    other_addr = LibraAddress.from_bytes(b'A'*16)
     bcm = TestBusinessContext(my_addr)
     processor = PaymentProcessor(bcm, store, loop)
 
@@ -275,8 +275,8 @@ def test_process_command_success_no_proc(payment, loop):
 def test_process_command_success_vanilla(payment, loop):
     store = StorableFactory({})
 
-    my_addr = LibraAddress.encode(b'B'*16)
-    other_addr = LibraAddress.encode(b'A'*16)
+    my_addr = LibraAddress.from_bytes(b'B'*16)
+    other_addr = LibraAddress.from_bytes(b'A'*16)
     bcm = TestBusinessContext(my_addr)
     processor = PaymentProcessor(bcm, store, loop)
 

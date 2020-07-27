@@ -136,7 +136,7 @@ class PaymentProcessor(CommandProcessor):
         )
         new_tasks = []
         for (other_address_str, command, seq) in pending_commands:
-            other_address = LibraAddress(other_address_str)
+            other_address = LibraAddress.from_encoded_str(other_address_str)
             task = self.loop.create_task(self.process_command_success_async(
                 other_address, command, seq))
             new_tasks += [task]
@@ -160,7 +160,7 @@ class PaymentProcessor(CommandProcessor):
                     f'Command with {other_address.as_str()}.#{seq}'
                     f' Trigger outcome.')
 
-                # try to constuct a payment.
+                # try to construct a payment.
                 payment = command.get_payment(self.object_store)
                 self.set_payment_outcome_exception(
                                 payment.reference_id,
@@ -358,13 +358,15 @@ class PaymentProcessor(CommandProcessor):
 
         # Ensure that the two parties involved are in the VASP channel
         parties = set([
-            new_payment.sender.get_address().as_str(),
-            new_payment.receiver.get_address().as_str(),
+            new_payment.sender.get_onchain_address_encoded_str(),
+            new_payment.receiver.get_onchain_address_encoded_str()
         ])
+
+        other_addr_str = other_address.as_str()
 
         needed_parties = set([
             my_address.as_str(),
-            other_address.as_str()
+            other_addr_str
         ])
 
         if parties != needed_parties:
@@ -373,15 +375,14 @@ class PaymentProcessor(CommandProcessor):
                 f'but got {str(parties)}'
             )
 
-        other_addr = other_address.as_str()
 
         # Ensure the originator is one of the VASPs in the channel.
-        origin = command.get_origin().as_str()
-        if origin not in parties:
+        origin_str = command.get_origin().as_str()
+        if origin_str not in parties:
             raise PaymentLogicError('Command originates from wrong party')
 
         # Only check the commands we get from others.
-        if origin == other_addr:
+        if origin_str == other_addr_str:
             if command.dependencies == []:
 
                 # Check that the reference_id is correct
@@ -389,9 +390,9 @@ class PaymentProcessor(CommandProcessor):
                 # the ref id stays the same.
 
                 ref_id_structure = new_payment.reference_id.split('_')
-                if not (len(ref_id_structure) > 1 and ref_id_structure[0] == origin):
+                if not (len(ref_id_structure) > 1 and ref_id_structure[0] == origin_str):
                     raise PaymentLogicError(
-                        f'Expected reference_id of the form {origin}_XYZ, got: '
+                        f'Expected reference_id of the form {origin_str}_XYZ, got: '
                         f'{new_payment.reference_id}'
                     )
 
@@ -405,7 +406,6 @@ class PaymentProcessor(CommandProcessor):
                         seq, status_success, error=None):
         ''' Overrides CommandProcessor. '''
 
-        #other_addr = channel.get_other_address()
         other_str = other_addr.as_str()
 
         # Call the failure handler and exit.
@@ -431,7 +431,7 @@ class PaymentProcessor(CommandProcessor):
         self.persist_command_obligation(other_str, seq, command)
 
         # Spin further command processing in its own task.
-        logger.debug(f'(other:{other_addr.as_str()}) Schedule cmd {seq}')
+        logger.debug(f'(other:{other_str}) Schedule cmd {seq}')
         fut = self.loop.create_task(self.process_command_success_async(
             other_addr, command, seq))
 
@@ -515,18 +515,6 @@ class PaymentProcessor(CommandProcessor):
         is_receipient = business.is_recipient(new_payment)
         is_sender = not is_receipient
 
-        # Ensure address and subaddress are consistent
-        sender_addr = LibraAddress(new_payment.sender.get_address().as_str(),)
-        sender_subaddr = LibraAddress(new_payment.sender.address)
-        recv_addr = LibraAddress(new_payment.receiver.get_address().as_str(),)
-        recv_subaddr = LibraAddress(new_payment.receiver.address)
-
-        if sender_subaddr.onchain() != sender_addr or \
-                recv_subaddr.onchain() != recv_addr:
-            raise PaymentLogicError(
-                'Address and subaddress mismatch.'
-            )
-
         role = ['sender', 'receiver'][is_receipient]
 
         if new_payment.data[role].status.as_status() != Status.none:
@@ -537,16 +525,20 @@ class PaymentProcessor(CommandProcessor):
         if not self.good_initial_status(new_payment, not is_sender):
             raise PaymentLogicError('Invalid status transition.')
 
-        # Check that the subaddreses are valid
-        sub_send = LibraAddress(new_payment.sender.address)
-        sub_revr = LibraAddress(new_payment.receiver.address)
+        # Check that the subaddresses are present
+        sub_send = LibraAddress.from_encoded_str(new_payment.sender.address)
+        sub_revr = LibraAddress.from_encoded_str(new_payment.receiver.address)
 
-        if sub_send.version != 1:
-            raise PaymentLogicError('Sender Subaddress needs to contain'
-                                    ' an encoded subaddress.')
-        if sub_revr.version != 1:
-            raise PaymentLogicError('Receiver Subaddress needs to contain'
-                                    ' an encoded subaddress.')
+        if not sub_send.subaddress_bytes:
+            raise PaymentLogicError(
+                f'Sender address needs to contain an encoded subaddress, '
+                f'but got {sub_send.as_str()}'
+            )
+        if not sub_revr.subaddress_bytes:
+            raise PaymentLogicError(
+                f'Receiver address needs to contain an encoded subaddress, '
+                f'but got {sub_revr.as_str()}'
+            )
 
         self.check_signatures(new_payment)
 

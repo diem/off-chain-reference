@@ -21,8 +21,8 @@ import asyncio
 
 # A stand alone performance test.
 
-PeerA_addr = LibraAddress.encode(b'A'*16)
-PeerB_addr = LibraAddress.encode(b'B'*16)
+PeerA_addr = LibraAddress.from_bytes(b'A'*16)
+PeerB_addr = LibraAddress.from_bytes(b'B'*16)
 peer_address = {
     PeerA_addr.as_str(): 'http://localhost:8091',
     PeerB_addr.as_str(): 'http://localhost:8092',
@@ -106,8 +106,8 @@ async def main_perf(messages_num=10, wait_num=0, verbose=False):
     payments = []
     for cid in range(messages_num):
         peerA_addr = PeerA_addr.as_str()
-        sub_a = LibraAddress.encode(b'A'*16, b'a'*8).as_str()
-        sub_b = LibraAddress.encode(b'B'*16, b'b'*8).as_str()
+        sub_a = LibraAddress.from_bytes(b'A'*16, b'a'*8).as_str()
+        sub_b = LibraAddress.from_bytes(b'B'*16, b'b'*8).as_str()
         sender = PaymentActor(sub_a, StatusObject(Status.needs_kyc_data), [])
         receiver = PaymentActor(sub_b, StatusObject(Status.none), [])
         action = PaymentAction(10, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
