@@ -9,7 +9,7 @@ compliant implementations easy and flexible.
 
 To install the API, activate the Python virtual environment you use, and then execute:
 
-    git clone https://github.com/calibra/off-chain-api.git
+    git clone https://github.com/novifinancial/off-chain-api.git
     cd off-chain-api
     pip install .
 

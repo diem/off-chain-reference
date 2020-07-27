@@ -145,7 +145,7 @@ class Aionet:
             'application/json' content type and data encoded by json.dumps.
         """
 
-        other_addr = LibraAddress(request.match_info['other_addr'])
+        other_addr = LibraAddress.from_encoded_str(request.match_info['other_addr'])
         logger.debug(f'Request Received from {other_addr.as_str()}')
 
         # Check and extract '
@@ -253,6 +253,9 @@ class Aionet:
     def sequence_command(self, other_addr, command):
         ''' Sequences a new command to the local queue, ready to be
             sent to the other VASP.
+
+            other_addr (LibraAddress) : the LibraAddress of the other VASP.
+            command (ProtocolCommand) : A ProtocolCommand instance.
 
             Returns:
                 str: json str of the net message

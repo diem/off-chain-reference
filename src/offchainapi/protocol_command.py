@@ -111,5 +111,5 @@ class ProtocolCommand(JSONSerializable):
         self.creates_versions = list(data['_creates_versions'])
         if flag == JSONFlag.STORE:
             if "_origin" in data:
-                self.origin = LibraAddress(data["_origin"])
+                self.origin = LibraAddress.from_encoded_str(data["_origin"])
         return self
