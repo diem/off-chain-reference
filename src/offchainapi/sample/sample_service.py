@@ -229,6 +229,7 @@ class sample_business(BusinessContext):
         # We are not ready to settle yet!
         return False
 
+
 class sample_vasp:
 
     def __init__(self, my_addr):
