@@ -215,8 +215,7 @@ class PaymentProcessor(CommandProcessor):
 
         try:
             new_payment = None
-            # Notify the business context about the new payment.
-            # This allows the business to do any custom record-keeping
+
             command_ctx = await self.business.payment_pre_processing(
                 other_address, seq, command, payment)
 
@@ -262,8 +261,6 @@ class PaymentProcessor(CommandProcessor):
                         f'created for Payment lastly with seq num #{seq}'
                     )
 
-            # Notify the business context about the new payment.
-            # This allows the business to do any custom record-keeping
             await self.business.payment_post_processing(
                 other_address, seq, command, payment, new_payment, command_ctx)
 
