@@ -182,11 +182,9 @@ def test_vasp_simple(json_request, vasp, other_addr, loop):
 
     key = vasp.info_context.get_peer_compliance_signature_key(other_addr)
     signed_json_request = key.sign_message(json.dumps(json_request))
-    xx = vasp.process_request(other_addr, signed_json_request)
-    assert xx
-    requests = [xx]
-    assert len(requests) == 1
-    assert requests[0].type is CommandResponseObject
+    response = vasp.process_request(other_addr, signed_json_request)
+    assert response
+    assert response.type is CommandResponseObject
 
     assert len(vasp.pp.futs) == 1
     for fut in vasp.pp.futs:

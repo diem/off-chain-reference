@@ -315,7 +315,7 @@ class VASPPairChannel:
 
     def apply_response(self, request):
         """Updates all structures according to the success or failure of
-        a given command. The given request must also contains a response
+        a given command. The given request must also contain a response
         (not None).
 
         Args:

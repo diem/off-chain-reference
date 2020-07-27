@@ -254,6 +254,9 @@ class Aionet:
         ''' Sequences a new command to the local queue, ready to be
             sent to the other VASP.
 
+            other_addr (LibraAddress) : the LibraAddress of the other VASP.
+            command (ProtocolCommand) : A ProtocolCommand instance.
+
             Returns:
                 str: json str of the net message
         '''
