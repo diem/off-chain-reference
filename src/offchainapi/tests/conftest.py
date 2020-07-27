@@ -23,21 +23,21 @@ import json
 
 @pytest.fixture
 def three_addresses():
-    a0 = LibraAddress.encode(b'A'*16)
-    a1 = LibraAddress.encode(b'B' + b'A'*15)
-    a2 = LibraAddress.encode(b'B'*16)
+    a0 = LibraAddress.from_bytes(b'A'*16)
+    a1 = LibraAddress.from_bytes(b'B' + b'A'*15)
+    a2 = LibraAddress.from_bytes(b'B'*16)
     return (a0, a1, a2)
 
 
 @pytest.fixture
 def sender_actor():
-    s_addr = LibraAddress.encode(b'A'*16, b'a'*8).as_str()
+    s_addr = LibraAddress.from_bytes(b'A'*16, b'a'*8).as_str()
     return PaymentActor(s_addr, Status.none, [])
 
 
 @pytest.fixture
 def receiver_actor():
-    s_addr = LibraAddress.encode(b'B'*16, b'b'*8).as_str()
+    s_addr = LibraAddress.from_bytes(b'B'*16, b'b'*8).as_str()
     return PaymentActor(s_addr, Status.none, [])
 
 
