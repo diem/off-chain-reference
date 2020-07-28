@@ -3,7 +3,6 @@
 
 from enum import Enum
 from os import urandom
-from binascii import hexlify
 import json
 
 REQUIRED = True
@@ -83,10 +82,8 @@ class StructureChecker:
             else:
                 if xtype in {str, int, list, dict}:
                     diff[field] = self.data[field]
-                elif issubclass(xtype, Enum):
-                    diff[field] = self.data[field].name
                 else:
-                    diff[field] = str(self.data[field])
+                    raise RuntimeError(f'Cannot get diff for type "{xtype}".')
         return diff
 
     def has_changed(self):
@@ -145,12 +142,10 @@ class StructureChecker:
                         new_diff[field] = xtype.from_full_record(diff[field])
                 else:
                     # Use default constructor of the type
-                    if xtype in {int, str, list}:
+                    if xtype in {int, str, list, dict}:
                         new_diff[field] = xtype(diff[field])
-                    elif issubclass(xtype, Enum):
-                        new_diff[field] = xtype[diff[field]]
                     else:
-                        new_diff[field] = xtype(diff[field])
+                        raise StructureException(f'Cannot parse type: {xtype}')
 
             else:
                 # We tolerate fields we do not know about, but ignore them.
@@ -266,7 +261,6 @@ class JSONSerializable:
     def parse(cls, data, flag):
         """Parse a data dictionary and return a JSON serializable instance. """
         if '_ObjectType' not in data:
-            print(data)
             raise JSONParsingError('No object type information')
 
         if data['_ObjectType'] not in cls.json_type_map:
