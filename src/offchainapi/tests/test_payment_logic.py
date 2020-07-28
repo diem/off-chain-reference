@@ -6,7 +6,7 @@ from ..status_logic import Status
 from ..payment_command import PaymentCommand, PaymentLogicError
 from ..business import BusinessForceAbort, BusinessValidationFailure
 
-from ..payment import PaymentObject
+from ..payment import PaymentObject, StatusObject
 from ..libra_address import LibraAddress
 from ..asyncnet import Aionet
 from ..storage import StorableFactory
@@ -35,7 +35,7 @@ def test_check_new_payment_from_sender(payment, processor):
 def test_check_new_payment_sender_set_receiver_state_fail(payment, processor):
     bcm = processor.business_context()
     bcm.is_recipient.side_effect = [True]
-    payment.receiver.update({'status': Status.ready_for_settlement})
+    payment.receiver.update({'status': StatusObject(Status.ready_for_settlement)})
     with pytest.raises(PaymentLogicError):
         processor.check_new_payment(payment)
 
@@ -43,7 +43,7 @@ def test_check_new_payment_sender_set_receiver_state_fail(payment, processor):
 def test_check_new_payment_receiver_set_sender_state_fail(payment, processor):
     bcm = processor.business_context()
     bcm.is_recipient.side_effect = [False] * 4
-    payment.sender.update({'status': Status.ready_for_settlement})
+    payment.sender.update({'status': StatusObject(Status.ready_for_settlement)})
     with pytest.raises(PaymentLogicError):
         processor.check_new_payment(payment)
 
@@ -70,7 +70,7 @@ def test_payment_update_from_sender(payment, processor):
 def test_check_new_update_sender_modify_receiver_state_fail(payment, processor):
     bcm = processor.business_context()
     bcm.is_recipient.side_effect = [True]*5
-    diff = {'receiver': {'status': "settled"}}
+    diff = {'receiver': {'status': { 'status': "settled"}}}
     new_obj = payment.new_version()
     new_obj = PaymentObject.from_full_record(diff, base_instance=new_obj)
     assert new_obj.receiver.data['status'] != payment.receiver.data['status']
@@ -81,7 +81,7 @@ def test_check_new_update_sender_modify_receiver_state_fail(payment, processor):
 def test_check_new_update_receiver_modify_sender_state_fail(payment, processor):
     bcm = processor.business_context()
     bcm.is_recipient.side_effect = [False]*5
-    diff = {'sender': {'status': "settled"}}
+    diff = {'sender': {'status': { 'status': "settled"}}}
     new_obj = payment.new_version()
     new_obj = PaymentObject.from_full_record(diff, base_instance=new_obj)
     assert new_obj.sender.data['status'] != payment.sender.data['status']
@@ -136,9 +136,9 @@ def test_payment_process_receiver_new_payment(payment, processor):
     bcm.next_kyc_level_to_request.side_effect = [Status.needs_kyc_data]
     bcm.next_kyc_to_provide.side_effect = [{Status.none}]
     bcm.ready_for_settlement.side_effect = [False]
-    assert payment.receiver.status == Status.none
+    assert payment.receiver.status.as_status() == Status.none
     new_payment = processor.payment_process(payment)
-    assert new_payment.receiver.status == Status.needs_kyc_data
+    assert new_payment.receiver.status.as_status() == Status.needs_kyc_data
 
     bcm.is_recipient.side_effect = [True, True]
     bcm.check_account_existence.side_effect = [None]
@@ -147,7 +147,7 @@ def test_payment_process_receiver_new_payment(payment, processor):
     bcm.ready_for_settlement.side_effect = [ True ]
     bcm.has_settled.side_effect = [False]
     new_payment2 = processor.payment_process(new_payment)
-    assert new_payment2.receiver.status == Status.ready_for_settlement
+    assert new_payment2.receiver.status.as_status() == Status.ready_for_settlement
 
     bcm.is_recipient.side_effect = [True, True]
     bcm.check_account_existence.side_effect = [None]
@@ -156,7 +156,7 @@ def test_payment_process_receiver_new_payment(payment, processor):
     bcm.ready_for_settlement.side_effect = [ True ]
     bcm.has_settled.side_effect = [True]
     new_payment3 = processor.payment_process(new_payment2)
-    assert new_payment3.receiver.status == Status.ready_for_settlement
+    assert new_payment3.receiver.status.as_status() == Status.ready_for_settlement
 
 
 def test_payment_process_abort_from_receiver(payment, processor):
@@ -165,16 +165,16 @@ def test_payment_process_abort_from_receiver(payment, processor):
     bcm.check_account_existence.side_effect = [None]
     bcm.next_kyc_level_to_request.side_effect = [BusinessForceAbort]
     new_payment = processor.payment_process(payment)
-    assert new_payment.receiver.status == Status.abort
+    assert new_payment.receiver.status.as_status() == Status.abort
 
 
 def test_payment_process_abort_from_sender(payment, processor):
     bcm = processor.business_context()
     bcm.is_recipient.side_effect = [True]
     bcm.ready_for_settlement.side_effect = [False]
-    payment.sender.status = Status.abort
+    payment.sender.status = StatusObject(Status.abort, 'code', 'msg')
     new_payment = processor.payment_process(payment)
-    assert new_payment.receiver.status == Status.abort
+    assert new_payment.receiver.status.as_status() == Status.abort
 
 
 def test_payment_process_get_extended_kyc(payment, processor, kyc_data):

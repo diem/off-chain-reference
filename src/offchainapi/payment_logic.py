@@ -4,8 +4,7 @@
 from .business import BusinessForceAbort
 from .protocol_command import ProtocolCommand
 from .command_processor import CommandProcessor
-from .payment import Status, PaymentObject
-from .status_logic import is_valid_status_transition, is_valid_initial
+from .payment import Status, PaymentObject, StatusObject
 from .payment_command import PaymentCommand, PaymentLogicError
 from .asyncnet import NetworkException
 from .shared_object import SharedObject
@@ -311,10 +310,10 @@ class PaymentProcessor(CommandProcessor):
         '''
 
         # Check if payment is in a final state
-        if not (payment.sender.status == Status.settled or \
-                payment.receiver.status == Status.settled or \
-                payment.sender.status == Status.abort or \
-                payment.receiver.status == Status.abort):
+        if not (payment.sender.status.as_status() == Status.settled or \
+                payment.receiver.status.as_status() == Status.settled or \
+                payment.sender.status.as_status() == Status.abort or \
+                payment.receiver.status.as_status() == Status.abort):
             return
 
         # Check if anyone is waiting for this payment.
@@ -517,9 +516,8 @@ class PaymentProcessor(CommandProcessor):
         is_sender = not is_receipient
 
         role = ['sender', 'receiver'][is_receipient]
-        other_role = ['sender', 'receiver'][is_sender]
-        other_status = new_payment.data[other_role].status
-        if new_payment.data[role].status != Status.none:
+
+        if new_payment.data[role].status.as_status() != Status.none:
             raise PaymentLogicError(
                 'Sender set receiver status or vice-versa.'
             )
@@ -565,8 +563,8 @@ class PaymentProcessor(CommandProcessor):
             raise PaymentLogicError(f'Cannot change {role} information.')
 
         # Check the status transition is valid.
-        status = myself_actor.status
-        other_status = other_actor.status
+        status = myself_actor.status.as_status()
+        other_status = other_actor.status.as_status()
         other_role_is_sender = not is_sender
 
         if not self.can_change_status(payment, other_status, other_role_is_sender):
@@ -597,18 +595,47 @@ class PaymentProcessor(CommandProcessor):
             * bool: True for valid transition and False otherwise.
         """
 
-        old_sender = payment.sender.status
-        old_receiver = payment.receiver.status
+        old_sender = payment.sender.status.as_status()
+        old_receiver = payment.receiver.status.as_status()
         new_sender, new_receiver = old_sender, old_receiver
         if actor_is_sender:
             new_sender = new_status
         else:
             new_receiver = new_status
 
-        valid = is_valid_status_transition(
-            old_sender, old_receiver,
-            new_sender, new_receiver,
-            actor_is_sender)
+        valid = True
+
+        # Ensure other side stays the same.
+        if actor_is_sender:
+            valid &= new_receiver == old_receiver
+            changed_old, changed_new = old_sender, new_sender
+        else:
+            valid &= new_sender == old_sender
+            changed_old, changed_new = old_receiver, new_receiver
+
+        # Terminal states remain terminal
+        if changed_old in {Status.abort, Status.settled}:
+            valid &= changed_old == changed_new
+            return valid
+
+        # Respect ordering of status
+        status_heights = {
+            Status.none: 100,
+            Status.needs_kyc_data: 200,
+            Status.needs_recipient_signature: 200,
+            Status.ready_for_settlement: 400,
+            Status.settled: 800,
+            Status.abort: 1000
+        }
+
+        valid &= status_heights[changed_new] >= status_heights[changed_old]
+
+        # We only settle after both sides agree to settle
+        ready_level = status_heights[Status.ready_for_settlement]
+        if changed_new in {Status.settled}:
+            valid &= (status_heights[new_sender] >= ready_level and
+                      status_heights[new_receiver] >= ready_level)
+
         return valid
 
     def good_initial_status(self, payment, actor_is_sender):
@@ -616,9 +643,9 @@ class PaymentProcessor(CommandProcessor):
             the role of the actor that created it. Returns a bool set
             to true if it is valid."""
 
-        sender_st = payment.sender.status
-        receiver_st = payment.receiver.status
-        return is_valid_initial(sender_st, receiver_st, actor_is_sender)
+        if actor_is_sender:
+            return payment.receiver.status.as_status() == Status.none
+        return payment.sender.status.as_status() == Status.none
 
     async def payment_process_async(self, payment, ctx=None):
         ''' Processes a payment that was just updated, and returns a
@@ -637,7 +664,7 @@ class PaymentProcessor(CommandProcessor):
         role = ['sender', 'receiver'][is_receiver]
         other_role = ['sender', 'receiver'][not is_receiver]
 
-        status = payment.data[role].status
+        status = payment.data[role].status.as_status()
 
         if status in {Status.settled, Status.abort}:
             # Nothing more to be done with this payment
@@ -646,14 +673,20 @@ class PaymentProcessor(CommandProcessor):
             return payment.new_version()
 
         current_status = status
-        other_status = payment.data[other_role].status
+        other_status = payment.data[other_role].status.as_status()
 
         new_payment = payment.new_version()
+
+        abort_code = None
+        abort_msg = None
 
         try:
             # We set our status as abort.
             if other_status == Status.abort:
                 current_status = Status.abort
+
+                abort_code = 'FOLLOW'
+                abort_msg = 'Follows the abort from the other side.'
 
             if current_status == Status.none:
                 await business.check_account_existence(new_payment, ctx)
@@ -700,13 +733,16 @@ class PaymentProcessor(CommandProcessor):
                 if await business.has_settled(new_payment, ctx):
                     current_status = Status.settled
 
-        except BusinessForceAbort:
+        except BusinessForceAbort as e:
 
             # We cannot abort once we said we are ready_for_settlement
             # or beyond. However we will catch a wrong change in the
             # check when we change status.
             new_payment = payment.new_version(new_payment.version)
             current_status = Status.abort
+
+            abort_code = e.code
+            abort_msg = e.message
 
         except Exception as e:
             logger.error(
@@ -720,10 +756,14 @@ class PaymentProcessor(CommandProcessor):
             new_payment.data[role].add_metadata(f'Error: ({role}): {str(e)}')
             current_status = Status.abort
 
+            # TODO: use proper codes and messages on abort.
+            abort_code = 'EXCEPTION_ABORT'
+            abort_msg = str(e)  # TODO: do not leak raw exceptions.
+
         # Do an internal consistency check:
         if not self.can_change_status(payment, current_status, is_sender):
-            sender_status = payment.sender.status
-            receiver_status = payment.receiver.status
+            sender_status = payment.sender.status.as_status()
+            receiver_status = payment.receiver.status.as_status()
             raise PaymentLogicError(
                 f'Invalid status transition while processing '
                 f'payment {payment.get_version()}: '
@@ -731,5 +771,6 @@ class PaymentProcessor(CommandProcessor):
                 f'SENDER={is_sender}'
             )
 
-        new_payment.data[role].change_status(current_status)
+        new_payment.data[role].change_status(
+            StatusObject(current_status, abort_code, abort_msg))
         return new_payment

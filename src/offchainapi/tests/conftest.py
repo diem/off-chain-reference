@@ -1,7 +1,7 @@
 # Copyright (c) The Libra Core Contributors
 # SPDX-License-Identifier: Apache-2.0
 
-from ..payment import PaymentActor, PaymentAction, PaymentObject, KYCData
+from ..payment import PaymentActor, PaymentAction, PaymentObject, KYCData, StatusObject
 from ..business import BusinessContext, VASPInfo
 from ..storage import StorableFactory
 from ..payment_logic import Status, PaymentProcessor, PaymentCommand
@@ -32,13 +32,13 @@ def three_addresses():
 @pytest.fixture
 def sender_actor():
     s_addr = LibraAddress.from_bytes(b'A'*16, b'a'*8).as_str()
-    return PaymentActor(s_addr, Status.none, [])
+    return PaymentActor(s_addr, StatusObject(Status.none), [])
 
 
 @pytest.fixture
 def receiver_actor():
     s_addr = LibraAddress.from_bytes(b'B'*16, b'b'*8).as_str()
-    return PaymentActor(s_addr, Status.none, [])
+    return PaymentActor(s_addr, StatusObject(Status.none), [])
 
 
 @pytest.fixture
@@ -118,8 +118,8 @@ def db(tmp_path):
 
 @pytest.fixture
 def command(payment_action):
-    sender = PaymentActor('C', Status.none, [])
-    receiver = PaymentActor('1', Status.none, [])
+    sender = PaymentActor('C', StatusObject(Status.none), [])
+    receiver = PaymentActor('1', StatusObject(Status.none), [])
     payment = PaymentObject(
         sender, receiver, 'XYZ_ABC', 'orig_ref', 'desc', payment_action
     )

@@ -6,7 +6,7 @@ from ..asyncnet import Aionet
 from ..storage import StorableFactory
 from ..libra_address import LibraAddress
 from ..payment_logic import PaymentProcessor, PaymentCommand
-from ..payment import PaymentAction, PaymentActor, PaymentObject
+from ..payment import PaymentAction, PaymentActor, PaymentObject, StatusObject
 from ..status_logic import Status
 
 from .basic_business_context import TestBusinessContext
@@ -23,9 +23,9 @@ def payment_sender_init():
     action = PaymentAction(5, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
 
     s_addr = LibraAddress.from_bytes(b'A'*16, b'a'*8).as_str()
-    sender =  PaymentActor(s_addr, Status.needs_kyc_data, [])
+    sender = PaymentActor(s_addr, StatusObject(Status.needs_kyc_data), [])
     r_addr = LibraAddress.from_bytes(b'B'*16, b'b'*8).as_str()
-    receiver =  PaymentActor(r_addr, Status.none, [])
+    receiver = PaymentActor(r_addr, StatusObject(Status.none), [])
 
     ref = f'{other_addr.as_str()}_XGGXHSHHSJ'
 

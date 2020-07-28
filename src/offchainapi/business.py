@@ -20,8 +20,16 @@ class BusinessValidationFailure(Exception):
 
 
 class BusinessForceAbort(Exception):
-    ''' Indicates protocol must abort the transaction. '''
-    pass
+    ''' Request an abort with given code and message.
+
+    Params:
+        * code (str): an error code on abort.
+        * message (str): a message explaining the reason for abort.
+    '''
+
+    def __init__(self, code, message):
+        self.code = code
+        self.message = message
 
 
 class BusinessContext:

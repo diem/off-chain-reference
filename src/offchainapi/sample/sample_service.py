@@ -142,10 +142,10 @@ class sample_business(BusinessContext):
 
         to_provide = set()
 
-        if payment.data[other_role].status == Status.needs_kyc_data:
+        if payment.data[other_role].status.as_status() == Status.needs_kyc_data:
                 to_provide.add(Status.needs_kyc_data)
 
-        if payment.data[other_role].status == Status.needs_recipient_signature:
+        if payment.data[other_role].status.as_status() == Status.needs_recipient_signature:
                 if my_role == 'receiver':
                     to_provide.add(Status.needs_recipient_signature)
 
@@ -170,7 +170,7 @@ class sample_business(BusinessContext):
         if 'recipient_signature' not in payment.data and my_role == 'sender':
             return Status.needs_recipient_signature
 
-        return payment.data[my_role].status
+        return payment.data[my_role].status.as_status()
 
     async def get_extended_kyc(self, payment, ctx=None):
         ''' Gets the extended KYC information for this payment.
@@ -230,7 +230,7 @@ class sample_business(BusinessContext):
         return False
 
     async def has_settled(self, payment, ctx=None):
-        if payment.sender.status == Status.settled:
+        if payment.sender.as_status() == Status.settled:
             # In this VASP we consider we are ready to settle when the sender
             # says so (in reality we would check on-chain as well.)
             my_role = self.get_my_role(payment)

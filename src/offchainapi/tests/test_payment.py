@@ -1,7 +1,7 @@
 # Copyright (c) The Libra Core Contributors
 # SPDX-License-Identifier: Apache-2.0
 
-from ..payment import PaymentActor, PaymentAction, PaymentObject, KYCData
+from ..payment import PaymentActor, PaymentAction, PaymentObject, KYCData, StatusObject
 from ..utils import StructureException, JSONFlag
 from ..payment_logic import Status
 
@@ -69,12 +69,35 @@ def test_payment_action_creation():
         _ = PaymentAction(10, 'LBT', 'charge', 0)
 
 
+def test_status_valdation():
+    snone1 = StatusObject(Status.none)
+    snone2 = StatusObject('none')
+    sabort1 = StatusObject('needs_kyc_data')
+    assert snone1 == snone2
+    assert snone1 != sabort1
+
+    with pytest.raises(StructureException):
+        _ = StatusObject('UNKNOWN')
+
+    # check the aborts
+    abort2 = StatusObject('abort', 'code', 'message')
+    with pytest.raises(StructureException):
+        _ = StatusObject('abort', 'code')
+
+    with pytest.raises(StructureException):
+        _ = StatusObject('none', 'code')
+    with pytest.raises(StructureException):
+        _ = StatusObject('none', 'code', 'message')
+
+
+
 def test_payment_actor_creation():
-    actor = PaymentActor('XYZ', Status.none, [])
+    snone = StatusObject(Status.none)
+    actor = PaymentActor('XYZ', snone, [])
 
     with pytest.raises(StructureException):
         # Bad subaddress type
-        _ = PaymentActor(0, Status.none, [])
+        _ = PaymentActor(0, snone, [])
 
     with pytest.raises(StructureException):
         # Bad status type
@@ -82,12 +105,12 @@ def test_payment_actor_creation():
 
     with pytest.raises(StructureException):
         # Bad metadata type
-        _ = PaymentActor('XYZ', Status.none, 0)
+        _ = PaymentActor('XYZ', snone, 0)
 
 
 def test_payment_actor_update_status(sender_actor):
-    sender_actor.change_status(Status.needs_kyc_data)
-    sender_actor.change_status(Status.ready_for_settlement)
+    sender_actor.change_status(StatusObject(Status.needs_kyc_data))
+    sender_actor.change_status(StatusObject(Status.ready_for_settlement))
 
     with pytest.raises(StructureException):
         sender_actor.change_status(0)
@@ -155,7 +178,7 @@ def test_specific():
     json_struct = {
                     'sender': {
                         'address': 'aaaa',
-                        'status': 'settled',
+                        'status': {'status': 'settled'},
                         'metadata': [],
                         'kyc_data': {
                             "payload_type": "KYC_DATA",
@@ -165,7 +188,7 @@ def test_specific():
                     },
                     'receiver': {
                         'address': 'bbbb',
-                        'status': 'needs_kyc_data',
+                        'status': {'status': 'needs_kyc_data'},
                         'metadata': [],
                         'kyc_data': {
                             "payload_type": "KYC_DATA",
@@ -216,12 +239,6 @@ def test_to_json(kyc_data, sender_actor, receiver_actor, payment_action):
     assert payment == new_payment
 
 
-def test_payment_actor_update_bad_status_fails(sender_actor):
-    diff = {'status': 'wrong_status'}
-    with pytest.raises(StructureException):
-        sender_actor.custom_update_checks(diff)
-
-
 def test_payment_actor_update_bad_metadata_fails(sender_actor):
     diff = {'metadata': [1234]}
     with pytest.raises(StructureException):
@@ -231,3 +248,21 @@ def test_payment_actor_update_bad_metadata_fails(sender_actor):
 def test_payment_actor_add_metadata(sender_actor):
     sender_actor.add_metadata('abcd')
     assert sender_actor.metadata == ['abcd']
+
+
+def test_status_object():
+    so0 = StatusObject('needs_kyc_data')
+    assert so0.data['status'] == 'needs_kyc_data'
+    assert 'abort_code' not in so0.data
+
+    so1 = StatusObject(Status.ready_for_settlement)
+    assert so1.status == "ready_for_settlement"
+    assert Status.ready_for_settlement == so1.as_status()
+
+    with pytest.raises(StructureException):
+        _ = StatusObject(Status.abort)
+
+    _ = StatusObject(
+            Status.abort,
+            abort_code='XYZ',
+            abort_message='Explain XYZ')
