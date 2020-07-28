@@ -2,10 +2,10 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from .business import BusinessForceAbort
-from .executor import CommandProcessor, ProtocolCommand
+from .protocol_command import ProtocolCommand
+from .command_processor import CommandProcessor
 from .payment import Status, PaymentObject
-from .status_logic import status_heights_MUST, \
-    is_valid_status_transition, is_valid_initial
+from .status_logic import is_valid_status_transition, is_valid_initial
 from .payment_command import PaymentCommand, PaymentLogicError
 from .asyncnet import NetworkException
 from .shared_object import SharedObject
@@ -419,7 +419,7 @@ class PaymentProcessor(CommandProcessor):
             return fut
 
         # Creates new objects.
-        new_versions = command.new_object_versions()
+        new_versions = command.get_new_object_versions()
         for version in new_versions:
             obj = command.get_object(version, self.object_store)
             self.object_store[version] = obj

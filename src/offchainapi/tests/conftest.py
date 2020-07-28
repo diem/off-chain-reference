@@ -6,7 +6,6 @@ from ..business import BusinessContext, VASPInfo
 from ..storage import StorableFactory
 from ..payment_logic import Status, PaymentProcessor, PaymentCommand
 from ..protocol import OffChainVASP, VASPPairChannel
-from ..executor import ProtocolExecutor
 from ..command_processor import CommandProcessor
 from ..libra_address import LibraAddress
 from ..protocol_messages import CommandRequestObject
@@ -75,18 +74,6 @@ def processor(store):
 
 
 @pytest.fixture
-def executor(three_addresses, store):
-    a0, _, a1 = three_addresses
-    channel = MagicMock(spec=VASPPairChannel)
-    channel.get_my_address.return_value = a0
-    channel.get_other_address.return_value = a1
-    with store:
-        channel.storage = store
-        command_processor = MagicMock(spec=CommandProcessor)
-        return ProtocolExecutor(channel, command_processor)
-
-
-@pytest.fixture
 def key():
     return ComplianceKey.generate()
 
@@ -110,22 +97,6 @@ def channel(three_addresses, vasp, store):
 
 @pytest.fixture
 def two_channels(three_addresses, vasp, store):
-    def monkey_tap(pair):
-        pair.msg = []
-
-        def to_tap(self, msg):
-            assert msg is not None
-            self.msg += [deepcopy(msg)]
-
-        def tap(self):
-            msg = self.msg
-            self.msg = []
-            return msg
-
-        pair.tap = types.MethodType(tap, pair)
-        pair.send_request = types.MethodType(to_tap, pair)
-        pair.send_response = types.MethodType(to_tap, pair)
-        return pair
 
     a0, a1, _ = three_addresses
     command_processor = MagicMock(spec=CommandProcessor)
@@ -136,9 +107,7 @@ def two_channels(three_addresses, vasp, store):
         a1, a0, vasp, store, command_processor
     )
 
-    server, client = monkey_tap(server), monkey_tap(client)
     return (server, client)
-
 
 @pytest.fixture
 def db(tmp_path):
@@ -160,14 +129,13 @@ def command(payment_action):
 @pytest.fixture
 def json_request(command):
     request = CommandRequestObject(command)
-    request.seq = 0
-    request.command_seq = 0
+    request.cid = 'SEQ_0'
     return request.get_json_data_dict(JSONFlag.NET)
 
 
 @pytest.fixture
 def json_response():
-    return {"seq": 0, "command_seq": 0, "status": "success"}
+    return {"cid": 'SEQ_0', "status": "success"}
 
 
 @pytest.fixture

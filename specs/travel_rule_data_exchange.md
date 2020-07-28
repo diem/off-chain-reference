@@ -105,6 +105,8 @@ For a travel rule data exchange, the [command_type](basic_building_blocks.md#com
 </pre>
 </details>
 
+The __dependencies_ list tracks the object versions that are necessary for a command to succeed. It allows server and client to detect commands that conflict, since they would list the same object version in their __dependencies_ lists. In such cases only one of the conflicting commands should proceed and be 'successful', and the other one should be a 'failure'. When a command status is successful, the objects with versions in the __create_versions_ list are created and may be used by subsequent commands. All object versions listed in the __dependencies_ list of a successful command become unavailable to subsequent commands.
+
 ### PaymentObject
 
 The structure in this object can be a full payment of just the fields of an existing payment object that need to be changed. Some fields are immutable after they are defined once (see below). Others can by updated multiple times. Updating immutable fields with a different value results in a command error, but it is acceptable to re-send the same value.

@@ -103,8 +103,7 @@ def json_request(my_addr, other_addr, payment_action):
     )
     command = PaymentCommand(payment)
     request = CommandRequestObject(command)
-    request.seq = 0
-    request.command_seq = 0
+    request.cid = 0
     return request.get_json_data_dict(JSONFlag.NET)
 
 
@@ -115,11 +114,10 @@ def json_request(my_addr, other_addr, payment_action):
     (10, 10, 'success', None, None),
 ])
 def simple_response_json_error(request, key):
-    seq, cmd_seq, status, protoerr, errcode = request.param
+    cid, cmd_seq, status, protoerr, errcode = request.param
     resp = CommandResponseObject()
     resp.status = status
-    resp.seq = seq
-    resp.command_seq = cmd_seq
+    resp.cid = cid
     if status == 'failure':
         resp.error = OffChainError(protoerr, errcode)
     json_obj = resp.get_json_data_dict(JSONFlag.NET)
@@ -184,10 +182,9 @@ def test_vasp_simple(json_request, vasp, other_addr, loop):
 
     key = vasp.info_context.get_peer_compliance_signature_key(other_addr)
     signed_json_request = key.sign_message(json.dumps(json_request))
-    vasp.process_request(other_addr, signed_json_request)
-    requests = vasp.collect_messages()
-    assert len(requests) == 1
-    assert requests[0].type is CommandResponseObject
+    response = vasp.process_request(other_addr, signed_json_request)
+    assert response
+    assert response.type is CommandResponseObject
 
     assert len(vasp.pp.futs) == 1
     for fut in vasp.pp.futs:
@@ -207,8 +204,8 @@ def test_vasp_simple_wrong_VASP(json_request, other_addr, loop, key):
 
     try:
         # vasp.pp.start_processor()
-        vasp.process_request(other_addr, signed_json_request)
-        responses = vasp.collect_messages()
+        resp = vasp.process_request(other_addr, signed_json_request)
+        responses = [resp]
         assert len(responses) == 1
         assert responses[0].type is CommandResponseObject
         content = json.loads(key.verify_message(responses[0].content))
@@ -219,4 +216,5 @@ def test_vasp_simple_wrong_VASP(json_request, other_addr, loop, key):
 
 
 def test_vasp_response(simple_response_json_error, vasp, other_addr):
-    vasp.process_response(other_addr, simple_response_json_error)
+    with pytest.raises(Exception):
+        vasp.process_response(other_addr, simple_response_json_error)

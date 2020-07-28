@@ -183,7 +183,7 @@ def test_value_command(db, payment):
 
 def test_value_request(db, payment):
     cmd = CommandRequestObject(PaymentCommand(payment))
-    cmd.seq = 10
+    cmd.cid = '10'
 
     val = StorableValue(db, 'command', CommandRequestObject)
     val.set_value(cmd)

@@ -187,15 +187,6 @@ async def main_perf(messages_num=10, wait_num=0, verbose=False):
                 for p in hist:
                     print(p.pretty())
 
-    # Esure they were register as successes on both sides.
-    Asucc = len([x for x in channelAB.executor.command_status_sequence if x])
-    Atotal = len(channelAB.executor.command_status_sequence)
-    print(f'Peer A successes: {Asucc}/{Atotal}')
-
-    Bsucc = len([x for x in channelBA.executor.command_status_sequence if x])
-    Btotal = len(channelBA.executor.command_status_sequence)
-    print(f'Peer B successes: {Bsucc}/{Btotal}')
-
     print(f'Estimate throughput #: {len(commands)/elapsed} Tx/s')
 
     # Close the loops
