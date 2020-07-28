@@ -104,18 +104,6 @@ class StructureChecker:
 
         return False
 
-    def what_changed(self):
-        ''' Generator that provides a sequence of changes.
-        The items in the sequence are tuples of (object, chnage_dictionary)'''
-        parse = self.parse_map()
-        for new_diff in self.update_record:
-            yield (self, new_diff)
-
-        for field in self.data:
-            _, parse_more = parse[field]
-            if parse_more:
-                yield from self.data[field].what_changed()
-
     def __eq__(self, other):
         ''' Define equality as equality between data fields only '''
         if not isinstance(other, type(self)):
