@@ -5,7 +5,8 @@
 from ..storage import StorableDict, StorableList, StorableValue, StorableFactory
 from ..payment_logic import PaymentCommand
 from ..protocol_messages import make_success_response, CommandRequestObject, \
-    make_command_error, OffChainErrorCode
+    make_command_error
+from ..errors import OffChainErrorCode
 
 import pytest
 

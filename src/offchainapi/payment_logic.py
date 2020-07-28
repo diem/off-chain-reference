@@ -3,7 +3,7 @@
 
 from .business import BusinessForceAbort
 from .protocol_command import ProtocolCommand
-from .protocol_messages import OffChainErrorCode
+from .errors import OffChainErrorCode
 from .command_processor import CommandProcessor
 from .payment import Status, PaymentObject, StatusObject
 from .payment_command import PaymentCommand, PaymentLogicError

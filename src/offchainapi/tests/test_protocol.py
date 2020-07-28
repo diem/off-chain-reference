@@ -3,19 +3,19 @@
 
 from ..protocol import VASPPairChannel, make_protocol_error, DependencyException
 from ..protocol_messages import CommandRequestObject, CommandResponseObject, \
-    OffChainProtocolError, OffChainException, OffChainErrorCode
+    OffChainProtocolError, OffChainException
+from ..errors import OffChainErrorCode
 from ..sample.sample_command import SampleCommand
 from ..command_processor import CommandProcessor
 from ..utils import JSONSerializable, JSONFlag
 from ..storage import StorableFactory
 
-import types
 from copy import deepcopy
 import random
 from unittest.mock import MagicMock
 import pytest
-import asyncio
 import json
+
 
 class RandomRun(object):
     def __init__(self, server, client, commands, seed='fixed seed'):
@@ -45,7 +45,6 @@ class RandomRun(object):
         server = self.server
         client = self.client
         commands = self.commands
-
 
         while True:
 

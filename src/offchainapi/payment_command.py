@@ -5,7 +5,7 @@ from .protocol_command import ProtocolCommand
 from .payment import PaymentObject
 from .utils import JSONSerializable
 from .command_processor import CommandValidationError
-from .protocol_messages import OffChainErrorCode
+from .errors import OffChainErrorCode
 
 
 # Functions to check incoming diffs

@@ -1,7 +1,7 @@
 # Copyright (c) The Libra Core Contributors
 # SPDX-License-Identifier: Apache-2.0
 
-from .protocol_messages import OffChainErrorCode
+from .errors import OffChainErrorCode
 
 class CommandValidationError(Exception):
     def __init__(self, error_code, error_message):
