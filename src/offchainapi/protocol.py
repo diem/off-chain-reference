@@ -23,7 +23,7 @@ NetMessage = namedtuple('NetMessage', ['src', 'dst', 'type', 'content'])
 logger = logging.getLogger(name='libra_off_chain_api.protocol')
 
 
-class DependencyException(Exception):
+class DependencyException(OffChainException):
     pass
 
 
