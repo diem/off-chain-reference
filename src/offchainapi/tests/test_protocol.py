@@ -3,7 +3,7 @@
 
 from ..protocol import VASPPairChannel, make_protocol_error, DependencyException
 from ..protocol_messages import CommandRequestObject, CommandResponseObject, \
-    OffChainProtocolError, OffChainException
+    OffChainProtocolError, OffChainException, OffChainErrorCode
 from ..sample.sample_command import SampleCommand
 from ..command_processor import CommandProcessor
 from ..utils import JSONSerializable, JSONFlag
@@ -225,7 +225,7 @@ def test_protocol_server_conflicting_sequence(two_channels):
 
     # The response to the second command is a failure
     assert reply_conflict.status == 'failure'
-    assert reply_conflict.error.code == 'conflict'
+    assert reply_conflict.error.code == OffChainErrorCode.conflict
 
     # Pass the reply back to the server
     assert server.next_final_sequence() == 0
@@ -510,7 +510,7 @@ def test_json_serlialize():
     assert req0 == req1
     assert req1 != req2
 
-    req0.response = make_protocol_error(req0, 'The error code')
+    req0.response = make_protocol_error(req0, OffChainErrorCode.test_error_code)
     data_err = req0.get_json_data_dict(JSONFlag.STORE)
     assert data_err is not None
     assert data_err['response'] is not None

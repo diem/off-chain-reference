@@ -5,7 +5,7 @@ from .command_processor import CommandProcessor
 from .protocol_messages import CommandRequestObject, CommandResponseObject, \
     OffChainProtocolError, OffChainException, \
     make_success_response, make_protocol_error, \
-    make_parsing_error, make_command_error
+    make_parsing_error, make_command_error, OffChainErrorCode
 from .utils import JSONParsingError, JSONFlag
 from .libra_address import LibraAddress
 from .crypto import OffChainInvalidSignature
@@ -485,7 +485,9 @@ class VASPPairChannel:
                     # There is a conflict, and it will have to be resolved
                     # TODO[issue 8]: How are conflicts meant to be resolved?
                     # With only two participants we cannot tolerate errors.
-                    response = make_protocol_error(request, code='conflict')
+                    response = make_protocol_error(
+                        request, code=OffChainErrorCode.conflict)
+
                     response.previous_command = previous_request.command
                     logger.error(
                         f'(other:{self.other_address_str}) '
@@ -510,7 +512,8 @@ class VASPPairChannel:
             if is_locked:
                 if self.is_server():
                     # The server requests take precedence, so make this wait.
-                    response = make_protocol_error(request, code='wait')
+                    response = make_protocol_error(
+                        request, code=OffChainErrorCode.wait)
                     return response
                 else:
                     # A client yields the locks to the server.
@@ -518,7 +521,8 @@ class VASPPairChannel:
 
         # Option 1: raise due to missing deps
         if not has_all_deps:
-            response = make_command_error(request, code='missing_dependency')
+            response = make_command_error(
+                request, code=OffChainErrorCode.missing_dependencies)
 
         else:
 
@@ -534,7 +538,10 @@ class VASPPairChannel:
                 # Option 3: did not raise, so return success.
                 response = make_success_response(request)
             except Exception as e:
-                response = make_command_error(request, str(e))
+                response = make_command_error(
+                    request,
+                    code=OffChainErrorCode.command_validation_error,
+                    message=str(e))
 
         # Write back to storage
         request.response = response

@@ -2,6 +2,22 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from .utils import JSONSerializable, JSONParsingError, JSONFlag
+from enum import Enum
+
+
+class OffChainErrorCode(Enum):
+
+    # Codes for protocol errors
+    conflict = 'conflict'
+    wait = 'wait'
+    parsing_error = 'parsing_error'
+
+    # Codes for command errors
+    missing_dependencies = 'missing_dependencies'
+    command_validation_error = 'command_validation_error'
+
+    # Test codes
+    test_error_code = 'test_error_code'
 
 
 class OffChainException(Exception):
@@ -37,19 +53,20 @@ class OffChainError(JSONSerializable):
     """Represents an OffChainError.
 
     Args:
-        protocol_error (bool, optional): Whether it is a protocol error.
-                                         Defaults to True.
-        code (str or None, optional): The error code. Defaults to None.
+        protocol_error (bool): Whether it is a protocol error.
+        code (OffchainErrorCode ): The error code.
         message (str): An error message explaining the problem. Defaults to None.
     """
 
-    def __init__(self, protocol_error=True, code=None, message=None):
+    def __init__(self, protocol_error, code, message=None):
         self.protocol_error = protocol_error
+
+        assert isinstance(code, OffChainErrorCode)
         self.code = code
         self.message = message
         # If no separate message, then message is code.
         if message is None:
-            self.message = code
+            self.message = f'Unspecified error with code "{code.value}"'
 
     def __eq__(self, other):
         return isinstance(other, OffChainError) \
@@ -60,7 +77,7 @@ class OffChainError(JSONSerializable):
         ''' Override JSONSerializable. '''
         data_dict = {
             "protocol_error": self.protocol_error,
-            "code": self.code
+            "code": str(self.code.value)
             }
 
         if self.message is not None:
@@ -68,6 +85,7 @@ class OffChainError(JSONSerializable):
 
         if __debug__:
             import json
+            print(data_dict)
             assert json.dumps(data_dict)
         return data_dict
 
@@ -76,7 +94,7 @@ class OffChainError(JSONSerializable):
         ''' Override JSONSerializable. '''
         try:
             protocol_error = bool(data['protocol_error'])
-            code = str(data['code'])
+            code = OffChainErrorCode[data['code']]
             message = None
             if 'message' in data:
                 message = str(data['message'])
@@ -265,14 +283,15 @@ def make_success_response(request):
     return response
 
 
-def make_protocol_error(request, code=None):
+def make_protocol_error(request, code, message=None):
     """ Constructs a CommandResponse signaling a protocol failure.
         We do not sequence or store such responses since we can recover
         from them.
 
     Args:
         request (CommandRequestObject): The request object.
-        code (int or None, optional): The error code. Defaults to None.
+        code (OffchainErrorCode): The error code.
+        message (str, optional): A human-readable message about this error.
 
     Returns:
         CommandResponseObject: The generated response object.
@@ -280,32 +299,38 @@ def make_protocol_error(request, code=None):
     response = CommandResponseObject()
     response.cid = request.cid
     response.status = 'failure'
-    response.error = OffChainError(protocol_error=True, code=code)
+    response.error = OffChainError(protocol_error=True, code=code, message=message)
     return response
 
 
-def make_parsing_error():
+def make_parsing_error(message=None):
     """ Constructs a CommandResponse signaling a protocol failure.
         We do not sequence or store such responses since we can recover
         from them.
 
+    Args:
+        message (str, optional): A human-readable message about this error.
+
     Returns:
         CommandResponseObject: The generated response object.
+
     """
     response = CommandResponseObject()
     response.cid = None
     response.status = 'failure'
-    response.error = OffChainError(protocol_error=True, code='parsing')
+    response.error = OffChainError(
+        protocol_error=True, code=OffChainErrorCode.parsing_error, message=message)
     return response
 
 
-def make_command_error(request, code=None):
+def make_command_error(request, code, message=None):
     """ Constructs a CommandResponse signaling a command failure.
         Those failures lead to a command being sequenced as a failure.
 
     Args:
         request (CommandRequestObject): The request object.
-        code (int or None, optional): The error code. Defaults to None.
+        code (OffchainErrorCode): The error code.
+        message (str, optional): A human-readable message about this error.
 
     Returns:
         CommandResponseObject: The generated response object.
@@ -313,5 +338,5 @@ def make_command_error(request, code=None):
     response = CommandResponseObject()
     response.cid = request.cid
     response.status = 'failure'
-    response.error = OffChainError(protocol_error=False, code=code)
+    response.error = OffChainError(protocol_error=False, code=code, message=message)
     return response
