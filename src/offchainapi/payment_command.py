@@ -4,10 +4,12 @@
 from .protocol_command import ProtocolCommand
 from .payment import PaymentObject
 from .utils import JSONSerializable
+from .command_processor import CommandValidationError
+from .protocol_messages import OffChainErrorCode
 
 
 # Functions to check incoming diffs
-class PaymentLogicError(Exception):
+class PaymentLogicError(CommandValidationError):
     """ Indicates a payment processing error. """
     pass
 
@@ -56,6 +58,7 @@ class PaymentCommand(ProtocolCommand):
         new_version = self.get_new_version()
         if new_version != version_number:
             raise PaymentLogicError(
+                OffChainErrorCode.payment_dependency_error,
                 f"Unknown object {version_number} (only know {new_version})"
             )
 
@@ -70,6 +73,7 @@ class PaymentCommand(ProtocolCommand):
             dep = self.dependencies[0]
             if dep not in dependencies:
                 raise PaymentLogicError(
+                    OffChainErrorCode.payment_wrong_structure,
                     f'Cound not find payment dependency: {dep}'
                 )
             dep_object = dependencies[dep]
@@ -80,7 +84,9 @@ class PaymentCommand(ProtocolCommand):
                 self.command, base_instance=updated_payment)
             return updated_payment
 
-        raise PaymentLogicError("Can depdend on no or one other payment.")
+        raise PaymentLogicError(
+            OffChainErrorCode.payment_wrong_structure,
+            "Can depdend on no or one other payment.")
 
     def get_payment(self, dependencies):
         version = self.get_new_version()

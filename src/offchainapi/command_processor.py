@@ -1,6 +1,16 @@
 # Copyright (c) The Libra Core Contributors
 # SPDX-License-Identifier: Apache-2.0
 
+from .protocol_messages import OffChainErrorCode
+
+class CommandValidationError(Exception):
+    def __init__(self, error_code, error_message):
+        self.error_code = error_code
+        if not isinstance(error_code, OffChainErrorCode):
+            raise RuntimeError(f'Error code must be of type OffChainErrorCode, not {type(error_code)}')
+        self.error_message = error_message
+
+
 class CommandProcessor:
 
     def business_context(self):
@@ -24,6 +34,12 @@ class CommandProcessor:
                 my_address (LibraAddress): own address.
                 other_address (LibraAddress): other party address.
                 command (PaymentCommand): The current payment.
+
+            Returns:
+                None: in case no errors are found.
+
+            Raises:
+                CommandValidationError: to indicate an error.
         '''
         raise NotImplementedError()  # pragma: no cover
 

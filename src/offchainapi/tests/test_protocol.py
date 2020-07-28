@@ -182,18 +182,12 @@ def test_protocol_server_client_benign(two_channels):
     request = server.sequence_command_local(SampleCommand('Hello'))
     assert isinstance(request, CommandRequestObject)
 
-    print()
-    print(request.pretty(JSONFlag.NET))
-
     # Pass the request to the client
     assert len(client.other_request_index) == 0
     reply = client.handle_request(request)
     assert isinstance(reply, CommandResponseObject)
     assert len(client.other_request_index) == 1
     assert reply.status == 'success'
-
-    print()
-    print(reply.pretty(JSONFlag.NET))
 
     # Pass the reply back to the server
     assert server.next_final_sequence() == 0

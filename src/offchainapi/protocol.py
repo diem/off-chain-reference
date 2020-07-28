@@ -1,7 +1,7 @@
 # Copyright (c) The Libra Core Contributors
 # SPDX-License-Identifier: Apache-2.0
 
-from .command_processor import CommandProcessor
+from .command_processor import CommandProcessor, CommandValidationError
 from .protocol_messages import CommandRequestObject, CommandResponseObject, \
     OffChainProtocolError, OffChainException, \
     make_success_response, make_protocol_error, \
@@ -537,11 +537,12 @@ class VASPPairChannel:
 
                 # Option 3: did not raise, so return success.
                 response = make_success_response(request)
-            except Exception as e:
+            except CommandValidationError as e:
+                print(f'EXCEPT {e}')
                 response = make_command_error(
                     request,
-                    code=OffChainErrorCode.command_validation_error,
-                    message=str(e))
+                    code=e.error_code,
+                    message=e.error_message)
 
         # Write back to storage
         request.response = response

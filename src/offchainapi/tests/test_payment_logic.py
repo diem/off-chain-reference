@@ -197,9 +197,6 @@ def test_persist(payment):
     processor.set_network(net)
 
     cmd = PaymentCommand(payment)
-    print()
-    print(cmd.pretty(JSONFlag.NET))
-
     assert len(processor.list_command_obligations()) == 0
 
     # Check that a  atomic write context must be in place.

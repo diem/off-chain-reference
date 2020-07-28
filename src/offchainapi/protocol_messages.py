@@ -16,6 +16,14 @@ class OffChainErrorCode(Enum):
     missing_dependencies = 'missing_dependencies'
     command_validation_error = 'command_validation_error'
 
+    # Payment command error codes
+    payment_wrong_status = 'payment_wrong_status'
+    payment_changed_other_actor = 'payment_changed_other_actor'
+    payment_wrong_actor = 'payment_wrong_actor'
+    payment_wrong_structure = 'payment_wrong_structure'
+    payment_dependency_error = 'payment_dependency_error'
+
+
     # Test codes
     test_error_code = 'test_error_code'
 
@@ -85,7 +93,6 @@ class OffChainError(JSONSerializable):
 
         if __debug__:
             import json
-            print(data_dict)
             assert json.dumps(data_dict)
         return data_dict
 

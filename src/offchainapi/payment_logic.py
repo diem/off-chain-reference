@@ -3,6 +3,7 @@
 
 from .business import BusinessForceAbort
 from .protocol_command import ProtocolCommand
+from .protocol_messages import OffChainErrorCode
 from .command_processor import CommandProcessor
 from .payment import Status, PaymentObject, StatusObject
 from .payment_command import PaymentCommand, PaymentLogicError
@@ -191,7 +192,7 @@ class PaymentProcessor(CommandProcessor):
         """
         # To process commands we should have set a network
         if self.net is None:
-            raise PaymentLogicError(
+            raise RuntimeError(
                 'Setup a processor network to process commands.'
             )
 
@@ -371,6 +372,7 @@ class PaymentProcessor(CommandProcessor):
 
         if parties != needed_parties:
             raise PaymentLogicError(
+                OffChainErrorCode.payment_wrong_actor,
                 f'Wrong Parties: expected {needed_parties} '
                 f'but got {str(parties)}'
             )
@@ -379,7 +381,9 @@ class PaymentProcessor(CommandProcessor):
         # Ensure the originator is one of the VASPs in the channel.
         origin_str = command.get_origin().as_str()
         if origin_str not in parties:
-            raise PaymentLogicError('Command originates from wrong party')
+            raise PaymentLogicError(
+                OffChainErrorCode.payment_wrong_actor,
+                f'Command originates from {origin_str} wrong party')
 
         # Only check the commands we get from others.
         if origin_str == other_addr_str:
@@ -519,11 +523,14 @@ class PaymentProcessor(CommandProcessor):
 
         if new_payment.data[role].status.as_status() != Status.none:
             raise PaymentLogicError(
-                'Sender set receiver status or vice-versa.'
+                OffChainErrorCode.payment_wrong_status,
+                f'Sender set receiver status or vice-versa.'
             )
 
         if not self.good_initial_status(new_payment, not is_sender):
-            raise PaymentLogicError('Invalid status transition.')
+            raise PaymentLogicError(
+                        OffChainErrorCode.payment_wrong_status,
+                        'Invalid status transition.')
 
         # Check that the subaddresses are present
         sub_send = LibraAddress.from_encoded_str(new_payment.sender.address)
@@ -560,7 +567,9 @@ class PaymentProcessor(CommandProcessor):
 
         # Ensure nothing on our side was changed by this update.
         if myself_actor != myself_actor_new:
-            raise PaymentLogicError(f'Cannot change {role} information.')
+            raise PaymentLogicError(
+                OffChainErrorCode.payment_changed_other_actor,
+                f'Cannot change {role} information.')
 
         # Check the status transition is valid.
         status = myself_actor.status.as_status()
@@ -568,7 +577,9 @@ class PaymentProcessor(CommandProcessor):
         other_role_is_sender = not is_sender
 
         if not self.can_change_status(payment, other_status, other_role_is_sender):
-            raise PaymentLogicError('Invalid Status transition')
+            raise PaymentLogicError(
+                OffChainErrorCode.payment_wrong_status,
+                'Invalid Status transition')
 
         self.check_signatures(new_payment)
 
@@ -758,7 +769,7 @@ class PaymentProcessor(CommandProcessor):
         if not self.can_change_status(payment, current_status, is_sender):
             sender_status = payment.sender.status.as_status()
             receiver_status = payment.receiver.status.as_status()
-            raise PaymentLogicError(
+            raise RuntimeError(
                 f'Invalid status transition while processing '
                 f'payment {payment.get_version()}: '
                 f'(({sender_status}, {receiver_status})) -> {current_status} '
