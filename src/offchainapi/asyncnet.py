@@ -167,9 +167,12 @@ class Aionet:
         try:
             request_json = await request.json()
 
-            # TODO: Handle timeout errors here.
             logger.debug(f'Data Received from {other_addr.as_str()}.')
             response = channel.parse_handle_request(request_json)
+
+            # Send back the response.
+            logger.debug(f'Sending back response to {other_addr.as_str()}.')
+            return web.json_response(response.content, headers=headers)
 
         except json.decoder.JSONDecodeError as e:
             # Raised if the request does not contain valid json.
@@ -182,10 +185,8 @@ class Aionet:
             logger.debug(f'ContentTypeError', exc_info=True)
             raise web.HTTPBadRequest(headers=headers)
 
-        # Send back the response.
-        logger.debug(f'Process Waiting messages.')
-        logger.debug(f'Sending back response to {other_addr.as_str()}.')
-        return web.json_response(response.content, headers=headers)
+        # TODO: Handle timeout errors here.
+
 
     async def send_request(self, other_addr, json_request):
         """ Uses an Http client to send an OffChainAPI request to another VASP.
@@ -264,6 +265,11 @@ class Aionet:
 
         channel = self.vasp.get_channel(other_addr)
         request = channel.sequence_command_local(command)
+
+        # Extract this to be used in testing
+        if __debug__:
+            self._cid = request.cid
+
         request = channel.package_request(request)
         request = request.content
         return request

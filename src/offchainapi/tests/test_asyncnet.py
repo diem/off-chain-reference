@@ -41,9 +41,12 @@ async def client(net_handler, aiohttp_client):
 
 @pytest.fixture
 async def server(net_handler, tester_addr, aiohttp_server, key):
+    obj = {}
+
     async def handler(request):
+        cid = obj.get('cid', 'XXX')
         headers = {'X-Request-ID': request.headers['X-Request-ID']}
-        resp = {"cid": 'XXX', "status": "success"}
+        resp = {"cid": cid, "status": "success"}
         signed_json_response = key.sign_message(json.dumps(resp))
         return aiohttp.web.json_response(signed_json_response, headers=headers)
 
@@ -51,6 +54,7 @@ async def server(net_handler, tester_addr, aiohttp_server, key):
     url = net_handler.get_url('/', tester_addr.as_str(), other_is_server=True)
     app.add_routes([aiohttp.web.post(url, handler)])
     server = await aiohttp_server(app)
+    server.obj = obj
     return server
 
 
@@ -99,10 +103,11 @@ async def test_send_request(net_handler, tester_addr, server, signed_json_reques
     # not expect a response.
 
 
-@pytest.mark.skip(reason="Currently cannot extract the fixed cid.")
 async def test_send_command(net_handler, tester_addr, server, command):
     base_url = f'http://{server.host}:{server.port}'
     net_handler.vasp.info_context.get_peer_base_url.return_value = base_url
     req = net_handler.sequence_command(tester_addr, command)
+    server.obj['cid'] = net_handler._cid
+
     ret = await net_handler.send_request(tester_addr, req)
     assert ret
