@@ -62,13 +62,6 @@ def test_init(vasp):
     Aionet(vasp)
 
 
-async def test_handle_request_debug(client):
-    response = await client.post('/')
-    assert response.status == 200
-    text = await response.text()
-    assert 'Hello, world' in text
-
-
 async def test_handle_request(url, net_handler, key, client, signed_json_request):
     #from json import dumps
     headers = {'X-Request-ID' : 'abc'}

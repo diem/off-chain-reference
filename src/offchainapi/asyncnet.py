@@ -40,12 +40,6 @@ class Aionet:
         self.app.add_routes([web.post(route, self.handle_request)])
         logger.debug(f'Register route {route}')
 
-        if __debug__:
-            self.app.add_routes([
-                web.post('/', self.handle_request_debug),
-                web.get('/', self.handle_request_debug)
-            ])
-
         # The watchdog process variables.
         self.watchdog_period = 10.0  # seconds
         self.watchdog_task_obj = None  # Store the task here to cancel.
@@ -124,10 +118,7 @@ class Aionet:
         url = f'v1/{server}/{client}/command/'
         full_url = urljoin(base_url, url)
         return full_url
-
-    if __debug__:
-        async def handle_request_debug(self, request):
-            return web.Response(text='Hello, world')
+        
 
     async def handle_request(self, request):
         """ Main Http server handler for incomming OffChainAPI requests.
