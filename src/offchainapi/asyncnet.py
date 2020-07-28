@@ -11,7 +11,6 @@ from aiohttp.client_exceptions import ClientError
 import asyncio
 import logging
 from urllib.parse import urljoin
-import json
 
 
 logger = logging.getLogger(name='libra_off_chain_api.asyncnet')
@@ -142,8 +141,7 @@ class Aionet:
             aiohttp.web.HTTPBadRequest: An exception for 400 Bad Request.
 
         Returns:
-            aiohttp.web.Response: A json response with predefined
-            'application/json' content type and data encoded by json.dumps.
+            aiohttp.web.Response: A JWS signed response.
         """
 
         other_addr = LibraAddress.from_encoded_str(request.match_info['other_addr'])
@@ -164,36 +162,23 @@ class Aionet:
             raise web.HTTPUnauthorized(headers=headers)
 
         # Perform the request, send back the reponse.
-        try:
-            request_json = await request.json()
+        request_text = await request.text()
 
-            logger.debug(f'Data Received from {other_addr.as_str()}.')
-            response = channel.parse_handle_request(request_json)
+        logger.debug(f'Data Received from {other_addr.as_str()}.')
+        response = channel.parse_handle_request(request_text)
 
-            # Send back the response.
-            logger.debug(f'Sending back response to {other_addr.as_str()}.')
-            return web.json_response(response.content, headers=headers)
-
-        except json.decoder.JSONDecodeError as e:
-            # Raised if the request does not contain valid json.
-            logger.debug(f'JSONDecodeError', exc_info=True)
-            raise web.HTTPBadRequest(headers=headers)
-
-        except aiohttp.client_exceptions.ContentTypeError as e:
-            # Raised when the server replies with wrong content type;
-            # eg. text/html instead of json.
-            logger.debug(f'ContentTypeError', exc_info=True)
-            raise web.HTTPBadRequest(headers=headers)
-
-        # TODO: Handle timeout errors here.
+        # Send back the response.
+        logger.debug(f'Sending back response to {other_addr.as_str()}.')
+        return web.Response(text=response.content, headers=headers)
 
 
-    async def send_request(self, other_addr, json_request):
+
+    async def send_request(self, other_addr, request_text):
         """ Uses an Http client to send an OffChainAPI request to another VASP.
 
         Args:
             other_addr (LibraAddress): The LibraAddress of the other VASP.
-            json_request (dict): a Dict that is a serialized request,
+            request_text (dict): a JWS signed request,
                 ready to be sent across the network.
 
         Raises:
@@ -220,34 +205,32 @@ class Aionet:
         try:
             async with self.session.post(
                     url,
-                    json=json_request,
+                    data=request_text,
                     headers=headers
             ) as response:
-                try:
-                    # Check the header is correct
-                    if 'X-Request-ID' not in response.headers or \
-                            response.headers['X-Request-ID'] != headers['X-Request-ID']:
-                        raise Exception(
-                            'Incorrect X-Request-ID header:', response.headers
-                        )
 
-                    json_response = await response.json()
-                    logger.debug(f'Json response: {json_response}')
+                # Check the header is correct
+                if 'X-Request-ID' not in response.headers or \
+                        response.headers['X-Request-ID'] != headers['X-Request-ID']:
+                    raise Exception(
+                        'Incorrect X-Request-ID header:', response.headers
+                    )
 
-                    # Wait in case the requests are sent out of order.
-                    res = channel.parse_handle_response(json_response)
-                    logger.debug(f'Response parsed with status: {res}')
+                # Check that there are no low-level HTTP errors.
+                if response.status != 200 :
+                    err_msg = f'Received status {response.status}: {response.text()}'
+                    raise Exception(err_msg)
 
-                    logger.debug(f'Process Waiting messages')
-                    return res
-                except json.decoder.JSONDecodeError as e:
-                    logger.debug(f'JSONDecodeError', exc_info=True)
-                    raise e
-                except asyncio.CancelledError as e:
-                    raise e
-                except Exception as e:
-                    logger.debug(f'Exception: {type(e)}', exc_info=True)
-                    raise e
+                response_text = await response.text()
+                logger.debug(f'Raw response: {response_text}')
+
+                # Wait in case the requests are sent out of order.
+                res = channel.parse_handle_response(response_text)
+                logger.debug(f'Response parsed with status: {res}')
+
+                logger.debug(f'Process Waiting messages')
+                return res
+
         except ClientError as e:
             logger.debug(f'ClientError {type(e)}: {e}')
             raise NetworkException(e)
@@ -260,7 +243,7 @@ class Aionet:
             command (ProtocolCommand) : A ProtocolCommand instance.
 
             Returns:
-                str: json str of the net message
+                str: str of the net message
         '''
 
         channel = self.vasp.get_channel(other_addr)

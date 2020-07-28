@@ -275,6 +275,7 @@ class VASPPairChannel:
             self.get_my_address().as_str()
         )
         signed_response = my_key.sign_message(json.dumps(struct))
+        assert type(signed_response) is str
 
         net_message = NetMessage(
             self.myself, self.other, CommandResponseObject, signed_response
@@ -515,22 +516,25 @@ class VASPPairChannel:
                     # A client yields the locks to the server.
                     pass
 
-        try:
-            # Option 1: raise due to missing deps
-            if not has_all_deps:
-                raise Exception('Missing dependencies')
+        # Option 1: raise due to missing deps
+        if not has_all_deps:
+            response = make_command_error(request, code='missing_dependency')
 
-            command = request.command
-            my_address = self.get_my_address()
-            other_address = self.get_other_address()
-            # Option 2: raise due to failing checks
-            self.processor.check_command(
-                my_address, other_address, command)
+        else:
 
-            # Option 3: did not raise, so return success.
-            response = make_success_response(request)
-        except Exception as e:
-            response = make_command_error(request, str(e))
+            try:
+                command = request.command
+                my_address = self.get_my_address()
+                other_address = self.get_other_address()
+
+                # Option 2: raise due to failing checks
+                self.processor.check_command(
+                    my_address, other_address, command)
+
+                # Option 3: did not raise, so return success.
+                response = make_success_response(request)
+            except Exception as e:
+                response = make_command_error(request, str(e))
 
         # Write back to storage
         request.response = response
@@ -569,11 +573,11 @@ class VASPPairChannel:
                 if dv in self.object_locks and self.object_locks[dv] == request.cid:
                     self.object_locks[dv] = 'True'
 
-    def parse_handle_response(self, json_response):
+    def parse_handle_response(self, response_text):
         """ Handles a response as json string or dict.
 
         Args:
-            json_response (str or dict): The json response.
+            response_text (str): The response signed iusing JWS.
 
         Returns:
             bool: Whether the command was a success or not
@@ -583,7 +587,9 @@ class VASPPairChannel:
             other_key = vasp.info_context.get_peer_compliance_verification_key(
                 self.other_address_str
             )
-            response = json.loads(other_key.verify_message(json_response))
+
+            verified_response = other_key.verify_message(response_text)
+            response = json.loads(verified_response)
             response = CommandResponseObject.from_json_data_dict(
                 response, JSONFlag.NET
             )
