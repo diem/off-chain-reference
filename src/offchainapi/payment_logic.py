@@ -647,7 +647,7 @@ class PaymentProcessor(CommandProcessor):
         new_payment = payment.new_version()
 
         try:
-            ctx = await business.payment_initial_processing(payment, ctx)
+            await business.payment_initial_processing(payment, ctx)
 
             if status in {Status.settled, Status.abort}:
                 # Nothing more to be done with this payment
