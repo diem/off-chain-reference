@@ -97,4 +97,12 @@ async def test_send_command(net_handler, tester_addr, server, command):
     server.obj['cid'] = net_handler._cid
 
     ret = await net_handler.send_request(tester_addr, req)
+    await net_handler.close()
     assert ret
+
+
+async def test_close_watchdog(net_handler, loop):
+    net_handler.schedule_watchdog(loop, period=0.1)
+    import asyncio
+    await asyncio.sleep(0.4, loop=loop)
+    await net_handler.close()
