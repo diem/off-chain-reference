@@ -123,7 +123,8 @@ class Aionet:
             server = self.vasp.get_vasp_address().as_str()
             client = other_addr_str
         url = f'v1/{server}/{client}/command/'
-        return urljoin(base_url, url)
+        full_url = urljoin(base_url, url)
+        return full_url
 
     if __debug__:
         async def handle_request_debug(self, request):

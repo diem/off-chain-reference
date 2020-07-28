@@ -72,7 +72,7 @@ class PaymentProcessor(CommandProcessor):
                 'command_cache', ProtocolCommand, root)
 
         # Allow mapping a set of future to payment reference_id outcomes
-        # Once a payment has an outcome (settled, abort, or command exception)
+        # Once a payment has an outcome (ready_for_settlement, abort, or command exception)
         # notify the appropriate futures of the result. These do not persist
         # crashes since they are run-time objects.
 
@@ -195,6 +195,10 @@ class PaymentProcessor(CommandProcessor):
                 'Setup a processor network to process commands.'
             )
 
+        # Update the outcome of the payment
+        payment = command.get_payment(self.object_store)
+        self.set_payment_outcome(payment)
+
         # If there is no registered obligation to process there is no
         # need to process this command. We log here an error, which
         # might be due to a bug.
@@ -207,10 +211,6 @@ class PaymentProcessor(CommandProcessor):
             return
 
         logger.info(f'(other:{other_address_str}) Process Command #{seq}')
-
-        # Update the outcome of the payment
-        payment = command.get_payment(self.object_store)
-        self.set_payment_outcome(payment)
 
         try:
             # Notify the business context about the new payment.
@@ -250,8 +250,8 @@ class PaymentProcessor(CommandProcessor):
                     # despite being our turn to make progress. As a result
                     # some extra processing should be done until progress
                     # can be made. Note that if the payment is already done
-                    # (as in settled/abort) we have set an outcome for it,
-                    # and this will be a no-op.
+                    # (as in ready_for_settlement/abort) we have set an outcome
+                    # for it, and this will be a no-op.
                     self.set_payment_outcome_exception(
                         payment.reference_id,
                         PaymentProcessorNoProgress())
@@ -284,8 +284,8 @@ class PaymentProcessor(CommandProcessor):
 
     async def wait_for_payment_outcome(self, reference_id):
         ''' Returns the payment object with the given a reference_id once the
-        object has the sender or receiver status set to either 'settled' or
-        'abort'.
+        object has the sender and/or receiver status set to either
+        'ready_for_settlement' or 'abort'.
         '''
         fut = self.loop.create_future()
 
@@ -310,8 +310,8 @@ class PaymentProcessor(CommandProcessor):
         '''
 
         # Check if payment is in a final state
-        if not (payment.sender.status.as_status() == Status.settled or \
-                payment.receiver.status.as_status() == Status.settled or \
+        if not ((payment.sender.status.as_status() == Status.ready_for_settlement and \
+                payment.receiver.status.as_status() == Status.ready_for_settlement) or \
                 payment.sender.status.as_status() == Status.abort or \
                 payment.receiver.status.as_status() == Status.abort):
             return
@@ -614,8 +614,13 @@ class PaymentProcessor(CommandProcessor):
             changed_old, changed_new = old_receiver, new_receiver
 
         # Terminal states remain terminal
-        if changed_old in {Status.abort, Status.settled}:
+        if changed_old in {Status.abort}:
             valid &= changed_old == changed_new
+            return valid
+
+        if old_sender == Status.ready_for_settlement and \
+                old_receiver == Status.ready_for_settlement:
+            valid &= new_sender == old_sender
             return valid
 
         # Respect ordering of status
@@ -624,18 +629,10 @@ class PaymentProcessor(CommandProcessor):
             Status.needs_kyc_data: 200,
             Status.needs_recipient_signature: 200,
             Status.ready_for_settlement: 400,
-            Status.settled: 800,
             Status.abort: 1000
         }
 
         valid &= status_heights[changed_new] >= status_heights[changed_old]
-
-        # We only settle after both sides agree to settle
-        ready_level = status_heights[Status.ready_for_settlement]
-        if changed_new in {Status.settled}:
-            valid &= (status_heights[new_sender] >= ready_level and
-                      status_heights[new_receiver] >= ready_level)
-
         return valid
 
     def good_initial_status(self, payment, actor_is_sender):
@@ -665,8 +662,12 @@ class PaymentProcessor(CommandProcessor):
         other_role = ['sender', 'receiver'][not is_receiver]
 
         status = payment.data[role].status.as_status()
+        status_other = payment.data[other_role].status.as_status()
 
-        if status in {Status.settled, Status.abort}:
+        if status in {Status.abort} or (
+            status == Status.ready_for_settlement and
+            status_other == Status.ready_for_settlement
+        ):
             # Nothing more to be done with this payment
             # Return a new payment version with no modification
             # To singnal no changes, and therefore no new command.
@@ -721,17 +722,10 @@ class PaymentProcessor(CommandProcessor):
             # Check if we have all the KYC we need
             if current_status not in {
                     Status.ready_for_settlement,
-                    Status.settled,
                     Status.abort}:
                 ready = await business.ready_for_settlement(new_payment, ctx)
                 if ready:
                     current_status = Status.ready_for_settlement
-
-            # Ensure both sides are past the finality barrier
-            if current_status == Status.ready_for_settlement \
-                    and self.can_change_status(payment, Status.settled, is_sender):
-                if await business.has_settled(new_payment, ctx):
-                    current_status = Status.settled
 
         except BusinessForceAbort as e:
 

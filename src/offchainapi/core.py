@@ -120,15 +120,16 @@ class Vasp:
         return result.result()
 
     async def wait_for_payment_outcome_async(self, payment_reference_id):
-        ''' Awaits until the payment with the given reference_id is either
-        settled or aborted and returns the payment object at that version.
+        ''' Awaits until the payment with the given reference_id is
+        ready_for_settlement or aborted and returns the payment object
+        at that version.
 
         Parameters:
             payment_reference_id (str): the reference_id of the payment
                 of interest.
 
         Returns a PaymentObject with the given reference_id that is ether
-        settled or aborted by one of the parties.
+        ready_for_settlement or aborted by one of the parties.
 
         '''
         payment = await self.pp.wait_for_payment_outcome(payment_reference_id)
