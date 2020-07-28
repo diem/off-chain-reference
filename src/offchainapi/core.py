@@ -236,8 +236,6 @@ class Vasp:
         payment = list(self.pp.get_payment_history_by_ref_id(reference_id))
         return payment
 
-
-
     async def close_async(self):
         ''' Await this to cleanly close the network
            and any pending commands being processed. '''
