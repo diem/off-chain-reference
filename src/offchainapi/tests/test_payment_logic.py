@@ -6,12 +6,13 @@ from ..status_logic import Status
 from ..payment_command import PaymentCommand, PaymentLogicError
 from ..business import BusinessForceAbort, BusinessValidationFailure
 
-from ..payment import PaymentObject, StatusObject
+from ..payment import PaymentObject, StatusObject, PaymentActor
 from ..libra_address import LibraAddress
 from ..asyncnet import Aionet
 from ..storage import StorableFactory
 from ..payment_logic import PaymentProcessor
 from ..utils import JSONFlag
+from ..errors import OffChainErrorCode
 
 from .basic_business_context import TestBusinessContext
 
@@ -36,8 +37,9 @@ def test_check_new_payment_sender_set_receiver_state_fail(payment, processor):
     bcm = processor.business_context()
     bcm.is_recipient.side_effect = [True]
     payment.receiver.update({'status': StatusObject(Status.ready_for_settlement)})
-    with pytest.raises(PaymentLogicError):
+    with pytest.raises(PaymentLogicError) as e:
         processor.check_new_payment(payment)
+    assert e.value.error_code == OffChainErrorCode.payment_wrong_status
 
 
 def test_check_new_payment_receiver_set_sender_state_fail(payment, processor):
@@ -52,11 +54,62 @@ def test_check_signatures_bad_fail(payment, processor):
     bcm.is_recipient.side_effect = [False] * 4
     payment.add_recipient_signature('BAD SINGNATURE')
     bcm.validate_recipient_signature.side_effect = [
+        BusinessValidationFailure('Sig fails'),
         BusinessValidationFailure('Sig fails')
     ]
-    with pytest.raises(BusinessValidationFailure):
+    with pytest.raises(BusinessValidationFailure) as e:
         processor.check_signatures(payment)
 
+    with pytest.raises(PaymentLogicError) as e:
+        processor.check_new_payment(payment)
+
+def test_bad_sender_actor_address(payment, processor):
+    snone = StatusObject(Status.none)
+    actor = PaymentActor('XYZ', snone, [])
+
+    bcm = processor.business_context()
+    bcm.is_recipient.side_effect = [False] * 4
+
+    payment.sender = actor
+    with pytest.raises(PaymentLogicError) as e:
+        processor.check_new_payment(payment)
+    assert e.value.error_code == OffChainErrorCode.payment_invalid_libra_address
+
+def test_bad_sender_actor_subaddress(payment, processor):
+    bcm = processor.business_context()
+    bcm.is_recipient.side_effect = [False] * 4
+
+    addr = LibraAddress.from_encoded_str(payment.sender.address)
+    addr2 = LibraAddress.from_bytes(addr.onchain_address_bytes, None)
+    payment.sender.address = addr2.as_str()
+
+    with pytest.raises(PaymentLogicError) as e:
+        processor.check_new_payment(payment)
+    assert e.value.error_code == OffChainErrorCode.payment_invalid_libra_subaddress
+
+def test_bad_receiver_actor_address(payment, processor):
+    snone = StatusObject(Status.none)
+    actor = PaymentActor('XYZ', snone, [])
+
+    bcm = processor.business_context()
+    bcm.is_recipient.side_effect = [False] * 4
+
+    payment.receiver = actor
+    with pytest.raises(PaymentLogicError) as e:
+        processor.check_new_payment(payment)
+    assert e.value.error_code == OffChainErrorCode.payment_invalid_libra_address
+
+def test_bad_receiver_actor_subaddress(payment, processor):
+    bcm = processor.business_context()
+    bcm.is_recipient.side_effect = [False] * 4
+
+    addr = LibraAddress.from_encoded_str(payment.sender.address)
+    addr2 = LibraAddress.from_bytes(addr.onchain_address_bytes, None)
+    payment.receiver.address = addr2.as_str()
+
+    with pytest.raises(PaymentLogicError) as e:
+        processor.check_new_payment(payment)
+    assert e.value.error_code == OffChainErrorCode.payment_invalid_libra_subaddress
 
 def test_payment_update_from_sender(payment, processor):
     bcm = processor.business_context()
@@ -74,6 +127,19 @@ def test_check_new_update_sender_modify_receiver_state_fail(payment, processor):
     new_obj = payment.new_version()
     new_obj = PaymentObject.from_full_record(diff, base_instance=new_obj)
     assert new_obj.receiver.data['status'] != payment.receiver.data['status']
+    with pytest.raises(PaymentLogicError):
+        processor.check_new_update(payment, new_obj)
+
+def test_check_new_update_bad_signature(payment, processor):
+    bcm = processor.business_context()
+    bcm.is_recipient.side_effect = [False] * 5
+    bcm.validate_recipient_signature.side_effect = [
+        BusinessValidationFailure('Bad signature') ]
+
+    diff = {'recipient_signature': 'XXX_BAD_SIGN'}
+    new_obj = payment.new_version()
+    new_obj = PaymentObject.from_full_record(diff, base_instance=new_obj)
+
     with pytest.raises(PaymentLogicError):
         processor.check_new_update(payment, new_obj)
 
@@ -128,6 +194,25 @@ def test_check_command(three_addresses, payment, processor):
                 other_address = channel.get_other_address()
                 processor.check_command(my_address, other_address, command)
 
+def test_check_command_bad_refid(three_addresses, payment, processor):
+    a0, _, a1 = three_addresses
+    channel = MagicMock(spec=VASPPairChannel)
+    channel.get_my_address.return_value = a0
+    channel.get_other_address.return_value = a1
+    origin = a1 # Only check new commands from other side
+
+    # Wrong origin ref_ID address
+    payment.reference_id = f'{origin.as_str()[:-2]}ZZ_XYZ'
+    command = PaymentCommand(payment)
+    command.set_origin(origin)
+
+    my_address = channel.get_my_address()
+    other_address = channel.get_other_address()
+
+    with pytest.raises(PaymentLogicError) as e:
+        processor.check_command(my_address, other_address, command)
+    assert e.value.error_code == OffChainErrorCode.payment_wrong_structure
+
 
 def test_payment_process_receiver_new_payment(payment, processor):
     bcm = processor.business_context()
@@ -174,6 +259,18 @@ def test_payment_process_abort_from_sender(payment, processor):
     new_payment = processor.payment_process(payment)
     assert new_payment.receiver.status.as_status() == Status.abort
 
+def test_payment_process_abort_from_business(payment, processor):
+    bcm = processor.business_context()
+    bcm.is_recipient.side_effect = [True]
+    bcm.ready_for_settlement.side_effect = [
+        BusinessForceAbort('CODE', 'MESSAGE')
+
+     ]
+    new_payment = processor.payment_process(payment)
+    assert payment.receiver.status.as_status() != Status.abort
+    assert new_payment.receiver.status.as_status() == Status.abort
+    assert new_payment.receiver.status.abort_code == 'CODE'
+    assert new_payment.receiver.status.abort_message == 'MESSAGE'
 
 def test_payment_process_get_extended_kyc(payment, processor, kyc_data):
     bcm = processor.business_context()

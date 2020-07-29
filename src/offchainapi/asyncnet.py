@@ -118,7 +118,7 @@ class Aionet:
         url = f'v1/{server}/{client}/command/'
         full_url = urljoin(base_url, url)
         return full_url
-        
+
 
     async def handle_request(self, request):
         """ Main Http server handler for incomming OffChainAPI requests.

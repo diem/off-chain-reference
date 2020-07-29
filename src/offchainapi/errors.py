@@ -39,6 +39,7 @@ class OffChainErrorCode(Enum):
     # rejected with an idempotent command error.
     missing_dependencies = 'missing_dependencies'
 
+
     # Payment command error codes
     # ---------------------------
     #
@@ -46,11 +47,14 @@ class OffChainErrorCode(Enum):
     # as all command errors, results in the request with this cid to alreays
     # fail.)
 
+    payment_invalid_libra_address = 'payment_invalid_libra_address'
+    payment_invalid_libra_subaddress = 'payment_invalid_libra_subaddress'
     payment_wrong_status = 'payment_wrong_status'
     payment_changed_other_actor = 'payment_changed_other_actor'
     payment_wrong_actor = 'payment_wrong_actor'
     payment_wrong_structure = 'payment_wrong_structure'
     payment_dependency_error = 'payment_dependency_error'
+    payment_wrong_recipient_signature = 'payment_wrong_recipient_signature'
 
     # Test codes
     test_error_code = 'test_error_code'

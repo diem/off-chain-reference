@@ -9,6 +9,7 @@ from ..sample.sample_command import SampleCommand
 from ..command_processor import CommandProcessor
 from ..utils import JSONSerializable, JSONFlag
 from ..storage import StorableFactory
+from ..crypto import OffChainInvalidSignature
 
 from copy import deepcopy
 import random
@@ -331,6 +332,17 @@ def test_protocol_conflict1(two_channels):
     succ = client.parse_handle_response(msg2)
     assert succ  # success
 
+
+def test_protocol_bad_signature(two_channels):
+    server, client = two_channels
+
+    msg = 'XRandomXJunk' # client.package_request(msg).content
+    with pytest.raises(OffChainInvalidSignature):
+        msg2 = server.parse_handle_request(msg).content
+
+    msg = '.Random.Junk' # client.package_request(msg).content
+    with pytest.raises(OffChainInvalidSignature):
+        msg2 = server.parse_handle_request(msg).content
 
 def test_protocol_conflict2(two_channels):
     server, client = two_channels

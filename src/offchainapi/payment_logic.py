@@ -1,7 +1,7 @@
 # Copyright (c) The Libra Core Contributors
 # SPDX-License-Identifier: Apache-2.0
 
-from .business import BusinessForceAbort
+from .business import BusinessForceAbort, BusinessValidationFailure
 from .protocol_command import ProtocolCommand
 from .errors import OffChainErrorCode
 from .command_processor import CommandProcessor
@@ -9,7 +9,7 @@ from .payment import Status, PaymentObject, StatusObject
 from .payment_command import PaymentCommand, PaymentLogicError
 from .asyncnet import NetworkException
 from .shared_object import SharedObject
-from .libra_address import LibraAddress
+from .libra_address import LibraAddress, LibraAddressError
 
 import asyncio
 import logging
@@ -266,10 +266,6 @@ class PaymentProcessor(CommandProcessor):
                 if self.obligation_exists(other_address_str, seq):
                     self.release_command_obligation(other_address_str, seq)
 
-        # Prevent the next catch-all handler from catching canceled exceptions.
-        except asyncio.CancelledError as e:
-            raise e
-
         except NetworkException as e:
             logger.warning(
                 f'(other:{other_address_str}) Network error: seq #{seq}: {e}'
@@ -396,6 +392,7 @@ class PaymentProcessor(CommandProcessor):
                 ref_id_structure = new_payment.reference_id.split('_')
                 if not (len(ref_id_structure) > 1 and ref_id_structure[0] == origin_str):
                     raise PaymentLogicError(
+                        OffChainErrorCode.payment_wrong_structure,
                         f'Expected reference_id of the form {origin_str}_XYZ, got: '
                         f'{new_payment.reference_id}'
                     )
@@ -521,33 +518,44 @@ class PaymentProcessor(CommandProcessor):
 
         role = ['sender', 'receiver'][is_receipient]
 
-        if new_payment.data[role].status.as_status() != Status.none:
-            raise PaymentLogicError(
-                OffChainErrorCode.payment_wrong_status,
-                f'Sender set receiver status or vice-versa.'
-            )
-
         if not self.good_initial_status(new_payment, not is_sender):
             raise PaymentLogicError(
                         OffChainErrorCode.payment_wrong_status,
-                        'Invalid status transition.')
+                        f'Sender set receiver status or vice-versa.')
 
         # Check that the subaddresses are present
-        sub_send = LibraAddress.from_encoded_str(new_payment.sender.address)
-        sub_revr = LibraAddress.from_encoded_str(new_payment.receiver.address)
+        # TODO: catch exceptions into Payment errors
 
+        try:
+            sub_send = LibraAddress.from_encoded_str(new_payment.sender.address)
+            sub_revr = LibraAddress.from_encoded_str(new_payment.receiver.address)
+        except LibraAddressError as e:
+            raise PaymentLogicError(
+                OffChainErrorCode.payment_invalid_libra_address,
+                str(e)
+            )
+
+        # TODO: TEST and fix these
         if not sub_send.subaddress_bytes:
             raise PaymentLogicError(
+                OffChainErrorCode.payment_invalid_libra_subaddress,
                 f'Sender address needs to contain an encoded subaddress, '
                 f'but got {sub_send.as_str()}'
             )
         if not sub_revr.subaddress_bytes:
             raise PaymentLogicError(
+                OffChainErrorCode.payment_invalid_libra_subaddress,
                 f'Receiver address needs to contain an encoded subaddress, '
                 f'but got {sub_revr.as_str()}'
             )
 
-        self.check_signatures(new_payment)
+        try:
+            self.check_signatures(new_payment)
+        except BusinessValidationFailure:
+            raise PaymentLogicError(
+                OffChainErrorCode.payment_wrong_recipient_signature,
+                'Recipient signature check failed.'
+            )
 
     def check_new_update(self, payment, new_payment):
         ''' Checks a diff updating an existing payment.
@@ -581,7 +589,13 @@ class PaymentProcessor(CommandProcessor):
                 OffChainErrorCode.payment_wrong_status,
                 'Invalid Status transition')
 
-        self.check_signatures(new_payment)
+        try:
+            self.check_signatures(new_payment)
+        except BusinessValidationFailure:
+            raise PaymentLogicError(
+                OffChainErrorCode.payment_wrong_recipient_signature,
+                'Recipient signature check failed.'
+            )
 
     def payment_process(self, payment):
         ''' A syncronous version of payment processing -- largely

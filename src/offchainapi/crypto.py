@@ -85,6 +85,8 @@ class ComplianceKey:
             return verifier.payload.decode("utf-8")
         except jws.InvalidJWSSignature:
             raise OffChainInvalidSignature(signature)
+        except jws.InvalidJWSObject:
+            raise OffChainInvalidSignature(signature)
 
     def thumbprint(self):
         return self._key.thumbprint()

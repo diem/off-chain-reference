@@ -172,8 +172,6 @@ class CommandRequestObject(JSONSerializable):
             command = JSONSerializable.parse(data['command'], flag)
             self = CommandRequestObject(command)
             self.cid = str(data["cid"])
-            if 'signature' in data:
-                self.signature = data["signature"]
             if flag == JSONFlag.STORE and 'response' in data:
                 self.response = CommandResponseObject.from_json_data_dict(
                     data['response'], flag

@@ -131,12 +131,17 @@ class PaymentCommand(ProtocolCommand):
         self.command = data['payment']
 
         if len(self.dependencies) > 1:
+            # TODO: Test for such errors within protocol.py tests.
             raise PaymentLogicError(
+                OffChainErrorCode.payment_wrong_structure,
                 "A payment can only depend on a single previous payment"
             )
 
         if len(self.creates_versions) != 1:
-            raise PaymentLogicError("A payment always creates a new payment")
+            # TODO: Test for such errors within protocol.py tests.
+            raise PaymentLogicError(
+                OffChainErrorCode.payment_wrong_structure,
+                "A payment always creates a new payment")
 
         return self
 
