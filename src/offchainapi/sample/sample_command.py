@@ -48,7 +48,7 @@ class SampleCommand(ProtocolCommand):
         ''' Construct the object from a serlialized JSON data dictionary (from json.loads). '''
         self = super().from_json_data_dict(data, flag)
         self.command = SampleObject(data['command'])
-        self.dependencies = data['_dependencies']
+        self.dependencies = data['_reads']
         assert type(self) == cls
         return self
 

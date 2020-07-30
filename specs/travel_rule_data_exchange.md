@@ -14,10 +14,10 @@ All requests between VASPs are structured as [`CommandRequestObject`s](basic_bui
     "seq": 1,
     "command": {
 	    "_ObjectType": "PaymentCommand",
-	    "_creates_versions": [
+	    "_writes": [
 	        "08697804e12212fa1c979283963d5c71"
 	    ],
-	    "_dependencies": [],
+	    "_reads": [],
 	    "payment": {
 		    "sender": {
 			    "address": "lbr1pgfpyysjzgfpyysjzgfpyysjzgf3xycnzvf3xycsm957ne",
@@ -85,8 +85,8 @@ For a travel rule data exchange, the [command_type](basic_building_blocks.md#com
 | Field 	    | Type 	| Required? 	| Description 	|
 |-------	    |------	|-----------	|-------------	|
 | _ObjectType   | str  | Y             | The fixed string `PaymentCommand` |
-| _creates_versions | list of str |  Y | Must be a list containing a single str representing the version of the new or updated `PaymentObject` resulting from the success of this payment command. A list with any other number of items results in a command error.  This string must be a unique random string between this pair of VASPs and is used to represent the version of the item created. These should be at least 16 bytes long and encoded to string in hexadecimal notation using characters in the range[A-Za-z0-9] |
-| _dependencies | list of str | Y | Can be an empty list or a list containing a single previous version. If the list is empty this payment command defines a new payment. If the list contains one item, then this command updates the shared `PaymentObject` with the given version. It is an error to include more versions, and it results in a command error response.  The value in this field must match a version previously specified by the `_creates_versions` parameter on a prior command. |
+| _writes | list of str |  Y | Must be a list containing a single str representing the version of the new or updated `PaymentObject` resulting from the success of this payment command. A list with any other number of items results in a command error.  This string must be a unique random string between this pair of VASPs and is used to represent the version of the item created. These should be at least 16 bytes long and encoded to string in hexadecimal notation using characters in the range[A-Za-z0-9] |
+| _reads | list of str | Y | Can be an empty list or a list containing a single previous version. If the list is empty this payment command defines a new payment. If the list contains one item, then this command updates the shared `PaymentObject` with the given version. It is an error to include more versions, and it results in a command error response.  The value in this field must match a version previously specified by the `_writes` parameter on a prior command. |
 | payment| [`PaymentObject`](#paymentobject) | Y | contains a `PaymentObject` that either creates a new payment or updates an existing payment. Note that strict validity check apply when updating payments, that are listed in the section below describing these objects. An invalid update or initial payment object results in a command error
 
 <details>
@@ -94,10 +94,10 @@ For a travel rule data exchange, the [command_type](basic_building_blocks.md#com
 <pre>
 {
     "_ObjectType": "PaymentCommand",
-    "_creates_versions": [
+    "_writes": [
         "08697804e12212fa1c979283963d5c71"
     ],
-    "_dependencies": [],
+    "_reads": [],
     "payment": {
         PaymentObject(),
     }
@@ -105,7 +105,7 @@ For a travel rule data exchange, the [command_type](basic_building_blocks.md#com
 </pre>
 </details>
 
-The __dependencies_ list tracks the object versions that are necessary for a command to succeed. It allows server and client to detect commands that conflict, since they would list the same object version in their __dependencies_ lists. In such cases only one of the conflicting commands should proceed and be 'successful', and the other one should be a 'failure'. When a command status is successful, the objects with versions in the __create_versions_ list are created and may be used by subsequent commands. All object versions listed in the __dependencies_ list of a successful command become unavailable to subsequent commands.
+The __reads_ list tracks the object versions that are necessary for a command to succeed. It allows server and client to detect commands that conflict, since they would list the same object version in their __reads_ lists. In such cases only one of the conflicting commands should proceed and be 'successful', and the other one should be a 'failure'. When a command status is successful, the objects with versions in the __create_versions_ list are created and may be used by subsequent commands. All object versions listed in the __reads_ list of a successful command become unavailable to subsequent commands.
 
 ### PaymentObject
 

@@ -15,15 +15,15 @@ All requests between VASPs are structured as [`CommandRequestObject`s](#commandr
     "seq": 1,
     "command": {
         "_ObjectType": "FundPullPreApprovalCommand",
-        "_creates_versions": [
+        "_writes": [
             "08697804e12212fa1c979283963d5c71"
         ],
-        "_dependencies": [],
+        "_reads": [],
         "fund_pull_pre_approval": {
             "address": "lbr1pgfpnegv9gfpyysjzgfpyysjzgf3xycnzvf3xycsmxycyy",
             "biller_address": "lbr1pgfpyysjzgfpyysjzgfpyysjzgf3xycnzvf3xycsm957ne",
             "funds_pre_approval_id": "lbr1qg9q5zs2pg9q5zs2pg9q5zs2pgy7gvd9u_ref1002"
-            "expiration_timestamp": 72322, 
+            "expiration_timestamp": 72322,
             "max_cumulative_amount": {
                 "amount": 100,
                 "currency": "USD"
@@ -70,8 +70,8 @@ For a fund pre-approval request, the [command_type](basic_building_blocks.md#com
 | Field 	    | Type 	| Required? 	| Description 	|
 |-------	    |------	|-----------	|-------------	|
 | _ObjectType   | str  | Y             | The fixed string `FundPullPreApprovalCommand` |
-| _creates_versions | list of str |  Y | Must be a list containing a single str representing the version of the new or updated `FundPullPreApprovalObject` resulting from the success of this command. A list with any other number of items results in a command error.  This string must be a unique random string between this pair of VASPs and is used to represent the version of the item created. These should be at least 16 bytes long and encoded to string in hexadecimal notation using characters in the range[A-Za-z0-9] |
-| _dependencies | list of str | Y | Can be an empty list or a list containing a single previous version. If the list is empty this command defines a new fund pre-approval. If the list contains one item, then this command updates the shared `FundPullPreApprovalObject` with the given version. It is an error to include more versions, and it results in a command error response.  The value in this field must match a version previously specified by the `_creates_versions` parameter on a prior command. |
+| _writes | list of str |  Y | Must be a list containing a single str representing the version of the new or updated `FundPullPreApprovalObject` resulting from the success of this command. A list with any other number of items results in a command error.  This string must be a unique random string between this pair of VASPs and is used to represent the version of the item created. These should be at least 16 bytes long and encoded to string in hexadecimal notation using characters in the range[A-Za-z0-9] |
+| _reads | list of str | Y | Can be an empty list or a list containing a single previous version. If the list is empty this command defines a new fund pre-approval. If the list contains one item, then this command updates the shared `FundPullPreApprovalObject` with the given version. It is an error to include more versions, and it results in a command error response.  The value in this field must match a version previously specified by the `_writes` parameter on a prior command. |
 | fund_pull_pre_approval| [`FundPullPreApprovalObject`](#fundpullpreapprovalobject) | Y | contains a `FundPullPreApprovalObject` that either creates a new pre-approval or updates an existing pre-approval. Note that strict validity checks apply when updating pre-approvals, that are listed in the section below describing these objects. An invalid update or initial pre-approval object results in a command error
 
 <details>
@@ -79,10 +79,10 @@ For a fund pre-approval request, the [command_type](basic_building_blocks.md#com
 <pre>
 {
     "_ObjectType": "FundPullPreApprovalCommand",
-    "_creates_versions": [
+    "_writes": [
         "08697804e12212fa1c979283963d5c71"
     ],
-    "_dependencies": [],
+    "_reads": [],
     "fund_pull_pre_approval": {
         FundPullPreApprovalObject(),
     }
@@ -102,7 +102,7 @@ The structure in this object can be a full pre-approval of just the fields of an
 | funds_pre_approval_id | str | Y | Unique reference ID of this pre-approval on the pre-approval initiator VASP (the VASP which originally created this pre-approval object). This value should be unique, and formatted as “<creator_vasp_onchain_address_bech32>_<unique_id>”.  For example, ”lbr1x23456abcd_seqABCD“. This field is mandatory on pre-approval creation and immutable after that.  Updates to an existing pre-approval must also include the previously created pre-approval ID. |
 | max_cumulative_amount | [CurrencyObject](#currencyobject) | N | Max cumulative amount that is approved for funds pre-approval.  This is the sum across all transactions that occur while utilizing this funds pre-approval. |
 | description | str | N | Description of the funds pre-approval.  May be utilized so show the user a description about the request for funds pre-approval |
-| status | str enum | N | Status of this pre-approval. See [Pre-Approval Status Enum](#pre-approval-status-enum) for valid statuses. 
+| status | str enum | N | Status of this pre-approval. See [Pre-Approval Status Enum](#pre-approval-status-enum) for valid statuses.
 
 <details>
 <summary> FundPullPreApprovalObject example </summary>
@@ -111,7 +111,7 @@ The structure in this object can be a full pre-approval of just the fields of an
     "address": "lbr1pgfpnegv9gfpyysjzgfpyysjzgf3xycnzvf3xycsmxycyy",
     "biller_address": "lbr1pgfpyysjzgfpyysjzgfpyysjzgf3xycnzvf3xycsm957ne",
     "funds_pre_approval_id": "lbr1qg9q5zs2pg9q5zs2pg9q5zs2pgy7gvd9u_ref1002"
-    "expiration_timestamp": 72322, 
+    "expiration_timestamp": 72322,
     "max_cumulative_amount": CurrencyObject(),
     "description": "Kevin's online shop",
     "status": "valid",
@@ -168,5 +168,3 @@ In addition, the "dependencies" array of the PaymentObject must contain the late
 Previous: [Travel Rule Data Exchange](travel_rule_data_exchange.md)
 
 Next: [Auth and Capture](auth_capture.md)
-
-

@@ -78,8 +78,8 @@ class ProtocolCommand(JSONSerializable):
             dict: A data dictionary compatible with JSON serilization.
         """
         data_dict = {
-            "_dependencies":     self.dependencies,
-            "_creates_versions": self.creates_versions,
+            "_reads":     self.dependencies,
+            "_writes": self.creates_versions,
         }
 
         if flag == JSONFlag.STORE:
@@ -107,8 +107,8 @@ class ProtocolCommand(JSONSerializable):
         """
         self = cls.__new__(cls)
         ProtocolCommand.__init__(self)
-        self.dependencies = list(data['_dependencies'])
-        self.creates_versions = list(data['_creates_versions'])
+        self.dependencies = list(data['_reads'])
+        self.creates_versions = list(data['_writes'])
         if flag == JSONFlag.STORE:
             if "_origin" in data:
                 self.origin = LibraAddress.from_encoded_str(data["_origin"])
