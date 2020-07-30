@@ -260,9 +260,6 @@ class PaymentProcessor(CommandProcessor):
                         f'created for Payment lastly with seq num #{seq}'
                     )
 
-            await self.business.payment_post_processing(
-                other_address, seq, command, payment, new_payment, command_ctx)
-
             # If we are here we are done with this obligation.
             with self.storage_factory.atomic_writes():
                 if self.obligation_exists(other_address_str, seq):
@@ -665,9 +662,8 @@ class PaymentProcessor(CommandProcessor):
         other_role = ['sender', 'receiver'][not is_receiver]
 
         status = payment.data[role].status.as_status()
-        other_status = payment.data[other_role].status.as_status()
-
         current_status = status
+        other_status = payment.data[other_role].status.as_status()
 
         new_payment = payment.new_version()
 
@@ -677,7 +673,7 @@ class PaymentProcessor(CommandProcessor):
         try:
             await business.payment_initial_processing(payment, ctx)
 
-            if status in {Status.abort} or (
+            if status == Status.abort or (
                 status == Status.ready_for_settlement and
                 other_status == Status.ready_for_settlement
             ):

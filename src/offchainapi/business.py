@@ -198,34 +198,6 @@ class BusinessContext:
         '''
         pass
 
-    async def payment_post_processing(
-        self,
-        other_address,
-        seq,
-        comamnd,
-        payment,
-        new_payment,
-        ctx=None
-    ):
-
-        ''' An async method to let VASP perform custom business logic to a
-        successsful (sequenced & ACKed) command after normal processing.
-        For example it can be used to check whether the payment is in terminal
-        status. The command could have originated either from the other VASP
-        or this VASP (see `command.origin` to determine this).
-
-        Args:
-            other_address (str): the encoded libra address of the other VASP.
-            seq (int): the sequence number into the shared command sequence.
-            command (ProtocolCommand): the command that lead to the new or
-                updated payment.
-            payment (PaymentObject): the payment resulting from this command.
-            new_payment (Optional[PaymentObject]): the new payment from us, if any, when
-                the command is from the other side.
-            ctx (Any): Optional context object that business can store custom data
-        '''
-        pass
-
     async def payment_initial_processing(self, payment, ctx=None):
         '''
         Allow business to do custom pre-processing to a payment
