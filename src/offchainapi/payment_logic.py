@@ -213,9 +213,7 @@ class PaymentProcessor(CommandProcessor):
         logger.info(f'(other:{other_address_str}) Process Command #{seq}')
 
         try:
-            # Notify the business context about the new payment.
-            # This allows the business to do any custom record-keeping
-            command_ctx = await self.business.notify_payment_update(
+            command_ctx = await self.business.payment_pre_processing(
                 other_address, seq, command, payment)
 
             # Only respond to commands by other side.
@@ -662,17 +660,6 @@ class PaymentProcessor(CommandProcessor):
         other_role = ['sender', 'receiver'][not is_receiver]
 
         status = payment.data[role].status.as_status()
-        status_other = payment.data[other_role].status.as_status()
-
-        if status in {Status.abort} or (
-            status == Status.ready_for_settlement and
-            status_other == Status.ready_for_settlement
-        ):
-            # Nothing more to be done with this payment
-            # Return a new payment version with no modification
-            # To singnal no changes, and therefore no new command.
-            return payment.new_version()
-
         current_status = status
         other_status = payment.data[other_role].status.as_status()
 
@@ -682,6 +669,17 @@ class PaymentProcessor(CommandProcessor):
         abort_msg = None
 
         try:
+            await business.payment_initial_processing(payment, ctx)
+
+            if status == Status.abort or (
+                status == Status.ready_for_settlement and
+                other_status == Status.ready_for_settlement
+            ):
+                # Nothing more to be done with this payment
+                # Return a new payment version with no modification
+                # To singnal no changes, and therefore no new command.
+                return new_payment
+
             # We set our status as abort.
             if other_status == Status.abort:
                 current_status = Status.abort
