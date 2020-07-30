@@ -166,6 +166,8 @@ class BusinessContext:
                 code from:
                     - `status_logic.Status.needs_kyc_data`
                     - `status_logic.Status.needs_recipient_signature`
+                    - `status_logic.soft_match`
+                    - `status_logic.pending_review`
 
             Raises:
                 BusinessForceAbort : To abort the payment.
@@ -175,6 +177,27 @@ class BusinessContext:
 
     async def get_extended_kyc(self, payment, ctx=None):
         ''' Provides the extended KYC information for this payment.
+
+            Args:
+                payment (PaymentCommand): The concerned payment.
+
+            Raises:
+                   BusinessNotAuthorized: If the other VASP is not authorized to
+                    receive extended KYC data for this payment.
+
+            Returns:
+                KYCData: Returns the extended KYC information for
+                this payment.
+        '''
+        raise NotImplementedError()  # pragma: no cover
+
+
+    async def get_additional_kyc(self, payment, ctx=None):
+        ''' Provides the additional KYC information for this payment.
+
+            The additional information is requested or may be provided in case
+            of a `soft_match` state from the other VASP indicating more
+            information is required to disambiguate an individual.
 
             Args:
                 payment (PaymentCommand): The concerned payment.

@@ -128,7 +128,8 @@ async def main_perf(messages_num=10, wait_num=0, verbose=False):
         return res
 
     async def wait_for_all_payment_outcome(nodeA, payments, results):
-        fut_list = [nodeA.wait_for_payment_outcome_async(p.reference_id) for p,r in zip(payments, results)]
+        fut_list = [nodeA.wait_for_payment_outcome_async(
+            p.reference_id, timeout=None) for p,r in zip(payments, results)]
 
         res = await asyncio.gather(
                 *fut_list,

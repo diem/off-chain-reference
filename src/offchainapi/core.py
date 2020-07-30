@@ -15,6 +15,9 @@ from aiohttp import web
 
 logger = logging.getLogger(name='libra_off_chain_api.core')
 
+class VASPPaymentTimeout(Exception):
+    pass
+
 
 class Vasp:
     ''' Creates a VASP with the standard networking and storage backend.
@@ -119,7 +122,7 @@ class Vasp:
             self._await_start_notifier(), self.loop)
         return result.result()
 
-    async def wait_for_payment_outcome_async(self, payment_reference_id):
+    async def wait_for_payment_outcome_async(self, payment_reference_id, timeout=None):
         ''' Awaits until the payment with the given reference_id is
         ready_for_settlement or aborted and returns the payment object
         at that version.
@@ -127,21 +130,31 @@ class Vasp:
         Parameters:
             payment_reference_id (str): the reference_id of the payment
                 of interest.
+            timeout (float, or None by default): second until timeout.
 
         Returns a PaymentObject with the given reference_id that is ether
         ready_for_settlement or aborted by one of the parties.
 
         '''
-        payment = await self.pp.wait_for_payment_outcome(payment_reference_id)
+        try:
+            payment = await asyncio.wait_for(
+                self.pp.wait_for_payment_outcome(payment_reference_id),
+                timeout)
+        except asyncio.TimeoutError:
+            print(f'Timeout for payment {payment_reference_id}')
+            latest_version = self.get_payment_by_ref(payment_reference_id)
+            print('Pay:', latest_version)
+            raise VASPPaymentTimeout(latest_version)
+
         return payment
 
-    def wait_for_payment_outcome(self, payment_reference_id):
+    def wait_for_payment_outcome(self, payment_reference_id, timeout):
         ''' A non-async variant of wait_for_payment_outcome_async that returns
         a concurrent.futures Future with the result. You may call `.result()`
         on it to block or register a call-back. '''
         if self.loop is not None:
             res = asyncio.run_coroutine_threadsafe(
-                self.wait_for_payment_outcome_async(payment_reference_id), self.loop)
+                self.wait_for_payment_outcome_async(payment_reference_id, timeout), self.loop)
             return res
         else:
             raise RuntimeError('Event loop is None.')

@@ -653,6 +653,8 @@ class PaymentProcessor(CommandProcessor):
             Status.none: 100,
             Status.needs_kyc_data: 200,
             Status.needs_recipient_signature: 200,
+            Status.soft_match: 200,
+            Status.pending_review: 200,
             Status.ready_for_settlement: 400,
             Status.abort: 1000
         }
@@ -717,9 +719,31 @@ class PaymentProcessor(CommandProcessor):
             if current_status == Status.none:
                 await business.check_account_existence(new_payment, ctx)
 
+            # Provide KYC -- this may be async in case
+            # of need for user input
+            kyc_to_provide = await business.next_kyc_to_provide(
+                new_payment, ctx)
+
+            myself_new_actor = new_payment.data[role]
+
+            if Status.needs_kyc_data in kyc_to_provide:
+                extended_kyc = await business.get_extended_kyc(new_payment, ctx)
+                myself_new_actor.add_kyc_data(extended_kyc)
+
+            if Status.soft_match in kyc_to_provide:
+                additional_kyc = await business.get_additional_kyc(new_payment, ctx)
+                myself_new_actor.add_additional_kyc_data(additional_kyc)
+
+            if Status.needs_recipient_signature in kyc_to_provide:
+                signature = await business.get_recipient_signature(
+                    new_payment, ctx)
+                new_payment.add_recipient_signature(signature)
+
+            # Request more KYC Data or progress the protocol
             if current_status in {Status.none,
                                   Status.needs_kyc_data,
-                                  Status.needs_recipient_signature}:
+                                  Status.needs_recipient_signature,
+                                  Status.soft_match}:
 
                 # Request KYC -- this may be async in case
                 # of need for user input
@@ -727,22 +751,6 @@ class PaymentProcessor(CommandProcessor):
                     new_payment, ctx)
                 if next_kyc != Status.none:
                     current_status = next_kyc
-
-                # Provide KYC -- this may be async in case
-                # of need for user input
-                kyc_to_provide = await business.next_kyc_to_provide(
-                    new_payment, ctx)
-
-                myself_new_actor = new_payment.data[role]
-
-                if Status.needs_kyc_data in kyc_to_provide:
-                    extended_kyc = await business.get_extended_kyc(new_payment, ctx)
-                    myself_new_actor.add_kyc_data(extended_kyc)
-
-                if Status.needs_recipient_signature in kyc_to_provide:
-                    signature = await business.get_recipient_signature(
-                        new_payment, ctx)
-                    new_payment.add_recipient_signature(signature)
 
             # Check if we have all the KYC we need
             if current_status not in {

@@ -3,7 +3,7 @@
 
 from .utils import StructureException, StructureChecker, \
     REQUIRED, OPTIONAL, WRITE_ONCE, UPDATABLE, \
-    JSONSerializable
+    JSONSerializable, JSONFlag
 from .shared_object import SharedObject
 from .status_logic import Status
 from .libra_address import LibraAddress
@@ -113,6 +113,7 @@ class PaymentActor(StructureChecker):
     fields = [
         ('address', str, REQUIRED, WRITE_ONCE),
         ('kyc_data', KYCData, OPTIONAL, WRITE_ONCE),
+        ('additional_kyc_data', KYCData, OPTIONAL, WRITE_ONCE),
         ('status', StatusObject, REQUIRED, UPDATABLE),
         ('metadata', list, REQUIRED, UPDATABLE)
     ]
@@ -151,6 +152,16 @@ class PaymentActor(StructureChecker):
         """
         self.update({
             'kyc_data': kyc_data,
+        })
+
+    def add_additional_kyc_data(self, additional_kyc_data):
+        """ Add extended KYC information and kyc signature.
+
+        Args:
+            kyc_data (str): The KYC data object
+        """
+        self.update({
+            'additional_kyc_data': additional_kyc_data,
         })
 
     def add_metadata(self, item):
@@ -299,3 +310,6 @@ class PaymentObject(SharedObject, StructureChecker, JSONSerializable):
         self = PaymentObject.from_full_record(data)
         SharedObject.from_json_data_dict(data, flag, self)
         return self
+
+    def __str__(self):
+        return json.dumps(self.get_json_data_dict(JSONFlag.STORE), indent=4)
