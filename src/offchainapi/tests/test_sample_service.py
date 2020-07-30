@@ -3,7 +3,7 @@
 
 from ..sample.sample_service import sample_business, sample_vasp
 from ..payment_logic import Status, PaymentProcessor, PaymentCommand
-from ..payment import PaymentActor, PaymentObject
+from ..payment import PaymentActor, PaymentObject, StatusObject
 from ..libra_address import LibraAddress
 from ..utils import JSONFlag
 from ..protocol_messages import CommandRequestObject, CommandResponseObject, \
@@ -29,7 +29,7 @@ def business_and_processor(three_addresses, store):
 def payment_as_receiver(three_addresses, sender_actor, payment_action):
     _, _, a0 = three_addresses
     subaddr = LibraAddress.from_bytes(a0.onchain_address_bytes, b'x'*8)
-    receiver = PaymentActor(subaddr.as_str(), Status.none, [])
+    receiver = PaymentActor(subaddr.as_str(), StatusObject(Status.none), [])
     return PaymentObject(
         sender_actor, receiver, 'ref', 'orig_ref', 'desc', payment_action
     )
@@ -40,7 +40,7 @@ def kyc_payment_as_receiver(payment_as_receiver, kyc_data):
     payment = payment_as_receiver
     payment.sender.add_kyc_data(kyc_data)
     payment.receiver.add_kyc_data(kyc_data)
-    payment.sender.change_status(Status.needs_recipient_signature)
+    payment.sender.change_status(StatusObject(Status.needs_recipient_signature))
     return payment
 
 
@@ -48,7 +48,7 @@ def kyc_payment_as_receiver(payment_as_receiver, kyc_data):
 def settled_payment_as_receiver(kyc_payment_as_receiver):
     payment = kyc_payment_as_receiver
     payment.add_recipient_signature('SIG')
-    payment.sender.change_status(Status.settled)
+    payment.sender.change_status(Status.ready_for_settlement)
     return payment
 
 
@@ -56,7 +56,7 @@ def settled_payment_as_receiver(kyc_payment_as_receiver):
 def payment_as_sender(three_addresses, receiver_actor, payment_action):
     _, _, a0 = three_addresses
     subaddr = LibraAddress.from_bytes(a0.onchain_address_bytes, b'x'*8)
-    sender = PaymentActor(subaddr.as_str(), Status.none, [])
+    sender = PaymentActor(subaddr.as_str(), StatusObject(Status.none), [])
     return PaymentObject(
         sender, receiver_actor, 'ref', 'orig_ref', 'desc', payment_action
     )
@@ -67,7 +67,7 @@ def kyc_payment_as_sender(payment_as_sender, kyc_data):
     payment = payment_as_sender
     payment.sender.add_kyc_data(kyc_data)
     payment.receiver.add_kyc_data(kyc_data)
-    payment.sender.change_status(Status.needs_recipient_signature)
+    payment.sender.change_status(StatusObject(Status.needs_recipient_signature))
     payment.add_recipient_signature('SIG')
     assert payment.sender is not None
     return payment
@@ -95,16 +95,15 @@ def json_request(my_addr, other_addr, payment_action):
     sub_sender = LibraAddress.from_bytes(my_addr.onchain_address_bytes, b'a'*8)
     sub_receiver = LibraAddress.from_bytes(other_addr.onchain_address_bytes, b'b'*8)
 
-    sender = PaymentActor(sub_sender.as_str(), Status.none, [])
-    receiver = PaymentActor(sub_receiver.as_str(), Status.none, [])
+    sender = PaymentActor(sub_sender.as_str(), StatusObject(Status.none), [])
+    receiver = PaymentActor(sub_receiver.as_str(), StatusObject(Status.none), [])
     ref = f'{other_addr.as_str()}_XYZ'
     payment = PaymentObject(
         sender, receiver, ref, 'Original Reference', 'A description...', payment_action
     )
     command = PaymentCommand(payment)
     request = CommandRequestObject(command)
-    request.seq = 0
-    request.command_seq = 0
+    request.cid = 0
     return request.get_json_data_dict(JSONFlag.NET)
 
 
@@ -115,11 +114,10 @@ def json_request(my_addr, other_addr, payment_action):
     (10, 10, 'success', None, None),
 ])
 def simple_response_json_error(request, key):
-    seq, cmd_seq, status, protoerr, errcode = request.param
+    cid, cmd_seq, status, protoerr, errcode = request.param
     resp = CommandResponseObject()
     resp.status = status
-    resp.seq = seq
-    resp.command_seq = cmd_seq
+    resp.cid = cid
     if status == 'failure':
         resp.error = OffChainError(protoerr, errcode)
     json_obj = resp.get_json_data_dict(JSONFlag.NET)
@@ -141,7 +139,7 @@ def test_business_is_related(business_and_processor, payment_as_receiver):
 
     ret_payment = proc.payment_process(payment)
     assert ret_payment.has_changed()
-    assert ret_payment.receiver.status == Status.needs_kyc_data
+    assert ret_payment.receiver.status.as_status() == Status.needs_kyc_data
 
 
 def test_business_is_kyc_provided(business_and_processor, kyc_payment_as_receiver):
@@ -157,7 +155,7 @@ def test_business_is_kyc_provided(business_and_processor, kyc_payment_as_receive
 
     ready = proc.loop.run_until_complete(bc.ready_for_settlement(ret_payment))
     assert ready
-    assert ret_payment.receiver.status == Status.ready_for_settlement
+    assert ret_payment.receiver.status.as_status() == Status.ready_for_settlement
 
 
 def test_business_is_kyc_provided_sender(business_and_processor, kyc_payment_as_sender):
@@ -173,7 +171,7 @@ def test_business_is_kyc_provided_sender(business_and_processor, kyc_payment_as_
 
     ready = proc.loop.run_until_complete(bc.ready_for_settlement(ret_payment))
     assert ready
-    assert ret_payment.data['sender'].data['status'] == Status.ready_for_settlement
+    assert ret_payment.sender.status.as_status() == Status.ready_for_settlement
     assert bc.get_account('x'*8)['balance'] == 5.0
 
 
@@ -184,10 +182,9 @@ def test_vasp_simple(json_request, vasp, other_addr, loop):
 
     key = vasp.info_context.get_peer_compliance_signature_key(other_addr)
     signed_json_request = key.sign_message(json.dumps(json_request))
-    vasp.process_request(other_addr, signed_json_request)
-    requests = vasp.collect_messages()
-    assert len(requests) == 1
-    assert requests[0].type is CommandResponseObject
+    response = vasp.process_request(other_addr, signed_json_request)
+    assert response
+    assert response.type is CommandResponseObject
 
     assert len(vasp.pp.futs) == 1
     for fut in vasp.pp.futs:
@@ -207,8 +204,8 @@ def test_vasp_simple_wrong_VASP(json_request, other_addr, loop, key):
 
     try:
         # vasp.pp.start_processor()
-        vasp.process_request(other_addr, signed_json_request)
-        responses = vasp.collect_messages()
+        resp = vasp.process_request(other_addr, signed_json_request)
+        responses = [resp]
         assert len(responses) == 1
         assert responses[0].type is CommandResponseObject
         content = json.loads(key.verify_message(responses[0].content))
@@ -219,4 +216,5 @@ def test_vasp_simple_wrong_VASP(json_request, other_addr, loop, key):
 
 
 def test_vasp_response(simple_response_json_error, vasp, other_addr):
-    vasp.process_response(other_addr, simple_response_json_error)
+    with pytest.raises(Exception):
+        vasp.process_response(other_addr, simple_response_json_error)

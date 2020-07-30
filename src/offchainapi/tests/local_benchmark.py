@@ -10,7 +10,7 @@ from ..business import VASPInfo
 from ..libra_address import LibraAddress
 from ..payment_logic import PaymentCommand
 from ..status_logic import Status
-from ..payment import PaymentAction, PaymentActor, PaymentObject
+from ..payment import PaymentAction, PaymentActor, PaymentObject, StatusObject
 from ..core import Vasp
 from .basic_business_context import TestBusinessContext
 from ..crypto import ComplianceKey
@@ -108,8 +108,8 @@ async def main_perf(messages_num=10, wait_num=0, verbose=False):
         peerA_addr = PeerA_addr.as_str()
         sub_a = LibraAddress.from_bytes(b'A'*16, b'a'*8).as_str()
         sub_b = LibraAddress.from_bytes(b'B'*16, b'b'*8).as_str()
-        sender = PaymentActor(sub_a, Status.needs_kyc_data, [])
-        receiver = PaymentActor(sub_b, Status.none, [])
+        sender = PaymentActor(sub_a, StatusObject(Status.needs_kyc_data), [])
+        receiver = PaymentActor(sub_b, StatusObject(Status.none), [])
         action = PaymentAction(10, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
         payment = PaymentObject(
             sender, receiver, f'{peerA_addr}_ref{cid:08d}', None, 'Description ...', action
@@ -186,15 +186,6 @@ async def main_perf(messages_num=10, wait_num=0, verbose=False):
                 print('--'*40)
                 for p in hist:
                     print(p.pretty())
-
-    # Esure they were register as successes on both sides.
-    Asucc = len([x for x in channelAB.executor.command_status_sequence if x])
-    Atotal = len(channelAB.executor.command_status_sequence)
-    print(f'Peer A successes: {Asucc}/{Atotal}')
-
-    Bsucc = len([x for x in channelBA.executor.command_status_sequence if x])
-    Btotal = len(channelBA.executor.command_status_sequence)
-    print(f'Peer B successes: {Bsucc}/{Btotal}')
 
     print(f'Estimate throughput #: {len(commands)/elapsed} Tx/s')
 

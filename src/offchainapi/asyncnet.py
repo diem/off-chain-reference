@@ -80,8 +80,6 @@ class Aionet:
             while True:
                 for k in self.vasp.channel_store:
                     channel = self.vasp.channel_store[k]
-                    len_req = len(channel.waiting_requests)
-                    len_resp = len(channel.waiting_response)
 
                     role = ['Client', 'Server'][channel.is_server()]
                     waiting = channel.is_server() \
@@ -90,15 +88,13 @@ class Aionet:
                     other = channel.get_other_address().as_str()
                     # TODO: Retransmit a few of the requests here.
 
-                    len_my = len(channel.my_requests)
-                    len_oth = len(channel.other_requests)
+                    len_my = len(channel.my_request_index)
 
                     logger.info(
                         f'''
                         Channel: {me} [{role}] <-> {other}
-                        Queues: my: {len_my} (Wait: {waiting}) other: {len_oth}
-                        Retransmit: {channel.would_retransmit()}
-                        Wait-Req: {len_req} Wait-Resp: {len_resp}'''
+                        Queues: my: {len_my} (Wait: {waiting})
+                        Retransmit: {channel.would_retransmit()}'''
                     )
                 await asyncio.sleep(self.watchdog_period)
         except asyncio.CancelledError:
@@ -127,7 +123,8 @@ class Aionet:
             server = self.vasp.get_vasp_address().as_str()
             client = other_addr_str
         url = f'v1/{server}/{client}/command/'
-        return urljoin(base_url, url)
+        full_url = urljoin(base_url, url)
+        return full_url
 
     if __debug__:
         async def handle_request_debug(self, request):
@@ -172,9 +169,7 @@ class Aionet:
 
             # TODO: Handle timeout errors here.
             logger.debug(f'Data Received from {other_addr.as_str()}.')
-            response = await channel.parse_handle_request_to_future(
-                request_json
-            )
+            response = channel.parse_handle_request(request_json)
 
         except json.decoder.JSONDecodeError as e:
             # Raised if the request does not contain valid json.
@@ -189,7 +184,6 @@ class Aionet:
 
         # Send back the response.
         logger.debug(f'Process Waiting messages.')
-        channel.process_waiting_messages()
         logger.debug(f'Sending back response to {other_addr.as_str()}.')
         return web.json_response(response.content, headers=headers)
 
@@ -240,13 +234,10 @@ class Aionet:
                     logger.debug(f'Json response: {json_response}')
 
                     # Wait in case the requests are sent out of order.
-                    res = await channel.parse_handle_response_to_future(
-                        json_response
-                    )
+                    res = channel.parse_handle_response(json_response)
                     logger.debug(f'Response parsed with status: {res}')
 
                     logger.debug(f'Process Waiting messages')
-                    channel.process_waiting_messages()
                     return res
                 except json.decoder.JSONDecodeError as e:
                     logger.debug(f'JSONDecodeError', exc_info=True)
@@ -264,14 +255,8 @@ class Aionet:
         ''' Sequences a new command to the local queue, ready to be
             sent to the other VASP.
 
-            Upon successful completing the sender should call
-            `send_request` to actually send the request to the other
-            side. However, even if that fails subsequent retrasmissions
-            will automatically re-send the request.
-
-            Parameters:
-                other_addr (LibraAddress) : the LibraAddress of the other VASP.
-                command (ProtocolCommand) : A ProtocolCommand instance.
+            other_addr (LibraAddress) : the LibraAddress of the other VASP.
+            command (ProtocolCommand) : A ProtocolCommand instance.
 
             Returns:
                 str: json str of the net message
@@ -279,6 +264,7 @@ class Aionet:
 
         channel = self.vasp.get_channel(other_addr)
         request = channel.sequence_command_local(command)
+        request = channel.package_request(request)
         request = request.content
         return request
 

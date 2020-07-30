@@ -12,7 +12,7 @@ The basic protocol interaction consists of:
 * The responding VASP listens for requests, and when received, processes them to generate and send `CommandResponseObject` responses, with a success or failure status, through the HTTP response body.
 * The initiating VASP receives the response and processes it to assess whether it was successful or not.
 
-Both VASPs in a channel can asynchronously attempt to initiate and execute commands on shared objects. 
+Both VASPs in a channel can asynchronously attempt to initiate and execute commands on shared objects.
 
 As a reminder, all `CommandRequestObject` and `CommandResponseObject` objects sent are signed using JWS Signatures, using EdDSA and compact encoding. Recipients must verify the signatures when receiving any objects.
 
@@ -25,7 +25,7 @@ All requests between VASPs are structured as [`CommandRequestObject`s](#commandr
 {
     "_ObjectType": "CommandRequestObject",
     "command_type": "PaymentCommand", // Command type
-    "seq": 1,
+    "cid": "VASP1_12345",
     "command": CommandObject(), // Object of type as specified by command_type
 }
 </pre>
@@ -33,37 +33,34 @@ All requests between VASPs are structured as [`CommandRequestObject`s](#commandr
 
 A response would look like the following:
 <details>
-<summary> CommandRequestObject example </summary>
+<summary> CommandResponseObject example </summary>
 <pre>
 {
     "_ObjectType": "CommandResponseObject",
-    "seq": 1,
-    "command_seq": 1,
+    "cid": "VASP1_12345",
     "status": "success",
 }
 </pre>
 </details>
 
 ### CommandRequestObject
-All requests between VASPs are structured as `CommandRequestObject`s. 
+All requests between VASPs are structured as `CommandRequestObject`s.
 
 | Field 	| Type 	| Required? 	| Description 	|
 |-------	|------	|-----------	|-------------	|
 | _ObjectType| str| Y | Fixed value: `CommandRequestObject`|
 |command_type | str| Y |A string representing the type of command contained in the request. |
-|seq | int  | Y | The sequence of this request in the sender local sequence. |
+|cid | str  | Y | A unique command identifier. |
 | command | Command object | Y | The command to sequence. |
-|command_seq    | int | Server   | The sequence of this command in the joint command sequence. Only set if the server is the sender. See [Command Sequencing](command_sequencing.md) |
 
 <details>
 <summary> CommandRequestObject example </summary>
 <pre>
 {
     "_ObjectType": "CommandRequestObject",
-    "command_type": CommandType,
-    "seq": 1,
+    "command_type": "PaymentCommand",
+    "cid": "VASP1_12345",
     "command": CommandObject(),
-    "command_seq": 1,
 }
 </pre>
 </details>
@@ -74,8 +71,7 @@ All responses to a CommandRequestObject are in the form of a CommandResponseObje
 | Field 	     | Type 	| Required? 	| Description 	|
 |-------	     |------	|-----------	|-------------	|
 | _ObjectType    | str      | Y             | The fixed string `CommandResponseObject`. |
-| seq            | int       | Y             | The sequence number of the request responded to in the local sender request sequence. |
-| command_seq    | int or str=`null` | Y    | The sequence of the command responded to in the joint command sequence |
+| cid            | str       | Y             | The unique identifier of the corresponding request. |
 | status         | str      | Y             | Either `success` or `failure`. |
 | error          | List of [OffChainErrorObject](#offchainerrorobject) | N | Details on errors when status == "failure"
 
@@ -84,15 +80,14 @@ All responses to a CommandRequestObject are in the form of a CommandResponseObje
 <pre>
 {
     "_ObjectType": "CommandResponseObject",
-    "command_seq": null,
     "error": [OffChainErrorObject()],
-    "seq": 0,
+    "cid": "VASP1_12345",
     "status": "failure"
 }
 </pre>
 </details>
 
-When the `CommandResponseObject` status field is `failure`, the `error` field is included in the response to indicate the nature of the failure. The `error` field (type `OffChainError`) is a list of OffChainError objects. 
+When the `CommandResponseObject` status field is `failure`, the `error` field is included in the response to indicate the nature of the failure. The `error` field (type `OffChainError`) is a list of OffChainError objects.
 
 ### OffChainErrorObject
 Represents an error that occurred in response to a command.

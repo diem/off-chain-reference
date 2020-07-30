@@ -20,8 +20,16 @@ class BusinessValidationFailure(Exception):
 
 
 class BusinessForceAbort(Exception):
-    ''' Indicates protocol must abort the transaction. '''
-    pass
+    ''' Request an abort with given code and message.
+
+    Params:
+        * code (str): an error code on abort.
+        * message (str): a message explaining the reason for abort.
+    '''
+
+    def __init__(self, code, message):
+        self.code = code
+        self.message = message
 
 
 class BusinessContext:
@@ -259,26 +267,6 @@ class BusinessContext:
                 bool: Whether the VASP is ready to settle the payment.
             '''
         raise NotImplementedError()  # pragma: no cover
-
-    async def has_settled(self, payment, ctx=None):
-        ''' Returns whether the payment was settled on chain. If the payment can
-            be settled also package it and settle it on chain. This function
-            may be called multiple times for the same payment, but any on-chain
-            operation should be performed only once per payment.
-
-            Cannot raise:
-                BusinessForceAbort
-
-            since this is called past the finality barrier.
-
-            Args:
-                payment (PaymentCommand): The concerned payment.
-
-            Returns:
-                bool: Whether the payment was settled on chain.
-        '''
-        raise NotImplementedError()  # pragma: no cover
-
 
 class VASPInfo:
     """Contains information about VASPs"""

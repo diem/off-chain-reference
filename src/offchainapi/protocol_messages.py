@@ -8,10 +8,6 @@ class OffChainException(Exception):
     pass
 
 
-class OffChainOutOfOrder(Exception):
-    pass
-
-
 class OffChainProtocolError(Exception):
     ''' This class denotes protocol errors, namely errors at the
         OffChain protocols level rather than the command sequencing level. '''
@@ -104,8 +100,7 @@ class CommandRequestObject(JSONSerializable):
     """ Represents a command of the Off chain protocol. """
 
     def __init__(self, command):
-        self.seq = None          # The sequence in the local queue
-        self.command_seq = None  # Only server sets this
+        self.cid = None          # The sequence in the local queue
         self.command = command
         self.command_type = command.json_type()
 
@@ -115,8 +110,7 @@ class CommandRequestObject(JSONSerializable):
     def __eq__(self, other):
         ''' Define equality as field equality. '''
         return isinstance(other, CommandRequestObject) \
-            and self.seq == other.seq \
-            and self.command_seq == other.command_seq \
+            and self.cid == other.cid \
             and self.command == other.command \
             and self.command_type == other.command_type \
             and self.response == other.response
@@ -154,15 +148,12 @@ class CommandRequestObject(JSONSerializable):
     def get_json_data_dict(self, flag):
         ''' Override JSONSerializable. '''
         data_dict = {
-            "seq": self.seq,
+            "cid": self.cid,
             "command": self.command.get_json_data_dict(flag),
             "command_type": self.command_type
         }
 
         self.add_object_type(data_dict)
-
-        if self.command_seq is not None:
-            data_dict["command_seq"] = self.command_seq
 
         if flag == JSONFlag.STORE and self.response is not None:
             data_dict["response"] = self.response.get_json_data_dict(
@@ -178,9 +169,7 @@ class CommandRequestObject(JSONSerializable):
             # Use generic/dynamic parse functionality
             command = JSONSerializable.parse(data['command'], flag)
             self = CommandRequestObject(command)
-            self.seq = int(data["seq"])
-            if 'command_seq' in data:
-                self.command_seq = int(data['command_seq'])
+            self.cid = str(data["cid"])
             if 'signature' in data:
                 self.signature = data["signature"]
             if flag == JSONFlag.STORE and 'response' in data:
@@ -197,15 +186,13 @@ class CommandResponseObject(JSONSerializable):
 
     def __init__(self):
         # Start with no data
-        self.seq = None
-        self.command_seq = None
+        self.cid = None
         self.status = None
         self.error = None
 
     def __eq__(self, other):
         return isinstance(other, CommandResponseObject) \
-                and self.seq == other.seq \
-                and self.command_seq == other.command_seq \
+                and self.cid == other.cid \
                 and self.status == other.status \
                 and self.error == other.error
 
@@ -223,13 +210,9 @@ class CommandResponseObject(JSONSerializable):
     def get_json_data_dict(self, flag):
         ''' Override JSONSerializable. '''
         data_dict = {
-            "seq": self.seq,
+            "cid": self.cid,
             "status": self.status
         }
-
-        # Do not include if None
-        if self.command_seq is not None:
-            data_dict["command_seq"] = self.command_seq
 
         if self.error is not None:
             data_dict["error"] = self.error.get_json_data_dict(flag)
@@ -247,26 +230,17 @@ class CommandResponseObject(JSONSerializable):
         try:
             self = CommandResponseObject()
 
-            if 'seq' in data and data['seq'] is not None:
-                self.seq = int(data['seq'])
-
-            if 'command_seq' in data and data['command_seq'] is not None:
-                self.command_seq = data['command_seq']
+            if 'cid' in data and data['cid'] is not None:
+                self.cid = str(data['cid'])
 
             self.status = str(data['status'])
-
-            # Only None or int allowed
-            if self.command_seq is not None:
-                self.command_seq = int(self.command_seq)
 
             # Check the status is correct
             if self.status not in {'success', 'failure'}:
                 raise JSONParsingError(
                     f'Status must be success or failure not {self.status}')
-
             if self.status == 'success':
-                self.seq = int(data['seq'])
-
+                self.cid = str(data['cid'])
             if self.status == 'failure':
                 self.error = OffChainError.from_json_data_dict(
                     data['error'], flag)
@@ -286,7 +260,7 @@ def make_success_response(request):
         CommandResponseObject: The generated response object.
     """
     response = CommandResponseObject()
-    response.seq = request.seq
+    response.cid = request.cid
     response.status = 'success'
     return response
 
@@ -304,7 +278,7 @@ def make_protocol_error(request, code=None):
         CommandResponseObject: The generated response object.
     """
     response = CommandResponseObject()
-    response.seq = request.seq
+    response.cid = request.cid
     response.status = 'failure'
     response.error = OffChainError(protocol_error=True, code=code)
     return response
@@ -319,7 +293,7 @@ def make_parsing_error():
         CommandResponseObject: The generated response object.
     """
     response = CommandResponseObject()
-    response.seq = None
+    response.cid = None
     response.status = 'failure'
     response.error = OffChainError(protocol_error=True, code='parsing')
     return response
@@ -337,7 +311,7 @@ def make_command_error(request, code=None):
         CommandResponseObject: The generated response object.
     """
     response = CommandResponseObject()
-    response.seq = request.seq
+    response.cid = request.cid
     response.status = 'failure'
     response.error = OffChainError(protocol_error=False, code=code)
     return response
