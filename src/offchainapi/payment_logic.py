@@ -213,8 +213,6 @@ class PaymentProcessor(CommandProcessor):
         logger.info(f'(other:{other_address_str}) Process Command #{seq}')
 
         try:
-            new_payment = None
-
             command_ctx = await self.business.payment_pre_processing(
                 other_address, seq, command, payment)
 
