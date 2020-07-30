@@ -19,8 +19,8 @@ class SampleCommand(ProtocolCommand):
         if deps is None:
             self.dependencies = []
         else:
-            self.dependencies = deps
-        self.creates_versions   = [ command.item ]
+            self.dependencies = [(d,d) for d in deps]
+        self.creates_versions   = [(command.item, command.item)]
         self.command   = command
         self.always_happy = True
 
@@ -48,7 +48,7 @@ class SampleCommand(ProtocolCommand):
         ''' Construct the object from a serlialized JSON data dictionary (from json.loads). '''
         self = super().from_json_data_dict(data, flag)
         self.command = SampleObject(data['command'])
-        self.dependencies = data['_reads']
+        # self.dependencies = data['_reads']
         assert type(self) == cls
         return self
 

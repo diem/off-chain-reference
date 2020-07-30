@@ -572,7 +572,7 @@ def test_sample_command():
     data = obj.get_json_data_dict(JSONFlag.STORE)
     obj2 = JSONSerializable.parse(data, JSONFlag.STORE)
     assert obj2.version == obj.version
-    assert obj2.previous_versions == obj.previous_versions
+    assert obj2.previous_version == obj.previous_version
 
 
 def test_parse_handle_request_to_future(signed_json_request, channel, key):

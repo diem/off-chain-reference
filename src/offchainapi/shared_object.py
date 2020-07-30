@@ -12,7 +12,7 @@ class SharedObject(JSONSerializable):
     VASPs. All shared objects must be JSONSerializable.
 
     All shared objects have a `version` that is the current version of
-    this object, and also link to `previous_versions` that contain a previous
+    this object, and also link to a `previous_version` that contain a previous
     version of this, or other related objects.
 
     Once stored an object with a specific version must never change, rather
@@ -23,7 +23,7 @@ class SharedObject(JSONSerializable):
     def __init__(self):
         ''' All objects have a version number and their commit status. '''
         self.version = get_unique_string()
-        self.previous_versions = []  # Stores previous version of the object.
+        self.previous_version = None  # Stores previous version of the object.
 
     def new_version(self, new_version=None):
         """ Make a deep copy of an object with a new version number.
@@ -37,7 +37,7 @@ class SharedObject(JSONSerializable):
             SharedObject: The new shared obeject.
         """
         clone = deepcopy(self)
-        clone.previous_versions = [self.get_version()]
+        clone.previous_version = self.get_version()
         clone.version = new_version
         if clone.version is None:
             clone.version = get_unique_string()
@@ -67,7 +67,7 @@ class SharedObject(JSONSerializable):
 
         update_dict.update({
             '_version': self.version,
-            '_previous_versions': self.previous_versions,
+            '_previous_version': self.previous_version,
         })
 
         self.add_object_type(update_dict)
@@ -79,5 +79,5 @@ class SharedObject(JSONSerializable):
         if self is None:
             self = cls.__new__(cls)
         self.version = data['_version']
-        self.previous_versions = data['_previous_versions']
+        self.previous_version = data['_previous_version']
         return self

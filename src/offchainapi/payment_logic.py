@@ -460,8 +460,8 @@ class PaymentProcessor(CommandProcessor):
         payment = self.get_latest_payment_by_ref_id(ref_id)
         yield payment
 
-        while len(payment.previous_versions) > 0:
-            p_version = payment.previous_versions[0]
+        if payment.previous_version is not None:
+            p_version = payment.previous_version
             payment = self.object_store[p_version]
             yield payment
 

@@ -539,7 +539,6 @@ class VASPPairChannel:
                 # Option 3: did not raise, so return success.
                 response = make_success_response(request)
             except CommandValidationError as e:
-                print(f'EXCEPT {e}')
                 response = make_command_error(
                     request,
                     code=e.error_code,

@@ -28,14 +28,13 @@ class PaymentCommand(ProtocolCommand):
 
     def __init__(self, payment):
         ProtocolCommand.__init__(self)
-        self.dependencies = list(payment.previous_versions)
-        self.creates_versions = [payment.get_version()]
+        ref_id = payment.reference_id
+        self.dependencies = [(ref_id, payment.previous_version)] if payment.previous_version else []
+        self.creates_versions = [(ref_id, payment.get_version())]
         self.command = payment.get_full_diff_record()
 
     def __eq__(self, other):
         return ProtocolCommand.__eq__(self, other) \
-            and self.dependencies == other.dependencies \
-            and self.creates_versions == other.creates_versions \
             and self.command == other.command
 
     def get_object(self, version_number, dependencies):
@@ -70,7 +69,7 @@ class PaymentCommand(ProtocolCommand):
 
         # This command updates a previous payment.
         elif len(self.dependencies) == 1:
-            dep = self.dependencies[0]
+            _, dep = self.dependencies[0]
             if dep not in dependencies:
                 raise PaymentLogicError(
                     OffChainErrorCode.payment_wrong_structure,
@@ -158,7 +157,8 @@ class PaymentCommand(ProtocolCommand):
         assert len(self.dependencies) in [0, 1]
         if len(self.dependencies) == 0:
             return None
-        return self.dependencies[0]
+        _, prev_version =  self.dependencies[0]
+        return prev_version
 
     def get_new_version(self):
         ''' Returns the version number of the payment.
@@ -168,4 +168,5 @@ class PaymentCommand(ProtocolCommand):
         '''
         # Ensured from the constructors.
         assert len(self.creates_versions) == 1
-        return self.creates_versions[0]
+        _, new_version = self.creates_versions[0]
+        return new_version

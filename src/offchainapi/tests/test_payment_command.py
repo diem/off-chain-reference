@@ -45,16 +45,6 @@ def test_payment_end_to_end_serialization(payment):
     assert request == request2
 
 
-def test_payment_command_multiple_dependencies_fail(payment):
-    new_payment = payment.new_version('v1')
-    # Error: 2 dependencies
-    new_payment.previous_versions += ['v2']
-    cmd = PaymentCommand(new_payment)
-    with pytest.raises(PaymentLogicError):
-        cmd.get_object(new_payment.get_version(),
-                       {payment.get_version(): payment})
-
-
 def test_payment_command_missing_dependency_fail(payment):
     new_payment = payment.new_version('v1')
     cmd = PaymentCommand(new_payment)

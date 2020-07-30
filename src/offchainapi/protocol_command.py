@@ -19,6 +19,12 @@ class ProtocolCommand(JSONSerializable):
         self.creates_versions = []
         self.origin = None  # Takes a LibraAddress.
 
+    def __eq__(self, other):
+        val = (self.dependencies == other.dependencies and
+               self.creates_versions == other.creates_versions and
+               self.origin == other.origin)
+        return val
+
     def set_origin(self, origin):
         """ Sets the Libra address that proposed this command.
 
@@ -43,7 +49,7 @@ class ProtocolCommand(JSONSerializable):
             Returns:
                 list: A list of version numbers.
         '''
-        return set(self.dependencies)
+        return set(v for _,v in self.dependencies)
 
     def get_new_object_versions(self):
         ''' Get the list of version numbers created by this command.
@@ -51,7 +57,7 @@ class ProtocolCommand(JSONSerializable):
             Returns:
                 list: A list of version numbers.
         '''
-        return set(self.creates_versions)
+        return set(v for _, v in self.creates_versions)
 
     def get_object(self, version_number, dependencies):
         """ Returns the actual shared object with this version number.
@@ -77,9 +83,13 @@ class ProtocolCommand(JSONSerializable):
         Returns:
             dict: A data dictionary compatible with JSON serilization.
         """
+
+        for pair in zip(self.dependencies, self.creates_versions):
+            k, v = pair
+
         data_dict = {
-            "_reads":     self.dependencies,
-            "_writes": self.creates_versions,
+            "_reads":     dict(self.dependencies),
+            "_writes": dict(self.creates_versions),
         }
 
         if flag == JSONFlag.STORE:
@@ -107,8 +117,8 @@ class ProtocolCommand(JSONSerializable):
         """
         self = cls.__new__(cls)
         ProtocolCommand.__init__(self)
-        self.dependencies = list(data['_reads'])
-        self.creates_versions = list(data['_writes'])
+        self.dependencies = list((k,v) for k,v in data['_reads'].items())
+        self.creates_versions = list((k,v) for k,v in data['_writes'].items())
         if flag == JSONFlag.STORE:
             if "_origin" in data:
                 self.origin = LibraAddress.from_encoded_str(data["_origin"])

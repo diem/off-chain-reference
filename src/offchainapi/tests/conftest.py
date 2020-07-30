@@ -19,7 +19,7 @@ from unittest.mock import MagicMock
 from mock import AsyncMock
 import pytest
 import json
-
+from os import urandom
 
 @pytest.fixture
 def three_addresses():
@@ -48,8 +48,10 @@ def payment_action():
 
 @pytest.fixture
 def payment(sender_actor, receiver_actor, payment_action):
+    ref_id = f'{LibraAddress.from_encoded_str(sender_actor.address).get_onchain().as_str()}_{urandom(16).hex()}'
     return PaymentObject(
-        sender_actor, receiver_actor, '_ref', 'orig_ref', 'desc', payment_action
+        sender_actor, receiver_actor, ref_id, None,
+        'Human readable payment information.', payment_action
     )
 
 
