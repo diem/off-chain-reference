@@ -84,15 +84,25 @@ class Aionet:
                     role = ['Client', 'Server'][channel.is_server()]
                     waiting = channel.is_server() \
                         and channel.would_retransmit()
-                    me = channel.get_my_address().as_str()
-                    other = channel.get_other_address().as_str()
-                    # TODO: Retransmit a few of the requests here.
+                    me = channel.get_my_address()
+                    other = channel.get_other_address()
+
+                    # Retransmit a few of the requests here.
+                    messages = channel.package_retransmit(number=100)
+                    for message in messages:
+                        req = message[3]
+                        try:
+                            return await self.send_request(other, req)
+                        except NetworkException as e:
+                            self.logger.debug(
+                                f'Attempt to re-transmit message {message} '
+                                f'failed with error: {str(e)}'
+                            )
 
                     len_my = len(channel.my_request_index)
-
                     logger.info(
                         f'''
-                        Channel: {me} [{role}] <-> {other}
+                        Channel: {me.as_str()} [{role}] <-> {other.as_str()}
                         Queues: my: {len_my} (Wait: {waiting})
                         Retransmit: {channel.would_retransmit()}'''
                     )
