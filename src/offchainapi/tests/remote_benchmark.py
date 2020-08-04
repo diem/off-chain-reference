@@ -26,7 +26,7 @@ from json import loads, dumps
 import aiohttp
 
 logging.basicConfig(
-    level=logging.INFO, format="[%(levelname)s] %(asctime)s: %(message)s"
+    level=logging.ERROR, format="[%(levelname)s] %(asctime)s: %(message)s"
 )
 
 

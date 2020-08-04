@@ -90,11 +90,14 @@ class Aionet:
                     # Retransmit a few of the requests here.
                     messages = channel.package_retransmit(number=100)
                     for message in messages:
+                        logger.info(
+                            f'Attempt to re-transmit messages {message}.'
+                        )
                         req = message[3]
                         try:
                             return await self.send_request(other, req)
                         except NetworkException as e:
-                            self.logger.debug(
+                            logger.debug(
                                 f'Attempt to re-transmit message {message} '
                                 f'failed with error: {str(e)}'
                             )
