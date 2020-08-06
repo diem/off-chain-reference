@@ -110,20 +110,25 @@ async def test_send_command(net_handler, tester_addr, server, command):
 
 async def test_watchdog_task(net_handler, tester_addr, server, command):
     # Ensure there is a request to re-transmit.
-    _ = net_handler.sequence_command(tester_addr, command)
+    req = net_handler.sequence_command(tester_addr, command)
     base_url = f'http://{server.host}:{server.port}'
     net_handler.vasp.info_context.get_peer_base_url.return_value = base_url
     assert len(net_handler.vasp.channel_store.values()) == 1
     channel = list(net_handler.vasp.channel_store.values())[0]
     assert channel.would_retransmit()
-    assert channel.package_retransmit(number=100)
+    assert len(channel.package_retransmit(number=100)) == 1
+    assert channel.package_retransmit(number=100)[0].content == req
+    assert channel.next_final_sequence() == 0
 
     # Run the watchdog for a while.
     loop = asyncio.get_event_loop()
     net_handler.schedule_watchdog(loop, period=0.1)
     await asyncio.sleep(0.3)
 
-    # Ensure there is nothing to re-transmit.
+    # Ensure the watchdog successfully sent the command.
+    assert channel.next_final_sequence() == 1
+
+    # Ensure there is nothing else to re-transmit.
     assert not channel.would_retransmit()
     assert not channel.package_retransmit(number=100)
     await net_handler.close()
