@@ -108,7 +108,7 @@ async def test_send_command(net_handler, tester_addr, server, command):
     assert ret
 
 
-async def test_watchdog_task(net_handler, tester_addr, testee_addr, server, command):
+async def test_watchdog_task(net_handler, tester_addr, server, command):
     # Ensure there is a request to re-transmit.
     _ = net_handler.sequence_command(tester_addr, command)
     base_url = f'http://{server.host}:{server.port}'
