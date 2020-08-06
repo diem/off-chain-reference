@@ -93,9 +93,8 @@ class Aionet:
                         logger.info(
                             f'Attempt to re-transmit messages {message}.'
                         )
-                        req = message[3]
                         try:
-                            return await self.send_request(other, req)
+                            await self.send_request(other, message.content)
                         except NetworkException as e:
                             logger.debug(
                                 f'Attempt to re-transmit message {message} '
