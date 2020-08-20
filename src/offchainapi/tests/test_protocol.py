@@ -337,12 +337,10 @@ def test_protocol_bad_signature(two_channels):
     server, client = two_channels
 
     msg = 'XRandomXJunk' # client.package_request(msg).content
-    with pytest.raises(OffChainInvalidSignature):
-        msg2 = server.parse_handle_request(msg).content
+    assert server.parse_handle_request(msg).raw.is_failure()
 
     msg = '.Random.Junk' # client.package_request(msg).content
-    with pytest.raises(OffChainInvalidSignature):
-        msg2 = server.parse_handle_request(msg).content
+    assert server.parse_handle_request(msg).raw.is_failure()
 
 def test_protocol_conflict2(two_channels):
     server, client = two_channels
@@ -593,14 +591,6 @@ def test_parse_handle_request_to_future_out_of_order(json_request, channel,
     res = fut.content
     res = json.loads(key.verify_message(res))
     assert res['status']== 'success'
-
-
-def test_parse_handle_request_to_future_exception(json_request, channel):
-    with pytest.raises(Exception):
-        fut = channel.parse_handle_request(
-            json_request  # json_request is not signed.
-        )
-
 
 def test_parse_handle_response_to_future_parsing_error(json_response, channel,
                                                        command, key):

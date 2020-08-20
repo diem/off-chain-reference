@@ -29,6 +29,9 @@ class OffChainErrorCode(Enum):
     # discarded with a protocol error.
     parsing_error = 'parsing_error'
 
+    # Indicates that the signature verification failed
+    invalid_signature = 'invalid_signature'
+
     # Codes for command errors
     # ------------------------
     #

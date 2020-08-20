@@ -205,6 +205,10 @@ class CommandResponseObject(JSONSerializable):
         """
         return self.status == 'failure' and self.error.protocol_error
 
+    def is_failure(self):
+        """ Returns True if the response represents a failure. """
+        return self.status == 'failure'
+
     # define serialization interface
 
     def get_json_data_dict(self, flag):
@@ -285,7 +289,7 @@ def make_protocol_error(request, code, message=None):
     return response
 
 
-def make_parsing_error(message=None):
+def make_parsing_error(message=None, code=OffChainErrorCode.parsing_error):
     """ Constructs a CommandResponse signaling a protocol failure.
         We do not sequence or store such responses since we can recover
         from them.
@@ -301,7 +305,7 @@ def make_parsing_error(message=None):
     response.cid = None
     response.status = 'failure'
     response.error = OffChainError(
-        protocol_error=True, code=OffChainErrorCode.parsing_error, message=message)
+        protocol_error=True, code=code, message=message)
     return response
 
 

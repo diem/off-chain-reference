@@ -1,9 +1,7 @@
-# off-chain-api
+# off-chain-reference
 [![License](https://img.shields.io/badge/license-Apache-green.svg)](LICENSE)
 
-Off-Chain API: Supports exchanging KYC data and attestation of KYC data between VASPs.
-It uses standard transports and technologies such as HTTP, JSON and TLS to make
-compliant implementations easy and flexible.
+Off-Chain Reference: Supports defining payments, exchanging KYC data and attestation of KYC data between VASPs.
 
 ## Installation
 
@@ -33,7 +31,7 @@ The index of the documentation is a very good place to start to learn more. [Ove
 
 ## Status
 
-The specifications and code are shared here to support discussions within the Libra Association. Neither the specifications nor the code should be considered final, and breaking API changes are likely to occur.
+The specifications and code are shared here to support discussions within the Libra Association and wider community. Neither the specifications nor the code should be considered final. Breaking API changes are likely to occur.
 
 ## License
 
