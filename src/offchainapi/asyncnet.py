@@ -77,15 +77,27 @@ class Aionet:
                     role = ['Client', 'Server'][channel.is_server()]
                     waiting = channel.is_server() \
                         and channel.would_retransmit()
-                    me = channel.get_my_address().as_str()
-                    other = channel.get_other_address().as_str()
-                    # TODO: Retransmit a few of the requests here.
+                    me = channel.get_my_address()
+                    other = channel.get_other_address()
+
+                    # Retransmit a few of the requests here.
+                    messages = channel.package_retransmit(number=100)
+                    for message in messages:
+                        logger.info(
+                            f'Attempt to re-transmit messages {message}.'
+                        )
+                        try:
+                            await self.send_request(other, message.content)
+                        except NetworkException as e:
+                            logger.debug(
+                                f'Attempt to re-transmit message {message} '
+                                f'failed with error: {str(e)}'
+                            )
 
                     len_my = len(channel.my_request_index)
-
                     logger.info(
                         f'''
-                        Channel: {me} [{role}] <-> {other}
+                        Channel: {me.as_str()} [{role}] <-> {other.as_str()}
                         Queues: my: {len_my} (Wait: {waiting})
                         Retransmit: {channel.would_retransmit()}'''
                     )
@@ -158,9 +170,12 @@ class Aionet:
         logger.debug(f'Data Received from {other_addr.as_str()}.')
         response = channel.parse_handle_request(request_text)
 
+        # Return an error code upon an error
+        status = 200 if not response.raw.is_failure() else 400
+
         # Send back the response.
         logger.debug(f'Sending back response to {other_addr.as_str()}.')
-        return web.Response(text=response.content, headers=headers)
+        return web.Response(status=status, text=response.content, headers=headers)
 
 
 

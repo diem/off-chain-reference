@@ -18,7 +18,7 @@ import logging
 from itertools import islice
 
 """ A Class to store messages meant to be sent on a network. """
-NetMessage = namedtuple('NetMessage', ['src', 'dst', 'type', 'content'])
+NetMessage = namedtuple('NetMessage', ['src', 'dst', 'type', 'content', 'raw'])
 
 logger = logging.getLogger(name='libra_off_chain_api.protocol')
 
@@ -254,7 +254,8 @@ class VASPPairChannel:
             self.myself,
             self.other,
             CommandRequestObject,
-            json_string
+            json_string,
+            request
         )
 
         return net_message
@@ -279,7 +280,7 @@ class VASPPairChannel:
         assert type(signed_response) is str
 
         net_message = NetMessage(
-            self.myself, self.other, CommandResponseObject, signed_response
+            self.myself, self.other, CommandResponseObject, signed_response, response
         )
 
         return net_message
@@ -425,7 +426,7 @@ class VASPPairChannel:
                 f'(other:{self.other_address_str}) '
                 f'Signature verification failed. OffChainInvalidSignature: {e}'
             )
-            raise e
+            response = make_parsing_error(f'{e}', code=OffChainErrorCode.invalid_signature)
 
         except JSONParsingError as e:
             logger.error(
