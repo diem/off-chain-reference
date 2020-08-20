@@ -190,13 +190,6 @@ class VASPPairChannel:
 
         logger.debug(f'(other:{self.other_address_str}) Created VASP channel')
 
-    def my_next_seq(self):
-        """
-        Returns:
-            str: The next command ID for this VASP to be used with requests.
-        """
-        return f'{self.myself.as_str()}_{str(len(self.my_request_index))}'
-
     def get_my_address(self):
         """
         Returns:
@@ -371,7 +364,6 @@ class VASPPairChannel:
         # Ensure all storage operations are written atomically.
         with self.rlock:
             with self.storage.atomic_writes() as _:
-                request.cid = self.my_next_seq()
 
                 self.processor.check_command(
                     self.get_my_address(),

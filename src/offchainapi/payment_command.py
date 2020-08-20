@@ -37,6 +37,16 @@ class PaymentCommand(ProtocolCommand):
         return ProtocolCommand.__eq__(self, other) \
             and self.command == other.command
 
+    def get_request_cid(self):
+        """ Suggests the cid that the request with this command should contain.
+
+            Each cid should ideally be unique, and the same command should create a
+            request with the same cid. """
+
+        _, new_version = self.creates_versions[0]
+        return new_version
+
+
     def get_object(self, version_number, dependencies):
         """ Returns the new payment object defined by this command. Since this
         may depend on a previous payment (when it is an update) we need to

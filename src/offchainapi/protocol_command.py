@@ -25,6 +25,15 @@ class ProtocolCommand(JSONSerializable):
                self.origin == other.origin)
         return val
 
+
+    def get_request_cid(self):
+        """ Suggests the cid that the request with this command should contain.
+
+        Each cid should ideally be unique, and the same command should create a
+        request with the same cid. """
+        raise NotImplementedError()  # pragma: no cover
+
+
     def set_origin(self, origin):
         """ Sets the Libra address that proposed this command.
 

@@ -151,7 +151,7 @@ class PaymentProcessor(CommandProcessor):
             self, other_address, command, seq, error):
         ''' Process any command failures from either ends of a channel.'''
         logger.error(
-            f'(other:{other_address.as_str()}) Command #{seq} Failure: {error}'
+            f'(other:{other_address.as_str()}) Command #{seq} Failure: {error} ({error.message})'
         )
 
         # If this is our own command, that just failed, we should update
