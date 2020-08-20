@@ -5,6 +5,7 @@
 
 # ---------------------------------------------------------------------------
 
+from .errors import OffChainErrorCode
 
 # A model for VASP business environment
 
@@ -28,7 +29,8 @@ class BusinessForceAbort(Exception):
     '''
 
     def __init__(self, code, message):
-        self.code = code
+        assert isinstance(code, OffChainErrorCode)
+        self.code = code.value
         self.message = message
 
 

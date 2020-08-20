@@ -90,6 +90,7 @@ async def test_send_request(net_handler, tester_addr, server, signed_json_reques
         _ = await net_handler.send_request(tester_addr, signed_json_request)
     # Raises since the vasp did not emit the command; so it does
     # not expect a response.
+    await net_handler.close()
 
 
 async def test_send_command(net_handler, tester_addr, server, command):

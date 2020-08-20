@@ -10,6 +10,7 @@ from .payment_command import PaymentCommand, PaymentLogicError
 from .asyncnet import NetworkException
 from .shared_object import SharedObject
 from .libra_address import LibraAddress, LibraAddressError
+from .utils import get_unique_string
 
 import asyncio
 import logging
@@ -758,24 +759,26 @@ class PaymentProcessor(CommandProcessor):
             new_payment = payment.new_version(new_payment.version)
             current_status = Status.abort
 
-            abort_code = e.code
+            abort_code = e.code # already a string
             abort_msg = e.message
 
         except Exception as e:
+            # This is an unexpected error, so we need to track it.
+            error_ref = get_unique_string()
+
             logger.error(
-                f'Error while processing payment {payment.reference_id}'
+                f'[{error_ref}] Error while processing payment {payment.reference_id}'
                 ' return error in metadata & abort.')
             logger.exception(e)
 
             # Only report the error in meta-data
             # & Abort the payment.
             new_payment = payment.new_version(new_payment.version)
-            new_payment.data[role].add_metadata(f'Error: ({role}): {str(e)}')
             current_status = Status.abort
 
             # TODO: use proper codes and messages on abort.
-            abort_code = 'EXCEPTION_ABORT'
-            abort_msg = str(e)  # TODO: do not leak raw exceptions.
+            abort_code = OffChainErrorCode.payment_vasp_error.value
+            abort_msg = f'An unexpected excption was raised by the VASP business logic. Ref: {error_ref}'  # TODO: do not leak raw exceptions.
 
         # Do an internal consistency check:
         if not self.can_change_status(payment, current_status, is_sender):

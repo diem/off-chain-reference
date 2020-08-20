@@ -246,7 +246,7 @@ def test_payment_process_abort_from_receiver(payment, processor):
     bcm = processor.business_context()
     bcm.is_recipient.side_effect = [True, True]
     bcm.check_account_existence.side_effect = [None]
-    bcm.next_kyc_level_to_request.side_effect = [BusinessForceAbort]
+    bcm.next_kyc_level_to_request.side_effect = [ BusinessForceAbort(OffChainErrorCode.payment_insufficient_funds, 'Not enough money in account.') ]
     new_payment = processor.payment_process(payment)
     assert new_payment.receiver.status.as_status() == Status.abort
 
@@ -263,13 +263,13 @@ def test_payment_process_abort_from_business(payment, processor):
     bcm = processor.business_context()
     bcm.is_recipient.side_effect = [True]
     bcm.ready_for_settlement.side_effect = [
-        BusinessForceAbort('CODE', 'MESSAGE')
+        BusinessForceAbort(OffChainErrorCode.payment_vasp_error, 'MESSAGE')
 
      ]
     new_payment = processor.payment_process(payment)
     assert payment.receiver.status.as_status() != Status.abort
     assert new_payment.receiver.status.as_status() == Status.abort
-    assert new_payment.receiver.status.abort_code == 'CODE'
+    assert new_payment.receiver.status.abort_code == OffChainErrorCode.payment_vasp_error.value
     assert new_payment.receiver.status.abort_message == 'MESSAGE'
 
 def test_payment_process_get_extended_kyc(payment, processor, kyc_data):
