@@ -348,9 +348,7 @@ class PaymentProcessor(CommandProcessor):
     def check_command(self, my_address, other_address, command):
         ''' Overrides CommandProcessor. '''
 
-        dependencies = self.object_store
-        new_version = command.get_new_version_number()
-        new_payment = command.get_object(new_version, dependencies)
+        new_payment = command.get_payment(self.object_store)
 
         # Ensure that the two parties involved are in the VASP channel
         parties = set([
@@ -399,7 +397,7 @@ class PaymentProcessor(CommandProcessor):
                 self.check_new_payment(new_payment)
             else:
                 old_version = command.get_previous_version_number()
-                old_payment = dependencies[old_version]
+                old_payment = self.object_store[old_version]
                 self.check_new_update(old_payment, new_payment)
 
     def process_command(self, other_addr, command,
@@ -689,7 +687,7 @@ class PaymentProcessor(CommandProcessor):
         current_status = status
         other_status = payment.data[other_role].status.as_status()
 
-        new_payment = payment.new_version()
+        new_payment = payment.new_version(store=self.object_store)
 
         abort_code = None
         abort_msg = None
@@ -756,7 +754,7 @@ class PaymentProcessor(CommandProcessor):
             # We cannot abort once we said we are ready_for_settlement
             # or beyond. However we will catch a wrong change in the
             # check when we change status.
-            new_payment = payment.new_version(new_payment.version)
+            new_payment = payment.new_version(new_payment.version, store=self.object_store)
             current_status = Status.abort
 
             abort_code = e.code # already a string
@@ -773,7 +771,7 @@ class PaymentProcessor(CommandProcessor):
 
             # Only report the error in meta-data
             # & Abort the payment.
-            new_payment = payment.new_version(new_payment.version)
+            new_payment = payment.new_version(new_payment.version, store=self.object_store)
             current_status = Status.abort
 
             # TODO: use proper codes and messages on abort.

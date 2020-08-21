@@ -59,9 +59,9 @@ if __name__ == '__main__':
         columns={
             0: ("name", 100),
             1: ("ncall", 20),
-            2: ("tsub", 4),
-            3: ("ttot", 4),
-            4: ("tavg", 4)
+            2: ("tsub", 8),
+            3: ("ttot", 8),
+            4: ("tavg", 8)
         }
 
         yappi.get_func_stats().strip_dirs().print_all(columns=columns)

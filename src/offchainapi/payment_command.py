@@ -88,7 +88,8 @@ class PaymentCommand(ProtocolCommand):
             dep_object = dependencies[dep]
 
             # Need to get a deepcopy new version.
-            updated_payment = dep_object.new_version(new_version)
+            updated_payment = dep_object.new_version(new_version, store=dependencies)
+
             PaymentObject.from_full_record(
                 self.command, base_instance=updated_payment)
             return updated_payment
@@ -99,6 +100,11 @@ class PaymentCommand(ProtocolCommand):
 
     def get_payment(self, dependencies):
         version = self.get_new_version_number()
+
+        # Optimization to prevent repeated checks and deep copying
+        if version in dependencies:
+            return dependencies[version]
+
         return self.get_object(version, dependencies)
 
     def get_json_data_dict(self, flag):
