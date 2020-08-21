@@ -349,7 +349,7 @@ class PaymentProcessor(CommandProcessor):
         ''' Overrides CommandProcessor. '''
 
         dependencies = self.object_store
-        new_version = command.get_new_version()
+        new_version = command.get_new_version_number()
         new_payment = command.get_object(new_version, dependencies)
 
         # Ensure that the two parties involved are in the VASP channel
@@ -398,7 +398,7 @@ class PaymentProcessor(CommandProcessor):
 
                 self.check_new_payment(new_payment)
             else:
-                old_version = command.get_previous_version()
+                old_version = command.get_previous_version_number()
                 old_payment = dependencies[old_version]
                 self.check_new_update(old_payment, new_payment)
 

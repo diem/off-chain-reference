@@ -29,6 +29,9 @@ if __name__ == '__main__':
     parser.add_argument(
         '-v', '--verbose', metavar='VERBOSE', type=bool, default=False,
         help='Print all payments', dest='verb')
+    parser.add_argument(
+        '-x', '--xprofile', metavar='PROFILE', type=bool, default=False,
+        help='Profile this run', dest='xprof')
 
     args = parser.parse_args()
 
@@ -40,7 +43,26 @@ if __name__ == '__main__':
         print('Error only logging...')
         logging.basicConfig(level=logging.ERROR)
 
+    if args.xprof:
+        import yappi
+        import time
+        yappi.set_clock_type("cpu")
+        yappi.start()
+
     asyncio.run(local_benchmark.main_perf(
         messages_num=args.paym,
         wait_num=args.wait,
         verbose=args.verb))
+
+    if args.xprof:
+
+        columns={
+            0: ("name", 100),
+            1: ("ncall", 20),
+            2: ("tsub", 4),
+            3: ("ttot", 4),
+            4: ("tavg", 4)
+        }
+
+        yappi.get_func_stats().strip_dirs().print_all(columns=columns)
+        yappi.get_thread_stats().print_all()

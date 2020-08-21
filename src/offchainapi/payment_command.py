@@ -64,7 +64,7 @@ class PaymentCommand(ProtocolCommand):
             PaymentObject: The updated payment.
         """
         # First find dependencies & created objects.
-        new_version = self.get_new_version()
+        new_version = self.get_new_version_number()
         if new_version != version_number:
             raise PaymentLogicError(
                 OffChainErrorCode.payment_dependency_error,
@@ -98,7 +98,7 @@ class PaymentCommand(ProtocolCommand):
             "Can depdend on no or one other payment.")
 
     def get_payment(self, dependencies):
-        version = self.get_new_version()
+        version = self.get_new_version_number()
         return self.get_object(version, dependencies)
 
     def get_json_data_dict(self, flag):
@@ -155,7 +155,7 @@ class PaymentCommand(ProtocolCommand):
         return self
 
     # Helper functions for payment commands specifically
-    def get_previous_version(self):
+    def get_previous_version_number(self):
         """ Returns the version of the previous payment, or None if this
         command creates a new payment
 
@@ -170,7 +170,7 @@ class PaymentCommand(ProtocolCommand):
         _, prev_version =  self.dependencies[0]
         return prev_version
 
-    def get_new_version(self):
+    def get_new_version_number(self):
         ''' Returns the version number of the payment.
 
             Returns:
