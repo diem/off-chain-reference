@@ -10,6 +10,7 @@ from .payment_command import PaymentCommand, PaymentLogicError
 from .asyncnet import NetworkException
 from .shared_object import SharedObject
 from .libra_address import LibraAddress, LibraAddressError
+from .utils import get_unique_string
 
 import asyncio
 import logging
@@ -150,7 +151,7 @@ class PaymentProcessor(CommandProcessor):
             self, other_address, command, seq, error):
         ''' Process any command failures from either ends of a channel.'''
         logger.error(
-            f'(other:{other_address.as_str()}) Command #{seq} Failure: {error}'
+            f'(other:{other_address.as_str()}) Command #{seq} Failure: {error} ({error.message})'
         )
 
         # If this is our own command, that just failed, we should update
@@ -214,9 +215,7 @@ class PaymentProcessor(CommandProcessor):
         logger.info(f'(other:{other_address_str}) Process Command #{seq}')
 
         try:
-            # Notify the business context about the new payment.
-            # This allows the business to do any custom record-keeping
-            command_ctx = await self.business.notify_payment_update(
+            command_ctx = await self.business.payment_pre_processing(
                 other_address, seq, command, payment)
 
             # Only respond to commands by other side.
@@ -349,9 +348,7 @@ class PaymentProcessor(CommandProcessor):
     def check_command(self, my_address, other_address, command):
         ''' Overrides CommandProcessor. '''
 
-        dependencies = self.object_store
-        new_version = command.get_new_version()
-        new_payment = command.get_object(new_version, dependencies)
+        new_payment = command.get_payment(self.object_store)
 
         # Ensure that the two parties involved are in the VASP channel
         parties = set([
@@ -383,7 +380,7 @@ class PaymentProcessor(CommandProcessor):
 
         # Only check the commands we get from others.
         if origin_str == other_addr_str:
-            if command.dependencies == []:
+            if command.reads_version_map == []:
 
                 # Check that the reference_id is correct
                 # Only do this for the definition of new payments, after that
@@ -399,8 +396,8 @@ class PaymentProcessor(CommandProcessor):
 
                 self.check_new_payment(new_payment)
             else:
-                old_version = command.get_previous_version()
-                old_payment = dependencies[old_version]
+                old_version = command.get_previous_version_number()
+                old_payment = self.object_store[old_version]
                 self.check_new_update(old_payment, new_payment)
 
     def process_command(self, other_addr, command,
@@ -689,26 +686,26 @@ class PaymentProcessor(CommandProcessor):
         other_role = ['sender', 'receiver'][not is_receiver]
 
         status = payment.data[role].status.as_status()
-        status_other = payment.data[other_role].status.as_status()
-
-        if status in {Status.abort} or (
-            status == Status.ready_for_settlement and
-            status_other == Status.ready_for_settlement
-        ):
-            # Nothing more to be done with this payment
-            # Return a new payment version with no modification
-            # To singnal no changes, and therefore no new command.
-            return payment.new_version()
-
         current_status = status
         other_status = payment.data[other_role].status.as_status()
 
-        new_payment = payment.new_version()
+        new_payment = payment.new_version(store=self.object_store)
 
         abort_code = None
         abort_msg = None
 
         try:
+            await business.payment_initial_processing(payment, ctx)
+
+            if status == Status.abort or (
+                status == Status.ready_for_settlement and
+                other_status == Status.ready_for_settlement
+            ):
+                # Nothing more to be done with this payment
+                # Return a new payment version with no modification
+                # To singnal no changes, and therefore no new command.
+                return new_payment
+
             # We set our status as abort.
             if other_status == Status.abort:
                 current_status = Status.abort
@@ -765,27 +762,29 @@ class PaymentProcessor(CommandProcessor):
             # We cannot abort once we said we are ready_for_settlement
             # or beyond. However we will catch a wrong change in the
             # check when we change status.
-            new_payment = payment.new_version(new_payment.version)
+            new_payment = payment.new_version(new_payment.version, store=self.object_store)
             current_status = Status.abort
 
-            abort_code = e.code
+            abort_code = e.code # already a string
             abort_msg = e.message
 
         except Exception as e:
+            # This is an unexpected error, so we need to track it.
+            error_ref = get_unique_string()
+
             logger.error(
-                f'Error while processing payment {payment.reference_id}'
+                f'[{error_ref}] Error while processing payment {payment.reference_id}'
                 ' return error in metadata & abort.')
             logger.exception(e)
 
             # Only report the error in meta-data
             # & Abort the payment.
-            new_payment = payment.new_version(new_payment.version)
-            new_payment.data[role].add_metadata(f'Error: ({role}): {str(e)}')
+            new_payment = payment.new_version(new_payment.version, store=self.object_store)
             current_status = Status.abort
 
             # TODO: use proper codes and messages on abort.
-            abort_code = 'EXCEPTION_ABORT'
-            abort_msg = str(e)  # TODO: do not leak raw exceptions.
+            abort_code = OffChainErrorCode.payment_vasp_error.value
+            abort_msg = f'An unexpected excption was raised by the VASP business logic. Ref: {error_ref}'  # TODO: do not leak raw exceptions.
 
         # Do an internal consistency check:
         if not self.can_change_status(payment, current_status, is_sender):

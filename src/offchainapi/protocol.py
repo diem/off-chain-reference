@@ -18,7 +18,7 @@ import logging
 from itertools import islice
 
 """ A Class to store messages meant to be sent on a network. """
-NetMessage = namedtuple('NetMessage', ['src', 'dst', 'type', 'content'])
+NetMessage = namedtuple('NetMessage', ['src', 'dst', 'type', 'content', 'raw'])
 
 logger = logging.getLogger(name='libra_off_chain_api.protocol')
 
@@ -190,13 +190,6 @@ class VASPPairChannel:
 
         logger.debug(f'(other:{self.other_address_str}) Created VASP channel')
 
-    def my_next_seq(self):
-        """
-        Returns:
-            str: The next command ID for this VASP to be used with requests.
-        """
-        return f'{self.myself.as_str()}_{str(len(self.my_request_index))}'
-
     def get_my_address(self):
         """
         Returns:
@@ -254,7 +247,8 @@ class VASPPairChannel:
             self.myself,
             self.other,
             CommandRequestObject,
-            json_string
+            json_string,
+            request
         )
 
         return net_message
@@ -279,7 +273,7 @@ class VASPPairChannel:
         assert type(signed_response) is str
 
         net_message = NetMessage(
-            self.myself, self.other, CommandResponseObject, signed_response
+            self.myself, self.other, CommandResponseObject, signed_response, response
         )
 
         return net_message
@@ -370,7 +364,6 @@ class VASPPairChannel:
         # Ensure all storage operations are written atomically.
         with self.rlock:
             with self.storage.atomic_writes() as _:
-                request.cid = self.my_next_seq()
 
                 self.processor.check_command(
                     self.get_my_address(),
@@ -425,7 +418,7 @@ class VASPPairChannel:
                 f'(other:{self.other_address_str}) '
                 f'Signature verification failed. OffChainInvalidSignature: {e}'
             )
-            raise e
+            response = make_parsing_error(f'{e}', code=OffChainErrorCode.invalid_signature)
 
         except JSONParsingError as e:
             logger.error(

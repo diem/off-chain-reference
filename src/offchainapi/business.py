@@ -5,6 +5,7 @@
 
 # ---------------------------------------------------------------------------
 
+from .errors import OffChainErrorCode
 
 # A model for VASP business environment
 
@@ -28,31 +29,13 @@ class BusinessForceAbort(Exception):
     '''
 
     def __init__(self, code, message):
-        self.code = code
+        assert isinstance(code, OffChainErrorCode)
+        self.code = code.value
         self.message = message
 
 
 class BusinessContext:
     """ The interface a VASP should define to drive the Off-chain protocol. """
-
-    async def notify_payment_update(self, other_address, seq, command, payment):
-        """ An async method to notify the VASP that a successsful command has
-        been sequenced resulting in a new or updated payment. This provides the
-        VASP with full visibility into the sequence of payments. The command
-        could have originated either from the other VASP or this VASP (see
-        `command.origin` to determine this).
-
-        Args:
-            other_address (str): the encoded libra address of the other VASP.
-            seq (int): the sequence number into the shared command sequence.
-            command (ProtocolCommand): the command that lead to the new or
-            updated payment.
-            payment (PaymentObject): the payment resulting from this command.
-
-        Returns None or a context objext that will be passed on the
-        other business context functions.
-        """
-        pass
 
     def open_channel_to(self, other_vasp_addr):
         """Requests authorization to open a channel to another VASP.
@@ -75,6 +58,7 @@ class BusinessContext:
 
         Args:
             payment (PaymentCommand): The concerned payment.
+            ctx (Any): Optional context object that business can store custom data
 
         Returns:
             bool: Whether the VASP is the sender of the payment.
@@ -86,6 +70,7 @@ class BusinessContext:
 
         Args:
             payment (PaymentCommand): The concerned payment.
+            ctx (Any): Optional context object that business can store custom data
 
         Returns:
             bool: Whether the VASP is the recipient of the payment.
@@ -100,6 +85,7 @@ class BusinessContext:
         Args:
             payment (PaymentCommand): The payment command containing the actors
                 to check.
+            ctx (Any): Optional context object that business can store custom data
 
         Raises:
             BusinessValidationFailure: If the account does not exist.
@@ -116,6 +102,7 @@ class BusinessContext:
         Args:
             payment (PaymentCommand): The payment command containing the
                 signature to check.
+            ctx (Any): Optional context object that business can store custom data
 
         Raises:
             BusinessValidationFailure: If the signature is invalid
@@ -128,6 +115,7 @@ class BusinessContext:
 
         Args:
             payment (PaymentCommand): The payment to sign.
+            ctx (Any): Optional context object that business can store custom data
         """
         raise NotImplementedError()  # pragma: no cover
 
@@ -139,6 +127,7 @@ class BusinessContext:
 
             Args:
                 payment (PaymentCommand): The concerned payment.
+                ctx (Any): Optional context object that business can store custom data
 
             Returns:
                 Status: A set of status indicating to level of kyc to provide,
@@ -159,6 +148,7 @@ class BusinessContext:
 
             Args:
                 payment (PaymentCommand): The concerned payment.
+                ctx (Any): Optional context object that business can store custom data
 
             Returns:
                 Status: Returns Status.none or the current status
@@ -180,6 +170,7 @@ class BusinessContext:
 
             Args:
                 payment (PaymentCommand): The concerned payment.
+                ctx (Any): Optional context object that business can store custom data
 
             Raises:
                    BusinessNotAuthorized: If the other VASP is not authorized to
@@ -212,7 +203,37 @@ class BusinessContext:
         '''
         raise NotImplementedError()  # pragma: no cover
 
-# ----- Settlement -----
+# ----- Payment Processing -----
+
+    async def payment_pre_processing(self, other_address, seq, command, payment):
+        ''' An async method to let VASP perform custom business logic to a
+        successsful (sequenced & ACKed) command prior to normal processing.
+        For example it can be used to check whether the payment is in terminal
+        status. The command could have originated either from the other VASP
+        or this VASP (see `command.origin` to determine this).
+
+        Args:
+            other_address (str): the encoded libra address of the other VASP.
+            seq (int): the sequence number into the shared command sequence.
+            command (ProtocolCommand): the command that lead to the new or
+                updated payment.
+            payment (PaymentObject): the payment resulting from this command.
+
+        Returns None or a context objext that will be passed on the
+        other business context functions.
+        '''
+        pass
+
+    async def payment_initial_processing(self, payment, ctx=None):
+        '''
+        Allow business to do custom pre-processing to a payment
+        Args:
+            payment (PaymentObject): The concerned payment.
+            ctx (Any): Optional context object that business can store custom data
+        Raises:
+            BusinessForceAbort: When business wants to abort a payment
+        '''
+        pass
 
     async def ready_for_settlement(self, payment, ctx=None):
         ''' Indicates whether a payment is ready for settlement as far as this

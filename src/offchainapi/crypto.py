@@ -84,9 +84,9 @@ class ComplianceKey:
             verifier.verify(self._key, alg='EdDSA')
             return verifier.payload.decode("utf-8")
         except jws.InvalidJWSSignature:
-            raise OffChainInvalidSignature(signature)
+            raise OffChainInvalidSignature(signature, "Invalid Signature")
         except jws.InvalidJWSObject:
-            raise OffChainInvalidSignature(signature)
+            raise OffChainInvalidSignature(signature, "Invalid Format")
 
     def thumbprint(self):
         return self._key.thumbprint()

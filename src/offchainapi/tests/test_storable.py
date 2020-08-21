@@ -176,7 +176,7 @@ def test_value_command(db, payment):
     val.set_value(cmd)
     assert val.get_value() == cmd
 
-    cmd.creates_versions = [('xxxxxxxx', 'xxxxxxxx')]
+    cmd.writes_version_map = [('xxxxxxxx', 'xxxxxxxx')]
     assert val.get_value() != cmd
     val.set_value(cmd)
     assert val.get_value() == cmd

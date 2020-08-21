@@ -19,3 +19,23 @@ def test_payment_command_conform(payment):
     print('PaymentCommand Example:')
     print(json.dumps(data, indent=4))
     print('-'*40)
+
+def test_request_payment_command_conform(payment):
+    cmd = PaymentCommand(payment.new_version())
+    req = CommandRequestObject(cmd)
+    data = req.get_json_data_dict(JSONFlag.NET)
+
+    print()
+    print('-'*40)
+    print('CommandRequestObject Example:')
+    print(json.dumps(data, indent=4))
+    print('-'*40)
+
+    resp = make_success_response(req)
+    data = resp.get_json_data_dict(JSONFlag.NET)
+
+    print()
+    print('-'*40)
+    print('CommandResponseObject Example:')
+    print(json.dumps(data, indent=4))
+    print('-'*40)

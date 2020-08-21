@@ -96,13 +96,22 @@ class OffChainError(JSONSerializable):
     def __repr__(self):
         return f'OffChainError({self.code}, protocol={self.protocol_error})'
 
+def get_request_cid_helper(command):
+    """ Extract a cid for a request from a command. """
+    try:
+        return command.get_request_cid()
+    except Exception as e:
+        # Allow a debug option for simple commands
+        if __debug__ :
+            return repr(command)
+        raise
 
 @JSONSerializable.register
 class CommandRequestObject(JSONSerializable):
     """ Represents a command of the Off chain protocol. """
 
     def __init__(self, command):
-        self.cid = None          # The sequence in the local queue
+        self.cid = get_request_cid_helper(command)
         self.command = command
         self.command_type = command.json_type()
 
@@ -205,6 +214,10 @@ class CommandResponseObject(JSONSerializable):
         """
         return self.status == 'failure' and self.error.protocol_error
 
+    def is_failure(self):
+        """ Returns True if the response represents a failure. """
+        return self.status == 'failure'
+
     # define serialization interface
 
     def get_json_data_dict(self, flag):
@@ -239,8 +252,12 @@ class CommandResponseObject(JSONSerializable):
             if self.status not in {'success', 'failure'}:
                 raise JSONParsingError(
                     f'Status must be success or failure not {self.status}')
+
+            # TODO: Do we need this special case?
             if self.status == 'success':
                 self.cid = str(data['cid'])
+
+
             if self.status == 'failure':
                 self.error = OffChainError.from_json_data_dict(
                     data['error'], flag)
@@ -285,7 +302,7 @@ def make_protocol_error(request, code, message=None):
     return response
 
 
-def make_parsing_error(message=None):
+def make_parsing_error(message=None, code=OffChainErrorCode.parsing_error):
     """ Constructs a CommandResponse signaling a protocol failure.
         We do not sequence or store such responses since we can recover
         from them.
@@ -301,7 +318,7 @@ def make_parsing_error(message=None):
     response.cid = None
     response.status = 'failure'
     response.error = OffChainError(
-        protocol_error=True, code=OffChainErrorCode.parsing_error, message=message)
+        protocol_error=True, code=code, message=message)
     return response
 
 

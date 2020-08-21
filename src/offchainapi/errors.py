@@ -29,6 +29,9 @@ class OffChainErrorCode(Enum):
     # discarded with a protocol error.
     parsing_error = 'parsing_error'
 
+    # Indicates that the signature verification failed
+    invalid_signature = 'invalid_signature'
+
     # Codes for command errors
     # ------------------------
     #
@@ -58,6 +61,11 @@ class OffChainErrorCode(Enum):
     payment_wrong_structure = 'payment_wrong_structure'
     payment_dependency_error = 'payment_dependency_error'
     payment_wrong_recipient_signature = 'payment_wrong_recipient_signature'
+
+    ## Abort codes
+    payment_insufficient_funds = 'payment_insufficient_funds'
+    payment_vasp_error = 'payment_vasp_error'
+
 
     # Test codes
     test_error_code = 'test_error_code'
