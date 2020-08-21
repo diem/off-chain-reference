@@ -191,7 +191,7 @@ def run_client(my_configs_path, other_configs_path, num_of_commands=10, port=0):
         sub_b = LibraAddress.from_bytes(b'B'*16, b'b'*8).as_str()
         sender = PaymentActor(sub_b, StatusObject(Status.none), [])
         receiver = PaymentActor(sub_a, StatusObject(Status.none), [])
-        action = PaymentAction(10, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
+        action = PaymentAction(10, 'TIK', 'charge', 994773)
         reference = f'{my_addr.as_str()}_{cid}'
         payment = PaymentObject(
             sender, receiver, reference, 'orig_ref', 'desc', action

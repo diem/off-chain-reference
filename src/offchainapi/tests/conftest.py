@@ -51,7 +51,7 @@ def receiver_actor():
 
 @pytest.fixture
 def payment_action():
-    return PaymentAction(5, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
+    return PaymentAction(5, 'TIK', 'charge', 7784993)
 
 
 @pytest.fixture

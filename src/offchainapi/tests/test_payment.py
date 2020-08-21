@@ -50,31 +50,31 @@ def test_kyc_data_missing_type_fail():
 
 
 def test_payment_action_creation():
-    action = PaymentAction(10, 'LBT', 'charge', '2020-01-01 19:00 UTC')
+    action = PaymentAction(10, 'LBT', 'charge', 778587)
 
     with pytest.raises(StructureException):
         # Try negative payment, should fail
-        _ = PaymentAction(-10, 'LBT', 'charge', '2020-01-01 19:00 UTC')
+        _ = PaymentAction(-10, 'LBT', 'charge', 778587)
 
     with pytest.raises(StructureException):
         # Try zero payment, should fail
-        _ = PaymentAction(0, 'LBT', 'charge', '2020-01-01 19:00 UTC')
+        _ = PaymentAction(0, 'LBT', 'charge', 778587)
 
     with pytest.raises(StructureException):
         # Use floating point for value
-        _ = PaymentAction(0.01, 'LBT', 'charge', '2020-01-01 19:00 UTC')
+        _ = PaymentAction(0.01, 'LBT', 'charge', 778587)
 
     with pytest.raises(StructureException):
         # Use int for currency
-        _ = PaymentAction(10, 5, 'charge', '2020-01-01 19:00 UTC')
+        _ = PaymentAction(10, 5, 'charge', 778587)
 
     with pytest.raises(StructureException):
         # Use wrong type for action
-        _ = PaymentAction(10, 'LBT', 0, '2020-01-01 19:00 UTC')
+        _ = PaymentAction(10, 'LBT', 0, 778587)
 
     with pytest.raises(StructureException):
         # Use wrong type for timestamp
-        _ = PaymentAction(10, 'LBT', 'charge', 0)
+        _ = PaymentAction(10, 'LBT', 'charge', 'NOT UNIX TIMESTAMP')
 
 
 def test_status_valdation():
@@ -211,7 +211,7 @@ def test_specific():
                         'amount': 10,
                         'currency': 'TIK',
                         'action': 'charge',
-                        'timestamp': '2020-01-02 18:00:00 UTC'
+                        'timestamp': 785562
                     },
                     'recipient_signature': 'QkJCQkJCQkJCQkJCQkJCQg==.ref 0.SIGNED'
                     }

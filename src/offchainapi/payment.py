@@ -198,7 +198,7 @@ class PaymentAction(StructureChecker):
         ('amount', int, REQUIRED, WRITE_ONCE),
         ('currency', str, REQUIRED, WRITE_ONCE),
         ('action', str, REQUIRED, WRITE_ONCE),
-        ('timestamp', str, REQUIRED, WRITE_ONCE)
+        ('timestamp', int, REQUIRED, WRITE_ONCE)
     ]
 
     def __init__(self, amount, currency, action, timestamp):
