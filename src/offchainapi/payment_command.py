@@ -29,8 +29,8 @@ class PaymentCommand(ProtocolCommand):
     def __init__(self, payment):
         ProtocolCommand.__init__(self)
         ref_id = payment.reference_id
-        self.dependencies = [(ref_id, payment.previous_version)] if payment.previous_version else []
-        self.creates_versions = [(ref_id, payment.get_version())]
+        self.reads_version_map = [(ref_id, payment.previous_version)] if payment.previous_version else []
+        self.writes_version_map = [(ref_id, payment.get_version())]
         self.command = payment.get_full_diff_record()
 
     def __eq__(self, other):
@@ -43,7 +43,7 @@ class PaymentCommand(ProtocolCommand):
             Each cid should ideally be unique, and the same command should create a
             request with the same cid. """
 
-        _, new_version = self.creates_versions[0]
+        _, new_version = self.writes_version_map[0]
         return new_version
 
 
@@ -72,14 +72,14 @@ class PaymentCommand(ProtocolCommand):
             )
 
         # This indicates the command creates a fresh payment.
-        if len(self.dependencies) == 0:
+        if len(self.reads_version_map) == 0:
             payment = PaymentObject.create_from_record(self.command)
             payment.set_version(new_version)
             return payment
 
         # This command updates a previous payment.
-        elif len(self.dependencies) == 1:
-            _, dep = self.dependencies[0]
+        elif len(self.reads_version_map) == 1:
+            _, dep = self.reads_version_map[0]
             if dep not in dependencies:
                 raise PaymentLogicError(
                     OffChainErrorCode.payment_wrong_structure,
@@ -145,14 +145,14 @@ class PaymentCommand(ProtocolCommand):
         assert isinstance(self, PaymentCommand)
         self.command = data['payment']
 
-        if len(self.dependencies) > 1:
+        if len(self.reads_version_map) > 1:
             # TODO: Test for such errors within protocol.py tests.
             raise PaymentLogicError(
                 OffChainErrorCode.payment_wrong_structure,
                 "A payment can only depend on a single previous payment"
             )
 
-        if len(self.creates_versions) != 1:
+        if len(self.writes_version_map) != 1:
             # TODO: Test for such errors within protocol.py tests.
             raise PaymentLogicError(
                 OffChainErrorCode.payment_wrong_structure,
@@ -170,10 +170,10 @@ class PaymentCommand(ProtocolCommand):
             command creates a new payment.
         """
         # This is  ensured from the constructors.
-        assert len(self.dependencies) in [0, 1]
-        if len(self.dependencies) == 0:
+        assert len(self.reads_version_map) in [0, 1]
+        if len(self.reads_version_map) == 0:
             return None
-        _, prev_version =  self.dependencies[0]
+        _, prev_version =  self.reads_version_map[0]
         return prev_version
 
     def get_new_version_number(self):
@@ -183,6 +183,6 @@ class PaymentCommand(ProtocolCommand):
                 int: The version number of the payment.
         '''
         # Ensured from the constructors.
-        assert len(self.creates_versions) == 1
-        _, new_version = self.creates_versions[0]
+        assert len(self.writes_version_map) == 1
+        _, new_version = self.writes_version_map[0]
         return new_version

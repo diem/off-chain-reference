@@ -380,7 +380,7 @@ class PaymentProcessor(CommandProcessor):
 
         # Only check the commands we get from others.
         if origin_str == other_addr_str:
-            if command.dependencies == []:
+            if command.reads_version_map == []:
 
                 # Check that the reference_id is correct
                 # Only do this for the definition of new payments, after that
