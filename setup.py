@@ -18,7 +18,7 @@ setuptools.setup(
     name="novifinancial-offchainreference",
     author="Novi Financial",
     author_email="",
-    description="A reference implementation of the Off-chain API",
+    description="A reference implementation of the Off-chain API (LIP-1)",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/novifinancial/off-chain-reference",
