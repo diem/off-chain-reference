@@ -22,8 +22,8 @@ sys.path.insert(0, os.path.abspath('../src/'))
 # -- Project information -----------------------------------------------------
 
 project = 'offchainapi'
-copyright = '2020, Calibra'
-author = 'Calibra'
+copyright = '2020, Novi Financial'
+author = 'Novi Financial'
 
 
 # -- General configuration ---------------------------------------------------

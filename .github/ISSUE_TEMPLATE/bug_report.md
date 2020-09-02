@@ -1,6 +1,6 @@
 ---
 name: "\U0001F41B Bug report"
-about: Create a bug report to help improve the Offchain API
+about: Create a bug report to help improve 'off-chain-reference'
 title: "[Bug]"
 labels: bug
 assignees: ''
@@ -9,11 +9,7 @@ assignees: ''
 
 # 🐛 Bug
 
-If you're looking to report an issue with the Libra Core project go to https://github.com/libra/libra
-
 <!-- A clear and concise description of what the bug is.
-
-If you've uncovered a security issue, please email security@libra.org -->
 
 ## Steps to reproduce
 

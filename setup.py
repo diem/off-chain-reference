@@ -15,13 +15,13 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    name="calibra-offchainapi",
-    author="Calibra",
+    name="novifinancial-offchainreference",
+    author="Novi Financial",
     author_email="",
-    description="An implementation of the Calibra Off-chain API",
+    description="A reference implementation of the Off-chain API",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/calibra/off-chain-api",
+    url="https://github.com/novifinancial/off-chain-reference",
     packages=setuptools.find_packages(where='src'),
     package_dir={'': 'src'},
     classifiers=[
