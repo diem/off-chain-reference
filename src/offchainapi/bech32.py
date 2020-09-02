@@ -16,7 +16,7 @@
 # MIT Licence of the above here: https://github.com/fiatjaf/bech32/blob/master/LICENSE
 # commit: 48b6fe15ccdbf2741a9410df277bd95f9086e18a
 
-"""Reference implementation for Bech32 encoding of Libra addresses and sub-addresses."""
+"""Reference implementation for Bech32 encoding of Libra Blockchain addresses and sub-addresses."""
 
 from typing import Iterable, List, Optional, Tuple
 
