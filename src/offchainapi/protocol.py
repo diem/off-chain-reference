@@ -72,10 +72,10 @@ class OffChainVASP:
         self.storage_factory = storage_factory
 
     def get_vasp_address(self):
-        """Return our own VASP Libra Address.
+        """Return our own VASP Libra Blockchain Address.
 
         Returns:
-            LibraAddress: The VASP's address.
+            LibraAddress: The VASP's Blockchain address.
         """
         return self.vasp_addr
 
@@ -83,7 +83,7 @@ class OffChainVASP:
         ''' Returns a VASPPairChannel with the other VASP.
 
         Parameters:
-            other_vasp_addr (LibraAddress): The address of the other VASP.
+            other_vasp_addr (LibraAddress): The Libra Blockchain address of the other VASP.
 
         Returns:
             VASPPairChannel: A channel with the other VASP.
@@ -119,8 +119,8 @@ class VASPPairChannel:
         channel bewteen two VASPs.
 
     Args:
-        myself (LibraAddress): The address of the current VASP.
-        other (LibraAddress): The address of the other VASP.
+        myself (LibraAddress): The Libra Blockchain address of the current VASP.
+        other (LibraAddress): The Libra Blockchain address of the other VASP.
         vasp (OffChainVASP): The OffChainVASP to which this channel
                              is attached.
         storage (StorageFactory): The storage factory.
@@ -207,14 +207,14 @@ class VASPPairChannel:
     def get_my_address(self):
         """
         Returns:
-            LibraAddress: The address of this VASP.
+            LibraAddress: The Libra Blockchain address of this VASP.
         """
         return self.myself
 
     def get_other_address(self):
         """
         Returns:
-            LibraAddress: The address of the other VASP.
+            LibraAddress: The Libra Blockchain address of the other VASP.
         """
         return self.other
 

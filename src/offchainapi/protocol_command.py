@@ -28,19 +28,19 @@ class ProtocolCommand(JSONSerializable):
         self.origin = None  # Takes a LibraAddress.
 
     def set_origin(self, origin):
-        """ Sets the Libra address that proposed this command.
+        """ Sets the Libra Blockchain address that proposed this command.
 
         Args:
-            origin (LibraAddress): the Libra address that proposed the command.
+            origin (LibraAddress): the Libra Blockchain address that proposed the command.
         """
         assert self.origin is None or origin == self.origin
         self.origin = origin
 
     def get_origin(self):
-        """ Gets the Libra address that proposed this command.
+        """ Gets the Libra Blockchain address that proposed this command.
 
         Returns:
-            LibraAddress: the Libra address that proposed this command.
+            LibraAddress: the Libra Blockchain address that proposed this command.
 
         """
         return self.origin

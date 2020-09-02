@@ -98,7 +98,7 @@ class LibraAddress:
         return self.encoded_address_bytes
 
     def last_bit(self):
-        """ Get the last bit of the decoded onchain address.
+        """ Get the last bit of the decoded onchain Libra Blockchain address.
         """
         return self.onchain_address_bytes[-1] & 1
 
@@ -106,7 +106,7 @@ class LibraAddress:
         """ Compare two Libra addresses in term of their on-chain part
 
         Args:
-            other (LibraAddress): The Libra address to compare against.
+            other (LibraAddress): The Libra Blockchain address to compare against.
 
         Returns:
             bool: If the current address is greater (or equal) than other.
@@ -117,7 +117,7 @@ class LibraAddress:
         """ Define equality for LibraAddresses.
 
         Args:
-            other (LibraAddress): An other Libra address.
+            other (LibraAddress): An other Libra Blockchain address.
 
         Returns:
             bool: Whether this address equals the other address.

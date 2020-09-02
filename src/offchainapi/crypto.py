@@ -109,7 +109,7 @@ class ComplianceKey:
 
             Params:
                reference_id_bytes (bytes): the bytes of the reference_id.
-               libra_address_bytes (bytes): the 16 bytes of the  libra address
+               libra_address_bytes (bytes): the 16 bytes of the Libra Blockchain address
                value_u64 (int): a unsigned integer of the value.
 
             Returns the hex encoded string ed25519 signature (64 x 2 char).
