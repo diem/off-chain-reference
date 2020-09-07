@@ -1,10 +1,19 @@
-# Copyright (c) The Libra Core Contributors
-# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) Facebook, Inc. and its affiliates.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#    http://www.apache.org/licenses/LICENSE-2.0
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 """ Define the 'business logic' for the Off-chain protocols """
 
 # ---------------------------------------------------------------------------
 
+from .errors import OffChainErrorCode
 
 # A model for VASP business environment
 
@@ -28,7 +37,8 @@ class BusinessForceAbort(Exception):
     '''
 
     def __init__(self, code, message):
-        self.code = code
+        assert isinstance(code, OffChainErrorCode)
+        self.code = code.value
         self.message = message
 
 
@@ -154,6 +164,8 @@ class BusinessContext:
                 code from:
                     - `status_logic.Status.needs_kyc_data`
                     - `status_logic.Status.needs_recipient_signature`
+                    - `status_logic.soft_match`
+                    - `status_logic.pending_review`
 
             Raises:
                 BusinessForceAbort : To abort the payment.
@@ -178,7 +190,29 @@ class BusinessContext:
         '''
         raise NotImplementedError()  # pragma: no cover
 
+
+    async def get_additional_kyc(self, payment, ctx=None):
+        ''' Provides the additional KYC information for this payment.
+
+            The additional information is requested or may be provided in case
+            of a `soft_match` state from the other VASP indicating more
+            information is required to disambiguate an individual.
+
+            Args:
+                payment (PaymentCommand): The concerned payment.
+
+            Raises:
+                   BusinessNotAuthorized: If the other VASP is not authorized to
+                    receive extended KYC data for this payment.
+
+            Returns:
+                KYCData: Returns the extended KYC information for
+                this payment.
+        '''
+        raise NotImplementedError()  # pragma: no cover
+
 # ----- Payment Processing -----
+
     async def payment_pre_processing(self, other_address, seq, command, payment):
         ''' An async method to let VASP perform custom business logic to a
         successsful (sequenced & ACKed) command prior to normal processing.

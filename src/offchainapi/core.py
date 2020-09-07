@@ -1,5 +1,13 @@
-# Copyright (c) The Libra Core Contributors
-# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) Facebook, Inc. and its affiliates.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#    http://www.apache.org/licenses/LICENSE-2.0
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 """ This modules defines the 'core' Off-chain API interface and objects
     to spin an instance of the Off-chain API client and servers. """
@@ -14,6 +22,9 @@ import logging
 from aiohttp import web
 
 logger = logging.getLogger(name='libra_off_chain_api.core')
+
+class VASPPaymentTimeout(Exception):
+    pass
 
 
 class Vasp:
@@ -119,7 +130,7 @@ class Vasp:
             self._await_start_notifier(), self.loop)
         return result.result()
 
-    async def wait_for_payment_outcome_async(self, payment_reference_id):
+    async def wait_for_payment_outcome_async(self, payment_reference_id, timeout=None):
         ''' Awaits until the payment with the given reference_id is
         ready_for_settlement or aborted and returns the payment object
         at that version.
@@ -127,21 +138,31 @@ class Vasp:
         Parameters:
             payment_reference_id (str): the reference_id of the payment
                 of interest.
+            timeout (float, or None by default): second until timeout.
 
         Returns a PaymentObject with the given reference_id that is ether
         ready_for_settlement or aborted by one of the parties.
 
         '''
-        payment = await self.pp.wait_for_payment_outcome(payment_reference_id)
+        try:
+            payment = await asyncio.wait_for(
+                self.pp.wait_for_payment_outcome(payment_reference_id),
+                timeout)
+        except asyncio.TimeoutError:
+            print(f'Timeout for payment {payment_reference_id}')
+            latest_version = self.get_payment_by_ref(payment_reference_id)
+            print('Pay:', latest_version)
+            raise VASPPaymentTimeout(latest_version)
+
         return payment
 
-    def wait_for_payment_outcome(self, payment_reference_id):
+    def wait_for_payment_outcome(self, payment_reference_id, timeout):
         ''' A non-async variant of wait_for_payment_outcome_async that returns
         a concurrent.futures Future with the result. You may call `.result()`
         on it to block or register a call-back. '''
         if self.loop is not None:
             res = asyncio.run_coroutine_threadsafe(
-                self.wait_for_payment_outcome_async(payment_reference_id), self.loop)
+                self.wait_for_payment_outcome_async(payment_reference_id, timeout), self.loop)
             return res
         else:
             raise RuntimeError('Event loop is None.')
@@ -235,8 +256,6 @@ class Vasp:
         """
         payment = list(self.pp.get_payment_history_by_ref_id(reference_id))
         return payment
-
-
 
     async def close_async(self):
         ''' Await this to cleanly close the network

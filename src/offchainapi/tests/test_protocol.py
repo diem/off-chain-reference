@@ -1,21 +1,30 @@
-# Copyright (c) The Libra Core Contributors
-# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) Facebook, Inc. and its affiliates.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#    http://www.apache.org/licenses/LICENSE-2.0
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 from ..protocol import VASPPairChannel, make_protocol_error, DependencyException
 from ..protocol_messages import CommandRequestObject, CommandResponseObject, \
     OffChainProtocolError, OffChainException
+from ..errors import OffChainErrorCode
 from ..sample.sample_command import SampleCommand
 from ..command_processor import CommandProcessor
 from ..utils import JSONSerializable, JSONFlag
 from ..storage import StorableFactory
+from ..crypto import OffChainInvalidSignature
 
-import types
 from copy import deepcopy
 import random
 from unittest.mock import MagicMock
 import pytest
-import asyncio
 import json
+
 
 class RandomRun(object):
     def __init__(self, server, client, commands, seed='fixed seed'):
@@ -45,7 +54,6 @@ class RandomRun(object):
         server = self.server
         client = self.client
         commands = self.commands
-
 
         while True:
 
@@ -182,18 +190,12 @@ def test_protocol_server_client_benign(two_channels):
     request = server.sequence_command_local(SampleCommand('Hello'))
     assert isinstance(request, CommandRequestObject)
 
-    print()
-    print(request.pretty(JSONFlag.NET))
-
     # Pass the request to the client
     assert len(client.other_request_index) == 0
     reply = client.handle_request(request)
     assert isinstance(reply, CommandResponseObject)
     assert len(client.other_request_index) == 1
     assert reply.status == 'success'
-
-    print()
-    print(reply.pretty(JSONFlag.NET))
 
     # Pass the reply back to the server
     assert server.next_final_sequence() == 0
@@ -225,7 +227,7 @@ def test_protocol_server_conflicting_sequence(two_channels):
 
     # The response to the second command is a failure
     assert reply_conflict.status == 'failure'
-    assert reply_conflict.error.code == 'conflict'
+    assert reply_conflict.error.code == OffChainErrorCode.conflict
 
     # Pass the reply back to the server
     assert server.next_final_sequence() == 0
@@ -338,6 +340,15 @@ def test_protocol_conflict1(two_channels):
     succ = client.parse_handle_response(msg2)
     assert succ  # success
 
+
+def test_protocol_bad_signature(two_channels):
+    server, client = two_channels
+
+    msg = 'XRandomXJunk' # client.package_request(msg).content
+    assert server.parse_handle_request(msg).raw.is_failure()
+
+    msg = '.Random.Junk' # client.package_request(msg).content
+    assert server.parse_handle_request(msg).raw.is_failure()
 
 def test_protocol_conflict2(two_channels):
     server, client = two_channels
@@ -510,7 +521,7 @@ def test_json_serlialize():
     assert req0 == req1
     assert req1 != req2
 
-    req0.response = make_protocol_error(req0, 'The error code')
+    req0.response = make_protocol_error(req0, OffChainErrorCode.test_error_code)
     data_err = req0.get_json_data_dict(JSONFlag.STORE)
     assert data_err is not None
     assert data_err['response'] is not None
@@ -567,7 +578,7 @@ def test_sample_command():
     data = obj.get_json_data_dict(JSONFlag.STORE)
     obj2 = JSONSerializable.parse(data, JSONFlag.STORE)
     assert obj2.version == obj.version
-    assert obj2.previous_versions == obj.previous_versions
+    assert obj2.previous_version == obj.previous_version
 
 
 def test_parse_handle_request_to_future(signed_json_request, channel, key):
@@ -588,14 +599,6 @@ def test_parse_handle_request_to_future_out_of_order(json_request, channel,
     res = fut.content
     res = json.loads(key.verify_message(res))
     assert res['status']== 'success'
-
-
-def test_parse_handle_request_to_future_exception(json_request, channel):
-    with pytest.raises(Exception):
-        fut = channel.parse_handle_request(
-            json_request  # json_request is not signed.
-        )
-
 
 def test_parse_handle_response_to_future_parsing_error(json_response, channel,
                                                        command, key):

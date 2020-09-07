@@ -1,9 +1,16 @@
-# Copyright (c) The Libra Core Contributors
-# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) Facebook, Inc. and its affiliates.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#    http://www.apache.org/licenses/LICENSE-2.0
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 from enum import Enum
 from os import urandom
-from binascii import hexlify
 import json
 
 REQUIRED = True
@@ -83,10 +90,8 @@ class StructureChecker:
             else:
                 if xtype in {str, int, list, dict}:
                     diff[field] = self.data[field]
-                elif issubclass(xtype, Enum):
-                    diff[field] = self.data[field].name
                 else:
-                    diff[field] = str(self.data[field])
+                    raise RuntimeError(f'Cannot get diff for type "{xtype}".')
         return diff
 
     def has_changed(self):
@@ -103,18 +108,6 @@ class StructureChecker:
                     return True
 
         return False
-
-    def what_changed(self):
-        ''' Generator that provides a sequence of changes.
-        The items in the sequence are tuples of (object, chnage_dictionary)'''
-        parse = self.parse_map()
-        for new_diff in self.update_record:
-            yield (self, new_diff)
-
-        for field in self.data:
-            _, parse_more = parse[field]
-            if parse_more:
-                yield from self.data[field].what_changed()
 
     def __eq__(self, other):
         ''' Define equality as equality between data fields only '''
@@ -157,12 +150,10 @@ class StructureChecker:
                         new_diff[field] = xtype.from_full_record(diff[field])
                 else:
                     # Use default constructor of the type
-                    if xtype in {int, str, list}:
+                    if xtype in {int, str, list, dict}:
                         new_diff[field] = xtype(diff[field])
-                    elif issubclass(xtype, Enum):
-                        new_diff[field] = xtype[diff[field]]
                     else:
-                        new_diff[field] = xtype(diff[field])
+                        raise StructureException(f'Cannot parse type: {xtype}')
 
             else:
                 # We tolerate fields we do not know about, but ignore them.
@@ -278,7 +269,6 @@ class JSONSerializable:
     def parse(cls, data, flag):
         """Parse a data dictionary and return a JSON serializable instance. """
         if '_ObjectType' not in data:
-            print(data)
             raise JSONParsingError('No object type information')
 
         if data['_ObjectType'] not in cls.json_type_map:

@@ -1,5 +1,13 @@
-# Copyright (c) The Libra Core Contributors
-# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) Facebook, Inc. and its affiliates.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#    http://www.apache.org/licenses/LICENSE-2.0
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 from ..payment import PaymentActor, PaymentAction, PaymentObject, KYCData, StatusObject
 from ..utils import StructureException, JSONFlag
@@ -42,31 +50,31 @@ def test_kyc_data_missing_type_fail():
 
 
 def test_payment_action_creation():
-    action = PaymentAction(10, 'LBT', 'charge', '2020-01-01 19:00 UTC')
+    action = PaymentAction(10, 'LBT', 'charge', 778587)
 
     with pytest.raises(StructureException):
         # Try negative payment, should fail
-        _ = PaymentAction(-10, 'LBT', 'charge', '2020-01-01 19:00 UTC')
+        _ = PaymentAction(-10, 'LBT', 'charge', 778587)
 
     with pytest.raises(StructureException):
         # Try zero payment, should fail
-        _ = PaymentAction(0, 'LBT', 'charge', '2020-01-01 19:00 UTC')
+        _ = PaymentAction(0, 'LBT', 'charge', 778587)
 
     with pytest.raises(StructureException):
         # Use floating point for value
-        _ = PaymentAction(0.01, 'LBT', 'charge', '2020-01-01 19:00 UTC')
+        _ = PaymentAction(0.01, 'LBT', 'charge', 778587)
 
     with pytest.raises(StructureException):
         # Use int for currency
-        _ = PaymentAction(10, 5, 'charge', '2020-01-01 19:00 UTC')
+        _ = PaymentAction(10, 5, 'charge', 778587)
 
     with pytest.raises(StructureException):
         # Use wrong type for action
-        _ = PaymentAction(10, 'LBT', 0, '2020-01-01 19:00 UTC')
+        _ = PaymentAction(10, 'LBT', 0, 778587)
 
     with pytest.raises(StructureException):
         # Use wrong type for timestamp
-        _ = PaymentAction(10, 'LBT', 'charge', 0)
+        _ = PaymentAction(10, 'LBT', 'charge', 'NOT UNIX TIMESTAMP')
 
 
 def test_status_valdation():
@@ -203,7 +211,7 @@ def test_specific():
                         'amount': 10,
                         'currency': 'TIK',
                         'action': 'charge',
-                        'timestamp': '2020-01-02 18:00:00 UTC'
+                        'timestamp': 785562
                     },
                     'recipient_signature': 'QkJCQkJCQkJCQkJCQkJCQg==.ref 0.SIGNED'
                     }

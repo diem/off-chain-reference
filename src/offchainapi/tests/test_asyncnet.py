@@ -1,5 +1,13 @@
-# Copyright (c) The Libra Core Contributors
-# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) Facebook, Inc. and its affiliates.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#    http://www.apache.org/licenses/LICENSE-2.0
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 from ..asyncnet import Aionet
 from ..protocol_messages import OffChainException
@@ -43,16 +51,20 @@ async def client(net_handler, aiohttp_client):
 
 @pytest.fixture
 async def server(net_handler, tester_addr, testee_addr, aiohttp_server, key):
+    obj = {}
     async def handler(request):
+        if 'cid' not in obj:
+            print('DEBUG: ATTACH A CID!!!!!!')
         headers = {'X-Request-ID': request.headers['X-Request-ID']}
-        resp = {"cid": f'{testee_addr.as_str()}_0', "status": "success"}
+        resp = {"cid": obj.get("cid",'SET A VALUE'), "status": "success"}
         signed_json_response = key.sign_message(json.dumps(resp))
-        return aiohttp.web.json_response(signed_json_response, headers=headers)
+        return aiohttp.web.Response(text=signed_json_response, headers=headers)
 
     app = aiohttp.web.Application()
     url = net_handler.get_url('/', tester_addr.as_str(), other_is_server=True)
     app.add_routes([aiohttp.web.post(url, handler)])
     server = await aiohttp_server(app)
+    server.side = obj
     return server
 
 
@@ -60,20 +72,13 @@ def test_init(vasp):
     Aionet(vasp)
 
 
-async def test_handle_request_debug(client):
-    response = await client.post('/')
-    assert response.status == 200
-    text = await response.text()
-    assert 'Hello, world' in text
-
-
 async def test_handle_request(url, net_handler, key, client, signed_json_request):
     headers = {'X-Request-ID': 'abc'}
     response = await client.post(
-        url, json=signed_json_request,
+        url, data=signed_json_request,
         headers=headers)
     assert response.status == 200
-    content = await response.json()
+    content = await response.text()
     content = json.loads(key.verify_message(content))
     assert content['status'] == 'success'
 
@@ -84,7 +89,6 @@ async def test_handle_request_not_authorised(vasp, url, json_request, client):
     response = await client.post(url, json=json_request, headers=headers)
     assert response.status == 401
 
-
 async def test_handle_request_bad_payload(client, url):
     headers = {'X-Request-ID': 'abc'}
     response = await client.post(url, headers=headers)
@@ -94,23 +98,29 @@ async def test_handle_request_bad_payload(client, url):
 async def test_send_request(net_handler, tester_addr, server, signed_json_request):
     base_url = f'http://{server.host}:{server.port}'
     net_handler.vasp.info_context.get_peer_base_url.return_value = base_url
+
     with pytest.raises(OffChainException):
         _ = await net_handler.send_request(tester_addr, signed_json_request)
     # Raises since the vasp did not emit the command; so it does
     # not expect a response.
+    await net_handler.close()
 
 
 async def test_send_command(net_handler, tester_addr, server, command):
     base_url = f'http://{server.host}:{server.port}'
     net_handler.vasp.info_context.get_peer_base_url.return_value = base_url
     req = net_handler.sequence_command(tester_addr, command)
+    server.side['cid'] = command.get_request_cid()
+
     ret = await net_handler.send_request(tester_addr, req)
+    await net_handler.close()
     assert ret
 
 
 async def test_watchdog_task(net_handler, tester_addr, server, command):
     # Ensure there is a request to re-transmit.
     req = net_handler.sequence_command(tester_addr, command)
+    server.side['cid'] = command.get_request_cid()
     base_url = f'http://{server.host}:{server.port}'
     net_handler.vasp.info_context.get_peer_base_url.return_value = base_url
     assert len(net_handler.vasp.channel_store.values()) == 1
@@ -119,6 +129,7 @@ async def test_watchdog_task(net_handler, tester_addr, server, command):
     assert len(channel.package_retransmit(number=100)) == 1
     assert channel.package_retransmit(number=100)[0].content == req
     assert channel.next_final_sequence() == 0
+
 
     # Run the watchdog for a while.
     loop = asyncio.get_event_loop()

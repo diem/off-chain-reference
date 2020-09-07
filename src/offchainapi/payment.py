@@ -1,9 +1,17 @@
-# Copyright (c) The Libra Core Contributors
-# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) Facebook, Inc. and its affiliates.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#    http://www.apache.org/licenses/LICENSE-2.0
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 from .utils import StructureException, StructureChecker, \
     REQUIRED, OPTIONAL, WRITE_ONCE, UPDATABLE, \
-    JSONSerializable
+    JSONSerializable, JSONFlag
 from .shared_object import SharedObject
 from .status_logic import Status
 from .libra_address import LibraAddress
@@ -113,6 +121,7 @@ class PaymentActor(StructureChecker):
     fields = [
         ('address', str, REQUIRED, WRITE_ONCE),
         ('kyc_data', KYCData, OPTIONAL, WRITE_ONCE),
+        ('additional_kyc_data', KYCData, OPTIONAL, WRITE_ONCE),
         ('status', StatusObject, REQUIRED, UPDATABLE),
         ('metadata', list, REQUIRED, UPDATABLE)
     ]
@@ -153,6 +162,16 @@ class PaymentActor(StructureChecker):
             'kyc_data': kyc_data,
         })
 
+    def add_additional_kyc_data(self, additional_kyc_data):
+        """ Add extended KYC information and kyc signature.
+
+        Args:
+            kyc_data (str): The KYC data object
+        """
+        self.update({
+            'additional_kyc_data': additional_kyc_data,
+        })
+
     def add_metadata(self, item):
         """ Add an item to the metadata
 
@@ -179,7 +198,7 @@ class PaymentAction(StructureChecker):
         ('amount', int, REQUIRED, WRITE_ONCE),
         ('currency', str, REQUIRED, WRITE_ONCE),
         ('action', str, REQUIRED, WRITE_ONCE),
-        ('timestamp', str, REQUIRED, WRITE_ONCE)
+        ('timestamp', int, REQUIRED, WRITE_ONCE)
     ]
 
     def __init__(self, amount, currency, action, timestamp):
@@ -270,9 +289,9 @@ class PaymentObject(SharedObject, StructureChecker, JSONSerializable):
         SharedObject.__init__(self)
         return self
 
-    def new_version(self, new_version=None):
+    def new_version(self, new_version=None, store=None):
         """ Override SharedObject. """
-        clone = SharedObject.new_version(self, new_version)
+        clone = SharedObject.new_version(self, new_version, store)
         clone.flatten()
         return clone
 
@@ -299,3 +318,6 @@ class PaymentObject(SharedObject, StructureChecker, JSONSerializable):
         self = PaymentObject.from_full_record(data)
         SharedObject.from_json_data_dict(data, flag, self)
         return self
+
+    def __str__(self):
+        return json.dumps(self.get_json_data_dict(JSONFlag.STORE), indent=4)

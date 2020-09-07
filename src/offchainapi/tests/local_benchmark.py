@@ -1,5 +1,13 @@
-# Copyright (c) The Libra Core Contributors
-# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) Facebook, Inc. and its affiliates.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#    http://www.apache.org/licenses/LICENSE-2.0
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 # Sample benchmark to profile performance and observe bottlenecks.
 #
@@ -110,7 +118,7 @@ async def main_perf(messages_num=10, wait_num=0, verbose=False):
         sub_b = LibraAddress.from_bytes(b'B'*16, b'b'*8).as_str()
         sender = PaymentActor(sub_a, StatusObject(Status.needs_kyc_data), [])
         receiver = PaymentActor(sub_b, StatusObject(Status.none), [])
-        action = PaymentAction(10, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
+        action = PaymentAction(10, 'TIK', 'charge', 984736)
         payment = PaymentObject(
             sender, receiver, f'{peerA_addr}_ref{cid:08d}', None, 'Description ...', action
         )
@@ -128,7 +136,8 @@ async def main_perf(messages_num=10, wait_num=0, verbose=False):
         return res
 
     async def wait_for_all_payment_outcome(nodeA, payments, results):
-        fut_list = [nodeA.wait_for_payment_outcome_async(p.reference_id) for p,r in zip(payments, results)]
+        fut_list = [nodeA.wait_for_payment_outcome_async(
+            p.reference_id, timeout=None) for p,r in zip(payments, results)]
 
         res = await asyncio.gather(
                 *fut_list,

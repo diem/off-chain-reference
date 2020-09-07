@@ -1,11 +1,20 @@
-# Copyright (c) The Libra Core Contributors
-# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) Facebook, Inc. and its affiliates.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#    http://www.apache.org/licenses/LICENSE-2.0
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
-from .command_processor import CommandProcessor
+from .command_processor import CommandProcessor, CommandValidationError
 from .protocol_messages import CommandRequestObject, CommandResponseObject, \
     OffChainProtocolError, OffChainException, \
     make_success_response, make_protocol_error, \
     make_parsing_error, make_command_error
+from .errors import OffChainErrorCode
 from .utils import JSONParsingError, JSONFlag
 from .libra_address import LibraAddress
 from .crypto import OffChainInvalidSignature
@@ -17,12 +26,12 @@ import logging
 from itertools import islice
 
 """ A Class to store messages meant to be sent on a network. """
-NetMessage = namedtuple('NetMessage', ['src', 'dst', 'type', 'content'])
+NetMessage = namedtuple('NetMessage', ['src', 'dst', 'type', 'content', 'raw'])
 
 logger = logging.getLogger(name='libra_off_chain_api.protocol')
 
 
-class DependencyException(Exception):
+class DependencyException(OffChainException):
     pass
 
 
@@ -189,13 +198,6 @@ class VASPPairChannel:
 
         logger.debug(f'(other:{self.other_address_str}) Created VASP channel')
 
-    def my_next_seq(self):
-        """
-        Returns:
-            str: The next command ID for this VASP to be used with requests.
-        """
-        return f'{self.myself.as_str()}_{str(len(self.my_request_index))}'
-
     def get_my_address(self):
         """
         Returns:
@@ -253,7 +255,8 @@ class VASPPairChannel:
             self.myself,
             self.other,
             CommandRequestObject,
-            json_string
+            json_string,
+            request
         )
 
         return net_message
@@ -275,9 +278,10 @@ class VASPPairChannel:
             self.get_my_address().as_str()
         )
         signed_response = my_key.sign_message(json.dumps(struct))
+        assert type(signed_response) is str
 
         net_message = NetMessage(
-            self.myself, self.other, CommandResponseObject, signed_response
+            self.myself, self.other, CommandResponseObject, signed_response, response
         )
 
         return net_message
@@ -368,7 +372,6 @@ class VASPPairChannel:
         # Ensure all storage operations are written atomically.
         with self.rlock:
             with self.storage.atomic_writes() as _:
-                request.cid = self.my_next_seq()
 
                 self.processor.check_command(
                     self.get_my_address(),
@@ -423,7 +426,7 @@ class VASPPairChannel:
                 f'(other:{self.other_address_str}) '
                 f'Signature verification failed. OffChainInvalidSignature: {e}'
             )
-            raise e
+            response = make_parsing_error(f'{e}', code=OffChainErrorCode.invalid_signature)
 
         except JSONParsingError as e:
             logger.error(
@@ -484,7 +487,9 @@ class VASPPairChannel:
                     # There is a conflict, and it will have to be resolved
                     # TODO[issue 8]: How are conflicts meant to be resolved?
                     # With only two participants we cannot tolerate errors.
-                    response = make_protocol_error(request, code='conflict')
+                    response = make_protocol_error(
+                        request, code=OffChainErrorCode.conflict)
+
                     response.previous_command = previous_request.command
                     logger.error(
                         f'(other:{self.other_address_str}) '
@@ -509,28 +514,36 @@ class VASPPairChannel:
             if is_locked:
                 if self.is_server():
                     # The server requests take precedence, so make this wait.
-                    response = make_protocol_error(request, code='wait')
+                    response = make_protocol_error(
+                        request, code=OffChainErrorCode.wait)
                     return response
                 else:
                     # A client yields the locks to the server.
                     pass
 
-        try:
-            # Option 1: raise due to missing deps
-            if not has_all_deps:
-                raise Exception('Missing dependencies')
+        # Option 1: raise due to missing deps
+        if not has_all_deps:
+            response = make_command_error(
+                request, code=OffChainErrorCode.missing_dependencies)
 
-            command = request.command
-            my_address = self.get_my_address()
-            other_address = self.get_other_address()
-            # Option 2: raise due to failing checks
-            self.processor.check_command(
-                my_address, other_address, command)
+        else:
 
-            # Option 3: did not raise, so return success.
-            response = make_success_response(request)
-        except Exception as e:
-            response = make_command_error(request, str(e))
+            try:
+                command = request.command
+                my_address = self.get_my_address()
+                other_address = self.get_other_address()
+
+                # Option 2: raise due to failing checks
+                self.processor.check_command(
+                    my_address, other_address, command)
+
+                # Option 3: did not raise, so return success.
+                response = make_success_response(request)
+            except CommandValidationError as e:
+                response = make_command_error(
+                    request,
+                    code=e.error_code,
+                    message=e.error_message)
 
         # Write back to storage
         request.response = response
@@ -569,11 +582,11 @@ class VASPPairChannel:
                 if dv in self.object_locks and self.object_locks[dv] == request.cid:
                     self.object_locks[dv] = 'True'
 
-    def parse_handle_response(self, json_response):
+    def parse_handle_response(self, response_text):
         """ Handles a response as json string or dict.
 
         Args:
-            json_response (str or dict): The json response.
+            response_text (str): The response signed iusing JWS.
 
         Returns:
             bool: Whether the command was a success or not
@@ -583,7 +596,9 @@ class VASPPairChannel:
             other_key = vasp.info_context.get_peer_compliance_verification_key(
                 self.other_address_str
             )
-            response = json.loads(other_key.verify_message(json_response))
+
+            verified_response = other_key.verify_message(response_text)
+            response = json.loads(verified_response)
             response = CommandResponseObject.from_json_data_dict(
                 response, JSONFlag.NET
             )

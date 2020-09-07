@@ -1,5 +1,22 @@
-# Copyright (c) The Libra Core Contributors
-# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) Facebook, Inc. and its affiliates.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#    http://www.apache.org/licenses/LICENSE-2.0
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+from .errors import OffChainErrorCode
+
+class CommandValidationError(Exception):
+    def __init__(self, error_code, error_message):
+        self.error_code = error_code
+        if not isinstance(error_code, OffChainErrorCode):
+            raise RuntimeError(f'Error code must be of type OffChainErrorCode, not {type(error_code)}')
+        self.error_message = error_message
 
 
 class CommandProcessor:
@@ -25,6 +42,12 @@ class CommandProcessor:
                 my_address (LibraAddress): own address.
                 other_address (LibraAddress): other party address.
                 command (PaymentCommand): The current payment.
+
+            Returns:
+                None: in case no errors are found.
+
+            Raises:
+                CommandValidationError: to indicate an error.
         '''
         raise NotImplementedError()  # pragma: no cover
 

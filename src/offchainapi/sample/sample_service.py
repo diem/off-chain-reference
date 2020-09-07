@@ -1,5 +1,13 @@
-# Copyright (c) The Libra Core Contributors
-# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) Facebook, Inc. and its affiliates.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#    http://www.apache.org/licenses/LICENSE-2.0
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 from ..business import BusinessContext, BusinessForceAbort, \
     BusinessValidationFailure, VASPInfo
@@ -11,6 +19,7 @@ from ..payment_logic import PaymentCommand, PaymentProcessor
 from ..status_logic import Status
 from ..storage import StorableFactory
 from ..crypto import ComplianceKey
+from ..errors import OffChainErrorCode
 
 import json
 
@@ -103,7 +112,7 @@ class sample_business(BusinessContext):
             sub = LibraAddress.from_encoded_str(payment.receiver.address).subaddress_bytes.decode('ascii')
             if sub in accounts:
                 return
-        raise BusinessForceAbort('Subaccount does not exist.')
+        raise BusinessForceAbort(OffChainErrorCode.payment_invalid_libra_subaddress, 'Subaccount does not exist.')
 
     def is_sender(self, payment, ctx=None):
         self.assert_payment_for_vasp(payment)
@@ -206,7 +215,7 @@ class sample_business(BusinessContext):
 
             else:
                 if reference not in account['pending_transactions']:
-                    raise BusinessForceAbort('Insufficient Balance')
+                    raise BusinessForceAbort(OffChainErrorCode.payment_insufficient_funds, 'Insufficient Balance')
 
         # This VASP always settles payments on chain, so we always need
         # a signature to settle on chain.

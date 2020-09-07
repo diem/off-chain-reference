@@ -1,5 +1,13 @@
-# Copyright (c) The Libra Core Contributors
-# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) Facebook, Inc. and its affiliates.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#    http://www.apache.org/licenses/LICENSE-2.0
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 from .utils import get_unique_string, JSONSerializable, JSONFlag
 from copy import deepcopy
@@ -12,7 +20,7 @@ class SharedObject(JSONSerializable):
     VASPs. All shared objects must be JSONSerializable.
 
     All shared objects have a `version` that is the current version of
-    this object, and also link to `previous_versions` that contain a previous
+    this object, and also link to a `previous_version` that contain a previous
     version of this, or other related objects.
 
     Once stored an object with a specific version must never change, rather
@@ -23,21 +31,28 @@ class SharedObject(JSONSerializable):
     def __init__(self):
         ''' All objects have a version number and their commit status. '''
         self.version = get_unique_string()
-        self.previous_versions = []  # Stores previous version of the object.
+        self.previous_version = None  # Stores previous version of the object.
 
-    def new_version(self, new_version=None):
+    def new_version(self, new_version=None, store=None):
         """ Make a deep copy of an object with a new version number.
 
         Args:
             new_version (str, optional): a specific new version string
                   to use otherwise a fresh random new version is used.
                   Defaults to None.
+            store (dict-like, optional): a persistant store that given
+                  a version number key, returns a *fresh* instance of
+                  the object.
 
         Returns:
             SharedObject: The new shared obeject.
         """
-        clone = deepcopy(self)
-        clone.previous_versions = [self.get_version()]
+        if store:
+            clone = store[self.version]
+        else:
+            clone = deepcopy(self)
+
+        clone.previous_version = self.get_version()
         clone.version = new_version
         if clone.version is None:
             clone.version = get_unique_string()
@@ -67,7 +82,7 @@ class SharedObject(JSONSerializable):
 
         update_dict.update({
             '_version': self.version,
-            '_previous_versions': self.previous_versions,
+            '_previous_version': self.previous_version,
         })
 
         self.add_object_type(update_dict)
@@ -79,5 +94,5 @@ class SharedObject(JSONSerializable):
         if self is None:
             self = cls.__new__(cls)
         self.version = data['_version']
-        self.previous_versions = data['_previous_versions']
+        self.previous_version = data['_previous_version']
         return self

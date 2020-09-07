@@ -1,5 +1,13 @@
-# Copyright (c) The Libra Core Contributors
-# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) Facebook, Inc. and its affiliates.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#    http://www.apache.org/licenses/LICENSE-2.0
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 from ..payment import PaymentActor, PaymentAction, PaymentObject, KYCData, StatusObject
 from ..business import BusinessContext, VASPInfo
@@ -19,7 +27,7 @@ from unittest.mock import MagicMock
 from mock import AsyncMock
 import pytest
 import json
-
+from os import urandom
 
 @pytest.fixture
 def three_addresses():
@@ -43,13 +51,15 @@ def receiver_actor():
 
 @pytest.fixture
 def payment_action():
-    return PaymentAction(5, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
+    return PaymentAction(5, 'TIK', 'charge', 7784993)
 
 
 @pytest.fixture
 def payment(sender_actor, receiver_actor, payment_action):
+    ref_id = f'{LibraAddress.from_encoded_str(sender_actor.address).get_onchain().as_str()}_{urandom(16).hex()}'
     return PaymentObject(
-        sender_actor, receiver_actor, '_ref', 'orig_ref', 'desc', payment_action
+        sender_actor, receiver_actor, ref_id, None,
+        'Human readable payment information.', payment_action
     )
 
 
@@ -129,13 +139,13 @@ def command(payment_action):
 @pytest.fixture
 def json_request(command):
     request = CommandRequestObject(command)
-    request.cid = 'SEQ_0'
+    request.cid = '85ef57011938e47ca7c9622661336f00'
     return request.get_json_data_dict(JSONFlag.NET)
 
 
 @pytest.fixture
 def json_response():
-    return {"cid": 'SEQ_0', "status": "success"}
+    return {"cid": '85ef57011938e47ca7c9622661336f00', "status": "success"}
 
 
 @pytest.fixture
