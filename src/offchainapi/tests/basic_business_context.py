@@ -39,7 +39,7 @@ class TestBusinessContext(BusinessContext):
     def open_channel_to(self, other_vasp_info):
         return True
 
-    async def notify_payment_update(self, other_address, seq, command, payment):
+    async def payment_pre_processing(self, other_address, seq, command, payment):
         ctx = {}
         ctx['settle'] = False
         return ctx
