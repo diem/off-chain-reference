@@ -159,7 +159,7 @@ async def main_perf(messages_num=10, wait_num=0, verbose=False):
     if verbose:
         for out, res in zip(outcomes, results):
             if not isinstance(out, Exception):
-                print('OUT OK:', out.sender.status, out.receiver.status)
+                print('OUT OK:', out.sender.status.as_status(), out.receiver.status.as_status())
             else:
                 print('OUT NOTOK:', str(out))
 

@@ -199,6 +199,9 @@ class CommandResponseObject(JSONSerializable):
         self.status = None
         self.error = None
 
+    def __repr__(self):
+        return f"Response <cid:{self.cid} status:{self.status} error:{self.error}>"
+
     def __eq__(self, other):
         return isinstance(other, CommandResponseObject) \
                 and self.cid == other.cid \

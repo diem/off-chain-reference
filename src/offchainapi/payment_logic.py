@@ -255,9 +255,14 @@ class PaymentProcessor(CommandProcessor):
                     self.set_payment_outcome_exception(
                         payment.reference_id,
                         PaymentProcessorNoProgress())
+
+                    is_receiver = self.business.is_recipient(new_payment)
+                    role = ['sender', 'receiver'][is_receiver]
+
                     logger.debug(
-                        f'(other:{other_address_str}) No more commands '
+                        f'(me: {role} other:{other_address_str}) No more commands '
                         f'created for Payment lastly with seq num #{seq}'
+                        f' {new_payment}'
                     )
 
             # If we are here we are done with this obligation.

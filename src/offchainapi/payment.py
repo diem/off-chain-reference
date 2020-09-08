@@ -304,6 +304,10 @@ class PaymentObject(SharedObject, StructureChecker, JSONSerializable):
         json_data = self.get_full_diff_record(json_data)
         return json_data
 
+    def __repr__(self):
+        data = self.get_json_data_dict(JSONFlag.NET)
+        return f'Payment: {data}'
+
     @classmethod
     def from_json_data_dict(cls, data, flag, self=None):
         ''' Override SharedObject. '''

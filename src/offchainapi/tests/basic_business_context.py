@@ -72,7 +72,7 @@ class TestBusinessContext(BusinessContext):
         role = ['receiver', 'sender'][self.is_sender(payment)]
         other_role = ['receiver', 'sender'][not self.is_sender(payment)]
         own_actor = payment.data[role]
-        other_actor = own_actor = payment.data[other_role]
+        other_actor = payment.data[other_role]
         kyc_data = set()
 
         if 'kyc_data' not in own_actor:
