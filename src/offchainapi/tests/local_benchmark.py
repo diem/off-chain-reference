@@ -129,7 +129,7 @@ async def main_perf(messages_num=10, wait_num=0, verbose=False):
 
     async def wait_for_all_payment_outcome(nodeA, payments, results):
         fut_list = [nodeA.wait_for_payment_outcome_async(
-            p.reference_id, timeout=None) for p,r in zip(payments, results)]
+            p.reference_id, timeout=60.0) for p,r in zip(payments, results)]
 
         res = await asyncio.gather(
                 *fut_list,
@@ -161,7 +161,7 @@ async def main_perf(messages_num=10, wait_num=0, verbose=False):
             if not isinstance(out, Exception):
                 print('OUT OK:', out.sender.status.as_status(), out.receiver.status.as_status())
             else:
-                print('OUT NOTOK:', str(out))
+                print('OUT NOTOK:', type(out), str(out))
 
     print('All payments done.')
 

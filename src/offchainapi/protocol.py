@@ -211,19 +211,22 @@ class VASPPairChannel:
         """
         return self.vasp
 
-    def next_final_sequence(self):
-        """
-        Returns:
-            int: The number of items in the sequence of successful commands.
-        """
-        return len(self.command_sequence)
-
     def get_final_sequence(self):
         """
         Returns:
             list: The sequence of successful commands.
         """
         return self.command_sequence
+
+    if __debug__:
+        # Only used for testing -- should not be used in production.
+
+        def next_final_sequence(self):
+            """
+            Returns:
+                int: The number of items in the sequence of successful commands.
+            """
+            return len(self.command_sequence)
 
     def package_request(self, request):
         """ A hook to send a request to other VASP.
@@ -325,7 +328,7 @@ class VASPPairChannel:
         self.processor.process_command(
             other_addr=other_addr,
             command=request.command,
-            seq=self.next_final_sequence(),
+            seq=request.cid,
             status_success=request.is_success(),
             error=response.error if response.error else None
         )
@@ -494,9 +497,14 @@ class VASPPairChannel:
                      for dv in depends_on_version
                      if dv in self.object_locks}
 
+        if any(dv not in obj_locks for dv in depends_on_version):
+            # Some dependencies are missing but may becomes available later?
+            response = make_protocol_error(
+                request, code=OffChainErrorCode.wait)
+            return response
+
         # Check all dependencies are here and not used.
-        has_all_deps = all(dv in obj_locks and
-                           obj_locks[dv] != 'False'
+        has_all_deps = all(obj_locks[dv] != 'False'
                            for dv in depends_on_version)
 
         # If one of the dependency is locked then wait.
@@ -516,7 +524,15 @@ class VASPPairChannel:
         # Option 1: raise due to missing deps
         if not has_all_deps:
             response = make_command_error(
-                request, code=OffChainErrorCode.missing_dependencies)
+                request, code=OffChainErrorCode.used_dependencies)
+
+            # Record the error in the log
+            logger.error(f'Reject request {request.cid} -- missing dependencies')
+            for dv in depends_on_version:
+                if dv not in obj_locks:
+                    logger.error(f' Key {dv} not found')
+                else:
+                    logger.error(f' Key {dv} = {obj_locks[dv]}')
 
         else:
 
@@ -566,6 +582,8 @@ class VASPPairChannel:
 
             for cv in create_versions:
                 self.object_locks[cv] = 'True'
+
+            logger.debug(f'[{self.role()}] Dependency update: {depends_on_version} -> {create_versions}')
 
         else:
             for dv in depends_on_version:

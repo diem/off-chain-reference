@@ -323,10 +323,10 @@ def test_protocol_conflict1(two_channels):
     msg3 = server.sequence_command_local(SampleCommand('World2', deps=['Hello']))
     msg3 = server.package_request(msg3).content
 
-    # Since this is not yet confirmed, reject the command
+    # Since this is not yet confirmed, make it wait
     msg4 = client.parse_handle_request(msg3).content
-    succ = server.parse_handle_response(msg4)
-    assert not succ  # Fails
+    with pytest.raises(OffChainProtocolError):
+        succ = server.parse_handle_response(msg4)
 
     # Now add the response that creates 'hello'
     succ = client.parse_handle_response(msg2)

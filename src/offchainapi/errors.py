@@ -32,6 +32,10 @@ class OffChainErrorCode(Enum):
     # Indicates that the signature verification failed
     invalid_signature = 'invalid_signature'
 
+    # One of the dependencies is missing -- this is recoverable if it becomes
+    # available down the line. Whence it is a protocol error only.
+    missing_dependencies = 'missing_dependencies'
+
     # Codes for command errors
     # ------------------------
     #
@@ -43,7 +47,8 @@ class OffChainErrorCode(Enum):
     # used by another command. As a result committing this command may result in
     # a conflict / inconsistent state. The command is therefore permanantly
     # rejected with an idempotent command error.
-    missing_dependencies = 'missing_dependencies'
+
+    used_dependencies    = 'used_dependencies'
 
 
     # Payment command error codes
