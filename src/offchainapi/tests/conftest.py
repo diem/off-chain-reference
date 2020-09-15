@@ -19,6 +19,7 @@ from unittest.mock import MagicMock
 from mock import AsyncMock
 import pytest
 import json
+import asyncio
 
 
 @pytest.fixture
@@ -84,7 +85,7 @@ def vasp(three_addresses, store, key):
     command_processor = MagicMock(spec=CommandProcessor)
     info_context = MagicMock(spec=VASPInfo)
     info_context.get_peer_compliance_verification_key.return_value = key
-    info_context.get_peer_compliance_signature_key.return_value = key
+    info_context.get_my_compliance_signature_key.return_value = key
     return OffChainVASP(a0, command_processor, store, info_context)
 
 
@@ -140,8 +141,8 @@ def json_response():
 
 @pytest.fixture
 def signed_json_request(json_request, key):
-    return key.sign_message(json.dumps(json_request))
+    return asyncio.run(key.sign_message(json.dumps(json_request)))
 
 @pytest.fixture
 def signed_json_response(json_response, key):
-    return key.sign_message(json.dumps(json_response))
+    return asyncio.run(key.sign_message(json.dumps(json_response)))

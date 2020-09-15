@@ -121,7 +121,7 @@ def simple_response_json_error(request, key):
     if status == 'failure':
         resp.error = OffChainError(protoerr, errcode)
     json_obj = resp.get_json_data_dict(JSONFlag.NET)
-    signed_json = key.sign_message(json.dumps(json_obj))
+    signed_json = asyncio.run(key.sign_message(json.dumps(json_obj)))
     return signed_json
 
 
@@ -180,9 +180,9 @@ def test_vasp_simple(json_request, vasp, other_addr, loop):
     net = AsyncMock(Aionet)
     vasp.pp.set_network(net)
 
-    key = vasp.info_context.get_peer_compliance_signature_key(other_addr)
-    signed_json_request = key.sign_message(json.dumps(json_request))
-    response = vasp.process_request(other_addr, signed_json_request)
+    key = vasp.info_context.get_my_compliance_signature_key(other_addr)
+    signed_json_request = asyncio.run(key.sign_message(json.dumps(json_request)))
+    response = asyncio.run(vasp.process_request(other_addr, signed_json_request))
     assert response
     assert response.type is CommandResponseObject
 
@@ -194,27 +194,28 @@ def test_vasp_simple(json_request, vasp, other_addr, loop):
     assert len(net.method_calls) == 2
 
 
-def test_vasp_simple_wrong_VASP(json_request, other_addr, loop, key):
+async def test_vasp_simple_wrong_VASP(json_request, other_addr, loop, key):
     my_addr = LibraAddress.from_bytes(b'X'*16)
     vasp = sample_vasp(my_addr)
     vasp.pp.loop = loop
 
-    key = vasp.info_context.get_peer_compliance_signature_key(other_addr)
-    signed_json_request = key.sign_message(json.dumps(json_request))
+    key = vasp.info_context.get_my_compliance_signature_key(other_addr)
+    signed_json_request = await key.sign_message(json.dumps(json_request))
 
     try:
         # vasp.pp.start_processor()
-        resp = vasp.process_request(other_addr, signed_json_request)
+        resp = await vasp.process_request(other_addr, signed_json_request)
         responses = [resp]
         assert len(responses) == 1
         assert responses[0].type is CommandResponseObject
-        content = json.loads(key.verify_message(responses[0].content))
+        content = await key.verify_message(responses[0].content)
+        content = json.loads(content)
         assert 'failure' == content['status']
     finally:
         # vasp.pp.stop_processor()
         pass
 
 
-def test_vasp_response(simple_response_json_error, vasp, other_addr):
+async def test_vasp_response(simple_response_json_error, vasp, other_addr):
     with pytest.raises(Exception):
-        vasp.process_response(other_addr, simple_response_json_error)
+        await vasp.process_response(other_addr, simple_response_json_error)

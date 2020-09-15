@@ -309,7 +309,7 @@ class VASPInfo:
         """
         raise NotImplementedError()  # pragma: no cover
 
-    def get_peer_compliance_signature_key(self, my_addr):
+    def get_my_compliance_signature_key(self, my_addr):
         """ Returns the compliance signature (secret) key of the VASP.
 
         Args:

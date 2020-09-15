@@ -83,19 +83,21 @@ def test_export_import():
     assert key == key_full
 
 
-def test_sign_verif_correct():
+async def test_sign_verif_correct():
     key = ComplianceKey.generate()
-    sig = key.sign_message(payload = 'Hello World!')
-    assert key.verify_message(sig) == 'Hello World!'
+    sig = await key.sign_message(payload = 'Hello World!')
+    raw = await key.verify_message(sig)
+    assert raw == "Hello World!"
 
 
-def test_sign_verif_incorrect():
+async def test_sign_verif_incorrect():
     key = ComplianceKey.generate()
-    sig = key.sign_message(payload = 'Hello World!')
+    sig = await key.sign_message(payload = 'Hello World!')
 
     key2 = ComplianceKey.generate()
     with pytest.raises(OffChainInvalidSignature):
-        assert key2.verify_message(sig) == 'Hello World!'
+        sig = await key2.verify_message(sig)
+        assert sig == 'Hello World!'
 
 
 def test_encode_recipient():

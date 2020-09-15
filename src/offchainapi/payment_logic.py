@@ -230,7 +230,7 @@ class PaymentProcessor(CommandProcessor):
                     # write the next request & free th obligation
                     # Or none of the two.
                     with self.storage_factory.atomic_writes():
-                        request = self.net.sequence_command(
+                        request = await self.net.sequence_command(
                             other_address, new_cmd
                         )
 
