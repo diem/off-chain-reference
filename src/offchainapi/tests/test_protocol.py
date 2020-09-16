@@ -564,8 +564,8 @@ def test_sample_command():
 
 
 async def test_parse_handle_request_to_future(signed_json_request, channel, key):
-    fut = await channel.parse_handle_request(signed_json_request)
-    res = await key.verify_message(fut.content)
+    response = await channel.parse_handle_request(signed_json_request)
+    res = await key.verify_message(response.content)
 
     res = json.loads(res)
     assert res['status'] == 'success'
