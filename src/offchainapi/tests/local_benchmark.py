@@ -48,7 +48,7 @@ class SimpleVASPInfo(VASPInfo):
         assert not key._key.has_private
         return key
 
-    def get_peer_compliance_signature_key(self, my_addr):
+    def get_my_compliance_signature_key(self, my_addr):
         return peer_keys[my_addr]
 
     def is_authorised_VASP(self, certificate, other_addr):

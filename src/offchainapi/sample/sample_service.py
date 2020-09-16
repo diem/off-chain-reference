@@ -50,7 +50,7 @@ class sample_vasp_info(VASPInfo):
         assert not self.other_key._key.has_private
         return self.other_key
 
-    def get_peer_compliance_signature_key(self, my_addr):
+    def get_my_compliance_signature_key(self, my_addr):
         return self.my_key
 
 
@@ -247,10 +247,10 @@ class sample_vasp:
         channel = self.vasp.get_channel(other_vasp)
         return channel
 
-    def process_request(self, other_vasp, request_json):
+    async def process_request(self, other_vasp, request_json):
         # Get the channel
         channel = self.get_channel(other_vasp)
-        resp = channel.parse_handle_request(request_json)
+        resp = await channel.parse_handle_request(request_json)
         return resp
 
     def insert_local_command(self, other_vasp, command):
@@ -258,10 +258,10 @@ class sample_vasp:
         req = channel.sequence_command_local(command)
         return req
 
-    def process_response(self, other_vasp, response_json):
+    async def process_response(self, other_vasp, response_json):
         channel = self.get_channel(other_vasp)
         try:
-            channel.parse_handle_response(response_json)
+            await channel.parse_handle_response(response_json)
         except OffChainProtocolError:
             pass
         except OffChainException:
