@@ -179,7 +179,7 @@ class Vasp:
             Note that the automatic retransmission will eventually re-sent
             the request until progress is made.
             '''
-        req = self.net_handler.sequence_command(addr, cmd)
+        req = await self.net_handler.sequence_command(addr, cmd)
         try:
             return await self.net_handler.send_request(addr, req)
         except NetworkException:

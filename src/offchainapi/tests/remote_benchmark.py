@@ -47,7 +47,7 @@ class SimpleVASPInfo(VASPInfo):
     def get_peer_compliance_verification_key(self, other_addr):
         return self.other_configs['key']
 
-    def get_peer_compliance_signature_key(self, my_addr):
+    def get_my_compliance_signature_key(self, my_addr):
         return self.my_configs['key']
 
     def get_TLS_cert_path(self, other_addr):

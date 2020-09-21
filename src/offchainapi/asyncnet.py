@@ -81,7 +81,7 @@ class Aionet:
                     other = channel.get_other_address()
 
                     # Retransmit a few of the requests here.
-                    messages = channel.package_retransmit(number=100)
+                    messages = await channel.package_retransmit(number=100)
                     for message in messages:
                         logger.info(
                             f'Attempt to re-transmit messages {message}.'
@@ -168,7 +168,7 @@ class Aionet:
         request_text = await request.text()
 
         logger.debug(f'Data Received from {other_addr.as_str()}.')
-        response = channel.parse_handle_request(request_text)
+        response = await channel.parse_handle_request(request_text)
 
         # Return an error code upon an error
         status = 200 if not response.raw.is_failure() else 400
@@ -231,7 +231,7 @@ class Aionet:
                 logger.debug(f'Raw response: {response_text}')
 
                 # Wait in case the requests are sent out of order.
-                res = channel.parse_handle_response(response_text)
+                res = await channel.parse_handle_response(response_text)
                 logger.debug(f'Response parsed with status: {res}')
 
                 logger.debug(f'Process Waiting messages')
@@ -241,7 +241,7 @@ class Aionet:
             logger.debug(f'ClientError {type(e)}: {e}')
             raise NetworkException(e)
 
-    def sequence_command(self, other_addr, command):
+    async def sequence_command(self, other_addr, command):
         ''' Sequences a new command to the local queue, ready to be
             sent to the other VASP.
 
@@ -254,12 +254,7 @@ class Aionet:
 
         channel = self.vasp.get_channel(other_addr)
         request = channel.sequence_command_local(command)
-
-        # Extract this to be used in testing
-        if __debug__:
-            self._cid = request.cid
-
-        request = channel.package_request(request)
+        request = await channel.package_request(request)
         request = request.content
         return request
 

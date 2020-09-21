@@ -16,6 +16,8 @@ from collections import namedtuple
 from threading import RLock
 import logging
 from itertools import islice
+import asyncio
+
 
 """ A Class to store messages meant to be sent on a network. """
 NetMessage = namedtuple('NetMessage', ['src', 'dst', 'type', 'content', 'raw'])
@@ -228,7 +230,8 @@ class VASPPairChannel:
             """
             return len(self.command_sequence)
 
-    def package_request(self, request):
+    async def package_request(self, request):
+
         """ A hook to send a request to other VASP.
 
         Args:
@@ -241,10 +244,10 @@ class VASPPairChannel:
 
         # Make signature.
         vasp = self.get_vasp()
-        my_key = vasp.info_context.get_peer_compliance_signature_key(
+        my_key = vasp.info_context.get_my_compliance_signature_key(
             self.get_my_address().as_str()
         )
-        json_string = my_key.sign_message(json.dumps(json_dict))
+        json_string = await my_key.sign_message(json.dumps(json_dict))
 
         net_message = NetMessage(
             self.myself,
@@ -256,7 +259,7 @@ class VASPPairChannel:
 
         return net_message
 
-    def package_response(self, response):
+    async def package_response(self, response):
         """ A hook to send a response to other VASP.
 
         Args:
@@ -269,11 +272,11 @@ class VASPPairChannel:
 
         # Sign response
         info_context = self.get_vasp().info_context
-        my_key = info_context.get_peer_compliance_signature_key(
+        my_key = info_context.get_my_compliance_signature_key(
             self.get_my_address().as_str()
         )
-        signed_response = my_key.sign_message(json.dumps(struct))
-        assert type(signed_response) is str
+
+        signed_response = await my_key.sign_message(json.dumps(struct))
 
         net_message = NetMessage(
             self.myself, self.other, CommandResponseObject, signed_response, response
@@ -386,7 +389,7 @@ class VASPPairChannel:
         # for an asyncronous implementation.
         return request
 
-    def parse_handle_request(self, json_command):
+    async def parse_handle_request(self, json_command):
         """ Handles a request provided as a json string or dict.
 
         Args:
@@ -401,7 +404,9 @@ class VASPPairChannel:
             other_key = vasp.info_context.get_peer_compliance_verification_key(
                 self.other_address_str
             )
-            request = json.loads(other_key.verify_message(json_command))
+
+            message = await other_key.verify_message(json_command)
+            request = json.loads(message)
 
             # Parse the request whoever necessary.
             request = CommandRequestObject.from_json_data_dict(
@@ -437,7 +442,7 @@ class VASPPairChannel:
             raise e
 
         # Prepare the response.
-        full_response = self.package_response(response)
+        full_response = await self.package_response(response)
         return full_response
 
     def handle_request(self, request):
@@ -592,7 +597,8 @@ class VASPPairChannel:
                 if dv in self.object_locks and self.object_locks[dv] == request.cid:
                     self.object_locks[dv] = 'True'
 
-    def parse_handle_response(self, response_text):
+
+    async def parse_handle_response(self, json_response):
         """ Handles a response as json string or dict.
 
         Args:
@@ -606,9 +612,8 @@ class VASPPairChannel:
             other_key = vasp.info_context.get_peer_compliance_verification_key(
                 self.other_address_str
             )
-
-            verified_response = other_key.verify_message(response_text)
-            response = json.loads(verified_response)
+            message = await other_key.verify_message(json_response)
+            response = json.loads(message)
             response = CommandResponseObject.from_json_data_dict(
                 response, JSONFlag.NET
             )
@@ -703,12 +708,16 @@ class VASPPairChannel:
             net_messages += [request_to_send]
         return net_messages
 
-    def package_retransmit(self, number=1):
+    async def package_retransmit(self, number=1):
         """ Packages up to a `number` (int) of earlier requests without a
         reply to send to the the  other party. Returns a list of `NetMessage`
         instances.
         """
-        return [self.package_request(m) for m in self.get_retransmit(number)]
+        return await asyncio.gather(
+            *[
+                self.package_request(m) for m in self.get_retransmit(number)
+            ]
+        )
 
     def would_retransmit(self):
         """ Returns true if there are any pending re-transmits, namely

@@ -308,74 +308,68 @@ def test_protocol_server_client_interleaved_swapped_request(two_channels):
     assert {c.command.item() for c in server.get_final_sequence()} == {
         'World', 'Hello'}
 
-def test_protocol_conflict1(two_channels):
+async def test_protocol_conflict1(two_channels):
     server, client = two_channels
 
     msg = client.sequence_command_local(SampleCommand('Hello'))
-    msg = client.package_request(msg).content
+    msg = (await client.package_request(msg)).content
 
-    msg2 = server.parse_handle_request(msg).content
+    msg2 = (await server.parse_handle_request(msg)).content
 
     # Since this is not yet confirmed, reject the command
     with pytest.raises(DependencyException):
         client.sequence_command_local(SampleCommand('World1', deps=['Hello']))
 
     msg3 = server.sequence_command_local(SampleCommand('World2', deps=['Hello']))
-    msg3 = server.package_request(msg3).content
+    msg3 = (await server.package_request(msg3)).content
 
     # Since this is not yet confirmed, make it wait
-    msg4 = client.parse_handle_request(msg3).content
+    msg4 = (await client.parse_handle_request(msg3)).content
     with pytest.raises(OffChainProtocolError):
-        succ = server.parse_handle_response(msg4)
+        succ = await server.parse_handle_response(msg4)
 
     # Now add the response that creates 'hello'
-    succ = client.parse_handle_response(msg2)
-    assert succ  # success
+    assert await client.parse_handle_response(msg2)  # success
 
-
-def test_protocol_bad_signature(two_channels):
+async def test_protocol_bad_signature(two_channels):
     server, client = two_channels
 
     msg = 'XRandomXJunk' # client.package_request(msg).content
-    assert server.parse_handle_request(msg).raw.is_failure()
+    assert (await server.parse_handle_request(msg)).raw.is_failure()
 
     msg = '.Random.Junk' # client.package_request(msg).content
-    assert server.parse_handle_request(msg).raw.is_failure()
+    assert (await server.parse_handle_request(msg)).raw.is_failure()
 
-def test_protocol_conflict2(two_channels):
+async def test_protocol_conflict2(two_channels):
     server, client = two_channels
 
     msg = client.sequence_command_local(SampleCommand('Hello'))
-    msg = client.package_request(msg).content
+    msg = (await client.package_request(msg)).content
 
-    msg2 = server.parse_handle_request(msg).content
-    succ = client.parse_handle_response(msg2)
-    assert succ  # success
+    msg2 = (await server.parse_handle_request(msg)).content
+    assert await client.parse_handle_response(msg2)  # success
 
     # Two concurrent requests
     creq = client.sequence_command_local(SampleCommand('cW', deps=['Hello']))
-    creq = client.package_request(creq).content
+    creq = (await client.package_request(creq)).content
     sreq = server.sequence_command_local(SampleCommand('sW', deps=['Hello']))
-    sreq = server.package_request(sreq).content
+    sreq = (await server.package_request(sreq)).content
 
     # Server gets client request
-    sresp = server.parse_handle_request(creq).content
+    sresp = (await server.parse_handle_request(creq)).content
     # Client is told to wait
     with pytest.raises(OffChainProtocolError):
-        _ = client.parse_handle_response(sresp)
+        _ = await client.parse_handle_response(sresp)
 
     # Client gets server request
-    cresp = client.parse_handle_request(sreq).content
-    succ = server.parse_handle_response(cresp)
-    assert succ  # Success
-
+    cresp = (await client.parse_handle_request(sreq)).content
+    assert await server.parse_handle_response(cresp)  # Success
     assert 'Hello' in server.object_locks
     assert server.object_locks['Hello'] == 'False'
 
     # Now try again the client request
-    sresp = server.parse_handle_request(creq).content
-    succ = client.parse_handle_response(sresp)
-    assert not succ
+    sresp = (await server.parse_handle_request(creq)).content
+    assert not await client.parse_handle_response(sresp)
 
 
 
@@ -573,32 +567,32 @@ def test_sample_command():
     assert obj2.previous_version == obj.previous_version
 
 
-def test_parse_handle_request_to_future(signed_json_request, channel, key):
-    fut = channel.parse_handle_request(
-        signed_json_request)
-    res = fut.content
-    res = json.loads(key.verify_message(res))
+async def test_parse_handle_request_to_future(signed_json_request, channel, key):
+    response = await channel.parse_handle_request(signed_json_request)
+    res = await key.verify_message(response.content)
+
+    res = json.loads(res)
     assert res['status'] == 'success'
 
 
-def test_parse_handle_request_to_future_out_of_order(json_request, channel,
-                                                     key):
+async def test_parse_handle_request_to_future_out_of_order(
+    json_request, channel, key
+):
     json_request['cid'] = '100'
-    json_request = key.sign_message(json.dumps(json_request))
-    fut = channel.parse_handle_request(
-        json_request
-    )
-    res = fut.content
-    res = json.loads(key.verify_message(res))
+    json_request = await key.sign_message(json.dumps(json_request))
+    fut = await channel.parse_handle_request(json_request)
+    res = await key.verify_message(fut.content)
+    res = json.loads(res)
     assert res['status']== 'success'
 
-def test_parse_handle_response_to_future_parsing_error(json_response, channel,
+
+async def test_parse_handle_response_to_future_parsing_error(json_response, channel,
                                                        command, key):
     _ = channel.sequence_command_local(command)
     json_response['cid'] = '"'  # Trigger a parsing error.
-    json_response = key.sign_message(json.dumps(json_response))
+    json_response = await key.sign_message(json.dumps(json_response))
     with pytest.raises(Exception):
-        _ = channel.parse_handle_response(json_response)
+        _ = await channel.parse_handle_response(json_response)
 
 
 def test_get_storage_factory(vasp):

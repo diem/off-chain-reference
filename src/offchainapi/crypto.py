@@ -71,13 +71,13 @@ class ComplianceKey:
     def export_full(self):
         return self._key.export_private()
 
-    def sign_message(self, payload):
+    async def sign_message(self, payload):
         signer = jws.JWS(payload.encode('utf-8'))
         signer.add_signature(self._key, alg='EdDSA')
         sig = signer.serialize(compact=True)
         return sig
 
-    def verify_message(self, signature):
+    async def verify_message(self, signature):
         try:
             verifier = jws.JWS()
             verifier.deserialize(signature)
