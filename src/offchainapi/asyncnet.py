@@ -234,7 +234,6 @@ class Aionet:
                 res = await channel.parse_handle_response(response_text)
                 logger.debug(f'Response parsed with status: {res}')
 
-                logger.debug(f'Process Waiting messages')
                 return res
 
         except ClientError as e:

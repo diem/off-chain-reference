@@ -401,6 +401,17 @@ class PaymentProcessor(CommandProcessor):
 
                 self.check_new_payment(new_payment)
             else:
+
+                # Ensure the payment ref_id stays the same
+                old_ref_id, _ = command.reads_version_map[0]
+                new_ref_id, _ = command.writes_version_map[0]
+                if old_ref_id != new_ref_id:
+                    raise PaymentLogicError(
+                        OffChainErrorCode.payment_wrong_structure,
+                        f'Expected the reference id to not change,'
+                        f' got: {old_ref_id} and {new_ref_id}'
+                    )
+
                 old_version = command.get_previous_version_number()
                 old_payment = self.object_store[old_version]
                 self.check_new_update(old_payment, new_payment)
@@ -491,7 +502,10 @@ class PaymentProcessor(CommandProcessor):
     # ----------- END of CommandProcessor interface ---------
 
     def check_signatures(self, payment):
-        ''' Utility function that checks all signatures present for validity. '''
+        ''' Utility function that checks all signatures present for validity.
+
+        Throws a BusinessValidationFailure exception if the recipient signature is present but incorrect.
+        '''
         business = self.business
         is_sender = business.is_sender(payment)
         other_actor = payment.receiver if is_sender else payment.sender
@@ -516,11 +530,10 @@ class PaymentProcessor(CommandProcessor):
         '''
         business = self.business
         is_receipient = business.is_recipient(new_payment)
-        is_sender = not is_receipient
 
         role = ['sender', 'receiver'][is_receipient]
 
-        if not self.good_initial_status(new_payment, not is_sender):
+        if not self.good_initial_status(new_payment, is_receipient):
             raise PaymentLogicError(
                         OffChainErrorCode.payment_wrong_status,
                         f'Sender set receiver status or vice-versa.')
@@ -567,13 +580,11 @@ class PaymentProcessor(CommandProcessor):
         '''
         business = self.business
         is_receiver = business.is_recipient(new_payment)
-        is_sender = not is_receiver
 
         role = ['sender', 'receiver'][is_receiver]
         other_role = ['sender', 'receiver'][role == 'sender']
         myself_actor = payment.data[role]
         myself_actor_new = new_payment.data[role]
-        other_actor = payment.data[other_role]
 
         # Ensure nothing on our side was changed by this update.
         if myself_actor != myself_actor_new:
@@ -583,13 +594,13 @@ class PaymentProcessor(CommandProcessor):
 
         # Check the status transition is valid.
         status = myself_actor.status.as_status()
-        other_status = other_actor.status.as_status()
-        other_role_is_sender = not is_sender
+        other_status = payment.data[other_role].status.as_status()
+        other_status_new = new_payment.data[other_role].status.as_status()
 
-        if not self.can_change_status(payment, other_status, other_role_is_sender):
+        if not self.can_change_status(payment, other_status_new, is_receiver):
             raise PaymentLogicError(
                 OffChainErrorCode.payment_wrong_status,
-                'Invalid Status transition')
+                f'Invalid Status transition: {other_status} -> {other_status_new}')
 
         try:
             self.check_signatures(new_payment)
@@ -655,8 +666,8 @@ class PaymentProcessor(CommandProcessor):
             Status.none: 100,
             Status.needs_kyc_data: 200,
             Status.needs_recipient_signature: 200,
-            Status.soft_match: 200,
-            Status.pending_review: 200,
+            Status.soft_match: 300,
+            Status.pending_review: 300,
             Status.ready_for_settlement: 400,
             Status.abort: 1000
         }

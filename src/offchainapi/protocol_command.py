@@ -93,9 +93,6 @@ class ProtocolCommand(JSONSerializable):
             dict: A data dictionary compatible with JSON serilization.
         """
 
-        for pair in zip(self.reads_version_map, self.writes_version_map):
-            k, v = pair
-
         data_dict = {
             "_reads":     dict(self.reads_version_map),
             "_writes": dict(self.writes_version_map),

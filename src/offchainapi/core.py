@@ -130,7 +130,7 @@ class Vasp:
         Parameters:
             payment_reference_id (str): the reference_id of the payment
                 of interest.
-            timeout (float, or None by default): second until timeout.
+            timeout (float, int, or None by default): second until timeout.
 
         Returns a PaymentObject with the given reference_id that is ether
         ready_for_settlement or aborted by one of the parties.
@@ -141,9 +141,8 @@ class Vasp:
                 self.pp.wait_for_payment_outcome(payment_reference_id),
                 timeout)
         except asyncio.TimeoutError:
-            print(f'Timeout for payment {payment_reference_id}')
+            logger.info(f'Timeout for payment {payment_reference_id}')
             latest_version = self.get_payment_by_ref(payment_reference_id)
-            print('Pay:', latest_version)
             raise VASPPaymentTimeout(latest_version)
 
         return payment

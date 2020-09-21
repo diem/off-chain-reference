@@ -5,9 +5,9 @@ from .errors import OffChainErrorCode
 
 class CommandValidationError(Exception):
     def __init__(self, error_code, error_message):
-        self.error_code = error_code
         if not isinstance(error_code, OffChainErrorCode):
             raise RuntimeError(f'Error code must be of type OffChainErrorCode, not {type(error_code)}')
+        self.error_code = error_code
         self.error_message = error_message
 
 

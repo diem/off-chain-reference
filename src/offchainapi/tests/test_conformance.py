@@ -13,6 +13,7 @@ def test_payment_command_conform(payment):
     cmd = PaymentCommand(payment.new_version())
     data = cmd.get_json_data_dict(JSONFlag.NET)
     cmd2 = PaymentCommand.from_json_data_dict(data, JSONFlag.NET)
+    assert cmd == cmd2
 
     print()
     print('-'*40)

@@ -32,9 +32,7 @@ class TestBusinessContext(BusinessContext):
         return True
 
     async def payment_pre_processing(self, other_address, seq, command, payment):
-        ctx = {}
-        ctx['settle'] = False
-        return ctx
+        return {'settle': False}
 
     # ----- Actors -----
 
@@ -70,7 +68,7 @@ class TestBusinessContext(BusinessContext):
 
     async def next_kyc_to_provide(self, payment, ctx=None):
         role = ['receiver', 'sender'][self.is_sender(payment)]
-        other_role = ['receiver', 'sender'][not self.is_sender(payment)]
+        other_role = ['sender', 'receiver'][self.is_sender(payment)]
         own_actor = payment.data[role]
         other_actor = payment.data[other_role]
         kyc_data = set()
@@ -109,11 +107,6 @@ class TestBusinessContext(BusinessContext):
 
     async def get_extended_kyc(self, payment, ctx=None):
         ''' Returns the extended KYC information for this payment.
-            In the format: (kyc_data, kyc_signature, kyc_certificate), where
-            all fields are of type str.
-
-            Can raise:
-                   BusinessNotAuthorized.
         '''
         return KYCData({
                     "payload_type": "KYC_DATA",
@@ -123,11 +116,6 @@ class TestBusinessContext(BusinessContext):
 
     async def get_additional_kyc(self, payment, ctx=None):
         ''' Returns the extended KYC information for this payment.
-            In the format: (kyc_data, kyc_signature, kyc_certificate), where
-            all fields are of type str.
-
-            Can raise:
-                   BusinessNotAuthorized.
         '''
         return KYCData({
                     "payload_type": "KYC_DATA",

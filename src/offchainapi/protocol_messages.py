@@ -11,7 +11,12 @@ class OffChainException(Exception):
 
 class OffChainProtocolError(Exception):
     ''' This class denotes protocol errors, namely errors at the
-        OffChain protocols level rather than the command sequencing level. '''
+        OffChain protocols level rather than the command sequencing level.
+
+        This is an Exception that is thown within the Python program
+        to represent the error, rather than the message type which is
+        OffChainError.
+        '''
 
     @staticmethod
     def make(protocol_error):
@@ -37,9 +42,15 @@ class OffChainProtocolError(Exception):
 class OffChainError(JSONSerializable):
     """Represents an OffChainError.
 
+    An offchain error is an actual message that is sent between the VASPs
+    at either end of the off chain channel. Some protocol errors can be handled
+    and a command retried, and do not result in a failure response being recorded.
+    Whereas command errors lead to a permanant failure, and are recorded as
+    responses of commands.
+
     Args:
         protocol_error (bool): Whether it is a protocol error.
-        code (OffchainErrorCode ): The error code.
+        code (OffchainErrorCode): The error code.
         message (str): An error message explaining the problem. Defaults to None.
     """
 
@@ -256,8 +267,11 @@ class CommandResponseObject(JSONSerializable):
                 raise JSONParsingError(
                     f'Status must be success or failure not {self.status}')
 
-            # TODO: Do we need this special case?
+            # All succesfful responses have a cid
             if self.status == 'success':
+                self.cid = str(data['cid'])
+            # Some non success responses have a cid.
+            elif 'cid' in data:
                 self.cid = str(data['cid'])
 
 

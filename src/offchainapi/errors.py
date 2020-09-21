@@ -45,7 +45,7 @@ class OffChainErrorCode(Enum):
 
     # Indicates that one or more dependencies are missing, or have already been
     # used by another command. As a result committing this command may result in
-    # a conflict / inconsistent state. The command is therefore permanantly
+    # a conflict / inconsistent state. The command is therefore permanently
     # rejected with an idempotent command error.
 
     used_dependencies    = 'used_dependencies'

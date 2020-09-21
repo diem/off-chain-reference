@@ -26,12 +26,13 @@ class PaymentCommand(ProtocolCommand):
             payment (PaymentObject): The payment from which to build the command.
     '''
 
-    def __init__(self, payment):
+    def __init__(self, payment_object):
         ProtocolCommand.__init__(self)
-        ref_id = payment.reference_id
-        self.reads_version_map = [(ref_id, payment.previous_version)] if payment.previous_version else []
-        self.writes_version_map = [(ref_id, payment.get_version())]
-        self.command = payment.get_full_diff_record()
+        ref_id = payment_object.reference_id
+        self.reads_version_map = [(ref_id, payment_object.previous_version)] \
+            if payment_object.previous_version else []
+        self.writes_version_map = [(ref_id, payment_object.get_version())]
+        self.command = payment_object.get_full_diff_record()
 
     def __eq__(self, other):
         return ProtocolCommand.__eq__(self, other) \
@@ -82,8 +83,8 @@ class PaymentCommand(ProtocolCommand):
             _, dep = self.reads_version_map[0]
             if dep not in dependencies:
                 raise PaymentLogicError(
-                    OffChainErrorCode.payment_wrong_structure,
-                    f'Cound not find payment dependency: {dep}'
+                    OffChainErrorCode.payment_dependency_error,
+                    f'Could not find payment dependency: {dep}'
                 )
             dep_object = dependencies[dep]
 
@@ -96,7 +97,7 @@ class PaymentCommand(ProtocolCommand):
 
         raise PaymentLogicError(
             OffChainErrorCode.payment_wrong_structure,
-            "Can depdend on no or one other payment.")
+            f"Should depend on exactly one object, got: {len(self.reads_version_map)}")
 
     def get_payment(self, dependencies):
         version = self.get_new_version_number()
@@ -170,7 +171,7 @@ class PaymentCommand(ProtocolCommand):
             command creates a new payment.
         """
         # This is  ensured from the constructors.
-        assert len(self.reads_version_map) in [0, 1]
+        assert len(self.reads_version_map) <= 1
         if len(self.reads_version_map) == 0:
             return None
         _, prev_version =  self.reads_version_map[0]
