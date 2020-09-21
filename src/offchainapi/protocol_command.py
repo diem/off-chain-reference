@@ -20,10 +20,9 @@ class ProtocolCommand(JSONSerializable):
         self.origin = None  # Takes a LibraAddress.
 
     def __eq__(self, other):
-        val = (self.reads_version_map == other.reads_version_map and
+        return (self.reads_version_map == other.reads_version_map and
                self.writes_version_map == other.writes_version_map and
                self.origin == other.origin)
-        return val
 
 
     def get_request_cid(self):
