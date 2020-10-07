@@ -3,7 +3,7 @@
 
 from jwcrypto.common import base64url_encode
 from cryptography.exceptions import InvalidSignature
-
+from libra import txnmetadata, utils
 from jwcrypto import jwk, jws
 import json
 
@@ -95,42 +95,46 @@ class ComplianceKey:
         return self._key.has_private == other._key.has_private \
             and self._key.thumbprint() == other._key.thumbprint()
 
-    def sign_ref_id(self, reference_id_bytes, libra_address_bytes, value_u64):
-        """ Sign the reference_id and associated data required for the recipient
-            signature using the complance key.
-
+    def sign_dual_attestation_data(self, reference_id, libra_address_bytes, amount):
+        """ Sign the dual attestation message using the compliance key
             Params:
-               reference_id_bytes (bytes): the bytes of the reference_id.
-               libra_address_bytes (bytes): the 16 bytes of the Libra Blockchain address
-               value_u64 (int): a unsigned integer of the value.
+               reference_id (str)
+               libra_address_bytes (bytes): the 16 bytes of sender Libra Blockchain address
+               amount (int): a unsigned integer of transaction amount
 
-            Returns the hex encoded string ed25519 signature (64 x 2 char).
+            Returns ed25519 signature bytes
         """
+        address = utils.account_address(bytes.hex(libra_address_bytes))
+        _, dual_attestation_msg = txnmetadata.travel_rule(reference_id, address, amount)
 
-        msg_b = encode_ref_id_data(reference_id_bytes, libra_address_bytes, value_u64)
-        priv = self._key._get_private_key()
-        return priv.sign(msg_b).hex()
+        return self.get_private().sign(dual_attestation_msg)
 
-    def verify_ref_id(self, reference_id_bytes, libra_address_bytes, value_u64, signature):
-        """ Verify the reference_id and  associated data sgnature from a recipient. Parameters
-        are the same as for sign_ref_id, with the addition of the signature in hex format
-        as returned by sign_ref_id. """
-        msg_b = encode_ref_id_data(reference_id_bytes, libra_address_bytes, value_u64)
-        pub = self._key._get_public_key()
+    def verify_dual_attestation_data(
+        self,
+        reference_id,
+        libra_address_bytes,
+        amount,
+        signature
+    ):
+        """
+        Verify the dual attestation message given reference id, sender libra address (bytes),
+        payment amount and signature
+            Params:
+               reference_id (str)
+               libra_address_bytes (bytes): the 16 bytes of sender Libra Blockchain address
+               amount (int): a unsigned integer of transaction amount
+               signature (bytes): ed25519 signature bytes
+            Returns none when verification succeeds.
+            Raises InvalidSignature when verification fails.
+        """
+        address = utils.account_address(bytes.hex(libra_address_bytes))
+        _, dual_attestation_msg = txnmetadata.travel_rule(reference_id, address, amount)
         try:
-            pub.verify(bytes.fromhex(signature), msg_b)
+            self.get_public().verify(signature, dual_attestation_msg)
         except InvalidSignature:
-            raise OffChainInvalidSignature(reference_id_bytes, libra_address_bytes, value_u64, signature)
-
-def encode_ref_id_data(reference_id_bytes, libra_address_bytes, value_u64):
-    if len(libra_address_bytes) != 16:
-        raise IncorrectInputException('Libra Address raw format is 16 bytes.')
-
-    message = b''
-    message += reference_id_bytes
-    message += libra_address_bytes
-    message += value_u64.to_bytes(8, byteorder='little')
-
-    domain_sep = b'@@$$LIBRA_ATTEST$$@@'
-    message += domain_sep
-    return message
+            raise OffChainInvalidSignature(
+                reference_id,
+                libra_address_bytes,
+                amount,
+                signature
+            )
