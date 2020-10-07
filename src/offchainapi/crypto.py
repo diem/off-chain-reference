@@ -125,7 +125,7 @@ class ComplianceKey:
                amount (int): a unsigned integer of transaction amount
                signature (bytes): ed25519 signature bytes
             Returns none when verification succeeds.
-            Raises InvalidSignature when verification fails.
+            Raises OffChainInvalidSignature when verification fails.
         """
         address = utils.account_address(bytes.hex(libra_address_bytes))
         _, dual_attestation_msg = txnmetadata.travel_rule(reference_id, address, amount)
