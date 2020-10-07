@@ -87,7 +87,7 @@ All responses to a CommandRequestObject are in the form of a CommandResponseObje
 </pre>
 </details>
 
-When the `CommandResponseObject` status field is `failure`, the `error` field is included in the response to indicate the nature of the failure. The `error` field (type `OffChainError`) is a list of OffChainError objects.
+When the `CommandResponseObject` status field is `failure`, the `error` field is included in the response to indicate the nature of the failure. The `error` field (type `OffChainErrorObject`) is a list of OffChainErrorObject objects.
 
 ### OffChainErrorObject
 Represents an error that occurred in response to a command.

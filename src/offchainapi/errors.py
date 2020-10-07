@@ -74,3 +74,37 @@ class OffChainErrorCode(Enum):
 
     # Test codes
     test_error_code = 'test_error_code'
+
+
+class OffChainException(Exception):
+    """ The base exception for exceptions and errors from the off-chain api """
+    pass
+
+class OffChainProtocolError(OffChainException):
+    ''' This class denotes protocol errors, namely errors at the
+        OffChain protocols level rather than the command sequencing level.
+
+        This is an Exception that is thrown within the Python program
+        to represent the error, rather than the message type which is
+        OffChainErrorObject.
+        '''
+
+    @staticmethod
+    def make(protocol_error):
+        """Make an OffChainProtocolError with a given error.
+
+        Args:
+            protocol_error (str): The protocol error representation.
+
+        Returns:
+            OffChainProtocolError: The error object.
+        """
+        self = OffChainProtocolError()
+        self.protocol_error = protocol_error
+        return self
+
+    def __str__(self):
+        return self.__repr__()
+
+    def __repr__(self):
+        return f'OffChainProtocolError: {str(self.protocol_error)}'

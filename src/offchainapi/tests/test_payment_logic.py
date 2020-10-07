@@ -57,10 +57,10 @@ def test_check_signatures_bad_fail(payment, processor):
         BusinessValidationFailure('Sig fails'),
         BusinessValidationFailure('Sig fails')
     ]
-    with pytest.raises(BusinessValidationFailure) as _:
+    with pytest.raises(BusinessValidationFailure):
         processor.check_signatures(payment)
 
-    with pytest.raises(PaymentLogicError) as _:
+    with pytest.raises(PaymentLogicError):
         processor.check_new_payment(payment)
 
 def test_bad_sender_actor_address(payment, processor):

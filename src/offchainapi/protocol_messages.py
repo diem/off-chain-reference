@@ -2,45 +2,10 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from .utils import JSONSerializable, JSONParsingError, JSONFlag
-from .errors import OffChainErrorCode
+from .errors import OffChainErrorCode, OffChainException, OffChainProtocolError
 
-
-class OffChainException(Exception):
-    pass
-
-
-class OffChainProtocolError(Exception):
-    ''' This class denotes protocol errors, namely errors at the
-        OffChain protocols level rather than the command sequencing level.
-
-        This is an Exception that is thown within the Python program
-        to represent the error, rather than the message type which is
-        OffChainError.
-        '''
-
-    @staticmethod
-    def make(protocol_error):
-        """Make an OffChainProtocolError with a given error.
-
-        Args:
-            protocol_error (str): The protocol error representation.
-
-        Returns:
-            OffChainProtocolError: The error object.
-        """
-        self = OffChainProtocolError()
-        self.protocol_error = protocol_error
-        return self
-
-    def __str__(self):
-        return self.__repr__()
-
-    def __repr__(self):
-        return f'OffChainProtocolError: {str(self.protocol_error)}'
-
-
-class OffChainError(JSONSerializable):
-    """Represents an OffChainError.
+class OffChainErrorObject(JSONSerializable):
+    """Represents an OffChainErrorObject.
 
     An offchain error is an actual message that is sent between the VASPs
     at either end of the off chain channel. Some protocol errors can be handled
@@ -65,7 +30,7 @@ class OffChainError(JSONSerializable):
             self.message = f'Unspecified error with code "{code.value}"'
 
     def __eq__(self, other):
-        return isinstance(other, OffChainError) \
+        return isinstance(other, OffChainErrorObject) \
             and self.protocol_error == other.protocol_error \
             and self.code == other.code
 
@@ -94,7 +59,7 @@ class OffChainError(JSONSerializable):
             if 'message' in data:
                 message = str(data['message'])
 
-            return OffChainError(
+            return OffChainErrorObject(
                 protocol_error,
                 code,
                 message)
@@ -105,7 +70,7 @@ class OffChainError(JSONSerializable):
         return self.__repr__()
 
     def __repr__(self):
-        return f'OffChainError({self.code}, protocol={self.protocol_error})'
+        return f'OffChainErrorObject({self.code}, protocol={self.protocol_error})'
 
 def get_request_cid_helper(command):
     """ Extract a cid for a request from a command. """
@@ -276,7 +241,7 @@ class CommandResponseObject(JSONSerializable):
 
 
             if self.status == 'failure':
-                self.error = OffChainError.from_json_data_dict(
+                self.error = OffChainErrorObject.from_json_data_dict(
                     data['error'], flag)
 
             return self
@@ -315,7 +280,7 @@ def make_protocol_error(request, code, message=None):
     response = CommandResponseObject()
     response.cid = request.cid
     response.status = 'failure'
-    response.error = OffChainError(protocol_error=True, code=code, message=message)
+    response.error = OffChainErrorObject(protocol_error=True, code=code, message=message)
     return response
 
 
@@ -334,7 +299,7 @@ def make_parsing_error(message=None, code=OffChainErrorCode.parsing_error):
     response = CommandResponseObject()
     response.cid = None
     response.status = 'failure'
-    response.error = OffChainError(
+    response.error = OffChainErrorObject(
         protocol_error=True, code=code, message=message)
     return response
 
@@ -354,5 +319,5 @@ def make_command_error(request, code, message=None):
     response = CommandResponseObject()
     response.cid = request.cid
     response.status = 'failure'
-    response.error = OffChainError(protocol_error=False, code=code, message=message)
+    response.error = OffChainErrorObject(protocol_error=False, code=code, message=message)
     return response

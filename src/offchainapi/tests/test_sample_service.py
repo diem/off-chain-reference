@@ -7,7 +7,7 @@ from ..payment import PaymentActor, PaymentObject, StatusObject
 from ..libra_address import LibraAddress
 from ..utils import JSONFlag
 from ..protocol_messages import CommandRequestObject, CommandResponseObject, \
-    OffChainError, OffChainErrorCode
+    OffChainErrorObject, OffChainErrorCode
 from ..asyncnet import Aionet
 
 from mock import AsyncMock
@@ -119,7 +119,7 @@ def simple_response_json_error(request, key):
     resp.status = status
     resp.cid = cid
     if status == 'failure':
-        resp.error = OffChainError(protoerr, errcode)
+        resp.error = OffChainErrorObject(protoerr, errcode)
     json_obj = resp.get_json_data_dict(JSONFlag.NET)
     signed_json = asyncio.run(key.sign_message(json.dumps(json_obj)))
     return signed_json

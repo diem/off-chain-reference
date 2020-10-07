@@ -593,11 +593,10 @@ class PaymentProcessor(CommandProcessor):
                 f'Cannot change {role} information.')
 
         # Check the status transition is valid.
-        status = myself_actor.status.as_status()
-        other_status = payment.data[other_role].status.as_status()
-        other_status_new = new_payment.data[other_role].status.as_status()
 
+        other_status_new = new_payment.data[other_role].status.as_status()
         if not self.can_change_status(payment, other_status_new, is_receiver):
+            other_status = payment.data[other_role].status.as_status()
             raise PaymentLogicError(
                 OffChainErrorCode.payment_wrong_status,
                 f'Invalid Status transition: {other_status} -> {other_status_new}')
@@ -666,8 +665,8 @@ class PaymentProcessor(CommandProcessor):
             Status.none: 100,
             Status.needs_kyc_data: 200,
             Status.needs_recipient_signature: 200,
-            Status.soft_match: 300,
-            Status.pending_review: 300,
+            Status.soft_match: 200,
+            Status.pending_review: 200,
             Status.ready_for_settlement: 400,
             Status.abort: 1000
         }
@@ -800,7 +799,7 @@ class PaymentProcessor(CommandProcessor):
 
             # TODO: use proper codes and messages on abort.
             abort_code = OffChainErrorCode.payment_vasp_error.value
-            abort_msg = f'An unexpected excption was raised by the VASP business logic. Ref: {error_ref}'  # TODO: do not leak raw exceptions.
+            abort_msg = f'An unexpected excption was raised by the VASP business logic. Ref: {error_ref}'
 
         # Do an internal consistency check:
         if not self.can_change_status(payment, current_status, is_sender):

@@ -20,7 +20,13 @@ import asyncio
 
 
 """ A Class to store messages meant to be sent on a network. """
-NetMessage = namedtuple('NetMessage', ['src', 'dst', 'type', 'content', 'raw'])
+NetMessage = namedtuple('NetMessage',
+    ['src',  # The libra address of the source (no subaddress)
+     'dst',  # The libra address of the destination (no subaddress)
+     'type', # The Python type CommandRequestObject or CommandResponseObject
+     'content', # A JSON serialized version of the object to be sent over in the POST request / response
+     'raw',  # The Python CommandRequestObject or CommandResponseObject object
+     ])
 
 logger = logging.getLogger(name='libra_off_chain_api.protocol')
 
@@ -158,7 +164,7 @@ class VASPPairChannel:
             self.other_address_str, None, root=root
         )
 
-        with self.storage.atomic_writes() as _:
+        with self.storage.atomic_writes():
 
             # The common sequence of commands and their
             # status for those committed.
@@ -369,7 +375,7 @@ class VASPPairChannel:
 
         # Ensure all storage operations are written atomically.
         with self.rlock:
-            with self.storage.atomic_writes() as _:
+            with self.storage.atomic_writes():
 
                 self.processor.check_command(
                     self.get_my_address(),
@@ -448,7 +454,7 @@ class VASPPairChannel:
     def handle_request(self, request):
         """ Handles a request provided as a dictionary. (see `_handle_request`)
         """
-        with self.storage.atomic_writes() as _:
+        with self.storage.atomic_writes():
             return self._handle_request(request)
 
     def _handle_request(self, request):
@@ -643,7 +649,7 @@ class VASPPairChannel:
     def handle_response(self, response):
         """ Handles a response provided as a dictionary. See `_handle_response`
         """
-        with self.storage.atomic_writes() as _:
+        with self.storage.atomic_writes():
             return self._handle_response(response)
 
     def _handle_response(self, response):

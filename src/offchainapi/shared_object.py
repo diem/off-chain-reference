@@ -39,6 +39,11 @@ class SharedObject(JSONSerializable):
         Returns:
             SharedObject: The new shared obeject.
         """
+
+        # This is an optimization: it turns out python deepcopy is EXTREMELY slow.
+        # Whereas json parsing with ujson is relatively fast. So if we have a store,
+        # and are creating a new version of the object, we can copy the full state
+        # from the store. If not we do the slower deep copy.
         if store:
             clone = store[self.version]
         else:
