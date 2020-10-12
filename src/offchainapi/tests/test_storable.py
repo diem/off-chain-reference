@@ -6,6 +6,7 @@ from ..storage import StorableDict, StorableList, StorableValue, StorableFactory
 from ..payment_logic import PaymentCommand
 from ..protocol_messages import make_success_response, CommandRequestObject, \
     make_command_error
+from ..errors import OffChainErrorCode
 
 import pytest
 
@@ -175,7 +176,7 @@ def test_value_command(db, payment):
     val.set_value(cmd)
     assert val.get_value() == cmd
 
-    cmd.creates_versions = ['xxxxxxxx']
+    cmd.writes_version_map = [('xxxxxxxx', 'xxxxxxxx')]
     assert val.get_value() != cmd
     val.set_value(cmd)
     assert val.get_value() == cmd
@@ -197,7 +198,7 @@ def test_value_request(db, payment):
     val.set_value(cmd)
     assert val.get_value() == cmd
 
-    cmd.response = make_command_error(cmd, code='Something went wrong')
+    cmd.response = make_command_error(cmd, code=OffChainErrorCode.test_error_code)
     assert val.get_value() != cmd
     val.set_value(cmd)
     assert val.get_value() == cmd

@@ -11,6 +11,7 @@ from ..payment_logic import PaymentCommand, PaymentProcessor
 from ..status_logic import Status
 from ..storage import StorableFactory
 from ..crypto import ComplianceKey
+from ..errors import OffChainErrorCode
 
 import json
 
@@ -103,7 +104,7 @@ class sample_business(BusinessContext):
             sub = LibraAddress.from_encoded_str(payment.receiver.address).subaddress_bytes.decode('ascii')
             if sub in accounts:
                 return
-        raise BusinessForceAbort('Subaccount does not exist.')
+        raise BusinessForceAbort(OffChainErrorCode.payment_invalid_libra_subaddress, 'Subaccount does not exist.')
 
     def is_sender(self, payment, ctx=None):
         self.assert_payment_for_vasp(payment)
@@ -206,7 +207,7 @@ class sample_business(BusinessContext):
 
             else:
                 if reference not in account['pending_transactions']:
-                    raise BusinessForceAbort('Insufficient Balance')
+                    raise BusinessForceAbort(OffChainErrorCode.payment_insufficient_funds, 'Insufficient Balance')
 
         # This VASP always settles payments on chain, so we always need
         # a signature to settle on chain.

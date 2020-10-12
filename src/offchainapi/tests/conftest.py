@@ -20,6 +20,7 @@ from mock import AsyncMock
 import pytest
 import json
 import asyncio
+from os import urandom
 
 
 @pytest.fixture
@@ -44,13 +45,15 @@ def receiver_actor():
 
 @pytest.fixture
 def payment_action():
-    return PaymentAction(5, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
+    return PaymentAction(5, 'TIK', 'charge', 7784993)
 
 
 @pytest.fixture
 def payment(sender_actor, receiver_actor, payment_action):
+    ref_id = f'{LibraAddress.from_encoded_str(sender_actor.address).get_onchain_encoded_str()}_{urandom(16).hex()}'
     return PaymentObject(
-        sender_actor, receiver_actor, '_ref', 'orig_ref', 'desc', payment_action
+        sender_actor, receiver_actor, ref_id, None,
+        'Human readable payment information.', payment_action
     )
 
 
@@ -130,13 +133,13 @@ def command(payment_action):
 @pytest.fixture
 def json_request(command):
     request = CommandRequestObject(command)
-    request.cid = 'SEQ_0'
+    request.cid = '85ef57011938e47ca7c9622661336f00'
     return request.get_json_data_dict(JSONFlag.NET)
 
 
 @pytest.fixture
 def json_response():
-    return {"cid": 'SEQ_0', "status": "success"}
+    return {"cid": '85ef57011938e47ca7c9622661336f00', "status": "success"}
 
 
 @pytest.fixture

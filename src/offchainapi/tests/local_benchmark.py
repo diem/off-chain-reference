@@ -110,7 +110,7 @@ async def main_perf(messages_num=10, wait_num=0, verbose=False):
         sub_b = LibraAddress.from_bytes(b'B'*16, b'b'*8).as_str()
         sender = PaymentActor(sub_a, StatusObject(Status.needs_kyc_data), [])
         receiver = PaymentActor(sub_b, StatusObject(Status.none), [])
-        action = PaymentAction(10, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
+        action = PaymentAction(10, 'TIK', 'charge', 984736)
         payment = PaymentObject(
             sender, receiver, f'{peerA_addr}_ref{cid:08d}', None, 'Description ...', action
         )
@@ -128,7 +128,8 @@ async def main_perf(messages_num=10, wait_num=0, verbose=False):
         return res
 
     async def wait_for_all_payment_outcome(nodeA, payments, results):
-        fut_list = [nodeA.wait_for_payment_outcome_async(p.reference_id) for p,r in zip(payments, results)]
+        fut_list = [nodeA.wait_for_payment_outcome_async(
+            p.reference_id, timeout=60.0) for p,r in zip(payments, results)]
 
         res = await asyncio.gather(
                 *fut_list,
@@ -158,9 +159,9 @@ async def main_perf(messages_num=10, wait_num=0, verbose=False):
     if verbose:
         for out, res in zip(outcomes, results):
             if not isinstance(out, Exception):
-                print('OUT OK:', out.sender.status, out.receiver.status)
+                print('OUT OK:', out.sender.status.as_status(), out.receiver.status.as_status())
             else:
-                print('OUT NOTOK:', str(out))
+                print('OUT NOTOK:', type(out), str(out))
 
     print('All payments done.')
 

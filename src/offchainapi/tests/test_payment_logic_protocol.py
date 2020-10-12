@@ -19,7 +19,7 @@ def payment_sender_init():
     my_addr = LibraAddress.from_bytes(b'B'*16)
     other_addr = LibraAddress.from_bytes(b'A'*16)
 
-    action = PaymentAction(5, 'TIK', 'charge', '2020-01-02 18:00:00 UTC')
+    action = PaymentAction(5, 'TIK', 'charge', 887355)
 
     s_addr = LibraAddress.from_bytes(b'A'*16, b'a'*8).as_str()
     sender = PaymentActor(s_addr, StatusObject(Status.needs_kyc_data), [])

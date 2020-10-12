@@ -11,6 +11,10 @@ V0 States
     * None  -- denotes the status of an object that does not exist
       for the payment recipient.
     * needs_kyc_data -- requires the other VASP to provide KYC data.
+    * pending_review -- indicated the actor is manually reviewing the payment
+      and delays are expected.
+    * soft_match -- indicates that the actor requires additional KYC information
+      to disambiguate the individual involved in the payment.
     * ready_for_settlement -- signals that the party is ready to settle
       the transaction.
     * needs_recipient_signature -- requests the recipient VASP to sign the
@@ -24,10 +28,16 @@ from enum import Enum
 
 class Status(Enum):
     none = 'none',
+
     needs_kyc_data = 'needs_kyc_data',
     # Sender only
+
     needs_recipient_signature = 'needs_recipient_signature',
     # Receiver only: this is a virtual flag
+
+    pending_review = 'pending_review'
+    soft_match = 'soft_match'
+
     ready_for_settlement = 'ready_for_settlement',
     abort = 'abort'
 

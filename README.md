@@ -1,7 +1,7 @@
 # off-chain-reference
 [![License](https://img.shields.io/badge/license-Apache-green.svg)](LICENSE)
 
-Off-Chain Reference: Provide a reference implemenation for defining payments, exchanging KYC data and attestation of KYC data between VASPs.
+Off-Chain Reference: Provide a reference implementation for defining payments, exchanging KYC data and attestation of KYC data between VASPs.
 
 ## Installation
 

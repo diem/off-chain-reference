@@ -7,7 +7,7 @@ from ..payment import PaymentActor, PaymentObject, StatusObject
 from ..libra_address import LibraAddress
 from ..utils import JSONFlag
 from ..protocol_messages import CommandRequestObject, CommandResponseObject, \
-    OffChainError
+    OffChainErrorObject, OffChainErrorCode
 from ..asyncnet import Aionet
 
 from mock import AsyncMock
@@ -108,7 +108,7 @@ def json_request(my_addr, other_addr, payment_action):
 
 
 @pytest.fixture(params=[
-    (None, None, 'failure', True, 'parsing'),
+    (None, None, 'failure', True, OffChainErrorCode.parsing_error),
     (0, 0, 'success', None, None),
     (0, 0, 'success', None, None),
     (10, 10, 'success', None, None),
@@ -119,7 +119,7 @@ def simple_response_json_error(request, key):
     resp.status = status
     resp.cid = cid
     if status == 'failure':
-        resp.error = OffChainError(protoerr, errcode)
+        resp.error = OffChainErrorObject(protoerr, errcode)
     json_obj = resp.get_json_data_dict(JSONFlag.NET)
     signed_json = asyncio.run(key.sign_message(json.dumps(json_obj)))
     return signed_json

@@ -17,10 +17,10 @@ class SampleCommand(ProtocolCommand):
         ProtocolCommand.__init__(self)
         command = SampleObject(command)
         if deps is None:
-            self.dependencies = []
+            self.reads_version_map = []
         else:
-            self.dependencies = deps
-        self.creates_versions   = [ command.item ]
+            self.reads_version_map = [(d,d) for d in deps]
+        self.writes_version_map   = [(command.item, command.item)]
         self.command   = command
         self.always_happy = True
 
@@ -31,8 +31,8 @@ class SampleCommand(ProtocolCommand):
         return self.command.item
 
     def __eq__(self, other):
-        return self.dependencies == other.dependencies \
-            and self.creates_versions == other.creates_versions \
+        return self.reads_version_map == other.reads_version_map \
+            and self.writes_version_map == other.writes_version_map \
             and self.command.item == other.command.item
 
     def __str__(self):
@@ -48,7 +48,6 @@ class SampleCommand(ProtocolCommand):
         ''' Construct the object from a serlialized JSON data dictionary (from json.loads). '''
         self = super().from_json_data_dict(data, flag)
         self.command = SampleObject(data['command'])
-        self.dependencies = data['_dependencies']
         assert type(self) == cls
         return self
 

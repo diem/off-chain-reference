@@ -15,9 +15,23 @@ logger = logging.getLogger(name='libra_off_chain_api.protocol_command')
 # Interface we need to do commands:
 class ProtocolCommand(JSONSerializable):
     def __init__(self):
-        self.dependencies = []
-        self.creates_versions = []
+        self.reads_version_map = []
+        self.writes_version_map = []
         self.origin = None  # Takes a LibraAddress.
+
+    def __eq__(self, other):
+        return (self.reads_version_map == other.reads_version_map and
+               self.writes_version_map == other.writes_version_map and
+               self.origin == other.origin)
+
+
+    def get_request_cid(self):
+        """ Suggests the cid that the request with this command should contain.
+
+        Each cid should ideally be unique, and the same command should create a
+        request with the same cid. """
+        raise NotImplementedError()  # pragma: no cover
+
 
     def set_origin(self, origin):
         """ Sets the Libra Blockchain address that proposed this command.
@@ -43,7 +57,7 @@ class ProtocolCommand(JSONSerializable):
             Returns:
                 list: A list of version numbers.
         '''
-        return set(self.dependencies)
+        return set(v for _,v in self.reads_version_map)
 
     def get_new_object_versions(self):
         ''' Get the list of version numbers created by this command.
@@ -51,7 +65,7 @@ class ProtocolCommand(JSONSerializable):
             Returns:
                 list: A list of version numbers.
         '''
-        return set(self.creates_versions)
+        return set(v for _, v in self.writes_version_map)
 
     def get_object(self, version_number, dependencies):
         """ Returns the actual shared object with this version number.
@@ -77,9 +91,10 @@ class ProtocolCommand(JSONSerializable):
         Returns:
             dict: A data dictionary compatible with JSON serilization.
         """
+
         data_dict = {
-            "_dependencies":     self.dependencies,
-            "_creates_versions": self.creates_versions,
+            "_reads":     dict(self.reads_version_map),
+            "_writes": dict(self.writes_version_map),
         }
 
         if flag == JSONFlag.STORE:
@@ -107,8 +122,8 @@ class ProtocolCommand(JSONSerializable):
         """
         self = cls.__new__(cls)
         ProtocolCommand.__init__(self)
-        self.dependencies = list(data['_dependencies'])
-        self.creates_versions = list(data['_creates_versions'])
+        self.reads_version_map = list((k,v) for k,v in data['_reads'].items())
+        self.writes_version_map = list((k,v) for k,v in data['_writes'].items())
         if flag == JSONFlag.STORE:
             if "_origin" in data:
                 self.origin = LibraAddress.from_encoded_str(data["_origin"])
