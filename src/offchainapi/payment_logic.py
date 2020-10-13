@@ -731,6 +731,19 @@ class PaymentProcessor(CommandProcessor):
             if current_status == Status.none:
                 await business.check_account_existence(new_payment, ctx)
 
+            # Request more KYC Data or progress the protocol
+            if current_status in {Status.none,
+                                  Status.needs_kyc_data,
+                                  Status.needs_recipient_signature,
+                                  Status.soft_match}:
+
+                # Request KYC -- this may be async in case
+                # of need for user input
+                next_kyc = await business.next_kyc_level_to_request(
+                    new_payment, ctx)
+                if next_kyc != Status.none:
+                    current_status = next_kyc
+
             # Provide KYC -- this may be async in case
             # of need for user input
             kyc_to_provide = await business.next_kyc_to_provide(
@@ -750,19 +763,6 @@ class PaymentProcessor(CommandProcessor):
                 signature = await business.get_recipient_signature(
                     new_payment, ctx)
                 new_payment.add_recipient_signature(signature)
-
-            # Request more KYC Data or progress the protocol
-            if current_status in {Status.none,
-                                  Status.needs_kyc_data,
-                                  Status.needs_recipient_signature,
-                                  Status.soft_match}:
-
-                # Request KYC -- this may be async in case
-                # of need for user input
-                next_kyc = await business.next_kyc_level_to_request(
-                    new_payment, ctx)
-                if next_kyc != Status.none:
-                    current_status = next_kyc
 
             # Check if we have all the KYC we need
             if current_status not in {
