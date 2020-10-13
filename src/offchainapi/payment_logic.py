@@ -821,6 +821,7 @@ class PaymentProcessor(CommandProcessor):
                 f'SENDER={is_sender}'
             )
 
+        assert new_payment is not None
         new_payment.data[role].change_status(
             StatusObject(current_status, abort_code, abort_msg))
         return new_payment
