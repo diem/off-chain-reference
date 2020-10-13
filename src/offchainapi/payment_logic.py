@@ -704,13 +704,12 @@ class PaymentProcessor(CommandProcessor):
         current_status = status
         other_status = payment.data[other_role].status.as_status()
 
-        new_payment = None
+        new_payment = payment.new_version(store=self.object_store)
 
         abort_code = None
         abort_msg = None
 
         try:
-            new_payment = payment.new_version(store=self.object_store)
             await business.payment_initial_processing(payment, ctx)
 
             if status == Status.abort or (
@@ -795,15 +794,7 @@ class PaymentProcessor(CommandProcessor):
 
             # Only report the error in meta-data
             # & Abort the payment.
-            if new_payment:
-                new_payment = payment.new_version(
-                    new_payment.version,
-                    store=self.object_store
-                )
-            else:
-                # new_payment loading failed, meaning that store does not
-                # recognize payment.version, so we do a deepcopy here
-                new_payment = payment.new_version(new_version=None, store=None)
+            new_payment = payment.new_version(new_payment.version, store=self.object_store)
             current_status = Status.abort
 
             # TODO: use proper codes and messages on abort.
@@ -821,7 +812,6 @@ class PaymentProcessor(CommandProcessor):
                 f'SENDER={is_sender}'
             )
 
-        assert new_payment is not None
         new_payment.data[role].change_status(
             StatusObject(current_status, abort_code, abort_msg))
         return new_payment
