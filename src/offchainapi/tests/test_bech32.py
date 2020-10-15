@@ -3,7 +3,14 @@
 
 import pytest
 
-from ..bech32 import Bech32Error, bech32_address_decode, bech32_address_encode, LBR, TLB
+from ..bech32 import (
+    Bech32Error,
+    bech32_address_decode,
+    bech32_address_encode,
+    LBR,
+    PLB,
+    TLB,
+)
 
 def test_bech32_valid_address() -> None:
     some_address = bytes(bytearray.fromhex("f72589b71ff4f8d139674a3f7369c69b"))
@@ -55,6 +62,20 @@ def test_bech32_valid_address() -> None:
         bech32_libra_address.upper(), LBR
     )
     assert hrp == LBR
+    assert version == 1
+    assert address == some_address
+    assert subaddress == some_sub_address
+
+    # premainnet address
+    some_sub_address = bytes(bytearray.fromhex("cf64428bdeb62af2"))
+
+    bech32_libra_address = bech32_address_encode(
+        PLB, some_address, some_sub_address
+    )
+    assert bech32_libra_address == "plb1p7ujcndcl7nudzwt8fglhx6wxn08kgs5tm6mz4usw4kqpv"
+
+    hrp, version, address, subaddress = bech32_address_decode(bech32_libra_address, PLB)
+    assert hrp == PLB
     assert version == 1
     assert address == some_address
     assert subaddress == some_sub_address
