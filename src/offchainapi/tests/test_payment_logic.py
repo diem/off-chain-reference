@@ -460,15 +460,16 @@ def test_can_change_status(payment, loop):
     reset_payment_status(payment)
 
     # 5: one side cannot change to lower status
+    # sender action
     for old_status in Status:
         update_role_status(payment, "sender", old_status)
         for new_status in Status:
             if STATUS_HEIGHTS[new_status] < STATUS_HEIGHTS[old_status]:
-                print(f"new: {new_status}, old: {old_status}")
                 assert not processor.can_change_status(payment, new_status, actor_is_sender=True)
 
     reset_payment_status(payment)
 
+    # receiver action
     for old_status in Status:
         update_role_status(payment, "receiver", old_status)
         for new_status in Status:
