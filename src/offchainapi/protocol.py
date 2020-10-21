@@ -13,7 +13,6 @@ from .crypto import OffChainInvalidSignature
 
 import json
 from collections import namedtuple
-from threading import RLock
 import logging
 from itertools import islice
 import asyncio
@@ -106,14 +105,6 @@ class OffChainVASP:
 
         return self.channel_store[store_key]
 
-    def get_storage_factory(self):
-        """Returns a storage factory for this system.
-
-        Returns:
-            StorableFactory: The storage factory of the VASP.
-        """
-        return self.storage_factory
-
 
 class VASPPairChannel:
     """ Represents the state of an off-chain bi-directional
@@ -154,11 +145,6 @@ class VASPPairChannel:
                 self.other_address_str
             )
 
-        # A reentrant lock to manage access.
-        self.rlock = RLock()
-
-        # State that is persisted.
-
         root = self.storage.make_dir(self.myself.as_str())
         other_vasp = self.storage.make_dir(
             self.other_address_str, root=root
@@ -182,9 +168,8 @@ class VASPPairChannel:
         self.object_locks = self.storage.make_dict(
             'object_locks', str, root=other_vasp)
 
-        # FIXME rename
-        self.my_request_index = self.storage.make_dict(
-                'my_request_index', CommandRequestObject,
+        self.my_pending_requests = self.storage.make_dict(
+                'my_pending_requests', CommandRequestObject,
                 root=other_vasp)
 
         logger.debug(f'(other:{self.other_address_str}) Created VASP channel')
@@ -203,26 +188,6 @@ class VASPPairChannel:
         """
         return self.other
 
-    def get_vasp(self):
-        """
-        Returns:
-            OffChainVASP: The OffChainVASP to which this channel is attached.
-        """
-        return self.vasp
-
-    # if __debug__:
-    #     # Only used for testing -- should not be used in production.
-    #     def get_command_sequence(self, cid):
-    #         """
-    #         Returns:
-    #             list: The sequence of successful commands.
-    #         """
-    #         command_list = []
-    #         for cid in self.command_sequence.keys():
-    #             command_list += [ self.command_sequence[cid] ]
-
-    #         return command_list
-
     async def package_request(self, request):
 
         """ A hook to send a request to other VASP.
@@ -236,7 +201,7 @@ class VASPPairChannel:
         json_dict = request.get_json_data_dict(JSONFlag.NET)
 
         # Make signature.
-        vasp = self.get_vasp()
+        vasp = self.vasp
         my_key = vasp.info_context.get_my_compliance_signature_key(
             self.get_my_address().as_str()
         )
@@ -264,7 +229,7 @@ class VASPPairChannel:
         struct = response.get_json_data_dict(JSONFlag.NET)
 
         # Sign response
-        info_context = self.get_vasp().info_context
+        info_context = self.vasp.info_context
         my_key = info_context.get_my_compliance_signature_key(
             self.get_my_address().as_str()
         )
@@ -369,7 +334,7 @@ class VASPPairChannel:
                 off_chain_command)
 
             # Add the request to those requiring a response.
-            self.my_request_index[request.cid] = request
+            self.my_pending_requests[request.cid] = request
 
             for dv in depends_on_version:
                 self.object_locks[str(dv)] = request.cid
@@ -391,7 +356,7 @@ class VASPPairChannel:
         """
         try:
             # Check signature
-            vasp = self.get_vasp()
+            vasp = self.vasp
             other_key = vasp.info_context.get_peer_compliance_verification_key(
                 self.other_address_str
             )
@@ -598,7 +563,7 @@ class VASPPairChannel:
             bool: Whether the command was a success or not
         """
         try:
-            vasp = self.get_vasp()
+            vasp = self.vasp
             other_key = vasp.info_context.get_peer_compliance_verification_key(
                 self.other_address_str
             )
@@ -670,7 +635,7 @@ class VASPPairChannel:
             # read db to get latest status
             return self.command_sequence[request_cid].is_success()
 
-        request = self.my_request_index.try_get(request_cid)
+        request = self.my_pending_requests.try_get(request_cid)
         if not request:
             raise OffChainException(
                 f'Response for unknown cid {request_cid} received.'
@@ -681,7 +646,7 @@ class VASPPairChannel:
 
         # Add the next command to the common sequence.
         self.command_sequence[request.cid] = request
-        del self.my_request_index[request_cid]
+        del self.my_pending_requests[request_cid]
         self.register_dependencies(request)
         self.apply_response(request)
 
@@ -691,8 +656,8 @@ class VASPPairChannel:
         ''' Returns up to a `number` (int) of pending requests
         (CommandRequestObject)'''
         net_messages = []
-        for next_retransmit in islice(self.my_request_index.keys(), number):
-            request_to_send = self.my_request_index[next_retransmit]
+        for next_retransmit in islice(self.my_pending_requests.keys(), number):
+            request_to_send = self.my_pending_requests[next_retransmit]
             net_messages += [request_to_send]
         return net_messages
 
@@ -711,7 +676,7 @@ class VASPPairChannel:
         """ Returns true if there are any pending re-transmits, namely
             requests for which the response has not yet been received.
         """
-        return not self.my_request_index.is_empty()
+        return not self.my_pending_requests.is_empty()
 
     def pending_retransmit_number(self):
         '''
@@ -719,4 +684,4 @@ class VASPPairChannel:
             the number of requests that are waiting to be
             retransmitted on this channel.
         '''
-        return len(self.my_request_index)
+        return len(self.my_pending_requests)

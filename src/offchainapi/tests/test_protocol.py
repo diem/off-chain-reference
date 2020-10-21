@@ -179,22 +179,22 @@ def test_protocol_server_client_benign(two_channels):
     request = server.sequence_command_local(SampleCommand('Hello'))
     assert isinstance(request, CommandRequestObject)
     assert len(server.command_sequence) == 0
-    assert len(server.my_request_index) == 1
+    assert len(server.my_pending_requests) == 1
 
     # Pass the request to the client
     assert len(client.command_sequence) == 0
-    assert len(client.my_request_index) == 0
+    assert len(client.my_pending_requests) == 0
     reply = client.handle_request(request)
     assert isinstance(reply, CommandResponseObject)
     assert len(client.command_sequence) == 1
-    assert len(client.my_request_index) == 0
+    assert len(client.my_pending_requests) == 0
     assert reply.status == 'success'
 
     # Pass the reply back to the server
     succ = server.handle_response(reply)
     assert succ
     assert len(server.command_sequence) == 1
-    assert len(server.my_request_index) == 0
+    assert len(server.my_pending_requests) == 0
 
     assert client.command_sequence[request.cid].command.item() == 'Hello'
 
@@ -236,7 +236,7 @@ def test_protocol_client_server_benign(two_channels):
     # Create a client request for a command
     request = client.sequence_command_local(SampleCommand('Hello'))
     assert isinstance(request, CommandRequestObject)
-    assert len(client.my_request_index) == 1
+    assert len(client.my_pending_requests) == 1
     assert len(client.command_sequence) == 0
 
     # Send to server
@@ -268,8 +268,8 @@ def test_protocol_server_client_interleaved_benign(two_channels):
     server_reply = server.handle_request(client_request)
     client.handle_response(server_reply)
 
-    assert len(client.my_request_index) == 0
-    assert len(server.my_request_index) == 0
+    assert len(client.my_pending_requests) == 0
+    assert len(server.my_pending_requests) == 0
     assert len(client.command_sequence) == 2
     assert len(server.command_sequence) == 2
 
@@ -308,8 +308,8 @@ def test_protocol_server_client_handled_previously_seen_messages(two_channels):
     assert server.handle_response(client_reply)
     assert client.handle_response(server_reply)
 
-    assert len(client.my_request_index) == 0
-    assert len(server.my_request_index) == 0
+    assert len(client.my_pending_requests) == 0
+    assert len(server.my_pending_requests) == 0
     assert len(client.command_sequence) == 2
     assert len(server.command_sequence) == 2
 
@@ -609,12 +609,9 @@ async def test_parse_handle_response_to_future_parsing_error(json_response, chan
         _ = await channel.parse_handle_response(json_response)
 
 
-def test_get_storage_factory(vasp):
-    assert isinstance(vasp.get_storage_factory(), StorableFactory)
-
-
 def test_role(channel):
     assert channel.role() == 'Client'
+
 
 def test_pending_retransmit_number(channel):
     assert channel.pending_retransmit_number() == 0
