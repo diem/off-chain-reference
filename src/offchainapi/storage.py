@@ -19,6 +19,16 @@ class BasicStore:
     def get(self, ns, key):
         return self.data[make_key(ns, key)]
 
+    # FIXME add test
+    def try_get(self, ns, key):
+        """
+        Returns value if key exists in storage, otherwise returns None
+        """
+        try:
+            return self.data[make_key(ns, key)]
+        except KeyError:
+            return None
+
     def put(self, ns, key, val):
         self.data[make_key(ns, key)] = val
 
@@ -258,6 +268,15 @@ class StorableDict(Storable):
     def base_key(self):
         return self.root + [self.name]
 
+    def try_get(self, key):
+        """
+        Returns value if key exists in storage, otherwise returns None
+        """
+        val =  self.db.try_get(self.ns, key)
+        if val is None:
+            return None
+        return self.post_proc(json.loads(val))
+
     def __getitem__(self, key):
         return self.post_proc(json.loads(self.db.get(self.ns, key)))
 
@@ -279,8 +298,8 @@ class StorableDict(Storable):
     def __delitem__(self, key):
         self.db.delete(self.ns, key)
 
-    def __contains__(self, item):
-        return self.db.isin(self.ns, item)
+    def __contains__(self, key):
+        return self.db.isin(self.ns, key)
 
 
 class StorableValue():

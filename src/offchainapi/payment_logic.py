@@ -417,7 +417,7 @@ class PaymentProcessor(CommandProcessor):
                 self.check_new_update(old_payment, new_payment)
 
     def process_command(self, other_addr, command,
-                        seq, status_success, error=None):
+                        cid, status_success, error=None):
         ''' Overrides CommandProcessor. '''
 
         other_str = other_addr.as_str()
@@ -425,7 +425,7 @@ class PaymentProcessor(CommandProcessor):
         # Call the failure handler and exit.
         if not status_success:
             fut = self.loop.create_task(self.process_command_failure_async(
-                other_addr, command, seq, error)
+                other_addr, command, cid, error)
             )
             if __debug__:
                 self.futs += [fut]
@@ -442,12 +442,12 @@ class PaymentProcessor(CommandProcessor):
 
         # We record an obligation to process this command, even
         # after crash recovery.
-        self.persist_command_obligation(other_str, seq, command)
+        self.persist_command_obligation(other_str, cid, command)
 
         # Spin further command processing in its own task.
-        logger.debug(f'(other:{other_str}) Schedule cmd {seq}')
+        logger.debug(f'(other:{other_str}) Schedule cmd {cid}')
         fut = self.loop.create_task(self.process_command_success_async(
-            other_addr, command, seq))
+            other_addr, command, cid))
 
         # Log the futures here to execute them inidividually
         # when testing.

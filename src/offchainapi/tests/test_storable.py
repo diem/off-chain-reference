@@ -135,3 +135,15 @@ def test_storable_factory(db):
 
     assert len(eg) == 3
     assert set(eg.keys()) == set(['x', 'y', 'z'])
+
+def test_try_get(db):
+    store = StorableDict(db, 'root', str)
+    assert store.is_empty()
+
+    with pytest.raises(KeyError):
+        store['foo']
+    assert store.try_get('foo') is None
+
+    store['foo'] = 'bar'
+    assert store['foo'] == 'bar'
+    assert store.try_get('foo') == 'bar'
