@@ -9,6 +9,7 @@ from .payment import Status, PaymentObject, StatusObject
 from .payment_command import PaymentCommand, PaymentLogicError
 from .asyncnet import NetworkException
 from .shared_object import SharedObject
+from .status_logic import STATUS_HEIGHTS
 from .libra_address import LibraAddress, LibraAddressError
 from .utils import get_unique_string
 
@@ -617,8 +618,8 @@ class PaymentProcessor(CommandProcessor):
             loop = asyncio.new_event_loop()
         return loop.run_until_complete(self.payment_process_async(payment))
 
-    def can_change_status(self, payment, new_status, actor_is_sender):
-        """ Checks whether an actor can change the status of a payment
+    def can_change_status(self, payment, new_self, actor_is_sender):
+        """ Checks whether an actor can change the status in its PaymentActor
             to a new status accoding to our logic for valid state
             transitions.
 
@@ -631,47 +632,41 @@ class PaymentProcessor(CommandProcessor):
         Returns:
             * bool: True for valid transition and False otherwise.
         """
-
-        old_sender = payment.sender.status.as_status()
-        old_receiver = payment.receiver.status.as_status()
-        new_sender, new_receiver = old_sender, old_receiver
         if actor_is_sender:
-            new_sender = new_status
+            old_self = payment.sender.status.as_status()
+            other = payment.receiver.status.as_status()
         else:
-            new_receiver = new_status
+            old_self = payment.receiver.status.as_status()
+            other = payment.sender.status.as_status()
 
         valid = True
 
-        # Ensure other side stays the same.
-        if actor_is_sender:
-            valid &= new_receiver == old_receiver
-            changed_old, changed_new = old_sender, new_sender
-        else:
-            valid &= new_sender == old_sender
-            changed_old, changed_new = old_receiver, new_receiver
+        # if other side aborts, self shall abort
+        if other == Status.abort:
+            valid &= new_self == Status.abort
 
-        # Terminal states remain terminal
-        if changed_old in {Status.abort}:
-            valid &= changed_old == changed_new
-            return valid
+        # If self has aborted, self shall not change status
+        if old_self == Status.abort:
+            valid &= old_self == new_self
 
-        if old_sender == Status.ready_for_settlement and \
-                old_receiver == Status.ready_for_settlement:
-            valid &= new_sender == old_sender
-            return valid
+        # If both are ready_for_settlement, self shall not change status
+        if (
+            old_self == Status.ready_for_settlement
+            and other == Status.ready_for_settlement
+        ):
+            valid &= old_self == new_self
+
+        # If self is ready_for_settlement, it shall only
+        # transit to other status when the other side aborts
+        # and it shall only transit to abort
+        if (
+            old_self == Status.ready_for_settlement
+            and other != Status.abort
+        ):
+            valid &= old_self == new_self
 
         # Respect ordering of status
-        status_heights = {
-            Status.none: 100,
-            Status.needs_kyc_data: 200,
-            Status.needs_recipient_signature: 200,
-            Status.soft_match: 200,
-            Status.pending_review: 200,
-            Status.ready_for_settlement: 400,
-            Status.abort: 1000
-        }
-
-        valid &= status_heights[changed_new] >= status_heights[changed_old]
+        valid &= STATUS_HEIGHTS[new_self] >= STATUS_HEIGHTS[old_self]
         return valid
 
     def good_initial_status(self, payment, actor_is_sender):

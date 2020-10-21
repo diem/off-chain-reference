@@ -46,3 +46,14 @@ class Status(Enum):
 
     def __repr__(self):
         return self.name
+
+
+STATUS_HEIGHTS = {
+    Status.none: 100,
+    Status.needs_kyc_data: 200,
+    Status.needs_recipient_signature: 200,
+    Status.soft_match: 200,
+    Status.pending_review: 200,
+    Status.ready_for_settlement: 400,
+    Status.abort: 1000
+}
