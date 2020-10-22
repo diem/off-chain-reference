@@ -19,6 +19,7 @@ from .basic_business_context import TestBusinessContext
 from unittest.mock import MagicMock
 from mock import AsyncMock
 import pytest
+import copy
 
 
 def test_check_new_payment_from_recipient(payment, processor):
@@ -442,3 +443,60 @@ def test_payment_logic_storage_separation_for_vasps(payment, loop, db):
     assert len(my_processor.pending_commands) == 0
     assert len(other_processor.pending_commands) == 0
     assert len(other_processor.list_command_obligations()) == 0
+
+
+async def test_process_command_happy_path(payment, loop, db):
+    store = StorableFactory(db)
+
+    my_addr = LibraAddress.from_bytes(b'B'*16)
+    other_addr = LibraAddress.from_bytes(b'A'*16)
+    my_bcm = TestBusinessContext(my_addr)
+    other_bcm = TestBusinessContext(other_addr)
+    # Use the same store/DB backend
+    my_processor = PaymentProcessor(my_bcm, store, loop)
+    other_processor = PaymentProcessor(other_bcm, store, loop)
+    net = AsyncMock(Aionet)
+    my_processor.set_network(net)
+    other_processor.set_network(net)
+
+    other_cmd = PaymentCommand(payment)
+    other_cmd.set_origin(other_addr)
+
+    # me: process success command
+    assert len(my_processor.object_store) == 0
+    fut = my_processor.process_command(other_addr, other_cmd, other_cmd.get_request_cid(), True)
+
+    assert len(my_processor.object_store) == 1
+    other_cmd_new_vers = list(other_cmd.get_new_object_versions())
+    assert len(other_cmd_new_vers) == 1
+    assert my_processor.object_store[other_cmd_new_vers[0]] == payment
+
+    assert my_processor.get_latest_payment_by_ref_id(payment.reference_id) == payment
+    assert len(my_processor.pending_commands) == 1
+    await fut
+
+    # Make some differences
+    payment2 = copy.deepcopy(payment)
+    payment2.update({
+        'original_payment_reference_id': payment.reference_id
+    })
+
+    my_cmd = PaymentCommand(payment2)
+    my_cmd.set_origin(my_addr)
+    # other: process success command
+    assert len(other_processor.object_store) == 0
+    fut = other_processor.process_command(other_addr, my_cmd, my_cmd.get_request_cid(), True)
+
+    assert len(other_processor.object_store) == 1
+    my_cmd_new_vers = list(my_cmd.get_new_object_versions())
+    assert len(my_cmd_new_vers) == 1
+
+    # Even though payment and payment2 have the same version id and share
+    # the db backend, they can distinguish the payments
+    assert other_processor.object_store[my_cmd_new_vers[0]] == payment2
+    assert my_processor.object_store[other_cmd_new_vers[0]] != payment2
+    assert my_processor.object_store[other_cmd_new_vers[0]] == payment
+
+    assert other_processor.get_latest_payment_by_ref_id(payment2.reference_id) == payment2
+    assert len(other_processor.pending_commands) == 1
+    await fut
