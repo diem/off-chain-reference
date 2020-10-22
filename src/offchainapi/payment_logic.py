@@ -71,9 +71,7 @@ class PaymentProcessor(CommandProcessor):
 
         # Persist those to enable crash-recovery
         self.pending_commands = storage_factory.make_dict(
-            'pending_commands', str, processor_dir)
-        self.command_cache = storage_factory.make_dict(
-            'command_cache', ProtocolCommand, processor_dir)
+            'pending_commands', ProtocolCommand, processor_dir)
 
         # Allow mapping a set of future to payment reference_id outcomes
         # Once a payment has an outcome (ready_for_settlement, abort, or command exception)
@@ -96,26 +94,23 @@ class PaymentProcessor(CommandProcessor):
     def command_unique_id(self, other_str, seq):
         ''' Returns a string that uniquerly identifies this
             command for the local VASP.'''
-        data = json.dumps((other_str, seq))
-        return f'{other_str}_{seq}', data
+        return json.dumps((other_str, seq))
 
     def persist_command_obligation(self, other_str, seq, command):
         ''' Persists the command to ensure its future execution. '''
-        uid, data = self.command_unique_id(other_str, seq)
-        self.pending_commands[uid] = data
-        self.command_cache[uid] = command
+        uid = self.command_unique_id(other_str, seq)
+        self.pending_commands[uid] = command
 
     def obligation_exists(self, other_str, seq):
-        uid, _ = self.command_unique_id(other_str, seq)
+        uid = self.command_unique_id(other_str, seq)
         return uid in self.pending_commands
 
     def release_command_obligation(self, other_str, seq):
         ''' Once the command is executed, and a potential response stored,
             this function allows us to remove the obligation to process
             the command. '''
-        uid, _ = self.command_unique_id(other_str, seq)
+        uid = self.command_unique_id(other_str, seq)
         del self.pending_commands[uid]
-        del self.command_cache[uid]
 
     def list_command_obligations(self):
         ''' Returns a list of (other_address, command sequence) tuples denoting
@@ -123,9 +118,8 @@ class PaymentProcessor(CommandProcessor):
             shutdown. '''
         pending = []
         for uid in self.pending_commands.keys():
-            data = self.pending_commands[uid]
-            (other_address_str, seq) = json.loads(data)
-            command = self.command_cache[uid]
+            (other_address_str, seq) = json.loads(uid)
+            command = self.pending_commands[uid]
             pending += [(other_address_str, command, seq)]
         return pending
 
