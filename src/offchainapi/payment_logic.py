@@ -57,21 +57,23 @@ class PaymentProcessor(CommandProcessor):
         # The processor state -- only access through event loop to prevent
         # mutlithreading bugs.
         self.storage_factory = storage_factory
-        with self.storage_factory.atomic_writes():
-            root = storage_factory.make_value('processor', None)
-            self.reference_id_index = storage_factory.make_dict(
-                'reference_id_index', PaymentObject, root)
 
-            # This is the primary store of shared objects.
-            # It maps version numbers -> objects.
-            self.object_store = storage_factory.make_dict(
-                'object_store', SharedObject, root=root)
+        root = storage_factory.make_dir(self.business.get_my_address())
+        processor_dir = storage_factory.make_dir('processor', root=root)
+        # map from reference_id to latest version id
+        self.reference_id_index = storage_factory.make_dict(
+            'reference_id_index', str, processor_dir)
 
-            # Persist those to enable crash-recovery
-            self.pending_commands = storage_factory.make_dict(
-                'pending_commands', str, root)
-            self.command_cache = storage_factory.make_dict(
-                'command_cache', ProtocolCommand, root)
+        # This is the primary store of shared objects.
+        # It maps version numbers -> objects.
+        self.object_store = storage_factory.make_dict(
+            'object_store', PaymentObject, root=processor_dir)
+
+        # Persist those to enable crash-recovery
+        self.pending_commands = storage_factory.make_dict(
+            'pending_commands', str, processor_dir)
+        self.command_cache = storage_factory.make_dict(
+            'command_cache', ProtocolCommand, processor_dir)
 
         # Allow mapping a set of future to payment reference_id outcomes
         # Once a payment has an outcome (ready_for_settlement, abort, or command exception)
@@ -459,12 +461,11 @@ class PaymentProcessor(CommandProcessor):
     # -------- Get Payment API commands --------
 
     def get_latest_payment_by_ref_id(self, ref_id):
-        ''' Returns the latest payment version with
-            the reference ID provided.'''
-        if ref_id in self.reference_id_index:
-            return self.reference_id_index[ref_id]
-        else:
+        ''' Returns the latest payment with the reference ID provided.'''
+        version = self.reference_id_index.try_get(ref_id)
+        if version is None:
             raise KeyError(ref_id)
+        return self.object_store[version]
 
     def get_payment_history_by_ref_id(self, ref_id):
         ''' Generator that returns all versions of a
@@ -487,17 +488,15 @@ class PaymentProcessor(CommandProcessor):
 
         # Write the new payment to the index of payments by
         # reference ID to support they GetPaymentAPI.
-        if ref_id in self.reference_id_index:
-            # We get the dependencies of the old payment.
-            old_version = self.reference_id_index[ref_id].get_version()
-
+        payment_version = self.reference_id_index.try_get(ref_id)
+        if payment_version:
             # We check that the previous version is present.
             # If so we update it with the new one.
             dependencies_versions = command.get_dependencies()
-            if old_version in dependencies_versions:
-                self.reference_id_index[ref_id] = payment
+            if payment_version in dependencies_versions:
+                self.reference_id_index[ref_id] = payment.version
         else:
-            self.reference_id_index[ref_id] = payment
+            self.reference_id_index[ref_id] = payment.version
 
     # ----------- END of CommandProcessor interface ---------
 

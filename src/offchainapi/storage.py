@@ -19,7 +19,6 @@ class BasicStore:
     def get(self, ns, key):
         return self.data[make_key(ns, key)]
 
-    # FIXME add test
     def try_get(self, ns, key):
         """
         Returns value if key exists in storage, otherwise returns None
@@ -219,20 +218,16 @@ class StorableFactory:
         return self
 
     def __enter__(self):
-        self.rlock.acquire()
         if self.levels == 0:
             self.current_transaction = get_unique_string()
 
         self.levels += 1
 
     def __exit__(self, type, value, traceback):
-        try:
-            self.levels -= 1
-            if self.levels == 0:
-                self.current_transaction = None
-                # self.persist_cache()
-        finally:
-            self.rlock.release()
+        self.levels -= 1
+        if self.levels == 0:
+            self.current_transaction = None
+            # self.persist_cache()
 
 
 class StorableDict(Storable):

@@ -44,9 +44,11 @@ class SharedObject(JSONSerializable):
         # Whereas json parsing with ujson is relatively fast. So if we have a store,
         # and are creating a new version of the object, we can copy the full state
         # from the store. If not we do the slower deep copy.
-        if store:
-            clone = store[self.version]
-        else:
+        clone = None
+        if store is not None:
+            clone = store.try_get(self.version)
+
+        if not clone:
             clone = deepcopy(self)
 
         clone.previous_version = self.get_version()

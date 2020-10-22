@@ -17,6 +17,9 @@ class TestBusinessContext(BusinessContext):
         self.reliable = reliable
         self.reliable_count = 0
 
+    def get_my_address(self):
+        return self.my_addr.as_str()
+
     def cause_error(self):
         self.reliable_count += 1
         fail = (self.reliable_count % 5 == 0)

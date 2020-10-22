@@ -222,12 +222,12 @@ class Aionet:
                         'Incorrect X-Request-ID header:', response.headers
                     )
 
+                response_text = await response.text()
                 # Check that there are no low-level HTTP errors.
                 if response.status != 200 :
-                    err_msg = f'Received status {response.status}: {await response.text()}'
+                    err_msg = f'Received status {response.status}: {response_text}'
                     raise Exception(err_msg)
 
-                response_text = await response.text()
                 logger.debug(f'Raw response: {response_text}')
 
                 # Wait in case the requests are sent out of order.
