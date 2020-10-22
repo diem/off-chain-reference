@@ -6,7 +6,8 @@ from ..protocol import OffChainVASP
 from ..libra_address import LibraAddress
 from ..payment_logic import PaymentCommand, PaymentProcessor
 from ..status_logic import Status
-from ..storage import StorableFactory, BasicStore
+from ..storage import StorableFactory
+from ..sample.sample_db import SampleDB
 from ..payment import PaymentAction, PaymentActor, PaymentObject, StatusObject
 from ..asyncnet import Aionet
 from ..core import Vasp
@@ -96,7 +97,7 @@ def run_server(my_configs_path, other_configs_path, num_of_commands=10, loop=Non
         port=my_configs['port'],
         business_context=AsyncMock(spec=BusinessContext),
         info_context=SimpleVASPInfo(my_configs, other_configs),
-        database=BasicStore(),
+        database=SampleDB(),
     )
     logging.info(f'Created VASP {my_addr.as_str()}.')
 
@@ -156,7 +157,7 @@ def run_client(my_configs_path, other_configs_path, num_of_commands=10, port=0):
         port=my_configs['port'],
         business_context=TestBusinessContext(my_addr),
         info_context=SimpleVASPInfo(my_configs, other_configs, port),
-        database=BasicStore(),
+        database=SampleDB(),
     )
     logging.info(f'Created VASP {my_addr.as_str()}.')
 

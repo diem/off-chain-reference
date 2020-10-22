@@ -10,7 +10,7 @@ from ..business import VASPInfo
 from ..libra_address import LibraAddress
 from ..payment_logic import PaymentCommand
 from ..status_logic import Status
-from ..storage import BasicStore
+from ..sample.sample_db import SampleDB
 from ..payment import PaymentAction, PaymentActor, PaymentObject, StatusObject
 from ..core import Vasp
 from .basic_business_context import TestBusinessContext
@@ -78,7 +78,7 @@ def make_new_VASP(Peer_addr, port, reliable=True):
         port=port,
         business_context=TestBusinessContext(Peer_addr, reliable=reliable),
         info_context=SimpleVASPInfo(Peer_addr),
-        database=BasicStore())
+        database=SampleDB())
 
     loop = asyncio.new_event_loop()
     VASPx.set_loop(loop)

@@ -3,7 +3,7 @@
 
 from ..payment import PaymentActor, PaymentAction, PaymentObject, KYCData, StatusObject
 from ..business import BusinessContext, VASPInfo
-from ..storage import StorableFactory, BasicStore
+from ..storage import StorableFactory
 from ..payment_logic import Status, PaymentProcessor, PaymentCommand
 from ..protocol import OffChainVASP, VASPPairChannel
 from ..command_processor import CommandProcessor
@@ -11,6 +11,7 @@ from ..libra_address import LibraAddress
 from ..protocol_messages import CommandRequestObject
 from ..utils import JSONFlag
 from ..crypto import ComplianceKey
+from ..sample.sample_db import SampleDB
 
 import types
 import dbm
@@ -115,7 +116,7 @@ def two_channels(three_addresses, vasp, store):
 
 @pytest.fixture
 def db(tmp_path):
-    return BasicStore()
+    return SampleDB()
 
 
 @pytest.fixture

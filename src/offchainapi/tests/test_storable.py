@@ -2,11 +2,12 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # Tests for the storage framework
-from ..storage import StorableDict, StorableValue, StorableFactory, BasicStore
+from ..storage import StorableDict, StorableValue, StorableFactory
 from ..payment_logic import PaymentCommand
 from ..protocol_messages import make_success_response, CommandRequestObject, \
     make_command_error
 from ..errors import OffChainErrorCode
+from ..sample.sample_db import SampleDB
 
 import pytest
 
