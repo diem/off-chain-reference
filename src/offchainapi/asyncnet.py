@@ -94,7 +94,7 @@ class Aionet:
                                 f'failed with error: {str(e)}'
                             )
 
-                    len_my = len(channel.my_request_index)
+                    len_my = len(channel.my_pending_requests)
                     logger.info(
                         f'''
                         Channel: {me.as_str()} [{role}] <-> {other.as_str()}

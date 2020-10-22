@@ -194,7 +194,7 @@ class StorableDict(Storable):
         """
         Returns value if key exists in storage, otherwise returns None
         """
-        val =  self.db.try_get(self.ns, key)
+        val = self.db.try_get(self.ns, key)
         if val is None:
             return None
         return self.post_proc(json.loads(val))

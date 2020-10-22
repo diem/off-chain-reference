@@ -352,7 +352,6 @@ class VASPPairChannel:
             NetMessage: The message to be sent on a network.
         """
 
-        # FIXME: lock here
         off_chain_command.set_origin(self.get_my_address())
         request = CommandRequestObject(off_chain_command)
 
