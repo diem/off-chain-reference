@@ -390,3 +390,55 @@ def test_process_command_success_vanilla(payment, loop, db):
 
     assert [call[0] for call in net.method_calls] == [
         'sequence_command', 'send_request']
+
+def test_payment_logic_storage_separation_for_vasps(payment, loop, db):
+    store = StorableFactory(db)
+
+    my_addr = LibraAddress.from_bytes(b'B'*16)
+    other_addr = LibraAddress.from_bytes(b'A'*16)
+    my_bcm = TestBusinessContext(my_addr)
+    other_bcm = TestBusinessContext(other_addr)
+    # Use the same store/DB backend
+    my_processor = PaymentProcessor(my_bcm, store, loop)
+    other_processor = PaymentProcessor(other_bcm, store, loop)
+
+    assert len(my_processor.pending_commands) == 0
+    assert len(other_processor.pending_commands) == 0
+
+    other_cmd = PaymentCommand(payment)
+    other_cmd.set_origin(other_addr)
+
+    my_cmd = PaymentCommand(payment)
+    my_cmd.set_origin(my_addr)
+
+    with my_processor.storage_factory.atomic_writes():
+        my_processor.persist_command_obligation(other_addr.as_str(), seq=10, command=other_cmd)
+
+    assert len(my_processor.pending_commands) == 1
+    assert len(other_processor.pending_commands) == 0
+
+    with other_processor.storage_factory.atomic_writes():
+        other_processor.persist_command_obligation(my_addr.as_str(), seq=20, command=my_cmd)
+
+    assert len(my_processor.pending_commands) == 1
+    assert len(other_processor.pending_commands) == 1
+
+    assert my_processor.list_command_obligations() == [
+       (other_addr.as_str(), other_cmd, 10)
+    ]
+    assert other_processor.list_command_obligations() == [
+       (my_addr.as_str(), my_cmd, 20)
+    ]
+
+    with my_processor.storage_factory.atomic_writes():
+        my_processor.release_command_obligation(other_addr.as_str(), seq=10)
+    assert len(my_processor.pending_commands) == 0
+    assert len(other_processor.pending_commands) == 1
+    assert len(my_processor.list_command_obligations()) == 0
+    assert len(other_processor.list_command_obligations()) == 1
+
+    with other_processor.storage_factory.atomic_writes():
+        other_processor.release_command_obligation(my_addr.as_str(), seq=20)
+    assert len(my_processor.pending_commands) == 0
+    assert len(other_processor.pending_commands) == 0
+    assert len(other_processor.list_command_obligations()) == 0
