@@ -4,7 +4,6 @@
 # The main storage interface.
 from hashlib import sha256
 import json
-from threading import RLock
 
 from .utils import JSONFlag, JSONSerializable, get_unique_string
 
@@ -100,29 +99,18 @@ class StorableFactory:
     '''
 
     def __init__(self, db):
-        self.rlock = RLock()
         self.db = db
         self.current_transaction = None
         self.levels = 0
 
-        # # Transaction cache: keep data in memory
-        # # until the transaction completes.
-        # self.cache = {}
-        # self.del_cache = set()
-
-        # # Check and fix the database, if this is needed
-        # self.crash_recovery()
 
     def make_dir(self, name, root=None):
         ''' Makes a new value-like storable.
 
             Parameters:
                 * name : a string representing the name of the object.
-                * xtype : the type of the object. It may be a simple type
-                  or a subclass of JSONSerializable.
                 * root : another storable object that acts as a logical
                   folder to this one.
-                * default : the default value of the storable.
 
         '''
         v = StorableValue(self.db, name, root)
@@ -145,65 +133,6 @@ class StorableFactory:
         v.factory = self
         return v
 
-    # def persist_cache(self):
-    #     ''' Safely persist the cache once the transaction is over.
-    #         This is called internally when the context manager exists.
-    #     '''
-
-    #     from itertools import chain
-
-    #     # Create a backup of all affected values.
-    #     old_entries = {}
-    #     non_existent_entries = []
-    #     for key in chain(self.cache.keys(), self.del_cache):
-    #         if key in self.db:
-    #             old_entries[key] = self.db[key]
-    #         else:
-    #             non_existent_entries += [key]
-
-    #     if len(old_entries) == 0 and len(non_existent_entries) == 0:
-    #         return
-
-    #     backup_data = json.dumps([old_entries, non_existent_entries])
-    #     self.db['__backup_recovery'] = backup_data
-    #     # TODO: call to flush to disk
-
-    #     # Write new values to the database
-    #     for item in self.cache:
-    #         self.db[item] = self.cache[item]
-    #     for item in self.del_cache:
-    #         if item in self.db:
-    #             del self.db[item]
-
-    #     # Upon completion of write, clean up
-    #     del self.db['__backup_recovery']
-    #     self.cache = {}
-    #     self.del_cache = set()
-
-    # def crash_recovery(self):
-    #     ''' Detects whether a database contains potentially inconsistent state
-    #         and recovers a good state of the database. '''
-
-    #     if not self.db.isin('__backup_recovery'):
-    #         return
-
-    #     # Recover the old good state.
-    #     backup_data = json.loads(self.db['__backup_recovery'])
-    #     old_entries = backup_data[0]
-    #     non_existent_entries = backup_data[1]
-
-    #     # Note, this may be executed many times in case of crash during
-    #     # crash recovery.
-    #     for item in old_entries:
-    #         self.db[item] = old_entries[item]
-    #     for item in non_existent_entries:
-    #         if item in self.db:
-    #             del self.db[item]
-
-    #     # TODO: Ensure the writes are complete?
-    #     del self.db['__backup_recovery']
-
-    # Define the interfaces as a context manager
 
     def atomic_writes(self):
         ''' Returns a context manager that ensures
@@ -227,7 +156,6 @@ class StorableFactory:
         self.levels -= 1
         if self.levels == 0:
             self.current_transaction = None
-            # self.persist_cache()
 
 
 class StorableDict(Storable):
@@ -257,7 +185,6 @@ class StorableDict(Storable):
         self.db = db
         self.xtype = xtype
 
-        # self.ns = sha256(key_join(self.base_key()).encode('utf8')).digest().hex()
         self.ns = key_join(self.base_key())
 
     def base_key(self):
@@ -310,7 +237,6 @@ class StorableValue():
 
         self.name = name
         self.db = db
-        # self.ns = sha256(key_join(self.base_key()).encode('utf8')).digest().hex()
         self.ns = key_join(self.base_key())
 
     def base_key(self):
