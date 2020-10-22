@@ -1,41 +1,40 @@
 # Copyright (c) The Libra Core Contributors
 # SPDX-License-Identifier: Apache-2.0
-
-def make_key(ns, key):
-    return ns + "@@" + key
+from ..database import Database
 
 
-class SampleDB:
+def make_key(prefix, key):
+    return prefix + "@@" + key
+
+
+class SampleDB(Database):
     def __init__(self):
         self.data = {}
 
-    def get(self, ns, key):
-        return self.data[make_key(ns, key)]
+    def get(self, prefix, key):
+        return self.data[make_key(prefix, key)]
 
-    def try_get(self, ns, key):
-        """
-        Returns value if key exists in storage, otherwise returns None
-        """
+    def try_get(self, prefix, key):
         try:
-            return self.data[make_key(ns, key)]
+            return self.data[make_key(prefix, key)]
         except KeyError:
             return None
 
-    def put(self, ns, key, val):
-        self.data[make_key(ns, key)] = val
+    def put(self, prefix, key, val):
+        self.data[make_key(prefix, key)] = val
 
-    def delete(self, ns, key):
-        del self.data[make_key(ns, key)]
+    def delete(self, prefix, key):
+        del self.data[make_key(prefix, key)]
 
-    def isin(self, ns, key):
-        return make_key(ns, key) in self.data
+    def isin(self, prefix, key):
+        return make_key(prefix, key) in self.data
 
-    def getkeys(self, ns):
+    def getkeys(self, prefix):
         keys = []
         for k, v in self.data.items():
-            if k.startswith(ns+"@@"):
-                keys.append(k[len(ns+"@@"):])
+            if k.startswith(prefix+"@@"):
+                keys.append(k[len(prefix+"@@"):])
         return keys
 
-    def count(self, ns):
-        return len(self.getkeys(ns))
+    def count(self, prefix):
+        return len(self.getkeys(prefix))

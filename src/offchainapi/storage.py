@@ -6,6 +6,7 @@ from hashlib import sha256
 import json
 
 from .utils import JSONFlag, JSONSerializable, get_unique_string
+from .database import Database
 
 
 def key_join(strs):
@@ -55,11 +56,11 @@ class StorableFactory:
     transactions.
 
     Initialize the ``StorableFactory`` with a persistent key-value
-    store ``db``. In case the db already contains data the initializer
-    runs the crash recovery procedure to cleanly re-open it.
+    store ``db``, which is an implementation of ``Database``.
     '''
 
     def __init__(self, db):
+        assert isinstance(db, Database)
         self.db = db
         self.current_transaction = None
         self.levels = 0
@@ -93,7 +94,6 @@ class StorableFactory:
         v = StorableDict(self.db, name, xtype, root)
         v.factory = self
         return v
-
 
     def atomic_writes(self):
         ''' Returns a context manager that ensures
@@ -146,7 +146,7 @@ class StorableDict(Storable):
         self.db = db
         self.xtype = xtype
 
-        self.ns = key_join(self.base_key())
+        self.prefix = key_join(self.base_key())
 
     def base_key(self):
         return self.root + [self.name]
@@ -155,37 +155,37 @@ class StorableDict(Storable):
         """
         Returns value if key exists in storage, otherwise returns None
         """
-        val = self.db.try_get(self.ns, key)
+        val = self.db.try_get(self.prefix, key)
         if val is None:
             return None
         return self.post_proc(json.loads(val))
 
     def __getitem__(self, key):
-        return self.post_proc(json.loads(self.db.get(self.ns, key)))
+        return self.post_proc(json.loads(self.db.get(self.prefix, key)))
 
     def __setitem__(self, key, value):
         data = json.dumps(self.pre_proc(value))
-        self.db.put(self.ns, key, data)
+        self.db.put(self.prefix, key, data)
 
     def keys(self):
         ''' An iterator over the keys of the dictionary. '''
-        return self.db.getkeys(self.ns)
+        return self.db.getkeys(self.prefix)
 
     def __len__(self):
-        return self.db.count(self.ns)
+        return self.db.count(self.prefix)
 
     def is_empty(self):
         ''' Returns True if dict is empty and False if it contains some elements.'''
-        return self.db.count(self.ns) == 0
+        return self.db.count(self.prefix) == 0
 
     def __delitem__(self, key):
-        self.db.delete(self.ns, key)
+        self.db.delete(self.prefix, key)
 
     def __contains__(self, key):
-        return self.db.isin(self.ns, key)
+        return self.db.isin(self.prefix, key)
 
 
-class StorableValue():
+class StorableValue:
     """ Implements a cached persistent value. The value is stored to storage
         but a cached variant is stored for quick reads.
     """
@@ -198,7 +198,7 @@ class StorableValue():
 
         self.name = name
         self.db = db
-        self.ns = key_join(self.base_key())
+        self.prefix = key_join(self.base_key())
 
     def base_key(self):
         return self.root + [ self.name ]
