@@ -195,11 +195,6 @@ async def main_perf(messages_num=10, wait_num=0, verbose=False):
     VASPa.close()
     VASPb.close()
 
-    # List the command obligations
-    oblA = VASPa.pp.list_command_obligations()
-    oblB = VASPb.pp.list_command_obligations()
-    print(f'Pending processing: VASPa {len(oblA)} VASPb {len(oblB)}')
-
     # List the remaining retransmits
     rAB = channelAB.pending_retransmit_number()
     rBA = channelBA.pending_retransmit_number()
