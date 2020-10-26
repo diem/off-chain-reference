@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from ..protocol import VASPPairChannel
-from ..status_logic import Status
+from ..status_logic import Status, STATUS_HEIGHTS
 from ..payment_command import PaymentCommand, PaymentLogicError
 from ..business import BusinessForceAbort, BusinessValidationFailure
 
@@ -390,3 +390,88 @@ def test_process_command_success_vanilla(payment, loop):
 
     assert [call[0] for call in net.method_calls] == [
         'sequence_command', 'send_request']
+
+
+def reset_payment_status(payment):
+    payment.sender.status = StatusObject(Status.none)
+    payment.receiver.status = StatusObject(Status.none)
+
+def update_role_status(payment, role, status):
+    if status == Status.abort:
+        payment.data[role].status = StatusObject(status, "", "")
+    else:
+        payment.data[role].status = StatusObject(status)
+
+def test_can_change_status(payment, loop):
+    """ Test invalid status change are rejected """
+    store = StorableFactory({})
+    my_addr = LibraAddress.from_bytes(b'B'*16)
+    other_addr = LibraAddress.from_bytes(b'A'*16)
+    bcm = TestBusinessContext(my_addr)
+    processor = PaymentProcessor(bcm, store, loop)
+
+    # 1: if one side is aborted, it should never switch to other status
+    # sender action
+    update_role_status(payment, "sender", Status.abort)
+    assert processor.can_change_status(payment, Status.abort, actor_is_sender=True)
+    assert not processor.can_change_status(payment, Status.ready_for_settlement, actor_is_sender=True)
+    reset_payment_status(payment)
+
+    # receiver action
+    update_role_status(payment, "receiver", Status.abort)
+    assert processor.can_change_status(payment, Status.abort, actor_is_sender=False)
+    assert not processor.can_change_status(payment, Status.ready_for_settlement, actor_is_sender=False)
+    reset_payment_status(payment)
+
+    # 2: if one side aborts, the other side cannot transit to status other than abort
+    # sender action
+    update_role_status(payment, "receiver", Status.abort)
+    assert processor.can_change_status(payment, Status.abort, actor_is_sender=True)
+    assert not processor.can_change_status(payment, Status.ready_for_settlement, actor_is_sender=True)
+    reset_payment_status(payment)
+
+    # receiver action
+    update_role_status(payment, "sender", Status.abort)
+    assert processor.can_change_status(payment, Status.abort, actor_is_sender=False)
+    assert not processor.can_change_status(payment, Status.ready_for_settlement, actor_is_sender=False)
+    reset_payment_status(payment)
+
+    # 3: if one side is ready_for_settlement, it can only switch to abort
+    # when the other side turns to abort
+    # sender action
+    update_role_status(payment, "sender", Status.ready_for_settlement)
+    update_role_status(payment, "receiver", Status.needs_kyc_data)
+    assert not processor.can_change_status(payment, Status.abort, actor_is_sender=True)
+    assert not processor.can_change_status(payment, Status.soft_match, actor_is_sender=True)
+    reset_payment_status(payment)
+
+    # receiver action
+    update_role_status(payment, "sender", Status.needs_kyc_data)
+    update_role_status(payment, "receiver", Status.ready_for_settlement)
+    assert not processor.can_change_status(payment, Status.abort, actor_is_sender=False)
+    assert not processor.can_change_status(payment, Status.needs_recipient_signature, actor_is_sender=False)
+    reset_payment_status(payment)
+
+    # 4: if both sides are ready_for_settlement, neither side can change status
+    update_role_status(payment, "sender", Status.ready_for_settlement)
+    update_role_status(payment, "receiver", Status.ready_for_settlement)
+    assert not processor.can_change_status(payment, Status.abort, actor_is_sender=True)
+    assert not processor.can_change_status(payment, Status.abort, actor_is_sender=False)
+    reset_payment_status(payment)
+
+    # 5: one side cannot change to lower status
+    # sender action
+    for old_status in Status:
+        update_role_status(payment, "sender", old_status)
+        for new_status in Status:
+            if STATUS_HEIGHTS[new_status] < STATUS_HEIGHTS[old_status]:
+                assert not processor.can_change_status(payment, new_status, actor_is_sender=True)
+
+    reset_payment_status(payment)
+
+    # receiver action
+    for old_status in Status:
+        update_role_status(payment, "receiver", old_status)
+        for new_status in Status:
+            if STATUS_HEIGHTS[new_status] < STATUS_HEIGHTS[old_status]:
+                assert not processor.can_change_status(payment, new_status, actor_is_sender=False)
