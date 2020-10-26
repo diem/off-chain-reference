@@ -160,8 +160,8 @@ class VASPPairChannel:
         # The map of commited requests with their corresponding responses.
         # This is also used to ensure command responses are indempotent.
         # All requests in this store have response attached.
-        self.command_sequence = self.storage.make_dict(
-            'command_sequence', CommandRequestObject, root=other_vasp
+        self.committed_commands = self.storage.make_dict(
+            'committed_commands', CommandRequestObject, root=other_vasp
         )
 
         # Keep track of object locks
@@ -469,7 +469,7 @@ class VASPPairChannel:
         depends_on_version = request.command.get_dependencies()
 
         # Always answer old requests.
-        previous_request = self.command_sequence.try_get(request.cid)
+        previous_request = self.committed_commands.try_get(request.cid)
         if previous_request:
             if previous_request.is_same_command(request):
 
@@ -547,7 +547,7 @@ class VASPPairChannel:
         # Write back to storage
         request.response = response
 
-        self.command_sequence[request.cid] = request
+        self.committed_commands[request.cid] = request
         self.register_dependencies(request)
         self.apply_response(request)
 
@@ -651,7 +651,7 @@ class VASPPairChannel:
         request_cid = response.cid
 
         # If we have already processed the response.
-        request = self.command_sequence.try_get(request_cid)
+        request = self.committed_commands.try_get(request_cid)
         if request:
             # Check the reponse is the same and log warning otherwise.
             if request.response != response:
@@ -663,7 +663,7 @@ class VASPPairChannel:
                 raise excp
             # This request may have concurrent modification
             # read db to get latest status
-            return self.command_sequence[request_cid].is_success()
+            return self.committed_commands[request_cid].is_success()
 
         request = self.my_pending_requests.try_get(request_cid)
         if not request:
@@ -675,7 +675,7 @@ class VASPPairChannel:
         request.response = response
 
         # Add the next command to the common sequence.
-        self.command_sequence[request.cid] = request
+        self.committed_commands[request.cid] = request
         del self.my_pending_requests[request_cid]
         self.register_dependencies(request)
         self.apply_response(request)

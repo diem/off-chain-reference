@@ -122,7 +122,7 @@ async def test_watchdog_task(net_handler, tester_addr, server, command):
     waiting_packages = await channel.package_retransmit(number=100)
     assert len(waiting_packages) == 1
     assert waiting_packages[0].content == req
-    assert len(channel.command_sequence) == 0
+    assert len(channel.committed_commands) == 0
 
 
     # Run the watchdog for a while.
@@ -131,7 +131,7 @@ async def test_watchdog_task(net_handler, tester_addr, server, command):
     await asyncio.sleep(0.3)
 
     # Ensure the watchdog successfully sent the command.
-    assert len(channel.command_sequence) == 1
+    assert len(channel.committed_commands) == 1
 
     # Ensure there is nothing else to re-transmit.
     assert not channel.would_retransmit()

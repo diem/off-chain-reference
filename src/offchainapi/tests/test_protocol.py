@@ -121,22 +121,22 @@ class RandomRun(object):
 
                 print([server.would_retransmit(),
                        client.would_retransmit(),
-                       len(server.command_sequence),
-                       len(client.command_sequence)])
+                       len(server.committed_commands),
+                       len(client.committed_commands)])
 
             if not server.would_retransmit() and not client.would_retransmit() \
-                    and len(server.command_sequence) + self.rejected == self.number \
-                    and len(client.command_sequence) + self.rejected == self.number:
+                    and len(server.committed_commands) + self.rejected == self.number \
+                    and len(client.committed_commands) + self.rejected == self.number:
                 break
 
     def checks(self, NUMBER):
         client = self.client
         server = self.server
 
-        client_exec_cid = client.command_sequence.keys()
-        server_exec_cid = server.command_sequence.keys()
-        client_seq = [client.command_sequence[c].command.item() for c in client_exec_cid]
-        server_seq = [server.command_sequence[c].command.item() for c in server_exec_cid]
+        client_exec_cid = client.committed_commands.keys()
+        server_exec_cid = server.committed_commands.keys()
+        client_seq = [client.committed_commands[c].command.item() for c in client_exec_cid]
+        server_seq = [server.committed_commands[c].command.item() for c in server_exec_cid]
 
         assert len(client_seq) == NUMBER - self.rejected
         assert set(client_seq) == set(server_seq)
@@ -179,25 +179,25 @@ def test_protocol_server_client_benign(two_channels):
     # Create a server request for a command
     request = server.sequence_command_local(SampleCommand('Hello'))
     assert isinstance(request, CommandRequestObject)
-    assert len(server.command_sequence) == 0
+    assert len(server.committed_commands) == 0
     assert len(server.my_pending_requests) == 1
 
     # Pass the request to the client
-    assert len(client.command_sequence) == 0
+    assert len(client.committed_commands) == 0
     assert len(client.my_pending_requests) == 0
     reply = client.handle_request(request)
     assert isinstance(reply, CommandResponseObject)
-    assert len(client.command_sequence) == 1
+    assert len(client.committed_commands) == 1
     assert len(client.my_pending_requests) == 0
     assert reply.status == 'success'
 
     # Pass the reply back to the server
     succ = server.handle_response(reply)
     assert succ
-    assert len(server.command_sequence) == 1
+    assert len(server.committed_commands) == 1
     assert len(server.my_pending_requests) == 0
 
-    assert client.command_sequence[request.cid].command.item() == 'Hello'
+    assert client.committed_commands[request.cid].command.item() == 'Hello'
 
 
 def test_protocol_server_conflicting_sequence(two_channels):
@@ -222,13 +222,13 @@ def test_protocol_server_conflicting_sequence(two_channels):
     assert reply_conflict.error.code == OffChainErrorCode.conflict
 
     # Pass the reply back to the server
-    assert len(server.command_sequence) == 0
+    assert len(server.committed_commands) == 0
     with pytest.raises(OffChainProtocolError):
         server.handle_response(reply_conflict)
 
     succ = server.handle_response(reply)
     assert succ
-    assert len(server.command_sequence) == 1
+    assert len(server.committed_commands) == 1
 
 
 def test_protocol_client_server_benign(two_channels):
@@ -238,20 +238,20 @@ def test_protocol_client_server_benign(two_channels):
     request = client.sequence_command_local(SampleCommand('Hello'))
     assert isinstance(request, CommandRequestObject)
     assert len(client.my_pending_requests) == 1
-    assert len(client.command_sequence) == 0
+    assert len(client.committed_commands) == 0
 
     # Send to server
     reply = server.handle_request(request)
     assert isinstance(reply, CommandResponseObject)
-    assert len(server.command_sequence) == 1
+    assert len(server.committed_commands) == 1
 
     # Pass response back to client
     succ = client.handle_response(reply)
     assert succ
-    assert len(client.command_sequence) == 1
+    assert len(client.committed_commands) == 1
 
-    assert client.command_sequence[request.cid].response is not None
-    assert client.command_sequence[request.cid].command.item() == 'Hello'
+    assert client.committed_commands[request.cid].response is not None
+    assert client.committed_commands[request.cid].command.item() == 'Hello'
 
 
 def test_protocol_server_client_interleaved_benign(two_channels):
@@ -271,18 +271,18 @@ def test_protocol_server_client_interleaved_benign(two_channels):
 
     assert len(client.my_pending_requests) == 0
     assert len(server.my_pending_requests) == 0
-    assert len(client.command_sequence) == 2
-    assert len(server.command_sequence) == 2
+    assert len(client.committed_commands) == 2
+    assert len(server.committed_commands) == 2
 
-    assert client.command_sequence[client_request.cid].response is not None
-    assert client.command_sequence[client_request.cid].command.item() == 'Hello'
-    assert server.command_sequence[client_request.cid].response is not None
-    assert server.command_sequence[client_request.cid].command.item() == 'Hello'
+    assert client.committed_commands[client_request.cid].response is not None
+    assert client.committed_commands[client_request.cid].command.item() == 'Hello'
+    assert server.committed_commands[client_request.cid].response is not None
+    assert server.committed_commands[client_request.cid].command.item() == 'Hello'
 
-    assert client.command_sequence[server_request.cid].response is not None
-    assert client.command_sequence[server_request.cid].command.item() == 'World'
-    assert server.command_sequence[server_request.cid].response is not None
-    assert server.command_sequence[server_request.cid].command.item() == 'World'
+    assert client.committed_commands[server_request.cid].response is not None
+    assert client.committed_commands[server_request.cid].command.item() == 'World'
+    assert server.committed_commands[server_request.cid].response is not None
+    assert server.committed_commands[server_request.cid].command.item() == 'World'
 
 
 def test_protocol_server_client_handled_previously_seen_messages(two_channels):
@@ -311,18 +311,18 @@ def test_protocol_server_client_handled_previously_seen_messages(two_channels):
 
     assert len(client.my_pending_requests) == 0
     assert len(server.my_pending_requests) == 0
-    assert len(client.command_sequence) == 2
-    assert len(server.command_sequence) == 2
+    assert len(client.committed_commands) == 2
+    assert len(server.committed_commands) == 2
 
-    assert client.command_sequence[client_request.cid].response is not None
-    assert client.command_sequence[client_request.cid].command.item() == 'Hello'
-    assert server.command_sequence[client_request.cid].response is not None
-    assert server.command_sequence[client_request.cid].command.item() == 'Hello'
+    assert client.committed_commands[client_request.cid].response is not None
+    assert client.committed_commands[client_request.cid].command.item() == 'Hello'
+    assert server.committed_commands[client_request.cid].response is not None
+    assert server.committed_commands[client_request.cid].command.item() == 'Hello'
 
-    assert client.command_sequence[server_request.cid].response is not None
-    assert client.command_sequence[server_request.cid].command.item() == 'World'
-    assert server.command_sequence[server_request.cid].response is not None
-    assert server.command_sequence[server_request.cid].command.item() == 'World'
+    assert client.committed_commands[server_request.cid].response is not None
+    assert client.committed_commands[server_request.cid].command.item() == 'World'
+    assert server.committed_commands[server_request.cid].response is not None
+    assert server.committed_commands[server_request.cid].command.item() == 'World'
 
 
 async def test_protocol_conflict1(two_channels):
@@ -405,13 +405,13 @@ def test_protocol_server_client_interleaved_swapped_reply(two_channels):
 
     client.handle_response(server_reply)
 
-    assert len(client.command_sequence) == 2
-    assert len(server.command_sequence) == 2
+    assert len(client.committed_commands) == 2
+    assert len(server.committed_commands) == 2
 
-    assert client.command_sequence[client_request.cid].command.item() == 'Hello'
-    assert server.command_sequence[client_request.cid].command.item() == 'Hello'
-    assert client.command_sequence[server_request.cid].command.item() == 'World'
-    assert server.command_sequence[server_request.cid].command.item() == 'World'
+    assert client.committed_commands[client_request.cid].command.item() == 'Hello'
+    assert server.committed_commands[client_request.cid].command.item() == 'Hello'
+    assert client.committed_commands[server_request.cid].command.item() == 'World'
+    assert server.committed_commands[server_request.cid].command.item() == 'World'
 
 
 def test_random_interleave_no_drop(two_channels):
@@ -456,10 +456,10 @@ def test_random_interleave_and_drop_and_invalid(two_channels):
     client = R.client
     server = R.server
 
-    client_exec_cid = client.command_sequence.keys()
-    server_exec_cid = server.command_sequence.keys()
-    client_seq = [client.command_sequence[c].command.item() for c in client_exec_cid]
-    server_seq = [server.command_sequence[c].command.item() for c in server_exec_cid]
+    client_exec_cid = client.committed_commands.keys()
+    server_exec_cid = server.committed_commands.keys()
+    client_seq = [client.committed_commands[c].command.item() for c in client_exec_cid]
+    server_seq = [server.committed_commands[c].command.item() for c in server_exec_cid]
 
     server_store_keys = server.object_locks.keys()
     client_store_keys = client.object_locks.keys()
@@ -492,8 +492,8 @@ def test_dependencies(two_channels):
     client = R.client
     server = R.server
 
-    client_exec_cid = client.command_sequence.keys()
-    mapcmd = set([client.command_sequence[c].command.item() for c in client_exec_cid])
+    client_exec_cid = client.committed_commands.keys()
+    mapcmd = set([client.committed_commands[c].command.item() for c in client_exec_cid])
 
     # Only one of the items with common dependency commits
     assert len(mapcmd & {'1', '4'}) == 1
