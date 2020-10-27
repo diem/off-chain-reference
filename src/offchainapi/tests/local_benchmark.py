@@ -10,6 +10,7 @@ from ..business import VASPInfo
 from ..libra_address import LibraAddress
 from ..payment_logic import PaymentCommand
 from ..status_logic import Status
+from ..sample.sample_db import SampleDB
 from ..payment import PaymentAction, PaymentActor, PaymentObject, StatusObject
 from ..core import Vasp
 from .basic_business_context import TestBusinessContext
@@ -77,7 +78,7 @@ def make_new_VASP(Peer_addr, port, reliable=True):
         port=port,
         business_context=TestBusinessContext(Peer_addr, reliable=reliable),
         info_context=SimpleVASPInfo(Peer_addr),
-        database={})
+        database=SampleDB())
 
     loop = asyncio.new_event_loop()
     VASPx.set_loop(loop)
@@ -193,11 +194,6 @@ async def main_perf(messages_num=10, wait_num=0, verbose=False):
     # Close the loops
     VASPa.close()
     VASPb.close()
-
-    # List the command obligations
-    oblA = VASPa.pp.list_command_obligations()
-    oblB = VASPb.pp.list_command_obligations()
-    print(f'Pending processing: VASPa {len(oblA)} VASPb {len(oblB)}')
 
     # List the remaining retransmits
     rAB = channelAB.pending_retransmit_number()

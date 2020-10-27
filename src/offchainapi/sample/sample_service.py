@@ -12,6 +12,7 @@ from ..status_logic import Status
 from ..storage import StorableFactory
 from ..crypto import ComplianceKey
 from ..errors import OffChainErrorCode
+from .sample_db import SampleDB
 
 import json
 
@@ -62,7 +63,7 @@ class sample_business(BusinessContext):
 
     # Helper functions for the business
 
-    def get_address(self):
+    def get_my_address(self):
         return self.my_addr.as_str()
 
     def get_account(self, subaddress):
@@ -75,8 +76,8 @@ class sample_business(BusinessContext):
         sender = payment.sender
         receiver = payment.receiver
 
-        if sender.get_onchain_address_encoded_str() == self.get_address() or \
-            receiver.get_onchain_address_encoded_str() == self.get_address():
+        if sender.get_onchain_address_encoded_str() == self.get_my_address() or \
+            receiver.get_onchain_address_encoded_str() == self.get_my_address():
             return
         raise BusinessValidationFailure()
 
@@ -108,7 +109,7 @@ class sample_business(BusinessContext):
 
     def is_sender(self, payment, ctx=None):
         self.assert_payment_for_vasp(payment)
-        return payment.sender.get_onchain_address_encoded_str() == self.get_address()
+        return payment.sender.get_onchain_address_encoded_str() == self.get_my_address()
 
 
     def validate_recipient_signature(self, payment, ctx=None):
@@ -236,7 +237,7 @@ class sample_vasp:
     def __init__(self, my_addr):
         self.my_addr = my_addr
         self.bc = sample_business(self.my_addr)
-        self.store        = StorableFactory({})
+        self.store        = StorableFactory(SampleDB())
         self.info_context = sample_vasp_info()
 
         self.pp = PaymentProcessor(self.bc, self.store)

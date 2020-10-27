@@ -108,9 +108,6 @@ class Vasp:
         # Run the watchdor task to log statistics.
         self.net_handler.schedule_watchdog(self.loop, period=watch_period)
 
-        # Reschedule commands to be processed, when the loop starts.
-        self.loop.create_task(self.pp.retry_process_commands())
-
         # Mechanism to notify the running of loop
         self.loop.create_task(self._set_start_notifier())
 

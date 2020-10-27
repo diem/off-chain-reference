@@ -37,6 +37,10 @@ class BusinessForceAbort(Exception):
 class BusinessContext:
     """ The interface a VASP should define to drive the Off-chain protocol. """
 
+    def get_my_address(self):
+        """Returns this VASP's str Libra address encoded in bech32"""
+        raise NotImplementedError()  # pragma: no cover
+
     def open_channel_to(self, other_vasp_addr):
         """Requests authorization to open a channel to another VASP.
         If it is authorized nothing is returned. If not an exception is

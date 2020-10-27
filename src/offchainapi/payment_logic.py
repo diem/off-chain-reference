@@ -58,21 +58,17 @@ class PaymentProcessor(CommandProcessor):
         # The processor state -- only access through event loop to prevent
         # mutlithreading bugs.
         self.storage_factory = storage_factory
-        with self.storage_factory.atomic_writes():
-            root = storage_factory.make_value('processor', None)
-            self.reference_id_index = storage_factory.make_dict(
-                'reference_id_index', PaymentObject, root)
 
-            # This is the primary store of shared objects.
-            # It maps version numbers -> objects.
-            self.object_store = storage_factory.make_dict(
-                'object_store', SharedObject, root=root)
+        root = storage_factory.make_dir(self.business.get_my_address())
+        processor_dir = storage_factory.make_dir('processor', root=root)
+        # map from reference_id to latest version id
+        self.reference_id_index = storage_factory.make_dict(
+            'reference_id_index', str, processor_dir)
 
-            # Persist those to enable crash-recovery
-            self.pending_commands = storage_factory.make_dict(
-                'pending_commands', str, root)
-            self.command_cache = storage_factory.make_dict(
-                'command_cache', ProtocolCommand, root)
+        # This is the primary store of shared objects.
+        # It maps version numbers -> objects.
+        self.object_store = storage_factory.make_dict(
+            'object_store', PaymentObject, root=processor_dir)
 
         # Allow mapping a set of future to payment reference_id outcomes
         # Once a payment has an outcome (ready_for_settlement, abort, or command exception)
@@ -89,62 +85,6 @@ class PaymentProcessor(CommandProcessor):
         ''' Assigns a concrete network for this command processor to use. '''
         assert self.net is None
         self.net = net
-
-    # ------ Machinery for crash tolerance.
-
-    def command_unique_id(self, other_str, seq):
-        ''' Returns a string that uniquerly identifies this
-            command for the local VASP.'''
-        data = json.dumps((other_str, seq))
-        return f'{other_str}_{seq}', data
-
-    def persist_command_obligation(self, other_str, seq, command):
-        ''' Persists the command to ensure its future execution. '''
-        uid, data = self.command_unique_id(other_str, seq)
-        self.pending_commands[uid] = data
-        self.command_cache[uid] = command
-
-    def obligation_exists(self, other_str, seq):
-        uid, _ = self.command_unique_id(other_str, seq)
-        return uid in self.pending_commands
-
-    def release_command_obligation(self, other_str, seq):
-        ''' Once the command is executed, and a potential response stored,
-            this function allows us to remove the obligation to process
-            the command. '''
-        uid, _ = self.command_unique_id(other_str, seq)
-        del self.pending_commands[uid]
-        del self.command_cache[uid]
-
-    def list_command_obligations(self):
-        ''' Returns a list of (other_address, command sequence) tuples denoting
-            the pending commands that need to be re-executed after a crash or
-            shutdown. '''
-        pending = []
-        for uid in self.pending_commands.keys():
-            data = self.pending_commands[uid]
-            (other_address_str, seq) = json.loads(data)
-            command = self.command_cache[uid]
-            pending += [(other_address_str, command, seq)]
-        return pending
-
-    async def retry_process_commands(self):
-        ''' A coroutine that attempts to re-processes any pending commands
-            after recovering from a crash. '''
-
-        pending_commands = self.list_command_obligations()
-
-        logger.info(
-            f'Re-scheduling {len(pending_commands)} commands for processing'
-        )
-        new_tasks = []
-        for (other_address_str, command, seq) in pending_commands:
-            other_address = LibraAddress.from_encoded_str(other_address_str)
-            task = self.loop.create_task(self.process_command_success_async(
-                other_address, command, seq))
-            new_tasks += [task]
-
-        return new_tasks
 
     # ------ Machinery for supporting async Business context ------
 
@@ -206,12 +146,6 @@ class PaymentProcessor(CommandProcessor):
         # need to process this command. We log here an error, which
         # might be due to a bug.
         other_address_str = other_address.as_str()
-        if not self.obligation_exists(other_address_str, seq):
-            logger.error(
-                f'(other:{other_address_str}) '
-                f'Process command called without obligation #{seq}'
-            )
-            return
 
         logger.info(f'(other:{other_address_str}) Process Command #{seq}')
 
@@ -229,20 +163,9 @@ class PaymentProcessor(CommandProcessor):
                 if new_payment.has_changed():
                     new_cmd = PaymentCommand(new_payment)
 
-                    # This context ensure that either we both
-                    # write the next request & free th obligation
-                    # Or none of the two.
-                    with self.storage_factory.atomic_writes():
-                        request = await self.net.sequence_command(
-                            other_address, new_cmd
-                        )
-
-                        # Crash-recovery: Once a request is ordered to
-                        # be sent out we can consider this command
-                        # done.
-                        if self.obligation_exists(other_address_str, seq):
-                            self.release_command_obligation(
-                                other_address_str, seq)
+                    request = await self.net.sequence_command(
+                        other_address, new_cmd
+                    )
 
                     # Attempt to send it to the other VASP.
                     await self.net.send_request(other_address, request)
@@ -265,11 +188,6 @@ class PaymentProcessor(CommandProcessor):
                         f'created for Payment lastly with seq num #{seq}'
                         f' {new_payment}'
                     )
-
-            # If we are here we are done with this obligation.
-            with self.storage_factory.atomic_writes():
-                if self.obligation_exists(other_address_str, seq):
-                    self.release_command_obligation(other_address_str, seq)
 
         except NetworkException as e:
             logger.warning(
@@ -418,7 +336,7 @@ class PaymentProcessor(CommandProcessor):
                 self.check_new_update(old_payment, new_payment)
 
     def process_command(self, other_addr, command,
-                        seq, status_success, error=None):
+                        cid, status_success, error=None):
         ''' Overrides CommandProcessor. '''
 
         other_str = other_addr.as_str()
@@ -426,7 +344,7 @@ class PaymentProcessor(CommandProcessor):
         # Call the failure handler and exit.
         if not status_success:
             fut = self.loop.create_task(self.process_command_failure_async(
-                other_addr, command, seq, error)
+                other_addr, command, cid, error)
             )
             if __debug__:
                 self.futs += [fut]
@@ -441,14 +359,10 @@ class PaymentProcessor(CommandProcessor):
         # Update the Index of Reference ID -> Payment.
         self.store_latest_payment_by_ref_id(command)
 
-        # We record an obligation to process this command, even
-        # after crash recovery.
-        self.persist_command_obligation(other_str, seq, command)
-
         # Spin further command processing in its own task.
-        logger.debug(f'(other:{other_str}) Schedule cmd {seq}')
+        logger.debug(f'(other:{other_str}) Schedule cmd {cid}')
         fut = self.loop.create_task(self.process_command_success_async(
-            other_addr, command, seq))
+            other_addr, command, cid))
 
         # Log the futures here to execute them inidividually
         # when testing.
@@ -460,12 +374,11 @@ class PaymentProcessor(CommandProcessor):
     # -------- Get Payment API commands --------
 
     def get_latest_payment_by_ref_id(self, ref_id):
-        ''' Returns the latest payment version with
-            the reference ID provided.'''
-        if ref_id in self.reference_id_index:
-            return self.reference_id_index[ref_id]
-        else:
+        ''' Returns the latest payment with the reference ID provided.'''
+        version = self.reference_id_index.try_get(ref_id)
+        if version is None:
             raise KeyError(ref_id)
+        return self.object_store[version]
 
     def get_payment_history_by_ref_id(self, ref_id):
         ''' Generator that returns all versions of a
@@ -488,17 +401,15 @@ class PaymentProcessor(CommandProcessor):
 
         # Write the new payment to the index of payments by
         # reference ID to support they GetPaymentAPI.
-        if ref_id in self.reference_id_index:
-            # We get the dependencies of the old payment.
-            old_version = self.reference_id_index[ref_id].get_version()
-
+        payment_version = self.reference_id_index.try_get(ref_id)
+        if payment_version:
             # We check that the previous version is present.
             # If so we update it with the new one.
             dependencies_versions = command.get_dependencies()
-            if old_version in dependencies_versions:
-                self.reference_id_index[ref_id] = payment
+            if payment_version in dependencies_versions:
+                self.reference_id_index[ref_id] = payment.version
         else:
-            self.reference_id_index[ref_id] = payment
+            self.reference_id_index[ref_id] = payment.version
 
     # ----------- END of CommandProcessor interface ---------
 

@@ -7,6 +7,7 @@ from ..libra_address import LibraAddress
 from ..payment_logic import PaymentCommand, PaymentProcessor
 from ..status_logic import Status
 from ..storage import StorableFactory
+from ..sample.sample_db import SampleDB
 from ..payment import PaymentAction, PaymentActor, PaymentObject, StatusObject
 from ..asyncnet import Aionet
 from ..core import Vasp
@@ -96,7 +97,7 @@ def run_server(my_configs_path, other_configs_path, num_of_commands=10, loop=Non
         port=my_configs['port'],
         business_context=AsyncMock(spec=BusinessContext),
         info_context=SimpleVASPInfo(my_configs, other_configs),
-        database={}
+        database=SampleDB(),
     )
     logging.info(f'Created VASP {my_addr.as_str()}.')
 
@@ -110,9 +111,9 @@ def run_server(my_configs_path, other_configs_path, num_of_commands=10, loop=Non
 
     def stop_server(vasp):
         channel = vasp.vasp.get_channel(other_addr)
-        requests = len(channel.other_request_index)
+        requests = len(list(channel.committed_commands.keys()))
         while requests < num_of_commands:
-            requests = len(channel.other_request_index)
+            requests = len(list(channel.committed_commands.keys()))
             time.sleep(0.1)
         vasp.close()
     Thread(target=stop_server, args=(vasp,)).start()
@@ -156,7 +157,7 @@ def run_client(my_configs_path, other_configs_path, num_of_commands=10, port=0):
         port=my_configs['port'],
         business_context=TestBusinessContext(my_addr),
         info_context=SimpleVASPInfo(my_configs, other_configs, port),
-        database={}
+        database=SampleDB(),
     )
     logging.info(f'Created VASP {my_addr.as_str()}.')
 

@@ -94,7 +94,7 @@ class Aionet:
                                 f'failed with error: {str(e)}'
                             )
 
-                    len_my = len(channel.my_request_index)
+                    len_my = len(channel.my_pending_requests)
                     logger.info(
                         f'''
                         Channel: {me.as_str()} [{role}] <-> {other.as_str()}
@@ -222,12 +222,12 @@ class Aionet:
                         'Incorrect X-Request-ID header:', response.headers
                     )
 
+                response_text = await response.text()
                 # Check that there are no low-level HTTP errors.
                 if response.status != 200 :
-                    err_msg = f'Received status {response.status}: {await response.text()}'
+                    err_msg = f'Received status {response.status}: {response_text}'
                     raise Exception(err_msg)
 
-                response_text = await response.text()
                 logger.debug(f'Raw response: {response_text}')
 
                 # Wait in case the requests are sent out of order.

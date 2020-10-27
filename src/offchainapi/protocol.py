@@ -13,7 +13,6 @@ from .crypto import OffChainInvalidSignature
 
 import json
 from collections import namedtuple
-from threading import RLock
 import logging
 from itertools import islice
 import asyncio
@@ -28,7 +27,14 @@ NetMessage = namedtuple('NetMessage',
      'raw',  # The Python CommandRequestObject or CommandResponseObject object
      ])
 
+""" A struct for dependencies in object_locks """
+DepLocks = namedtuple('DepLocks', ['mising_deps', 'used_deps', 'locked_deps'])
+
 logger = logging.getLogger(name='libra_off_chain_api.protocol')
+
+
+LOCK_AVAILABLE = "__AVAILABLE"
+LOCK_EXPIRED = "__EXPIRED"
 
 
 class DependencyException(OffChainException):
@@ -106,14 +112,6 @@ class OffChainVASP:
 
         return self.channel_store[store_key]
 
-    def get_storage_factory(self):
-        """Returns a storage factory for this system.
-
-        Returns:
-            StorableFactory: The storage factory of the VASP.
-        """
-        return self.storage_factory
-
 
 class VASPPairChannel:
     """ Represents the state of an off-chain bi-directional
@@ -154,47 +152,31 @@ class VASPPairChannel:
                 self.other_address_str
             )
 
-        # A reentrant lock to manage access.
-        self.rlock = RLock()
-
-        # State that is persisted.
-
-        root = self.storage.make_value(self.myself.as_str(), None)
-        other_vasp = self.storage.make_value(
-            self.other_address_str, None, root=root
+        root = self.storage.make_dir(self.myself.as_str())
+        other_vasp = self.storage.make_dir(
+            self.other_address_str, root=root
         )
 
-        with self.storage.atomic_writes():
+        # The map of commited requests with their corresponding responses.
+        # This is also used to ensure command responses are indempotent.
+        # All requests in this store have response attached.
+        self.committed_commands = self.storage.make_dict(
+            'committed_commands', CommandRequestObject, root=other_vasp
+        )
 
-            # The common sequence of commands and their
-            # status for those committed.
-            self.command_sequence = self.storage.make_list(
-                'command_sequence', CommandRequestObject, root=other_vasp
-            )
+        # Keep track of object locks (non re-entrant)
+        # Object_locks takes values '__AVAILBLE', '__EXPIRED' or a request cid.
+        #  * '__AVAILBLE' means that the object exists and is available to be used
+        #    by a command.
+        #  * '__EXPIRED' means that an object exists, but has already been used
+        #    by a command that is committed.
+        #  * Other value should be request cid of the comamnd holding this object
+        self.object_locks = self.storage.make_dict(
+            'object_locks', str, root=other_vasp)
 
-            # Keep track of object locks
-
-            # Object_locks takes values 'True', 'False' or a request cid.
-            #  * True means that the object exists and is ready to be used
-            #    by a command.
-            #  * False means that an object exists, but has already been used
-            #    by a command that is committed.
-            #  * Another value indicates a lock for a request with the cid
-            #    stored.
-            self.object_locks = self.storage.make_dict(
-                        'object_locks', str, root=other_vasp)
-
-            # Maps between request cid and requests for self and other.
-            self.my_request_index = self.storage.make_dict(
-                        'my_request_index', CommandRequestObject,
-                        root=other_vasp)
-            self.other_request_index = self.storage.make_dict(
-                        'other_request_index', CommandRequestObject,
-                        root=other_vasp)
-
-            # Indicates for a request cid if a response has been received.
-            self.pending_response = self.storage.make_dict(
-                        'pending_response', bool, root=other_vasp)
+        self.my_pending_requests = self.storage.make_dict(
+                'my_pending_requests', CommandRequestObject,
+                root=other_vasp)
 
         logger.debug(f'(other:{self.other_address_str}) Created VASP channel')
 
@@ -212,30 +194,6 @@ class VASPPairChannel:
         """
         return self.other
 
-    def get_vasp(self):
-        """
-        Returns:
-            OffChainVASP: The OffChainVASP to which this channel is attached.
-        """
-        return self.vasp
-
-    def get_final_sequence(self):
-        """
-        Returns:
-            list: The sequence of successful commands.
-        """
-        return self.command_sequence
-
-    if __debug__:
-        # Only used for testing -- should not be used in production.
-
-        def next_final_sequence(self):
-            """
-            Returns:
-                int: The number of items in the sequence of successful commands.
-            """
-            return len(self.command_sequence)
-
     async def package_request(self, request):
 
         """ A hook to send a request to other VASP.
@@ -249,7 +207,7 @@ class VASPPairChannel:
         json_dict = request.get_json_data_dict(JSONFlag.NET)
 
         # Make signature.
-        vasp = self.get_vasp()
+        vasp = self.vasp
         my_key = vasp.info_context.get_my_compliance_signature_key(
             self.get_my_address().as_str()
         )
@@ -277,7 +235,7 @@ class VASPPairChannel:
         struct = response.get_json_data_dict(JSONFlag.NET)
 
         # Sign response
-        info_context = self.get_vasp().info_context
+        info_context = self.vasp.info_context
         my_key = info_context.get_my_compliance_signature_key(
             self.get_my_address().as_str()
         )
@@ -337,10 +295,51 @@ class VASPPairChannel:
         self.processor.process_command(
             other_addr=other_addr,
             command=request.command,
-            seq=request.cid,
+            cid=request.cid,
             status_success=request.is_success(),
             error=response.error if response.error else None
         )
+
+    def get_dep_locks(self, request):
+        """
+        Get a request object's dependencies lock status, aka reads
+        Args:
+            request: CommandRequestObject, the concerned request
+        Returns:
+            DepLocks: a struct holding missing dependencies, used dependencies
+                and locked dependencies of the concerned request
+        """
+        depends_on_version = request.command.get_dependencies()
+
+        dep_locks = {dv: self.object_locks.try_get(str(dv)) for dv in depends_on_version}
+
+        missing_deps = []
+        used_deps = []
+        locked_deps = []
+        for dep, lock in dep_locks.items():
+            if lock is None:
+                missing_deps.append(str(dep))
+            elif lock == LOCK_EXPIRED:
+                used_deps.append(str(dep))
+            elif lock != LOCK_AVAILABLE:
+                locked_deps.append(str(dep))
+
+        if missing_deps:
+            logger.error(
+                f'Reject request {request.cid} -- missing dependencies: '
+                f'{", ".join(missing_deps)}'
+            )
+        if used_deps:
+            logger.error(
+                f'Reject request {request.cid} -- used dependencies: '
+                f'{", ".join(used_deps)}'
+            )
+        if locked_deps:
+            logger.warning(
+                f'Reject request {request.cid} -- locked dependencies: '
+                f'{", ".join(locked_deps)}'
+            )
+        return DepLocks(missing_deps, used_deps, locked_deps)
 
     def sequence_command_local(self, off_chain_command):
         """The local VASP attempts to sequence a new off-chain command.
@@ -356,40 +355,34 @@ class VASPPairChannel:
         request = CommandRequestObject(off_chain_command)
 
         # Before adding locally, check the dependencies
+        missing_deps, used_deps, locked_deps = self.get_dep_locks(request)
+        if missing_deps:
+            raise DependencyException(f'Dependencies not present: {", ".join(missing_deps)}')
+
+        if used_deps:
+            raise DependencyException(f'Dependencies used: {", ".join(used_deps)}')
+
+        if locked_deps:
+            raise DependencyException(f'Dependencies locked: {", ".join(locked_deps)}')
+
         create_versions = request.command.get_new_object_versions()
-        depends_on_version = request.command.get_dependencies()
+        existing_writes = []
+        for cv in create_versions:
+            if str(cv) in self.object_locks:
+                existing_writes.append(cv)
+        if existing_writes:
+            raise DependencyException(f'Object version already exists: {", ".join(existing_writes)}')
 
-        if any(dv not in self.object_locks for dv in depends_on_version):
-            raise DependencyException('Dependencies not present.')
+        self.processor.check_command(
+            self.get_my_address(),
+            self.get_other_address(),
+            off_chain_command)
 
-        if any(self.object_locks[dv] == 'False' for dv in depends_on_version):
-            raise DependencyException('Dependencies used.')
+        # Add the request to those requiring a response.
+        self.my_pending_requests[request.cid] = request
 
-        if any(cv in self.object_locks for cv in create_versions):
-            raise DependencyException('Object version already exists.')
-
-        is_locked = any(self.object_locks[dv] != 'True'
-                        for dv in depends_on_version)
-        if is_locked:
-            raise DependencyException('Dependencies locked.')
-
-        # Ensure all storage operations are written atomically.
-        with self.rlock:
-            with self.storage.atomic_writes():
-
-                self.processor.check_command(
-                    self.get_my_address(),
-                    self.get_other_address(),
-                    off_chain_command)
-
-                # Add the request to those requiring a response.
-                self.my_request_index[request.cid] = request
-                self.pending_response[request.cid] = True
-
-                for dv in depends_on_version:
-                    self.object_locks[dv] = request.cid
-                    # By definition nothing was waiting here, since
-                    # we checked it was all True.
+        for dv in off_chain_command.get_dependencies():
+            self.object_locks[str(dv)] = request.cid
 
         # Send the requests outside the locks to allow
         # for an asyncronous implementation.
@@ -406,7 +399,7 @@ class VASPPairChannel:
         """
         try:
             # Check signature
-            vasp = self.get_vasp()
+            vasp = self.vasp
             other_key = vasp.info_context.get_peer_compliance_verification_key(
                 self.other_address_str
             )
@@ -419,13 +412,12 @@ class VASPPairChannel:
                 request, JSONFlag.NET
             )
 
-            with self.rlock:
-                # Going ahead to process the request.
-                logger.debug(
-                    f'(other:{self.other_address_str}) '
-                    f'Processing request seq #{request.cid}',
-                )
-                response = self.handle_request(request)
+            # Going ahead to process the request.
+            logger.debug(
+                f'(other:{self.other_address_str}) '
+                f'Processing request seq #{request.cid}',
+            )
+            response = self.handle_request(request)
 
         except OffChainInvalidSignature as e:
             logger.warning(
@@ -452,12 +444,6 @@ class VASPPairChannel:
         return full_response
 
     def handle_request(self, request):
-        """ Handles a request provided as a dictionary. (see `_handle_request`)
-        """
-        with self.storage.atomic_writes():
-            return self._handle_request(request)
-
-    def _handle_request(self, request):
         """ Handles a request provided as a dictionary.
 
         Args:
@@ -473,90 +459,74 @@ class VASPPairChannel:
         depends_on_version = request.command.get_dependencies()
 
         # Always answer old requests.
-        if request.cid in self.other_request_index:
-            previous_request = self.other_request_index[request.cid]
-            if previous_request.has_response():
-                if previous_request.is_same_command(request):
+        previous_request = self.committed_commands.try_get(request.cid)
+        if previous_request:
+            if previous_request.is_same_command(request):
 
-                    # Invariant
-                    assert all(cv in self.object_locks
-                               for cv in create_versions)
+                # Invariant
+                assert all(str(cv) in self.object_locks
+                            for cv in create_versions)
 
-                    # Re-send the response.
-                    logger.debug(
-                        f'(other:{self.other_address_str}) '
-                        f'Handle request that alerady has a response: '
-                        f'cid #{request.cid}.',
-                    )
-                    return previous_request.response
-                else:
-                    # There is a conflict, and it will have to be resolved
-                    # TODO[issue 8]: How are conflicts meant to be resolved?
-                    # With only two participants we cannot tolerate errors.
-                    response = make_protocol_error(
-                        request, code=OffChainErrorCode.conflict)
+                # Re-send the response.
+                logger.debug(
+                    f'(other:{self.other_address_str}) '
+                    f'Handle request that alerady has a response: '
+                    f'cid #{request.cid}.',
+                )
+                return previous_request.response
+            else:
+                # There is a conflict, and it will have to be resolved
+                # TODO[issue 8]: How are conflicts meant to be resolved?
+                # With only two participants we cannot tolerate errors.
+                response = make_protocol_error(
+                    request, code=OffChainErrorCode.conflict)
 
-                    response.previous_command = previous_request.command
-                    logger.error(
-                        f'(other:{self.other_address_str}) '
-                        f'Conflicting requests for cid {request.cid}'
-                    )
-                    return response
+                response.previous_command = previous_request.command
+                logger.error(
+                    f'(other:{self.other_address_str}) '
+                    f'Conflicting requests for cid {request.cid}'
+                )
+                return response
 
-        # Read & cache object locks for this command
-        obj_locks = {dv:  self.object_locks[dv]
-                     for dv in depends_on_version
-                     if dv in self.object_locks}
-
-        if any(dv not in obj_locks for dv in depends_on_version):
-            # Some dependencies are missing but may becomes available later?
+        missing_deps, used_deps, locked_deps = self.get_dep_locks(request)
+        # Check potential protocol errors and exit
+        if missing_deps:
+            # Some dependencies are missing but may become available later?
             response = make_protocol_error(
-                request, code=OffChainErrorCode.wait)
+                request,
+                code=OffChainErrorCode.wait,
+                message=f'dependencies {", ".join(missing_deps)} are missing',
+            )
             return response
 
-        # Check all dependencies are here and not used.
-        has_all_deps = all(obj_locks[dv] != 'False'
-                           for dv in depends_on_version)
+        # Note: if locked depedency exists and self is client, yield locks to server
+        # (i.e. let this command take over conflict objects)
+        if locked_deps and self.is_server():
+            # The server requests take precedence, so make this wait.
+            response = make_protocol_error(
+                request,
+                code=OffChainErrorCode.wait,
+                message=f'dependencies {", ".join(locked_deps)} are locked',
+            )
+            return response
 
-        # If one of the dependency is locked then wait.
-        if has_all_deps:
-            is_locked = any(obj_locks[dv] != 'True'
-                            for dv in depends_on_version)
-            if is_locked:
-                if self.is_server():
-                    # The server requests take precedence, so make this wait.
-                    response = make_protocol_error(
-                        request, code=OffChainErrorCode.wait)
-                    return response
-                else:
-                    # A client yields the locks to the server.
-                    pass
-
-        # Option 1: raise due to missing deps
-        if not has_all_deps:
+        # Check potential command errors and apply to request
+        if used_deps:
             response = make_command_error(
-                request, code=OffChainErrorCode.used_dependencies)
+                request,
+                code=OffChainErrorCode.used_dependencies,
+                message=f'dependencies {", ".join(used_deps)} were used',
+            )
 
-            # Record the error in the log
-            logger.error(f'Reject request {request.cid} -- missing dependencies')
-            for dv in depends_on_version:
-                if dv not in obj_locks:
-                    logger.error(f' Key {dv} not found')
-                else:
-                    logger.error(f' Key {dv} = {obj_locks[dv]}')
-
-        else:
-
+        else: # Everything looks good, try to check command's integrity
             try:
                 command = request.command
                 my_address = self.get_my_address()
                 other_address = self.get_other_address()
 
-                # Option 2: raise due to failing checks
                 self.processor.check_command(
                     my_address, other_address, command)
 
-                # Option 3: did not raise, so return success.
                 response = make_success_response(request)
             except CommandValidationError as e:
                 response = make_command_error(
@@ -567,9 +537,7 @@ class VASPPairChannel:
         # Write back to storage
         request.response = response
 
-        # Update the index of others' requests
-        self.command_sequence += [request]
-        self.other_request_index[request.cid] = request
+        self.committed_commands[request.cid] = request
         self.register_dependencies(request)
         self.apply_response(request)
 
@@ -583,16 +551,16 @@ class VASPPairChannel:
         create_versions = request.command.get_new_object_versions()
         depends_on_version = request.command.get_dependencies()
 
-        assert not any(cv in self.object_locks for cv in create_versions)
+        assert not any(str(cv) in self.object_locks for cv in create_versions)
 
         if request.is_success():
-            assert all(v in self.object_locks for v in depends_on_version)
+            assert all(str(v) in self.object_locks for v in depends_on_version)
 
             for dv in depends_on_version:
-                self.object_locks[dv] = 'False'
+                self.object_locks[str(dv)] = LOCK_EXPIRED
 
             for cv in create_versions:
-                self.object_locks[cv] = 'True'
+                self.object_locks[str(cv)] = LOCK_AVAILABLE
 
             logger.debug(f'[{self.role()}] Dependency update: {depends_on_version} -> {create_versions}')
 
@@ -600,21 +568,22 @@ class VASPPairChannel:
             for dv in depends_on_version:
                 # The depedency may not be in the locks, since the failure
                 # may have been due to a missing dependency.
-                if dv in self.object_locks and self.object_locks[dv] == request.cid:
-                    self.object_locks[dv] = 'True'
+                if str(dv) in self.object_locks and self.object_locks[str(dv)] == request.cid:
+                    self.object_locks[str(dv)] = LOCK_AVAILABLE
+            logger.debug(f'[{self.role()}] Dependency no update: {depends_on_version} -> {create_versions}')
 
 
     async def parse_handle_response(self, json_response):
-        """ Handles a response as json string or dict.
+        """ Parses and handles a JWS signed response.
 
         Args:
-            response_text (str): The response signed iusing JWS.
+            response_text (str): The response signed using JWS.
 
         Returns:
             bool: Whether the command was a success or not
         """
         try:
-            vasp = self.get_vasp()
+            vasp = self.vasp
             other_key = vasp.info_context.get_peer_compliance_verification_key(
                 self.other_address_str
             )
@@ -624,9 +593,7 @@ class VASPPairChannel:
                 response, JSONFlag.NET
             )
 
-            with self.rlock:
-                result = self.handle_response(response)
-            return result
+            return self.handle_response(response)
 
         except OffChainInvalidSignature as e:
             logger.warning(
@@ -647,12 +614,6 @@ class VASPPairChannel:
             raise e
 
     def handle_response(self, response):
-        """ Handles a response provided as a dictionary. See `_handle_response`
-        """
-        with self.storage.atomic_writes():
-            return self._handle_response(response)
-
-    def _handle_response(self, response):
         """ Handles a response provided as a dictionary.
 
         Args:
@@ -671,46 +632,45 @@ class VASPPairChannel:
         if response.is_protocol_failure():
             raise OffChainProtocolError.make(response.error)
 
-        request_seq = response.cid
+        request_cid = response.cid
 
-        if request_seq not in self.my_request_index:
-            raise OffChainException(
-                f'Response for unknown cid {request_seq} received.'
-            )
-
-        # Idenpotent: We have already processed the response.
-        request = self.my_request_index[request_seq]
-        if request.has_response():
+        # If we have already processed the response.
+        request = self.committed_commands.try_get(request_cid)
+        if request:
             # Check the reponse is the same and log warning otherwise.
             if request.response != response:
                 excp = OffChainException(
-                    'Got duplicate but different responses.'
+                    'Got different responses with cid {request_cid}.'
                 )
                 excp.response1 = request.response
                 excp.response2 = response
                 raise excp
-            # this request may have concurrent modification
+            # This request may have concurrent modification
             # read db to get latest status
-            return self.my_request_index[request_seq].is_success()
+            return self.committed_commands[request_cid].is_success()
+
+        request = self.my_pending_requests.try_get(request_cid)
+        if not request:
+            raise OffChainException(
+                f'Response for unknown cid {request_cid} received.'
+            )
 
         # Read and write back response into request.
         request.response = response
-        del self.pending_response[request.cid]
 
         # Add the next command to the common sequence.
-        self.command_sequence += [request]
-        self.my_request_index[request_seq] = request
+        self.committed_commands[request.cid] = request
+        del self.my_pending_requests[request_cid]
         self.register_dependencies(request)
         self.apply_response(request)
-
         return request.is_success()
 
     def get_retransmit(self, number=1):
         ''' Returns up to a `number` (int) of pending requests
         (CommandRequestObject)'''
         net_messages = []
-        for next_retransmit in islice(self.pending_response.keys(), number):
-            request_to_send = self.my_request_index[next_retransmit]
+        for next_retransmit in islice(self.my_pending_requests.keys(), number):
+            request_to_send = self.my_pending_requests[next_retransmit]
             net_messages += [request_to_send]
         return net_messages
 
@@ -729,7 +689,7 @@ class VASPPairChannel:
         """ Returns true if there are any pending re-transmits, namely
             requests for which the response has not yet been received.
         """
-        return len(self.pending_response) > 0
+        return not self.my_pending_requests.is_empty()
 
     def pending_retransmit_number(self):
         '''
@@ -737,4 +697,4 @@ class VASPPairChannel:
             the number of requests that are waiting to be
             retransmitted on this channel.
         '''
-        return len(self.pending_response)
+        return len(self.my_pending_requests)

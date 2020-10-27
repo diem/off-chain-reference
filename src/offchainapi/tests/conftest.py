@@ -11,10 +11,9 @@ from ..libra_address import LibraAddress
 from ..protocol_messages import CommandRequestObject
 from ..utils import JSONFlag
 from ..crypto import ComplianceKey
+from ..sample.sample_db import SampleDB
 
 import types
-import dbm
-from copy import deepcopy
 from unittest.mock import MagicMock
 from mock import AsyncMock
 import pytest
@@ -67,8 +66,8 @@ def kyc_data():
 
 
 @pytest.fixture
-def store():
-    return StorableFactory({})
+def store(db):
+    return StorableFactory(db)
 
 
 @pytest.fixture
@@ -115,9 +114,7 @@ def two_channels(three_addresses, vasp, store):
 
 @pytest.fixture
 def db(tmp_path):
-    db_path = tmp_path / 'db.dat'
-    with dbm.open(str(db_path), 'c') as xdb:
-        yield xdb
+    return SampleDB()
 
 
 @pytest.fixture

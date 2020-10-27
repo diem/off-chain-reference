@@ -19,6 +19,7 @@ from .basic_business_context import TestBusinessContext
 from unittest.mock import MagicMock
 from mock import AsyncMock
 import pytest
+import copy
 
 
 def test_check_new_payment_from_recipient(payment, processor):
@@ -282,74 +283,8 @@ def test_payment_process_get_extended_kyc(payment, processor, kyc_data):
     assert new_payment.receiver.kyc_data == kyc_data
 
 
-def test_persist(payment):
-    store = StorableFactory({})
-
-    my_addr = LibraAddress.from_bytes(b'A'*16)
-    my_addr_str = my_addr.as_str()
-    bcm = TestBusinessContext(my_addr)
-    processor = PaymentProcessor(bcm, store)
-
-    net = AsyncMock(Aionet)
-    processor.set_network(net)
-
-    cmd = PaymentCommand(payment)
-    assert len(processor.list_command_obligations()) == 0
-
-    # Check that a  atomic write context must be in place.
-    with pytest.raises(RuntimeError):
-        processor.persist_command_obligation(my_addr_str, seq=10, command=cmd)
-
-    # Create 1 oblogation
-    with processor.storage_factory.atomic_writes():
-        processor.persist_command_obligation(my_addr_str, seq=10, command=cmd)
-
-    assert processor.obligation_exists(my_addr_str, seq=10)
-    assert len(processor.list_command_obligations()) == 1
-
-    # Check for something that does not exist
-    assert not processor.obligation_exists(my_addr_str, seq=11)
-
-    # delete obligation
-    with processor.storage_factory.atomic_writes():
-        processor.release_command_obligation(my_addr_str, seq=10)
-
-    assert len(processor.list_command_obligations()) == 0
-
-
-def test_reprocess(payment,  loop):
-    store = StorableFactory({})
-
-    my_addr = LibraAddress.from_bytes(b'A'*16)
-    my_addr_str = my_addr.as_str()
-    bcm = TestBusinessContext(my_addr)
-    processor = PaymentProcessor(bcm, store, loop)
-
-    net = AsyncMock(Aionet)
-    processor.set_network(net)
-
-    cmd = PaymentCommand(payment)
-
-    # Create 1 oblogation
-    with processor.storage_factory.atomic_writes():
-        processor.persist_command_obligation(my_addr_str, seq=10, command=cmd)
-
-    assert len(processor.list_command_obligations()) == 1
-
-    # Ensure is is recheduled
-    coro = processor.retry_process_commands()
-    tasks = loop.run_until_complete(coro)
-    assert len(tasks) == 1
-    assert tasks[0].done() == 1
-
-    assert tasks[0].result() is None
-
-    # Ensure that the obligation is cleared
-    assert len(processor.list_command_obligations()) == 0
-
-
-def test_process_command_success_no_proc(payment, loop):
-    store = StorableFactory({})
+def test_process_command_success_no_proc(payment, loop, db):
+    store = StorableFactory(db)
 
     my_addr = LibraAddress.from_bytes(b'B'*16)
     other_addr = LibraAddress.from_bytes(b'A'*16)
@@ -366,8 +301,8 @@ def test_process_command_success_no_proc(payment, loop):
     coro = processor.process_command_success_async(other_addr, cmd, seq=10)
     _ = loop.run_until_complete(coro)
 
-def test_process_command_success_vanilla(payment, loop):
-    store = StorableFactory({})
+def test_process_command_success_vanilla(payment, loop, db):
+    store = StorableFactory(db)
 
     my_addr = LibraAddress.from_bytes(b'B'*16)
     other_addr = LibraAddress.from_bytes(b'A'*16)
@@ -380,10 +315,6 @@ def test_process_command_success_vanilla(payment, loop):
     cmd = PaymentCommand(payment)
     cmd.set_origin(other_addr)
 
-    # Create an obligation first
-    with processor.storage_factory.atomic_writes():
-        processor.persist_command_obligation(other_addr.as_str(), seq=10, command=cmd)
-
     # No obligation means no processing
     coro = processor.process_command_success_async(other_addr, cmd, seq=10)
     _ = loop.run_until_complete(coro)
@@ -391,6 +322,59 @@ def test_process_command_success_vanilla(payment, loop):
     assert [call[0] for call in net.method_calls] == [
         'sequence_command', 'send_request']
 
+async def test_process_command_happy_path(payment, loop, db):
+    store = StorableFactory(db)
+
+    my_addr = LibraAddress.from_bytes(b'B'*16)
+    other_addr = LibraAddress.from_bytes(b'A'*16)
+    my_bcm = TestBusinessContext(my_addr)
+    other_bcm = TestBusinessContext(other_addr)
+    # Use the same store/DB backend
+    my_processor = PaymentProcessor(my_bcm, store, loop)
+    other_processor = PaymentProcessor(other_bcm, store, loop)
+    net = AsyncMock(Aionet)
+    my_processor.set_network(net)
+    other_processor.set_network(net)
+
+    other_cmd = PaymentCommand(payment)
+    other_cmd.set_origin(other_addr)
+
+    # me: process success command
+    assert len(my_processor.object_store) == 0
+    fut = my_processor.process_command(other_addr, other_cmd, other_cmd.get_request_cid(), True)
+
+    assert len(my_processor.object_store) == 1
+    other_cmd_new_vers = list(other_cmd.get_new_object_versions())
+    assert len(other_cmd_new_vers) == 1
+    assert my_processor.object_store[other_cmd_new_vers[0]] == payment
+
+    assert my_processor.get_latest_payment_by_ref_id(payment.reference_id) == payment
+    await fut
+
+    # Make some differences, and test that commands are isolated per VASPs
+    payment2 = copy.deepcopy(payment)
+    payment2.update({
+        'original_payment_reference_id': payment.reference_id
+    })
+
+    my_cmd = PaymentCommand(payment2)
+    my_cmd.set_origin(my_addr)
+    # other: process success command
+    assert len(other_processor.object_store) == 0
+    fut = other_processor.process_command(other_addr, my_cmd, my_cmd.get_request_cid(), True)
+
+    assert len(other_processor.object_store) == 1
+    my_cmd_new_vers = list(my_cmd.get_new_object_versions())
+    assert len(my_cmd_new_vers) == 1
+
+    # Even though payment and payment2 have the same version id and share
+    # the db backend, they can distinguish the payments
+    assert other_processor.object_store[my_cmd_new_vers[0]] == payment2
+    assert my_processor.object_store[other_cmd_new_vers[0]] != payment2
+    assert my_processor.object_store[other_cmd_new_vers[0]] == payment
+
+    assert other_processor.get_latest_payment_by_ref_id(payment2.reference_id) == payment2
+    await fut
 
 def reset_payment_status(payment):
     payment.sender.status = StatusObject(Status.none)
@@ -402,9 +386,9 @@ def update_role_status(payment, role, status):
     else:
         payment.data[role].status = StatusObject(status)
 
-def test_can_change_status(payment, loop):
+def test_can_change_status(payment, loop, db):
     """ Test invalid status change are rejected """
-    store = StorableFactory({})
+    store = StorableFactory(db)
     my_addr = LibraAddress.from_bytes(b'B'*16)
     other_addr = LibraAddress.from_bytes(b'A'*16)
     bcm = TestBusinessContext(my_addr)

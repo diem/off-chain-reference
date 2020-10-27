@@ -1,7 +1,8 @@
 # Copyright (c) The Libra Core Contributors
 # SPDX-License-Identifier: Apache-2.0
 
-from ..protocol import VASPPairChannel, make_protocol_error, DependencyException
+from ..protocol import VASPPairChannel, make_protocol_error, \
+    DependencyException, LOCK_EXPIRED, LOCK_AVAILABLE
 from ..protocol_messages import CommandRequestObject, CommandResponseObject, \
     OffChainProtocolError, OffChainException
 from ..errors import OffChainErrorCode
@@ -120,28 +121,25 @@ class RandomRun(object):
 
                 print([server.would_retransmit(),
                        client.would_retransmit(),
-                       server.next_final_sequence(),
-                       client.next_final_sequence()])
+                       len(server.committed_commands),
+                       len(client.committed_commands)])
 
             if not server.would_retransmit() and not client.would_retransmit() \
-                    and server.next_final_sequence() + self.rejected == self.number \
-                    and client.next_final_sequence() + self.rejected == self.number:
+                    and len(server.committed_commands) + self.rejected == self.number \
+                    and len(client.committed_commands) + self.rejected == self.number:
                 break
 
     def checks(self, NUMBER):
         client = self.client
         server = self.server
 
-        client_seq = [c.command.item() for c in client.get_final_sequence()]
-        server_seq = [c.command.item() for c in server.get_final_sequence()]
+        client_exec_cid = client.committed_commands.keys()
+        server_exec_cid = server.committed_commands.keys()
+        client_seq = [client.committed_commands[c].command.item() for c in client_exec_cid]
+        server_seq = [server.committed_commands[c].command.item() for c in server_exec_cid]
 
         assert len(client_seq) == NUMBER - self.rejected
         assert set(client_seq) == set(server_seq)
-
-        client_exec_seq = [c.command.item() for c in client.command_sequence]
-        server_exec_seq = [c.command.item() for c in server.command_sequence]
-        assert set(client_seq) == set(client_exec_seq)
-        assert set(server_seq) == set(server_exec_seq)
 
 
 def test_create_channel_to_myself(three_addresses, vasp):
@@ -181,22 +179,25 @@ def test_protocol_server_client_benign(two_channels):
     # Create a server request for a command
     request = server.sequence_command_local(SampleCommand('Hello'))
     assert isinstance(request, CommandRequestObject)
+    assert len(server.committed_commands) == 0
+    assert len(server.my_pending_requests) == 1
 
     # Pass the request to the client
-    assert len(client.other_request_index) == 0
+    assert len(client.committed_commands) == 0
+    assert len(client.my_pending_requests) == 0
     reply = client.handle_request(request)
     assert isinstance(reply, CommandResponseObject)
-    assert len(client.other_request_index) == 1
+    assert len(client.committed_commands) == 1
+    assert len(client.my_pending_requests) == 0
     assert reply.status == 'success'
 
     # Pass the reply back to the server
-    assert server.next_final_sequence() == 0
     succ = server.handle_response(reply)
     assert succ
+    assert len(server.committed_commands) == 1
+    assert len(server.my_pending_requests) == 0
 
-    assert server.next_final_sequence() > 0
-    assert client.next_final_sequence() > 0
-    assert client.get_final_sequence()[0].command.item() == 'Hello'
+    assert client.committed_commands[request.cid].command.item() == 'Hello'
 
 
 def test_protocol_server_conflicting_sequence(two_channels):
@@ -214,7 +215,6 @@ def test_protocol_server_conflicting_sequence(two_channels):
     reply_conflict = client.handle_request(request_conflict)
 
     # We only sequence one command.
-    assert len(client.other_request_index) == 1
     assert reply.status == 'success'
 
     # The response to the second command is a failure
@@ -222,40 +222,36 @@ def test_protocol_server_conflicting_sequence(two_channels):
     assert reply_conflict.error.code == OffChainErrorCode.conflict
 
     # Pass the reply back to the server
-    assert server.next_final_sequence() == 0
+    assert len(server.committed_commands) == 0
+    with pytest.raises(OffChainProtocolError):
+        server.handle_response(reply_conflict)
+
     succ = server.handle_response(reply)
     assert succ
-
-    assert server.next_final_sequence() > 0
-    assert client.next_final_sequence() > 0
-    assert client.get_final_sequence()[0].command.item() == 'Hello'
+    assert len(server.committed_commands) == 1
 
 
 def test_protocol_client_server_benign(two_channels):
     server, client = two_channels
 
-    # Create a server request for a command
+    # Create a client request for a command
     request = client.sequence_command_local(SampleCommand('Hello'))
     assert isinstance(request, CommandRequestObject)
-    assert len(client.other_request_index) == 0
+    assert len(client.my_pending_requests) == 1
+    assert len(client.committed_commands) == 0
 
     # Send to server
-    assert len(client.other_request_index) == 0
     reply = server.handle_request(request)
     assert isinstance(reply, CommandResponseObject)
-    assert len(server.other_request_index) == 1
-    assert server.next_final_sequence() == 1
-    assert server.next_final_sequence() > 0
+    assert len(server.committed_commands) == 1
 
     # Pass response back to client
-    assert client.my_request_index[request.cid].response is None
     succ = client.handle_response(reply)
     assert succ
+    assert len(client.committed_commands) == 1
 
-    assert client.next_final_sequence() > 0
-    assert client.my_request_index[request.cid].response is not None
-    assert client.get_final_sequence()[0].command.item() == 'Hello'
-    assert client.next_final_sequence() == 1
+    assert client.committed_commands[request.cid].response is not None
+    assert client.committed_commands[request.cid].command.item() == 'Hello'
 
 
 def test_protocol_server_client_interleaved_benign(two_channels):
@@ -271,20 +267,25 @@ def test_protocol_server_client_interleaved_benign(two_channels):
     client_reply = client.handle_request(server_request)
     server.handle_response(client_reply)
     server_reply = server.handle_request(client_request)
-
     client.handle_response(server_reply)
 
-    assert len(client.my_request_index) == 1
-    assert len(server.other_request_index) == 1
-    assert len(client.get_final_sequence()) == 2
-    assert len(server.get_final_sequence()) == 2
-    assert {c.command.item() for c in client.get_final_sequence()} == {
-        'World', 'Hello'}
-    assert {c.command.item() for c in server.get_final_sequence()} == {
-        'World', 'Hello'}
+    assert len(client.my_pending_requests) == 0
+    assert len(server.my_pending_requests) == 0
+    assert len(client.committed_commands) == 2
+    assert len(server.committed_commands) == 2
+
+    assert client.committed_commands[client_request.cid].response is not None
+    assert client.committed_commands[client_request.cid].command.item() == 'Hello'
+    assert server.committed_commands[client_request.cid].response is not None
+    assert server.committed_commands[client_request.cid].command.item() == 'Hello'
+
+    assert client.committed_commands[server_request.cid].response is not None
+    assert client.committed_commands[server_request.cid].command.item() == 'World'
+    assert server.committed_commands[server_request.cid].response is not None
+    assert server.committed_commands[server_request.cid].command.item() == 'World'
 
 
-def test_protocol_server_client_interleaved_swapped_request(two_channels):
+def test_protocol_server_client_handled_previously_seen_messages(two_channels):
     server, client = two_channels
 
     client_request = client.sequence_command_local(SampleCommand('Hello'))
@@ -293,20 +294,36 @@ def test_protocol_server_client_interleaved_swapped_request(two_channels):
     client_reply = client.handle_request(server_request)
     server_reply = server.handle_request(client_request)
     assert server_reply.status == 'success'
+    assert client_reply.status == 'success'
 
-    server.handle_response(client_reply)
+    # Handle seen requests
+    client_reply = client.handle_request(server_request)
     server_reply = server.handle_request(client_request)
+    assert server_reply.status == 'success'
+    assert client_reply.status == 'success'
 
-    client.handle_response(server_reply)
+    assert server.handle_response(client_reply)
+    assert client.handle_response(server_reply)
 
-    assert len(client.my_request_index) == 1
-    assert len(server.other_request_index) == 1
-    assert len(client.get_final_sequence()) == 2
-    assert len(server.get_final_sequence()) == 2
-    assert {c.command.item() for c in client.get_final_sequence()} == {
-        'World', 'Hello'}
-    assert {c.command.item() for c in server.get_final_sequence()} == {
-        'World', 'Hello'}
+    # Handle seen responses
+    assert server.handle_response(client_reply)
+    assert client.handle_response(server_reply)
+
+    assert len(client.my_pending_requests) == 0
+    assert len(server.my_pending_requests) == 0
+    assert len(client.committed_commands) == 2
+    assert len(server.committed_commands) == 2
+
+    assert client.committed_commands[client_request.cid].response is not None
+    assert client.committed_commands[client_request.cid].command.item() == 'Hello'
+    assert server.committed_commands[client_request.cid].response is not None
+    assert server.committed_commands[client_request.cid].command.item() == 'Hello'
+
+    assert client.committed_commands[server_request.cid].response is not None
+    assert client.committed_commands[server_request.cid].command.item() == 'World'
+    assert server.committed_commands[server_request.cid].response is not None
+    assert server.committed_commands[server_request.cid].command.item() == 'World'
+
 
 async def test_protocol_conflict1(two_channels):
     server, client = two_channels
@@ -365,12 +382,11 @@ async def test_protocol_conflict2(two_channels):
     cresp = (await client.parse_handle_request(sreq)).content
     assert await server.parse_handle_response(cresp)  # Success
     assert 'Hello' in server.object_locks
-    assert server.object_locks['Hello'] == 'False'
+    assert server.object_locks['Hello'] == LOCK_EXPIRED
 
     # Now try again the client request
     sresp = (await server.parse_handle_request(creq)).content
     assert not await client.parse_handle_response(sresp)
-
 
 
 def test_protocol_server_client_interleaved_swapped_reply(two_channels):
@@ -389,14 +405,13 @@ def test_protocol_server_client_interleaved_swapped_reply(two_channels):
 
     client.handle_response(server_reply)
 
-    assert len(client.my_request_index) == 1
-    assert len(server.other_request_index) == 1
-    assert len(client.get_final_sequence()) == 2
-    assert len(server.get_final_sequence()) == 2
-    assert {c.command.item() for c in client.get_final_sequence()} == {
-        'World', 'Hello'}
-    assert {c.command.item() for c in server.get_final_sequence()} == {
-        'World', 'Hello'}
+    assert len(client.committed_commands) == 2
+    assert len(server.committed_commands) == 2
+
+    assert client.committed_commands[client_request.cid].command.item() == 'Hello'
+    assert server.committed_commands[client_request.cid].command.item() == 'Hello'
+    assert client.committed_commands[server_request.cid].command.item() == 'World'
+    assert server.committed_commands[server_request.cid].command.item() == 'World'
 
 
 def test_random_interleave_no_drop(two_channels):
@@ -412,6 +427,7 @@ def test_random_interleave_no_drop(two_channels):
 
     R.checks(NUMBER)
 
+
 def test_random_interleave_and_drop(two_channels):
     server, client = two_channels
 
@@ -422,7 +438,6 @@ def test_random_interleave_and_drop(two_channels):
     R = RandomRun(server, client, commands, seed='drop')
     R.run()
     R.checks(NUMBER)
-
 
 
 def test_random_interleave_and_drop_and_invalid(two_channels):
@@ -441,8 +456,10 @@ def test_random_interleave_and_drop_and_invalid(two_channels):
     client = R.client
     server = R.server
 
-    client_seq = [c.command.item() for c in client.get_final_sequence()]
-    server_seq = [c.command.item() for c in server.get_final_sequence()]
+    client_exec_cid = client.committed_commands.keys()
+    server_exec_cid = server.committed_commands.keys()
+    client_seq = [client.committed_commands[c].command.item() for c in client_exec_cid]
+    server_seq = [server.committed_commands[c].command.item() for c in server_exec_cid]
 
     server_store_keys = server.object_locks.keys()
     client_store_keys = client.object_locks.keys()
@@ -475,14 +492,12 @@ def test_dependencies(two_channels):
     client = R.client
     server = R.server
 
-    mapcmd = {
-        c.command.item() for i, c in enumerate(
-            client.get_final_sequence()
-        )
-    }
+    client_exec_cid = client.committed_commands.keys()
+    mapcmd = set([client.committed_commands[c].command.item() for c in client_exec_cid])
+
     # Only one of the items with common dependency commits
-    assert len(mapcmd & {1, 4}) == 1
-    assert len(mapcmd & {8, 9}) == 1
+    assert len(mapcmd & {'1', '4'}) == 1
+    assert len(mapcmd & {'8', '9'}) == 1
     # All items commit (except those with common deps)
     assert len(mapcmd) == 8
 
@@ -595,12 +610,87 @@ async def test_parse_handle_response_to_future_parsing_error(json_response, chan
         _ = await channel.parse_handle_response(json_response)
 
 
-def test_get_storage_factory(vasp):
-    assert isinstance(vasp.get_storage_factory(), StorableFactory)
-
-
 def test_role(channel):
     assert channel.role() == 'Client'
 
+
 def test_pending_retransmit_number(channel):
     assert channel.pending_retransmit_number() == 0
+
+
+async def test_get_dep_locks(two_channels):
+    server, client = two_channels
+
+    msg = client.sequence_command_local(SampleCommand('Hello'))
+    msg = (await client.package_request(msg)).content
+    msg2 = (await server.parse_handle_request(msg)).content
+    assert await client.parse_handle_response(msg2)  # success
+
+    msg = client.sequence_command_local(SampleCommand('World'))
+    msg = (await client.package_request(msg)).content
+    msg2 = (await server.parse_handle_request(msg)).content
+    assert await client.parse_handle_response(msg2)  # success
+
+    assert client.object_locks['Hello'] == LOCK_AVAILABLE
+    assert client.object_locks['World'] == LOCK_AVAILABLE
+    assert server.object_locks['Hello'] == LOCK_AVAILABLE
+    assert server.object_locks['World'] == LOCK_AVAILABLE
+
+    assert len(client.object_locks) == 2
+    assert len(server.object_locks) == 2
+
+    request_has_missing_deps = CommandRequestObject(SampleCommand('foo', deps=['not_exist1', 'not_exist2']))
+    c_missing, c_used, c_locked = client.get_dep_locks(request_has_missing_deps)
+    assert set(c_missing) == {"not_exist1", "not_exist2"}
+    assert not c_used
+    assert not c_locked
+    with pytest.raises(DependencyException):
+        client.sequence_command_local(request_has_missing_deps.command)
+
+    cw1_request = CommandRequestObject(SampleCommand('cW1', deps=['Hello', 'World']))
+    c_missing, c_used, c_locked = client.get_dep_locks(cw1_request)
+    assert not c_missing
+    assert not c_used
+    assert not c_locked
+
+    creq = client.sequence_command_local(SampleCommand('cW2', deps=['Hello', 'World']))
+    creq = (await client.package_request(creq)).content
+    assert len(client.object_locks) == 2
+    assert client.object_locks['Hello'] == 'cW2'
+    assert client.object_locks['World'] == 'cW2'
+    assert 'cW2' not in client.object_locks
+
+    c_missing, c_used, c_locked = client.get_dep_locks(cw1_request)
+    assert not c_missing
+    assert not c_used
+    assert set(c_locked) == {'Hello', 'World'}
+    with pytest.raises(DependencyException):
+        client.sequence_command_local(cw1_request.command)
+
+    sw1_request = CommandRequestObject(SampleCommand('sW1', deps=['Hello']))
+
+    # Server gets client request
+    sresp = (await server.parse_handle_request(creq)).content
+    assert server.object_locks['Hello'] == LOCK_EXPIRED
+    assert server.object_locks['World'] == LOCK_EXPIRED
+    assert server.object_locks['cW2'] == LOCK_AVAILABLE
+
+    s_missing, s_used, s_locked = server.get_dep_locks(sw1_request)
+    assert not s_missing
+    assert s_used == ['Hello']
+    assert not s_locked
+    with pytest.raises(DependencyException):
+        server.sequence_command_local(sw1_request.command)
+
+    assert await client.parse_handle_response(sresp)
+    assert client.object_locks['Hello'] == LOCK_EXPIRED
+    assert client.object_locks['World'] == LOCK_EXPIRED
+    assert server.object_locks['cW2'] == LOCK_AVAILABLE
+
+    sw2_request = CommandRequestObject(SampleCommand('sW1', deps=['Hello', 'cW2', 'not_exist3']))
+    s_missing, s_used, s_locked = server.get_dep_locks(sw2_request)
+    assert s_missing == ['not_exist3']
+    assert s_used == ['Hello']
+    assert not s_locked
+    with pytest.raises(DependencyException):
+        server.sequence_command_local(sw2_request.command)
