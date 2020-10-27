@@ -69,10 +69,6 @@ class PaymentProcessor(CommandProcessor):
         self.object_store = storage_factory.make_dict(
             'object_store', PaymentObject, root=processor_dir)
 
-        # # Persist those to enable crash-recovery
-        # self.pending_commands = storage_factory.make_dict(
-        #     'pending_commands', ProtocolCommand, processor_dir)
-
         # Allow mapping a set of future to payment reference_id outcomes
         # Once a payment has an outcome (ready_for_settlement, abort, or command exception)
         # notify the appropriate futures of the result. These do not persist
