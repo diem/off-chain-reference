@@ -375,7 +375,7 @@ async def test_process_command_happy_path(payment, loop, db):
 
     assert other_processor.get_latest_payment_by_ref_id(payment2.reference_id) == payment2
     await fut
-I’m 
+
 def reset_payment_status(payment):
     payment.sender.status = StatusObject(Status.none)
     payment.receiver.status = StatusObject(Status.none)
@@ -386,9 +386,9 @@ def update_role_status(payment, role, status):
     else:
         payment.data[role].status = StatusObject(status)
 
-def test_can_change_status(payment, loop):
+def test_can_change_status(payment, loop, db):
     """ Test invalid status change are rejected """
-    store = StorableFactory({})
+    store = StorableFactory(db)
     my_addr = LibraAddress.from_bytes(b'B'*16)
     other_addr = LibraAddress.from_bytes(b'A'*16)
     bcm = TestBusinessContext(my_addr)
