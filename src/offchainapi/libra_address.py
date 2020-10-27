@@ -11,6 +11,20 @@ from .bech32 import (
     LIBRA_ZERO_SUBADDRESS,
 )
 
+# Set a global Human Readable Part.
+global GLOBAL_HRP
+GLOBAL_HRP = LBR
+
+def set_global_hrp(hrp = None):
+    """
+    Sets the global human readable part of the address, used by default constructors
+    to a specific string. If 'hrp' is None or ommitted resets the hrp to the detault LBR.
+    """
+    global GLOBAL_HRP
+    if hrp is None:
+        GLOBAL_HRP = LBR
+    else:
+        GLOBAL_HRP = hrp
 
 class LibraAddressError(Exception):
     ''' Represents an error when creating a LibraAddress. '''
@@ -28,10 +42,16 @@ class LibraAddress:
     """
 
     @classmethod
-    def from_bytes(cls, onchain_address_bytes, subaddress_bytes=None, hrp=LBR):
+    def from_bytes(cls, onchain_address_bytes, subaddress_bytes=None, hrp=None):
         """ Return a LibraAddress given onchain address in bytes, subaddress
-        in bytes (optional), and hrp (Human Readable Part)
+        in bytes (optional), and hrp (Human Readable Part). If hrp is not given,
+        use the global hrp.
         """
+
+        if hrp is None:
+            global GLOBAL_HRP
+            hrp = GLOBAL_HRP
+
         try:
             encoded_address = bech32_address_encode(
                 hrp,
@@ -48,10 +68,16 @@ class LibraAddress:
         return cls(encoded_address, onchain_address_bytes, subaddress_bytes, hrp)
 
     @classmethod
-    def from_hex(cls, onchain_address_hex, subaddress_hex=None, hrp=LBR):
+    def from_hex(cls, onchain_address_hex, subaddress_hex=None, hrp=None):
         """ Return a LibraAddress given onchain address in hex, subaddress
-        in hex (optional), and hrp (Human Readable Part)
+        in hex (optional), and hrp (Human Readable Part). If hrp is not given,
+        use the global hrp.
         """
+
+        if hrp is None:
+            global GLOBAL_HRP
+            hrp = GLOBAL_HRP
+
         onchain_address_bytes = bytes.fromhex(onchain_address_hex)
         subaddress_bytes = bytes.fromhex(subaddress_hex) if subaddress_hex else None
         return cls.from_bytes(onchain_address_bytes, subaddress_bytes, hrp)
