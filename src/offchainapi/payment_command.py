@@ -68,7 +68,7 @@ class PaymentCommand(ProtocolCommand):
         new_version = self.get_new_version_number()
         if new_version != version_number:
             raise PaymentLogicError(
-                OffChainErrorCode.payment_dependency_error,
+                OffChainErrorCode.payment_wrong_structure,
                 f"Unknown object {version_number} (only know {new_version})"
             )
 
@@ -83,7 +83,7 @@ class PaymentCommand(ProtocolCommand):
             _, dep = self.reads_version_map[0]
             if dep not in dependencies:
                 raise PaymentLogicError(
-                    OffChainErrorCode.payment_dependency_error,
+                    OffChainErrorCode.payment_wrong_structure,
                     f'Could not find payment dependency: {dep}'
                 )
             dep_object = dependencies[dep]

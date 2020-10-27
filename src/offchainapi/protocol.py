@@ -511,7 +511,7 @@ class VASPPairChannel:
         if any(dv not in obj_locks for dv in depends_on_version):
             # Some dependencies are missing but may becomes available later?
             response = make_protocol_error(
-                request, code=OffChainErrorCode.wait)
+                request, code=OffChainErrorCode.missing_dependencies)
             return response
 
         # Check all dependencies are here and not used.
