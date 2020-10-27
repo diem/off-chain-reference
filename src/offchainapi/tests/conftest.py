@@ -14,8 +14,6 @@ from ..crypto import ComplianceKey
 from ..sample.sample_db import SampleDB
 
 import types
-import dbm
-from copy import deepcopy
 from unittest.mock import MagicMock
 from mock import AsyncMock
 import pytest

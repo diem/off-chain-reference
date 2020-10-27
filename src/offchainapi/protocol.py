@@ -164,14 +164,13 @@ class VASPPairChannel:
             'committed_commands', CommandRequestObject, root=other_vasp
         )
 
-        # Keep track of object locks
-
+        # Keep track of object locks (non re-entrant)
         # Object_locks takes values '__AVAILBLE', '__EXPIRED' or a request cid.
         #  * '__AVAILBLE' means that the object exists and is available to be used
         #    by a command.
         #  * '__EXPIRED' means that an object exists, but has already been used
         #    by a command that is committed.
-        #  * Other values are request cids, meaning the comamnds holding this object
+        #  * Other value should be request cid of the comamnd holding this object
         self.object_locks = self.storage.make_dict(
             'object_locks', str, root=other_vasp)
 
@@ -374,19 +373,16 @@ class VASPPairChannel:
         if existing_writes:
             raise DependencyException(f'Object version already exists: {", ".join(existing_writes)}')
 
-        # Ensure all storage operations are written atomically.
-        with self.storage.atomic_writes():
+        self.processor.check_command(
+            self.get_my_address(),
+            self.get_other_address(),
+            off_chain_command)
 
-            self.processor.check_command(
-                self.get_my_address(),
-                self.get_other_address(),
-                off_chain_command)
+        # Add the request to those requiring a response.
+        self.my_pending_requests[request.cid] = request
 
-            # Add the request to those requiring a response.
-            self.my_pending_requests[request.cid] = request
-
-            for dv in off_chain_command.get_dependencies():
-                self.object_locks[str(dv)] = request.cid
+        for dv in off_chain_command.get_dependencies():
+            self.object_locks[str(dv)] = request.cid
 
         # Send the requests outside the locks to allow
         # for an asyncronous implementation.
@@ -448,12 +444,6 @@ class VASPPairChannel:
         return full_response
 
     def handle_request(self, request):
-        """ Handles a request provided as a dictionary. (see `_handle_request`)
-        """
-        with self.storage.atomic_writes():
-            return self._handle_request(request)
-
-    def _handle_request(self, request):
         """ Handles a request provided as a dictionary.
 
         Args:
@@ -624,12 +614,6 @@ class VASPPairChannel:
             raise e
 
     def handle_response(self, response):
-        """ Handles a response provided as a dictionary. See `_handle_response`
-        """
-        with self.storage.atomic_writes():
-            return self._handle_response(response)
-
-    def _handle_response(self, response):
         """ Handles a response provided as a dictionary.
 
         Args:

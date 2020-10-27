@@ -51,9 +51,7 @@ class Storable:
 class StorableFactory:
     ''' This class maintains an overview of the full storage subsystem,
     and creates specific classes for values, lists and dictionary like
-    types that can be stored persistently. It also provides a context
-    manager to provide atomic, all-or-nothing crash resistent
-    transactions.
+    types that can be stored persistently.
 
     Initialize the ``StorableFactory`` with a persistent key-value
     store ``db``, which is an implementation of ``Database``.
@@ -62,8 +60,6 @@ class StorableFactory:
     def __init__(self, db):
         assert isinstance(db, Database)
         self.db = db
-        self.current_transaction = None
-        self.levels = 0
 
 
     def make_dir(self, name, root=None):
@@ -81,7 +77,6 @@ class StorableFactory:
 
     def make_dict(self, name, xtype, root):
         ''' A new map-like storable object.
-
             Parameters:
                 * name : a string representing the name of the object.
                 * xtype : the type of the object stored in the map.
@@ -94,29 +89,6 @@ class StorableFactory:
         v = StorableDict(self.db, name, xtype, root)
         v.factory = self
         return v
-
-    def atomic_writes(self):
-        ''' Returns a context manager that ensures
-            all writes in its body on the objects created by this
-            StorableFactory are atomic.
-
-            Attempting to write to the objects created by this
-            StorableFactory outside the context manager will
-            throw an exception. The context manager is re-entrant
-            and commits to disk occur when the outmost context
-            manager (with) exits.'''
-        return self
-
-    def __enter__(self):
-        if self.levels == 0:
-            self.current_transaction = get_unique_string()
-
-        self.levels += 1
-
-    def __exit__(self, type, value, traceback):
-        self.levels -= 1
-        if self.levels == 0:
-            self.current_transaction = None
 
 
 class StorableDict(Storable):

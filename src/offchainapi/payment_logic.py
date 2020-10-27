@@ -166,13 +166,9 @@ class PaymentProcessor(CommandProcessor):
                 if new_payment.has_changed():
                     new_cmd = PaymentCommand(new_payment)
 
-                    # This context ensure that either we both
-                    # write the next request & free th obligation
-                    # Or none of the two.
-                    with self.storage_factory.atomic_writes():
-                        request = await self.net.sequence_command(
-                            other_address, new_cmd
-                        )
+                    request = await self.net.sequence_command(
+                        other_address, new_cmd
+                    )
 
                     # Attempt to send it to the other VASP.
                     await self.net.send_request(other_address, request)

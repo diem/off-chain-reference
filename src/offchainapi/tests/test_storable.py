@@ -120,19 +120,16 @@ def test_complicated_objects(db, payment):
 def test_storable_factory(db):
     store = StorableFactory(db)
 
-    with store as _:
-        eg = store.make_dict('eg', int, None)
+    eg = store.make_dict('eg', int, None)
 
-    with store as _:
-        eg['x'] = 10
-        eg['x'] = 20
-        eg['y'] = 20
-        eg['x'] = 30
+    eg['x'] = 10
+    eg['x'] = 20
+    eg['y'] = 20
+    eg['x'] = 30
 
-    with store as _:
-        x = eg['x']
-        l = len(eg)
-        eg['z'] = 20
+    x = eg['x']
+    l = len(eg)
+    eg['z'] = 20
 
     assert len(eg) == 3
     assert set(eg.keys()) == set(['x', 'y', 'z'])
