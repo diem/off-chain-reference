@@ -11,7 +11,7 @@ from ..libra_address import LibraAddress, LibraAddressError
 def test_onchain_address_only_OK():
     onchain_address_bytes = uuid4().bytes  # 16 bytes
 
-    libra_addr = LibraAddress.from_bytes(onchain_address_bytes)
+    libra_addr = LibraAddress.from_bytes(LBR, onchain_address_bytes)
     assert libra_addr.onchain_address_bytes == onchain_address_bytes
     assert libra_addr.subaddress_bytes == None
     expected_encoded_bytes = bech32_address_encode(
@@ -29,7 +29,7 @@ def test_non_none_subaddress_OK():
     onchain_address_bytes = uuid4().bytes  # 16 bytes
     subaddr_bytes = uuid4().bytes[8:]  # 8 bytes (v1)
 
-    libra_addr = LibraAddress.from_bytes(onchain_address_bytes, subaddr_bytes)
+    libra_addr = LibraAddress.from_bytes(LBR, onchain_address_bytes, subaddr_bytes)
     assert libra_addr.onchain_address_bytes == onchain_address_bytes
     assert libra_addr.subaddress_bytes == subaddr_bytes
     expected_encoded_bytes = bech32_address_encode(
@@ -46,7 +46,7 @@ def test_non_none_subaddress_OK():
 def test_invalid_onchain_address_length():
     onchain_address_bytes = uuid4().bytes[:10]  # 10 bytes
     with pytest.raises(LibraAddressError) as excinfo:
-        libra_addr = LibraAddress.from_bytes(onchain_address_bytes)
+        libra_addr = LibraAddress.from_bytes(LBR, onchain_address_bytes)
     assert "Bech32Error" in str(excinfo.value)
 
 
@@ -54,18 +54,18 @@ def test_invalid_subaddress_length():
     onchain_address_bytes = uuid4().bytes  # 16 bytes
     subaddr_bytes = uuid4().bytes[:4]  # 4 bytes, invalid
     with pytest.raises(LibraAddressError) as excinfo:
-        libra_addr = LibraAddress.from_bytes(onchain_address_bytes, subaddr_bytes)
+        libra_addr = LibraAddress.from_bytes(LBR, onchain_address_bytes, subaddr_bytes)
     assert "Bech32Error" in str(excinfo.value)
 
 
 def test_from_bytes():
     onchain_address_hex = uuid4().hex
     subaddress_hex = uuid4().hex[16:]
-    libra_addr = LibraAddress.from_hex(onchain_address_hex, subaddress_hex)
+    libra_addr = LibraAddress.from_hex(LBR, onchain_address_hex, subaddress_hex)
     assert libra_addr.onchain_address_bytes == bytes.fromhex(onchain_address_hex)
     assert libra_addr.subaddress_bytes == bytes.fromhex(subaddress_hex)
 
-    libra_addr = LibraAddress.from_hex(onchain_address_hex, None)
+    libra_addr = LibraAddress.from_hex(LBR, onchain_address_hex, None)
     assert libra_addr.onchain_address_bytes == bytes.fromhex(onchain_address_hex)
     assert libra_addr.subaddress_bytes == None
 
@@ -73,14 +73,14 @@ def test_from_bytes():
 def test_from_encoded_str():
     onchain_address_bytes = uuid4().bytes
     subaddress_bytes = uuid4().bytes[8:]
-    libra_addr_one = LibraAddress.from_bytes(onchain_address_bytes, subaddress_bytes, TLB)
+    libra_addr_one = LibraAddress.from_bytes(TLB, onchain_address_bytes, subaddress_bytes)
     libra_addr_two = LibraAddress.from_encoded_str(libra_addr_one.encoded_address_bytes)
     assert libra_addr_one == libra_addr_two
     assert libra_addr_two.hrp == TLB
     assert libra_addr_two.onchain_address_bytes == onchain_address_bytes
     assert libra_addr_two.subaddress_bytes == subaddress_bytes
 
-    libra_addr_three = LibraAddress.from_bytes(onchain_address_bytes, None, LBR)
+    libra_addr_three = LibraAddress.from_bytes(LBR, onchain_address_bytes, None)
     libra_addr_four = LibraAddress.from_encoded_str(libra_addr_three.encoded_address_bytes)
     assert libra_addr_three == libra_addr_four
     assert libra_addr_four.hrp == LBR
@@ -91,14 +91,14 @@ def test_from_encoded_str():
 def test_invalid_hrp():
     onchain_address_bytes = uuid4().bytes  # 16 bytes
     with pytest.raises(LibraAddressError) as excinfo:
-        libra_addr = LibraAddress.from_bytes(onchain_address_bytes, None, "haha")
+        libra_addr = LibraAddress.from_bytes("haha", onchain_address_bytes, None)
     assert "Bech32Error" in str(excinfo.value)
 
 
 def test_last_bit():
     onchain_address_bytes = uuid4().bytes  # 16 bytes
     subaddr_bytes = uuid4().bytes[8:]  # 8 bytes (v1)
-    libra_addr = LibraAddress.from_bytes(onchain_address_bytes, subaddr_bytes)
+    libra_addr = LibraAddress.from_bytes(LBR, onchain_address_bytes, subaddr_bytes)
     expected_last_bit = onchain_address_bytes[-1] & 1
 
     assert libra_addr.last_bit() == expected_last_bit
@@ -107,11 +107,11 @@ def test_last_bit():
 def test_GE():
     onchain_address_bytes_one = uuid4().bytes  # 16 bytes
     subaddr_bytes_one = uuid4().bytes[8:]  # 8 bytes (v1)
-    libra_addr_one = LibraAddress.from_bytes(onchain_address_bytes_one, subaddr_bytes_one)
+    libra_addr_one = LibraAddress.from_bytes(LBR, onchain_address_bytes_one, subaddr_bytes_one)
 
     onchain_address_bytes_two = uuid4().bytes  # 16 bytes
     subaddr_bytes_two = uuid4().bytes[8:]  # 8 bytes (v1)
-    libra_addr_two = LibraAddress.from_bytes(onchain_address_bytes_two, subaddr_bytes_two)
+    libra_addr_two = LibraAddress.from_bytes(LBR, onchain_address_bytes_two, subaddr_bytes_two)
 
     if onchain_address_bytes_one >= onchain_address_bytes_two:
         assert libra_addr_one.greater_than_or_equal(libra_addr_two)
@@ -125,14 +125,14 @@ def test_equal():
     hrp_list = [LBR, TLB]
 
     libra_addr_list_one = [
-        LibraAddress.from_bytes(onchain, sub, hrp)
+        LibraAddress.from_bytes(hrp, onchain, sub)
         for onchain in onchain_address_bytes_list
         for sub in subaddress_bytes_list
         for hrp in hrp_list
     ]
 
     libra_addr_list_two = [
-        LibraAddress.from_bytes(onchain, sub, hrp)
+        LibraAddress.from_bytes(hrp, onchain, sub)
         for onchain in onchain_address_bytes_list
         for sub in subaddress_bytes_list
         for hrp in hrp_list
@@ -150,9 +150,9 @@ def test_get_onchain():
     onchain_address_bytes = uuid4().bytes  # 16 bytes
     subaddr_bytes = uuid4().bytes[8:]  # 8 bytes (v1)
 
-    libra_addr = LibraAddress.from_bytes(onchain_address_bytes, subaddr_bytes)
+    libra_addr = LibraAddress.from_bytes(LBR, onchain_address_bytes, subaddr_bytes)
     onchain_only = libra_addr.get_onchain()
-    assert onchain_only == LibraAddress.from_bytes(onchain_address_bytes)
+    assert onchain_only == LibraAddress.from_bytes(LBR, onchain_address_bytes)
     assert onchain_only.get_onchain == onchain_only
 
 
@@ -160,16 +160,16 @@ def test_get_onchain():
     onchain_address_bytes = uuid4().bytes  # 16 bytes
     subaddr_bytes = uuid4().bytes[8:]  # 8 bytes (v1)
 
-    libra_addr = LibraAddress.from_bytes(onchain_address_bytes, subaddr_bytes)
+    libra_addr = LibraAddress.from_bytes(LBR, onchain_address_bytes, subaddr_bytes)
     onchain_only = libra_addr.get_onchain()
-    assert onchain_only == LibraAddress.from_bytes(onchain_address_bytes)
+    assert onchain_only == LibraAddress.from_bytes(LBR, onchain_address_bytes)
     assert onchain_only.get_onchain() == onchain_only
 
 
 def test_last_bit():
     onchain_address_bytes = uuid4().bytes  # 16 bytes
     subaddr_bytes = uuid4().bytes[8:]  # 8 bytes (v1)
-    libra_addr = LibraAddress.from_bytes(onchain_address_bytes, subaddr_bytes)
+    libra_addr = LibraAddress.from_bytes(LBR, onchain_address_bytes, subaddr_bytes)
     expected_last_bit = onchain_address_bytes[-1] & 1
 
     assert libra_addr.last_bit() == expected_last_bit
@@ -178,11 +178,11 @@ def test_last_bit():
 def test_GE():
     onchain_address_bytes_one = uuid4().bytes  # 16 bytes
     subaddr_bytes_one = uuid4().bytes[8:]  # 8 bytes (v1)
-    libra_addr_one = LibraAddress.from_bytes(onchain_address_bytes_one, subaddr_bytes_one)
+    libra_addr_one = LibraAddress.from_bytes(LBR, onchain_address_bytes_one, subaddr_bytes_one)
 
     onchain_address_bytes_two = uuid4().bytes  # 16 bytes
     subaddr_bytes_two = uuid4().bytes[8:]  # 8 bytes (v1)
-    libra_addr_two = LibraAddress.from_bytes(onchain_address_bytes_two, subaddr_bytes_two)
+    libra_addr_two = LibraAddress.from_bytes(LBR, onchain_address_bytes_two, subaddr_bytes_two)
 
     if onchain_address_bytes_one >= onchain_address_bytes_two:
         assert libra_addr_one.greater_than_or_equal(libra_addr_two)
