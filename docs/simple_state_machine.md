@@ -2,15 +2,19 @@
 
 ## What is the problem?
 
-Currently the off-chain protocol specified in LIP-1 allows payment objects to be a large variety of states, that could be updated concurrently by both Sender and Receiver VASPs. The large number of states and possible commands in response to these states makes compatible implementations difficult to implement, test and ensure they are comformant and interoperable.
+Currently the off-chain protocol specified in LIP-1 allows payment objects to be a large variety of states, that could be updated concurrently by both Sender and Receiver VASPs. The large number of states and possible commands in response to these states makes compatible implementations difficult to implement, test and ensure they are conformant and interoperable.
 
 ## Outline of solution
 
-We propose a simplified protocol in terms of the number of possible states as well as the number of transitions between these states. At each state it is easy to determine which VASP should submit the next command, and what information to include. Exception flows (pending review, soft-match and requiring full KYC exchange) are handled by aborting a payment and creating a new payment referencing it in the `original_payment_reference_id` field. Therefore all flows are supported while the protocol is simpler.
+We propose a simplified protocol in terms of the number of possible states as well as the number of transitions between these states. At each state it is easy to determine which VASP should submit the next command, and what information to include. Exception flows (pending review, soft-match and requiring full KYC exchange) are handled by aborting a payment and creating a new payment referencing it in the `original_payment_reference_id` field. Therefore all flows required by the product are supported while the technical protocol is simpler.
 
 ## Detailed solution
 
-The state machine of the protocol is described in the figure below. A state is determined by the status of the Sender and Receiver Actors of the latest payment object (The exact fields in the payment object are `sender`->`status`->`satus` and `receiver`->`status`->`satus`). The states are:
+The protocol and data structures of LIP-1 are used.
+
+As a reminder: two VASPs participate in the off-chain protocol. They each can define a `PaymentCommand` that create or update a single `PaymentObject`. Each `PaymentCommand` is sent to the other VASP in a `CommandRequestObject` and responded to by a `CommandResponseObject`. A `success` status in the response indicates that the object is updated by both VASPs (a command `failure` indicates the command is invalid, and a protocol failure indicates the command should be resubmitted at a later time).
+
+The state machine of the protocol is described in the figure below. A state is determined by the tuple of the status of the Sender and Receiver Actors of the latest payment object (The exact fields in the payment object are `sender`->`status`->`status` and `receiver`->`status`->`status`). The states are:
 
 KYC exchange flow
 
@@ -25,7 +29,7 @@ Simple flow
 * RABORT2: (`ready_for_settlement`, `abort`)
 * (READY as above)
 
-The sender and receiver of the payment take turns issuing `PaymentCommand` Objects, until the object they create or mutate is in one of the final states, namely SABORT, RABORT1, RABORT2 or READY.
+The sender and receiver of the payment take turns issuing `PaymentCommand` Objects, until the object they create or mutate is in one of the final states, namely SABORT, RABORT1, RABORT2 or READY. In the diagram below the Sender or Receiver labels on state transition arcs indicate the originator of the command that triggers the transition.
 
 ![picture](state_machine_simple.png)
 
@@ -128,3 +132,11 @@ The meaning of abort codes in the `Status` -> `abort_code` field of an `PaymentA
 * `need-kyc`: a payment needs the exchange of full KYC information. A new payment with this one in the `original_payment_reference_id` can be submitted using the KYC Exchange flow.
 * `no-kyc-needed`: the recipient indicates that they are not willing to provide KYC information since they judge that it is not necessary. A Simple flow payment can be initiated with this payment in its `original_payment_reference_id`.
 * `rejected`: the payment is rejected. It should not be used in the `original_payment_reference_id` field of a new payment.
+
+## Reference specification for JWS signatures used
+
+TODO
+
+## Reference specification for valid `recipient_signature` fields
+
+TODO
