@@ -1,0 +1,48 @@
+
+digraph G {
+  concentrate=False
+  rankdir=TB;
+  node [shape=record];
+
+# Happy path protocol
+  0 [label="Start"];
+  0->1 [label="Sender"]
+  1 [label="SINIT\n|{Sender:|Receiver:}|{{need_kyc}|{none}}"];
+  1 -> 2 [ label="Receiver" ];
+  1 -> 9002 [ label="Receiver" ];
+  2 [label="RSEND\n|{Sender:|Receiver:}|{{need_kyc}|{ready_for_settlement}}"];
+  9001 [label="SABORT\n|{Sender:|Receiver:}|{{abort}|{*}}"];
+  9002 [label="RABORT\n|{Sender:|Receiver:}|{{*}|{abort}}"];
+  3 [label="READY\n|{Sender:|Receiver:}|{{ready_for_settlement}|{ready_for_settlement}}",fillcolor=red];
+  2->3 [label="Sender"];
+  2->9001 [label="Sender"]
+
+
+# Receiver solf-match flow
+  1->4 [label = "Receiver"];
+  4 [label="RPENDING\n|{Sender:|Receiver:}|{{need_kyc}|{pending}}"];
+  4 -> 9002 [label="Receiver"];
+  1->5 [label = "Receiver"];
+  4->5 [label="Receiver"];
+  4->2 [label="Receiver"];
+  5 [label="RSOFT\n|{Sender:|Receiver:}|{{need_kyc}|{soft_match}}"];
+  5 -> 999;
+  5 -> 9001 [label = "Sender"];
+
+# Sender soft-match flow
+  2-> 6 [label="Sender"];
+  2-> 7 [label="Sender"];
+  6 [label="SPENDING\n|{Sender:|Receiver:}|{{pending}|{ready_for_settlement}}"];
+  6 -> 3 [label="Sender"];
+  6 -> 9001 [label="Sender"];
+  6 ->7 [label="Sender"];
+  7 [label="SSOFT\n|{Sender:|Receiver:}|{{soft_match}|{ready_for_settlement}}"];
+  7 -> 999;
+
+
+
+# Unknown
+
+ 999 [label = "?"]
+
+}
