@@ -1,4 +1,4 @@
-# A simplified state-machine for the LIP-1 off-chain protocol
+# A simplified state-machine for the LIP-1 off-chain `PaymentObject`/`PaymentCommand` protocol
 
 ## What is the problem?
 
