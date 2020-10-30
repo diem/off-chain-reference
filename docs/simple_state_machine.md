@@ -31,7 +31,7 @@ Simple flow
 * RABORT2: (`ready_for_settlement`, `abort`)
 * (READY as above)
 
-The sender and receiver of the payment take turns issuing `PaymentCommand` Objects, until the object they create or mutate is in one of the final states, namely SABORT, RABORT1, RABORT2 or READY. In the diagram below the Sender or Receiver labels on state transition arcs indicate the originator of the command that triggers the transition.
+The sender and receiver of the payment take turns issuing `PaymentCommand` Objects, until the object they create or mutate is in one of the final states, namely SABORT, RABORT1, RABORT2 or READY. In the diagram below the Sender or Receiver labels on state transition arcs indicate the originator of the command that triggers the transition. Some abort codes may allow a new payment to follow from an aborted payment.
 
 ![picture](state_machine_simple.png)
 

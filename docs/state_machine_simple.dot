@@ -40,10 +40,9 @@ digraph G {
   {rank=min; 0;}
   {rank=max; 999;}
 
-  9001 -> 0 [label = "Soft_match"];
-  9002 -> 0 [label = "Soft_match"];
-  9003 -> 0 [label = "need_kyc"];
+  9001 -> 0 [label = "Abort code:\nSoft_match, ..."];
+  9002 -> 0 [label = "Abort code:\nSoft_match, ..."];
+  9003 -> 0 [label = "Abort code:\nNeed_kyc, ..."];
 
 
 }
-
