@@ -14,7 +14,9 @@ The protocol and data structures of LIP-1 are used.
 
 As a reminder: two VASPs participate in the off-chain protocol. They each can define a `PaymentCommand` that create or update a single `PaymentObject`. Each `PaymentCommand` is sent to the other VASP in a `CommandRequestObject` and responded to by a `CommandResponseObject`. A `success` status in the response indicates that the object is updated by both VASPs (a command `failure` indicates the command is invalid, and a protocol failure indicates the command should be resubmitted at a later time).
 
-The state machine of the protocol is described in the figure below. A state is determined by the tuple of the status of the Sender and Receiver Actors of the latest payment object (The exact fields in the payment object are `sender`->`status`->`status` and `receiver`->`status`->`status`). The states are:
+The state machine of the protocol is described in the figure below. A state is determined by the tuple of the status of the Sender and Receiver Actors of the latest payment object (The exact fields in the payment object are `sender`->`status`->`status` and `receiver`->`status`->`status`).
+
+The states (Sender Status, Receiver Status) are:
 
 KYC exchange flow
 
