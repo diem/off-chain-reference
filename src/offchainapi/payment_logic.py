@@ -454,26 +454,12 @@ class PaymentProcessor(CommandProcessor):
         # TODO: catch exceptions into Payment errors
 
         try:
-            sub_send = LibraAddress.from_encoded_str(new_payment.sender.address)
-            sub_revr = LibraAddress.from_encoded_str(new_payment.receiver.address)
+            send_addr = LibraAddress.from_encoded_str(new_payment.sender.address)
+            receiver_addr = LibraAddress.from_encoded_str(new_payment.receiver.address)
         except LibraAddressError as e:
             raise PaymentLogicError(
                 OffChainErrorCode.payment_invalid_libra_address,
                 str(e)
-            )
-
-        # TODO: TEST and fix these
-        if not sub_send.subaddress_bytes:
-            raise PaymentLogicError(
-                OffChainErrorCode.payment_invalid_libra_subaddress,
-                f'Sender address needs to contain an encoded subaddress, '
-                f'but got {sub_send.as_str()}'
-            )
-        if not sub_revr.subaddress_bytes:
-            raise PaymentLogicError(
-                OffChainErrorCode.payment_invalid_libra_subaddress,
-                f'Receiver address needs to contain an encoded subaddress, '
-                f'but got {sub_revr.as_str()}'
             )
 
         try:
