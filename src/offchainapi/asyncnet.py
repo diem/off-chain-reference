@@ -5,12 +5,11 @@ from .business import BusinessNotAuthorized
 from .libra_address import LibraAddress
 from .utils import get_unique_string
 
-import aiohttp
+import aiohttp, os
 from aiohttp import web
 from aiohttp.client_exceptions import ClientError
 import asyncio
 import logging
-from urllib.parse import urljoin
 
 
 logger = logging.getLogger(name='libra_off_chain_api.asyncnet')
@@ -128,7 +127,7 @@ class Aionet:
             server = self.vasp.get_vasp_address().as_str()
             client = other_addr_str
         url = f'v1/{server}/{client}/command/'
-        full_url = urljoin(base_url, url)
+        full_url = '/'.join([base_url.rstrip('/'), url])
         return full_url
 
 
