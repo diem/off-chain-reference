@@ -1,48 +1,61 @@
 
 digraph G {
-  concentrate=False
+  concentrate=True;
   rankdir=TB;
   node [shape=record];
 
 # Happy path protocol
   0 [label="Start"];
   0->1 [label="Sender"]
+  0->10 [label="Sender"];
+
+
+  subgraph cluster_0 {
+  label = "KYC Exchange flow (with soft match)"
   1 [label="SINIT\n|{Sender:|Receiver:}|{{need_kyc}|{none}}"];
   1 -> 2 [ label="Receiver" ];
   1 -> 9002 [ label="Receiver" ];
   2 [label="RSEND\n|{Sender:|Receiver:}|{{need_kyc}|{ready_for_settlement}}"];
+
+  1 -> 4 [label="Receiver"];
+  4 [label = "RSOFT\n|{Sender:|Receiver:|Flags:}|{{need_kyc}|{soft_match}|{_, _}}"];
+
+  4 -> 5 [label = "Sender"];
+  4 -> 9001 [label = "Sender"];
+  5 [label = "SSOFTSEND\n|{Sender:|Receiver:|Flags:}|{{need_kyc}|{soft_match}|{Sx, _}}"];
+
+  5 -> 2 [label = "Receiver"];
+  5-> 9002 [label="Receiver"];
+
   9001 [label="SABORT\n|{Sender:|Receiver:}|{{abort}|{*}}"];
-  9002 [label="RABORT\n|{Sender:|Receiver:}|{{*}|{abort}}"];
-  3 [label="READY\n|{Sender:|Receiver:}|{{ready_for_settlement}|{ready_for_settlement}}",fillcolor=red];
-  2->3 [label="Sender"];
+  9002 [label="RABORT1\n|{Sender:|Receiver:}|{{*}|{abort}}"];
   2->9001 [label="Sender"]
 
 
-# Receiver solf-match flow
-  1->4 [label = "Receiver"];
-  4 [label="RPENDING\n|{Sender:|Receiver:}|{{need_kyc}|{pending}}"];
-  4 -> 9002 [label="Receiver"];
-  1->5 [label = "Receiver"];
-  4->5 [label="Receiver"];
-  4->2 [label="Receiver"];
-  5 [label="RSOFT\n|{Sender:|Receiver:}|{{need_kyc}|{soft_match}}"];
-  5 -> 999;
-  5 -> 9001 [label = "Sender"];
+  2 -> 6 [label = "Sender"];
+  6 [label = "SSOFT\n|{Sender:|Receiver:|Flags:}|{{soft_match}|{ready_for_settlement}|{*, _}}"];
 
-# Sender soft-match flow
-  2-> 6 [label="Sender"];
-  2-> 7 [label="Sender"];
-  6 [label="SPENDING\n|{Sender:|Receiver:}|{{pending}|{ready_for_settlement}}"];
-  6 -> 3 [label="Sender"];
-  6 -> 9001 [label="Sender"];
-  6 ->7 [label="Sender"];
-  7 [label="SSOFT\n|{Sender:|Receiver:}|{{soft_match}|{ready_for_settlement}}"];
-  7 -> 999;
+  6 -> 7 [label = "Receiver"];
+  6 -> 9002 [label = "Receiver"];
+  7 [label = "RSOFTSEND\n|{Sender:|Receiver:|Flags:}|{{soft_match}|{ready_for_settlement}|{*, Rx}}"];
+  7 -> 9001 [label = "Sender"];
 
+  }
 
+  3->999;
+  999 [label = "On-chain payment"]
 
-# Unknown
+  subgraph cluster_1 {
+  label = "Simple flow"
+  10 [label="SREADY\n|{Sender:|Receiver:}|{{ready_for_settlement}|{none}}"];
+  10 -> 9003 [label="Receiver"];
+  9003 [label="RABORT2\n|{Sender:|Receiver:}|{{ready_for_settlement}|{abort}}"];
+  }
 
- 999 [label = "?"]
+  7 -> 3 [label = "Sender"];
+  10 -> 3 [label="Receiver"];
+
+  3 [label="READY\n|{Sender:|Receiver:}|{{ready_for_settlement}|{ready_for_settlement}}",fillcolor=red];
+  2->3 [label="Sender"];
 
 }
