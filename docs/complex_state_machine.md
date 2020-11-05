@@ -14,7 +14,7 @@ The protocol and data structures of LIP-1 are used.
 
 As a reminder: two VASPs participate in the off-chain protocol. They each can define a `PaymentCommand` that create or update a single `PaymentObject`. Each `PaymentCommand` is sent to the other VASP in a `CommandRequestObject` and responded to by a `CommandResponseObject`. A `success` status in the response indicates that the object is updated by both VASPs (a command `failure` indicates the command is invalid, and a protocol failure indicates the command should be resubmitted at a later time).
 
-The state machine of the protocol is described in the figure below.
+The state machine of the protocol is described in the figure below. An implicit abort state for the sender is available (SABORT) when the sender is expected to provide a command; similarly an implicit receiver abort state (RABORT) can be reached when the receiver is expected to provide a command. The full state transition diagram, including abort states, is available in the appendix.
 
 A state is determined by the tuple of the status of the Sender and Receiver Actors of the latest Payment Object, and two flags `Sx` and `Rx`. The exact fields in the payment object for Sender and Receiver actor status are `sender`->`status`->`status` and `receiver`->`status`->`status`. The flag `Sx` and `Rx` are set when the Sender or the Receiver has included `additional_kyc_data` in the actor field (`Sender`-> `kyc_data` -> `additional_kyc_data` and `Receiver`-> `kyc_data` -> `additional_kyc_data` respectively).
 
@@ -35,14 +35,12 @@ Soft-match disambiguation states:
 * SSOFT (`soft_match`, `ready_for_settlement`, `*`, `_`)
 * RSOFTSEND (`soft_match`, `ready_for_settlement`, `*`, `Rx`)
 
-Simple flow
-* SREADY: (`ready_for_settlement`, `none`, `*`, `*`)
-* RABORT2: (`ready_for_settlement`, `abort`, `*`, `*`)
-* (READY as above)
+A star (`*`) denotes _any_ value, while an underscore (`_`) for a flag denotes _not set_.
 
-The sender and receiver of the payment take turns issuing `PaymentCommand` Objects, until the object they create or mutate is in one of the final states, namely SABORT, RABORT1, RABORT2 or READY. In the diagram below the Sender or Receiver labels on state transition arcs indicate the originator of the command that triggers the transition. Some abort codes may allow a new payment to follow from an aborted payment.
+The sender and receiver of the payment take turns issuing `PaymentCommand` Objects, until the object they create or mutate is in one of the final states, namely SABORT, RABORT1 or READY. In the diagram below the Sender or Receiver labels on state transition arcs indicate the originator of the command that triggers the transition. Some abort codes may allow a new payment to follow from an aborted payment.
 
-![picture](state_machine_complex.png)
+![picture](state_machine_complex_noabort.png)
+
 
 ## Steps of the protocol: The KYC Exchange Flow
 
@@ -74,7 +72,7 @@ The receiver VASP examines the sender KYC information and is either not satisfie
 * `Receiver` -> `Status` -> `Status`: `abort`
 * `Receiver` -> `Status` -> `abort_code`: one of `no-kyc-needed` or `rejected`.
 
-The sender can initiate a payment using the Simple Flow in case of an abort with `no-kyc-needed`.
+The sender can initiate a payment on-chain in case of an abort with `no-kyc-needed`.
 
 ### RSEND -> READY
 
@@ -105,49 +103,13 @@ After the Sender initiates a payment by providing KYC information (SINIT), the R
 
 Similarly to the flow above, the Sender at state (RSEND) may decide they need for information about the receiver of the payment to disambiguate a soft-match. They set their status `Sender` -> `Status` -> `Status` to `soft-match` (state SSOFT). The receiver can abort (RABORT) or provide the additional KYC in `Receiever` -> `kyc_data` -> `additional_kyc` (state RSOFTSEND). The sender may then abort (SABORT) or move to READY, and settle the payment.
 
-## Steps of the protocol: The Simple Flow
-
-The simple flow is executed when the sending VASP believes there is no need for the exchange of KYC information. It does not include any sender KYC information, and indicates it is ready to settle on the first message (sequence of states SREADY -> READY).
-
-### Start -> SREADY
-
-The Sender issues `PaymentCommand` to crate initial payment.
-
-The sender sends a payment with all mandatory fields the the following optional fields populated as:
-
-* `Sender` -> `Status` -> `Status`: `ready_for_settlement`.
-* `Receiver` -> `Status` -> `Status`: `none`
-
-### SREADY -> RABORT
-
-The Receiver issues `PaymentCommand` to update an existing payment.
-
-The Receiver examines the payment and determines that either more information is needed or the payment cannot proceed. They issue an abort with the appropriate code.
-
-* `Receiver` -> `Status` -> `Status`: `abort`
-* `Receiver` -> `Status` -> `abort_code`: one of `need-kyc` or `rejected`.
-
-### SREADY -> READY
-
-The Receiver issues `PaymentCommand` to update an existing payment.
-
-The Receiver is satisfied that no KYC information exchange is needed and is happy to proceed with the payment. They send a command updating the fields:
-
-* `Receiver` -> `Status` -> `Status`: `ready_for_settlement`
-* `recipient_signature` = a valid recipient signature.
-
-### READY
-
-The sender upon observing a payment in the READY state can execute it on chain.
-
 ## Abort codes and `original_payment_reference_id`
 
 An abort can lead to the submission of a new payment that tries to make progress past the reasons for abort. The new payment must include a reference to the previous payment.
 
 The meaning of abort codes in the `Status` -> `abort_code` field of an `PaymentActorObject` are:
 
-* `need-kyc`: a payment needs the exchange of full KYC information. A new payment with this one in the `original_payment_reference_id` can be submitted using the KYC Exchange flow.
-* `no-kyc-needed`: the recipient indicates that they are not willing to provide KYC information since they judge that it is not necessary. A Simple flow payment can be initiated with this payment in its `original_payment_reference_id`.
+* `no-kyc-needed`: the recipient indicates that they are not willing to provide KYC information since they judge that it is not necessary. The payment can be directly executed on chain.
 * `rejected`: the payment is rejected. It should not be used in the `original_payment_reference_id` field of a new payment.
 
 ## Reference specification for JWS signatures used
@@ -157,3 +119,7 @@ TODO
 ## Reference specification for valid `recipient_signature` fields
 
 TODO
+
+## Appendix A: Full state machine including abort states
+
+![picture](state_machine_complex.png)

@@ -17,11 +17,6 @@ subgraph cluster_2 {
 
 }
 
-  1 -> 9002 [ label="Receiver" ];
-  9001 [label="SABORT\n|{Sender:|Receiver:}|{{abort}|{*}}"];
-  9002 [label="RABORT1\n|{Sender:|Receiver:}|{{*}|{abort}}"];
-  2->9001 [label="Sender"]
-
 
   1 -> 4 [label="Receiver"];
   2 -> 6 [label = "Sender"];
@@ -40,9 +35,8 @@ subgraph cluster_0 {
   5 [label = "SSOFTSEND\n|{Sender:|Receiver:|Flags:}|{{need_kyc}|{soft_match}|{Sx, _}}"];
 }
 
-  4 -> 9001 [label = "Sender"];
   5 -> 2 [label = "Receiver"];
-  5-> 9002 [label="Receiver"];
+
 
 
 subgraph cluster_1 {
@@ -53,11 +47,7 @@ subgraph cluster_1 {
   7 [label = "RSOFTSEND\n|{Sender:|Receiver:|Flags:}|{{soft_match}|{ready_for_settlement}|{*, Rx}}"];
 }
 
-  6 -> 9002 [label = "Receiver"];
-  7 -> 9001 [label = "Sender"];
-
   7 -> 3 [label = "Sender"];
 
-  { rank=same; 3; 9001; 9002;}
 
 }
