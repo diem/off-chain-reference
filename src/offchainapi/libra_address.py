@@ -73,10 +73,10 @@ class LibraAddress:
         return cls(encoded_str, onchain_address_bytes, None, hrp)
 
 
-    def __init__(self, encoded_address_bytes, onchain_address_bytes, subaddress_bytes, hrp):
+    def __init__(self, encoded_address_str, onchain_address_bytes, subaddress_bytes, hrp):
         """ DO NOT CALL THIS DIRECTLY!! use factory methods instead."""
 
-        self.encoded_address_bytes = encoded_address_bytes
+        self.encoded_address_str = encoded_address_str
         self.onchain_address_bytes = onchain_address_bytes
         self.subaddress_bytes = subaddress_bytes
         self.hrp = hrp
@@ -88,7 +88,7 @@ class LibraAddress:
         )
 
     def as_str(self):
-        return self.encoded_address_bytes
+        return self.encoded_address_str
 
     def last_bit(self):
         """ Get the last bit of the decoded onchain Libra Blockchain address.
@@ -124,7 +124,7 @@ class LibraAddress:
         return self.equal(other)
 
     def __hash__(self):
-        return self.encoded_address_bytes.__hash__()
+        return self.encoded_address_str.__hash__()
 
     def get_onchain(self):
         """ Return a LibraAddress representing only the onchain address

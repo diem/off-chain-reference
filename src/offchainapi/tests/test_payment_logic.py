@@ -76,7 +76,7 @@ def test_bad_sender_actor_address(payment, processor):
         processor.check_new_payment(payment)
     assert e.value.error_code == OffChainErrorCode.payment_invalid_libra_address
 
-def test_bad_sender_actor_subaddress(payment, processor):
+def test_empty_sender_actor_subaddress(payment, processor):
     bcm = processor.business_context()
     bcm.is_recipient.side_effect = [False] * 4
 
@@ -84,9 +84,7 @@ def test_bad_sender_actor_subaddress(payment, processor):
     addr2 = LibraAddress.from_bytes("lbr", addr.onchain_address_bytes, None)
     payment.sender.address = addr2.as_str()
 
-    with pytest.raises(PaymentLogicError) as e:
-        processor.check_new_payment(payment)
-    assert e.value.error_code == OffChainErrorCode.payment_invalid_libra_subaddress
+    processor.check_new_payment(payment)
 
 def test_bad_receiver_actor_address(payment, processor):
     snone = StatusObject(Status.none)
@@ -100,7 +98,7 @@ def test_bad_receiver_actor_address(payment, processor):
         processor.check_new_payment(payment)
     assert e.value.error_code == OffChainErrorCode.payment_invalid_libra_address
 
-def test_bad_receiver_actor_subaddress(payment, processor):
+def test_empty_receiver_actor_subaddress(payment, processor):
     bcm = processor.business_context()
     bcm.is_recipient.side_effect = [False] * 4
 
@@ -108,9 +106,7 @@ def test_bad_receiver_actor_subaddress(payment, processor):
     addr2 = LibraAddress.from_bytes("lbr", addr.onchain_address_bytes, None)
     payment.receiver.address = addr2.as_str()
 
-    with pytest.raises(PaymentLogicError) as e:
-        processor.check_new_payment(payment)
-    assert e.value.error_code == OffChainErrorCode.payment_invalid_libra_subaddress
+    processor.check_new_payment(payment)
 
 def test_payment_update_from_sender(payment, processor):
     bcm = processor.business_context()
