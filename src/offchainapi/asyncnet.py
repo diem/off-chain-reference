@@ -5,12 +5,11 @@ from .business import BusinessNotAuthorized
 from .libra_address import LibraAddress
 from .utils import get_unique_string
 
-import aiohttp
+import aiohttp, os
 from aiohttp import web
 from aiohttp.client_exceptions import ClientError
 import asyncio
 import logging
-from urllib.parse import urljoin
 
 
 logger = logging.getLogger(name='libra_off_chain_api.asyncnet')
@@ -94,7 +93,7 @@ class Aionet:
                                 f'failed with error: {str(e)}'
                             )
 
-                    len_my = len(channel.my_request_index)
+                    len_my = len(channel.my_pending_requests)
                     logger.info(
                         f'''
                         Channel: {me.as_str()} [{role}] <-> {other.as_str()}
@@ -128,7 +127,7 @@ class Aionet:
             server = self.vasp.get_vasp_address().as_str()
             client = other_addr_str
         url = f'v1/{server}/{client}/command/'
-        full_url = urljoin(base_url, url)
+        full_url = '/'.join([base_url.rstrip('/'), url])
         return full_url
 
 
@@ -222,12 +221,12 @@ class Aionet:
                         'Incorrect X-Request-ID header:', response.headers
                     )
 
+                response_text = await response.text()
                 # Check that there are no low-level HTTP errors.
                 if response.status != 200 :
-                    err_msg = f'Received status {response.status}: {await response.text()}'
+                    err_msg = f'Received status {response.status}: {response_text}'
                     raise Exception(err_msg)
 
-                response_text = await response.text()
                 logger.debug(f'Raw response: {response_text}')
 
                 # Wait in case the requests are sent out of order.

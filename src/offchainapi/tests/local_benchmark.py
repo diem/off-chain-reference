@@ -10,6 +10,7 @@ from ..business import VASPInfo
 from ..libra_address import LibraAddress
 from ..payment_logic import PaymentCommand
 from ..status_logic import Status
+from ..sample.sample_db import SampleDB
 from ..payment import PaymentAction, PaymentActor, PaymentObject, StatusObject
 from ..core import Vasp
 from .basic_business_context import TestBusinessContext
@@ -21,8 +22,8 @@ import asyncio
 
 # A stand alone performance test.
 
-PeerA_addr = LibraAddress.from_bytes(b'A'*16)
-PeerB_addr = LibraAddress.from_bytes(b'B'*16)
+PeerA_addr = LibraAddress.from_bytes("lbr", b'A'*16)
+PeerB_addr = LibraAddress.from_bytes("lbr", b'B'*16)
 peer_address = {
     PeerA_addr.as_str(): 'http://localhost:8091',
     PeerB_addr.as_str(): 'http://localhost:8092',
@@ -77,7 +78,7 @@ def make_new_VASP(Peer_addr, port, reliable=True):
         port=port,
         business_context=TestBusinessContext(Peer_addr, reliable=reliable),
         info_context=SimpleVASPInfo(Peer_addr),
-        database={})
+        database=SampleDB())
 
     loop = asyncio.new_event_loop()
     VASPx.set_loop(loop)
@@ -106,8 +107,8 @@ async def main_perf(messages_num=10, wait_num=0, verbose=False):
     payments = []
     for cid in range(messages_num):
         peerA_addr = PeerA_addr.as_str()
-        sub_a = LibraAddress.from_bytes(b'A'*16, b'a'*8).as_str()
-        sub_b = LibraAddress.from_bytes(b'B'*16, b'b'*8).as_str()
+        sub_a = LibraAddress.from_bytes("lbr", b'A'*16, b'a'*8).as_str()
+        sub_b = LibraAddress.from_bytes("lbr", b'B'*16, b'b'*8).as_str()
         sender = PaymentActor(sub_a, StatusObject(Status.needs_kyc_data), [])
         receiver = PaymentActor(sub_b, StatusObject(Status.none), [])
         action = PaymentAction(10, 'TIK', 'charge', 984736)
@@ -193,11 +194,6 @@ async def main_perf(messages_num=10, wait_num=0, verbose=False):
     # Close the loops
     VASPa.close()
     VASPb.close()
-
-    # List the command obligations
-    oblA = VASPa.pp.list_command_obligations()
-    oblB = VASPb.pp.list_command_obligations()
-    print(f'Pending processing: VASPa {len(oblA)} VASPb {len(oblB)}')
 
     # List the remaining retransmits
     rAB = channelAB.pending_retransmit_number()

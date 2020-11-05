@@ -28,7 +28,7 @@ def business_and_processor(three_addresses, store):
 @pytest.fixture
 def payment_as_receiver(three_addresses, sender_actor, payment_action):
     _, _, a0 = three_addresses
-    subaddr = LibraAddress.from_bytes(a0.onchain_address_bytes, b'x'*8)
+    subaddr = LibraAddress.from_bytes("lbr", a0.onchain_address_bytes, b'x'*8)
     receiver = PaymentActor(subaddr.as_str(), StatusObject(Status.none), [])
     return PaymentObject(
         sender_actor, receiver, 'ref', 'orig_ref', 'desc', payment_action
@@ -55,7 +55,7 @@ def settled_payment_as_receiver(kyc_payment_as_receiver):
 @pytest.fixture
 def payment_as_sender(three_addresses, receiver_actor, payment_action):
     _, _, a0 = three_addresses
-    subaddr = LibraAddress.from_bytes(a0.onchain_address_bytes, b'x'*8)
+    subaddr = LibraAddress.from_bytes("lbr", a0.onchain_address_bytes, b'x'*8)
     sender = PaymentActor(subaddr.as_str(), StatusObject(Status.none), [])
     return PaymentObject(
         sender, receiver_actor, 'ref', 'orig_ref', 'desc', payment_action
@@ -92,8 +92,8 @@ def vasp(my_addr):
 
 @pytest.fixture
 def json_request(my_addr, other_addr, payment_action):
-    sub_sender = LibraAddress.from_bytes(my_addr.onchain_address_bytes, b'a'*8)
-    sub_receiver = LibraAddress.from_bytes(other_addr.onchain_address_bytes, b'b'*8)
+    sub_sender = LibraAddress.from_bytes("lbr", my_addr.onchain_address_bytes, b'a'*8)
+    sub_receiver = LibraAddress.from_bytes("lbr", other_addr.onchain_address_bytes, b'b'*8)
 
     sender = PaymentActor(sub_sender.as_str(), StatusObject(Status.none), [])
     receiver = PaymentActor(sub_receiver.as_str(), StatusObject(Status.none), [])
@@ -195,7 +195,7 @@ def test_vasp_simple(json_request, vasp, other_addr, loop):
 
 
 async def test_vasp_simple_wrong_VASP(json_request, other_addr, loop, key):
-    my_addr = LibraAddress.from_bytes(b'X'*16)
+    my_addr = LibraAddress.from_bytes("lbr", b'X'*16)
     vasp = sample_vasp(my_addr)
     vasp.pp.loop = loop
 

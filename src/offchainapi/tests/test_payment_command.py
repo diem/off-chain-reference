@@ -3,8 +3,10 @@
 
 from ..sample.sample_command import SampleCommand
 from ..payment_command import PaymentCommand, PaymentLogicError
+from ..payment import PaymentObject
 from ..protocol_messages import CommandRequestObject, make_success_response
 from ..utils import JSONFlag, JSONSerializable
+from ..storage import StorableDict
 
 import pytest
 
@@ -51,7 +53,7 @@ def test_payment_command_missing_dependency_fail(payment):
     with pytest.raises(PaymentLogicError):
         cmd.get_object(new_payment.get_version(), {})
 
-def test_get_payment(payment):
+def test_get_payment(payment, db):
 
     # Get a new payment -- no need for any dependency
     cmd = PaymentCommand(payment)
@@ -67,8 +69,7 @@ def test_get_payment(payment):
         #       Cound not find payment dependency:
         _ = new_cmd.get_payment({})
 
-    object_store = {
-            payment.get_version(): payment
-        }
+    object_store = StorableDict(db, 'root', PaymentObject)
+    object_store[payment.get_version()] = payment
     new_payment_copy = new_cmd.get_payment(object_store)
     assert new_payment == new_payment_copy

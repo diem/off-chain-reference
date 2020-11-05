@@ -27,5 +27,5 @@ setuptools.setup(
         'jwcrypto',
         'libra-client-sdk',
     ],
-    version="0.0.3.dev1",
+    version="0.0.6.dev1",
 )

@@ -9,13 +9,13 @@ from ..shared_object import SharedObject
 class SampleObject(SharedObject):
     def __init__(self, item):
         SharedObject.__init__(self)
-        self.item = item
+        self.item = str(item)
 
 @JSONSerializable.register
 class SampleCommand(ProtocolCommand):
-    def __init__(self, command, deps=None):
+    def __init__(self, item, deps=None):
         ProtocolCommand.__init__(self)
-        command = SampleObject(command)
+        command = SampleObject(item)
         if deps is None:
             self.reads_version_map = []
         else:
@@ -23,6 +23,9 @@ class SampleCommand(ProtocolCommand):
         self.writes_version_map   = [(command.item, command.item)]
         self.command   = command
         self.always_happy = True
+
+    def get_request_cid(self):
+        return self.item()
 
     def get_object(self, version_number, dependencies):
         return self.command

@@ -16,14 +16,14 @@ import asyncio
 
 @pytest.fixture
 def payment_sender_init():
-    my_addr = LibraAddress.from_bytes(b'B'*16)
-    other_addr = LibraAddress.from_bytes(b'A'*16)
+    my_addr = LibraAddress.from_bytes("lbr", b'B'*16)
+    other_addr = LibraAddress.from_bytes("lbr", b'A'*16)
 
     action = PaymentAction(5, 'TIK', 'charge', 887355)
 
-    s_addr = LibraAddress.from_bytes(b'A'*16, b'a'*8).as_str()
+    s_addr = LibraAddress.from_bytes("lbr", b'A'*16, b'a'*8).as_str()
     sender = PaymentActor(s_addr, StatusObject(Status.needs_kyc_data), [])
-    r_addr = LibraAddress.from_bytes(b'B'*16, b'b'*8).as_str()
+    r_addr = LibraAddress.from_bytes("lbr", b'B'*16, b'b'*8).as_str()
     receiver = PaymentActor(r_addr, StatusObject(Status.none), [])
 
     ref = f'{other_addr.as_str()}_XGGXHSHHSJ'
@@ -31,13 +31,13 @@ def payment_sender_init():
     payment = PaymentObject(sender, receiver, ref, None, None, action)
     return payment
 
-def test_logic_protocol_check(payment_sender_init, loop):
+def test_logic_protocol_check(payment_sender_init, loop, db):
     # Test the protocol given a sequence of commands.
 
-    store = StorableFactory({})
+    store = StorableFactory(db)
 
-    my_addr = LibraAddress.from_bytes(b'B'*16)
-    other_addr = LibraAddress.from_bytes(b'A'*16)
+    my_addr = LibraAddress.from_bytes("lbr", b'B'*16)
+    other_addr = LibraAddress.from_bytes("lbr", b'A'*16)
     bcm = TestBusinessContext(my_addr)
     processor = PaymentProcessor(bcm, store, loop)
 
@@ -50,13 +50,13 @@ def test_logic_protocol_check(payment_sender_init, loop):
     processor.check_command(my_addr, other_addr, cmd)
 
 
-def test_logic_protocol_process_start(payment_sender_init, loop):
+def test_logic_protocol_process_start(payment_sender_init, loop, db):
     # Test the protocol given a sequence of commands.
 
-    store = StorableFactory({})
+    store = StorableFactory(db)
 
-    my_addr = LibraAddress.from_bytes(b'B'*16)
-    other_addr = LibraAddress.from_bytes(b'A'*16)
+    my_addr = LibraAddress.from_bytes("lbr", b'B'*16)
+    other_addr = LibraAddress.from_bytes("lbr", b'A'*16)
     bcm = TestBusinessContext(my_addr)
     processor = PaymentProcessor(bcm, store, loop)
 
@@ -66,13 +66,9 @@ def test_logic_protocol_process_start(payment_sender_init, loop):
     cmd = PaymentCommand(payment_sender_init)
     cmd.set_origin(other_addr)
 
-    assert len(processor.command_cache) == 0
-
-    with store.atomic_writes():
-        processor.process_command(other_addr, cmd, seq=0, status_success=True)
+    processor.process_command(other_addr, cmd, cid=0, status_success=True)
 
     # Ensure an obligration is scheduled
-    assert len(processor.command_cache) == 1
     assert len(asyncio.all_tasks(loop)) == 1
 
     # Get the response command

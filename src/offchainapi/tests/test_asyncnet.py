@@ -122,7 +122,7 @@ async def test_watchdog_task(net_handler, tester_addr, server, command):
     waiting_packages = await channel.package_retransmit(number=100)
     assert len(waiting_packages) == 1
     assert waiting_packages[0].content == req
-    assert channel.next_final_sequence() == 0
+    assert len(channel.committed_commands) == 0
 
 
     # Run the watchdog for a while.
@@ -131,10 +131,32 @@ async def test_watchdog_task(net_handler, tester_addr, server, command):
     await asyncio.sleep(0.3)
 
     # Ensure the watchdog successfully sent the command.
-    assert channel.next_final_sequence() == 1
+    assert len(channel.committed_commands) == 1
 
     # Ensure there is nothing else to re-transmit.
     assert not channel.would_retransmit()
     waiting_packages = await channel.package_retransmit(number=100)
     assert not waiting_packages
     await net_handler.close()
+
+
+def test_get_url(net_handler, tester_addr, testee_addr):
+    base_url = "http://offchain.test.com/offchain"
+    expected = f"{base_url}/v1/{tester_addr.as_str()}/{testee_addr.as_str()}/command/"
+    url = net_handler.get_url(base_url, tester_addr.as_str(), other_is_server=True)
+    assert url == expected
+
+    base_url = "http://offchain.test.com/offchain/"
+    expected = f"{base_url}v1/{tester_addr.as_str()}/{testee_addr.as_str()}/command/"
+    url = net_handler.get_url(base_url, tester_addr.as_str(), other_is_server=True)
+    assert url == expected
+
+    base_url = "http://offchain.test.com"
+    expected = f"{base_url}/v1/{tester_addr.as_str()}/{testee_addr.as_str()}/command/"
+    url = net_handler.get_url(base_url, tester_addr.as_str(), other_is_server=True)
+    assert url == expected
+
+    base_url = "http://offchain.test.com/"
+    expected = f"{base_url}v1/{tester_addr.as_str()}/{testee_addr.as_str()}/command/"
+    url = net_handler.get_url(base_url, tester_addr.as_str(), other_is_server=True)
+    assert url == expected

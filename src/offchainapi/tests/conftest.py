@@ -11,10 +11,9 @@ from ..libra_address import LibraAddress
 from ..protocol_messages import CommandRequestObject
 from ..utils import JSONFlag
 from ..crypto import ComplianceKey
+from ..sample.sample_db import SampleDB
 
 import types
-import dbm
-from copy import deepcopy
 from unittest.mock import MagicMock
 from mock import AsyncMock
 import pytest
@@ -25,21 +24,21 @@ from os import urandom
 
 @pytest.fixture
 def three_addresses():
-    a0 = LibraAddress.from_bytes(b'A'*16)
-    a1 = LibraAddress.from_bytes(b'B' + b'A'*15)
-    a2 = LibraAddress.from_bytes(b'B'*16)
+    a0 = LibraAddress.from_bytes("lbr", b'A'*16)
+    a1 = LibraAddress.from_bytes("lbr", b'B' + b'A'*15)
+    a2 = LibraAddress.from_bytes("lbr", b'B'*16)
     return (a0, a1, a2)
 
 
 @pytest.fixture
 def sender_actor():
-    s_addr = LibraAddress.from_bytes(b'A'*16, b'a'*8).as_str()
+    s_addr = LibraAddress.from_bytes("lbr", b'A'*16, b'a'*8).as_str()
     return PaymentActor(s_addr, StatusObject(Status.none), [])
 
 
 @pytest.fixture
 def receiver_actor():
-    s_addr = LibraAddress.from_bytes(b'B'*16, b'b'*8).as_str()
+    s_addr = LibraAddress.from_bytes("lbr", b'B'*16, b'b'*8).as_str()
     return PaymentActor(s_addr, StatusObject(Status.none), [])
 
 
@@ -67,8 +66,8 @@ def kyc_data():
 
 
 @pytest.fixture
-def store():
-    return StorableFactory({})
+def store(db):
+    return StorableFactory(db)
 
 
 @pytest.fixture
@@ -115,9 +114,7 @@ def two_channels(three_addresses, vasp, store):
 
 @pytest.fixture
 def db(tmp_path):
-    db_path = tmp_path / 'db.dat'
-    with dbm.open(str(db_path), 'c') as xdb:
-        yield xdb
+    return SampleDB()
 
 
 @pytest.fixture

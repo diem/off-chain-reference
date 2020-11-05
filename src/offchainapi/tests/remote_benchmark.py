@@ -7,6 +7,7 @@ from ..libra_address import LibraAddress
 from ..payment_logic import PaymentCommand, PaymentProcessor
 from ..status_logic import Status
 from ..storage import StorableFactory
+from ..sample.sample_db import SampleDB
 from ..payment import PaymentAction, PaymentActor, PaymentObject, StatusObject
 from ..asyncnet import Aionet
 from ..core import Vasp
@@ -66,7 +67,7 @@ def load_configs(configs_path):
     assert 'key' in configs
 
     bytes_addr = configs['addr'].encode()
-    configs['addr'] = LibraAddress.from_bytes(bytes_addr)
+    configs['addr'] = LibraAddress.from_bytes("lbr", bytes_addr)
     configs['port'] = int(configs['port'])
     configs['key'] = ComplianceKey.from_str(dumps(configs['key']))
     return configs
@@ -96,7 +97,7 @@ def run_server(my_configs_path, other_configs_path, num_of_commands=10, loop=Non
         port=my_configs['port'],
         business_context=AsyncMock(spec=BusinessContext),
         info_context=SimpleVASPInfo(my_configs, other_configs),
-        database={}
+        database=SampleDB(),
     )
     logging.info(f'Created VASP {my_addr.as_str()}.')
 
@@ -110,9 +111,9 @@ def run_server(my_configs_path, other_configs_path, num_of_commands=10, loop=Non
 
     def stop_server(vasp):
         channel = vasp.vasp.get_channel(other_addr)
-        requests = len(channel.other_request_index)
+        requests = len(list(channel.committed_commands.keys()))
         while requests < num_of_commands:
-            requests = len(channel.other_request_index)
+            requests = len(list(channel.committed_commands.keys()))
             time.sleep(0.1)
         vasp.close()
     Thread(target=stop_server, args=(vasp,)).start()
@@ -156,7 +157,7 @@ def run_client(my_configs_path, other_configs_path, num_of_commands=10, port=0):
         port=my_configs['port'],
         business_context=TestBusinessContext(my_addr),
         info_context=SimpleVASPInfo(my_configs, other_configs, port),
-        database={}
+        database=SampleDB(),
     )
     logging.info(f'Created VASP {my_addr.as_str()}.')
 
@@ -179,8 +180,8 @@ def run_client(my_configs_path, other_configs_path, num_of_commands=10, port=0):
     # Make a payment commands.
     commands = []
     for cid in range(num_of_commands):
-        sub_a = LibraAddress.from_bytes(b'A'*16, b'a'*8).as_str()
-        sub_b = LibraAddress.from_bytes(b'B'*16, b'b'*8).as_str()
+        sub_a = LibraAddress.from_bytes("lbr", b'A'*16, b'a'*8).as_str()
+        sub_b = LibraAddress.from_bytes("lbr", b'B'*16, b'b'*8).as_str()
         sender = PaymentActor(sub_b, StatusObject(Status.none), [])
         receiver = PaymentActor(sub_a, StatusObject(Status.none), [])
         action = PaymentAction(10, 'TIK', 'charge', 994773)

@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from binascii import unhexlify, hexlify
+from typing import Optional
 from .bech32 import (
     bech32_address_encode,
     bech32_address_decode,
@@ -42,7 +43,7 @@ class LibraAddress:
     """
 
     @classmethod
-    def from_bytes(cls, onchain_address_bytes, subaddress_bytes=None, hrp=None):
+    def from_bytes(cls, hrp: str, onchain_address_bytes: bytes, subaddress_bytes: Optional[bytes] = None):
         """ Return a LibraAddress given onchain address in bytes, subaddress
         in bytes (optional), and hrp (Human Readable Part). If hrp is not given,
         use the global hrp.
@@ -68,7 +69,7 @@ class LibraAddress:
         return cls(encoded_address, onchain_address_bytes, subaddress_bytes, hrp)
 
     @classmethod
-    def from_hex(cls, onchain_address_hex, subaddress_hex=None, hrp=None):
+    def from_hex(cls, hrp: str, onchain_address_hex: bytes, subaddress_hex: Optional[bytes] = None):
         """ Return a LibraAddress given onchain address in hex, subaddress
         in hex (optional), and hrp (Human Readable Part). If hrp is not given,
         use the global hrp.
@@ -80,7 +81,7 @@ class LibraAddress:
 
         onchain_address_bytes = bytes.fromhex(onchain_address_hex)
         subaddress_bytes = bytes.fromhex(subaddress_hex) if subaddress_hex else None
-        return cls.from_bytes(onchain_address_bytes, subaddress_bytes, hrp)
+        return cls.from_bytes(hrp, onchain_address_bytes, subaddress_bytes)
 
     @classmethod
     def from_encoded_str(cls, encoded_str):
@@ -156,7 +157,7 @@ class LibraAddress:
             without any subaddress information. """
         if self.subaddress_bytes is None:
             return self
-        return LibraAddress.from_bytes(self.onchain_address_bytes, None, self.hrp)
+        return LibraAddress.from_bytes(self.hrp, self.onchain_address_bytes, None)
 
     def get_onchain_encoded_str(self):
         """ Return an encoded str representation of LibraAddress containing
