@@ -5,7 +5,7 @@ import pytest
 from uuid import uuid4
 
 from ..bech32 import Bech32Error, bech32_address_encode, LBR, TLB
-from ..libra_address import LibraAddress, LibraAddressError, GLOBAL_HRP, set_global_hrp
+from ..libra_address import LibraAddress, LibraAddressError
 
 
 def test_onchain_address_only_OK():
@@ -68,22 +68,6 @@ def test_from_bytes():
     libra_addr = LibraAddress.from_hex(LBR, onchain_address_hex, None)
     assert libra_addr.onchain_address_bytes == bytes.fromhex(onchain_address_hex)
     assert libra_addr.subaddress_bytes == None
-
-def test_from_global_hrp():
-    onchain_address_bytes = uuid4().bytes
-    subaddress_bytes = uuid4().bytes[8:]
-    libra_addr_one = LibraAddress.from_bytes(onchain_address_bytes, subaddress_bytes)
-    assert libra_addr_one.as_str()[:3] == GLOBAL_HRP
-
-    # Now change the global HRP
-    set_global_hrp(hrp = 'tlb')
-    libra_addr_two = LibraAddress.from_bytes(onchain_address_bytes, subaddress_bytes)
-    assert libra_addr_two.as_str()[:3] == 'tlb'
-
-    # Now reset it back to LBR
-    set_global_hrp()
-    libra_addr_three = LibraAddress.from_bytes(onchain_address_bytes, subaddress_bytes)
-    assert libra_addr_three.as_str()[:3] == 'lbr'
 
 
 def test_from_encoded_str():
