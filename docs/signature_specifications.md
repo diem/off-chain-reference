@@ -35,7 +35,7 @@ Valid JWS Compact Signature (str, utf8):
 Payments between services on chain may require a recipient signature using the services compliance key. The verification key for each service is stored on chain in their account.
 
 * The algorithm used to generate the signature is `EdDSA` as specified in RFC 8032.
-* The signature is over the Libra Canonical Serialization of a PaymentObject `reference_id` (bytes, ASCII), a 16-byes Libra on-chain Address, and the payment amount (u64) and a domain separator `DOMAIN_SEPARATOR` (with value in ascii `@@$$LIBRA_ATTEST$$@@`).
+* The signature is over the Libra Canonical Serialization of a Metadata structure including `reference_id` (bytes, ASCII), a 16-byes Libra on-chain `address`, the payment `amount` (u64), and a domain separator `DOMAIN_SEPARATOR` (with value in ascii `@@$$LIBRA_ATTEST$$@@`).
 * The output is a hex encoded 64-byte string representing the raw byte representation of the EdDSA signature.
 
 JWK key:
@@ -48,7 +48,7 @@ The data that contributes to the compliance recipient signature.
     libra_address_bytes (hex, bytes) = "53414d504c4552454641444452455353"
     amount (u64) = 5123456 (Hex: "802d4e0000000000")
 
-Metadata serialized using LCS + domain separator (bytes, hex):
+Metadata serialized using  LCS (including encoding of `reference_id`) + `address` + `amount` + `DOMAIN_SEPARATOR` (bytes, hex):
 
     "0200010d53414d504c455f5245465f494453414d504c4552454641444452455353802d4e0000000000404024244c494252415f41545445535424244040" (len=122)
 
