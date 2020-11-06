@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from jwcrypto import jwk, jws
+from jwcrypto.common import base64url_encode, base64url_decode
 import json
 from ..crypto import ComplianceKey, OffChainInvalidSignature
 import pytest
@@ -88,6 +89,36 @@ async def test_sign_verif_correct():
     raw = await key.verify_message(sig)
     assert raw == "Hello World!"
 
+async def test_sign_verif_compatibility():
+    key = ComplianceKey.generate()
+    print("JWK key:", key.export_full())
+
+    # LIP-1 Messages
+
+    payload = 'Hello World!'
+    verif = base64url_decode(json.loads(key.export_pub())["x"])
+    verif_hex = verif.hex()
+    print('Verification key (hex, bytes): "%s" (len=%s)' % (verif_hex, len(verif_hex)))
+    print('Payload message (str, utf8): "%s" (len=%s)' % (payload, len(payload)))
+
+    sig = await key.sign_message(payload = payload)
+    print('Signature (str, utf8): "%s" (len=%s)' % (sig, len(sig)))
+    raw = await key.verify_message(sig)
+    assert raw == payload
+
+    ## Dual attestation
+    reference_id = 'SAMPLE_REF_ID'
+    libra_address_bytes = b'SAMPLEREFADDRESS'
+    amount = 5_123_456
+
+    from libra import txnmetadata, utils
+    address = utils.account_address(bytes.hex(libra_address_bytes))
+    _, dual_attestation_msg = txnmetadata.travel_rule(reference_id, address, amount)
+    print(f'Metadata: reference_id (utf8) = "{reference_id}" libra_address_bytes (hex, bytes) = "{libra_address_bytes.hex()}" amount (u64) = "{amount}"')
+    print(f'LCS Metadata (bytes, hex): "{dual_attestation_msg.hex()}" (len={len(dual_attestation_msg.hex())})')
+
+    signature = key.sign_dual_attestation_data(reference_id, libra_address_bytes, amount)
+    print(f'Compliance Signature (bytes, hex): "{signature.hex()}" (len={len(signature.hex())})')
 
 async def test_sign_verif_incorrect():
     key = ComplianceKey.generate()

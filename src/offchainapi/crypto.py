@@ -5,6 +5,7 @@ from jwcrypto.common import base64url_encode
 from cryptography.exceptions import InvalidSignature
 from libra import txnmetadata, utils
 from jwcrypto import jwk, jws
+from jwcrypto.common import json_encode
 import json
 
 
@@ -73,7 +74,11 @@ class ComplianceKey:
 
     async def sign_message(self, payload):
         signer = jws.JWS(payload.encode('utf-8'))
-        signer.add_signature(self._key, alg='EdDSA')
+        signer.add_signature(
+            self._key,
+            alg=None,
+            protected=json_encode({"alg": "EdDSA"}),
+            header=None)
         sig = signer.serialize(compact=True)
         return sig
 
