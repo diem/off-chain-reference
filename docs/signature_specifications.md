@@ -42,7 +42,7 @@ JWK key:
 
     {"crv":"Ed25519","d":"txWBp6D61bBT-80v8hn-mwOgh6p1oTQIhDFW55AKvmk","kty":"OKP","x":"xJsn7MmQWtElKzP8B6TtBkzTPv3JRh2lwnnShpsVFTg"}
 
-Metadata:
+The data that contributes to the compliance recipient signature.
 
     reference_id (ascii) = "SAMPLE_REF_ID" (hex "53414d504c455f5245465f4944")
     libra_address_bytes (hex, bytes) = "53414d504c4552454641444452455353"
@@ -54,12 +54,14 @@ Metadata serialized using LCS + domain separator (bytes, hex):
 
 The above serialized string represents:
 
-        "0200010d"                                  -
+        "0200"                                      - Metadata type and version (2, constant)
+        010d"                                       - uleb128 encoded reference_id length (variable)
         "53414d504c455f5245465f4944"                - Bytes of reference_id (variable)
         "53414d504c4552454641444452455353"          - Bytes of Libra address (16)
         "802d4e0000000000"                          - Bytes of amount (8)
         "404024244c494252415f41545445535424244040"  - DOMAIN_SEPARATOR (20)
 
+For information on uleb128 encoding of a u32 length integer see: https://en.wikipedia.org/wiki/LEB128
 
 Compliance Signature output (bytes, hex):
 
