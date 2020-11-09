@@ -16,19 +16,19 @@ The JSON Web Signature (JWS) scheme is specified in RFC 7515. Messages in the of
 
 JWK key:
 
-    {"crv":"Ed25519","d":"txWBp6D61bBT-80v8hn-mwOgh6p1oTQIhDFW55AKvmk","kty":"OKP","x":"xJsn7MmQWtElKzP8B6TtBkzTPv3JRh2lwnnShpsVFTg"}
+    {"crv":"Ed25519","d":"vLtWeB7kt7fcMPlk01GhGmpWYTHYqnGRZUUN72AT1K4","kty":"OKP","x":"vUfj56-5Teu9guEKt9QQqIW1idtJE4YoVirC7IVyYSk"}
 
 Corresponding verification key (hex, bytes), as the 32 bytes stored on the Libra blockchain.
 
-    "c49b27ecc9905ad1252b33fc07a4ed064cd33efdc9461da5c279d2869b151538" (len=64)
+    "bd47e3e7afb94debbd82e10ab7d410a885b589db49138628562ac2ec85726129" (len=64)
 
 Sample payload message to sign (str, utf8):
 
-    "Hello World!" (len=12)
+    "Sample signed payload." (len=22)
 
 Valid JWS Compact Signature (str, utf8):
 
-    "eyJhbGciOiJFZERTQSJ9.SGVsbG8gV29ybGQh.AkVQBFMkSNklZDT0eOK7OOsz4gPsjfjgJXZujH5TGGYgfBulTS2kdJkwJX7UpLcfKoqGNE5G_WYBwDV8X01fDg" (len=124)
+    "eyJhbGciOiJFZERTQSJ9.U2FtcGxlIHNpZ25lZCBwYXlsb2FkLg.dZvbycl2Jkl3H7NmQzL6P0_lDEW42s9FrZ8z-hXkLqYyxNq8yOlDjlP9wh3wyop5MU2sIOYvay-laBmpdW6OBQ" (len=138)
 
 ## Reference specification for valid `recipient_signature` fields
 
@@ -40,29 +40,31 @@ Payments between services on chain may require a recipient signature using the s
 
 JWK key:
 
-    {"crv":"Ed25519","d":"txWBp6D61bBT-80v8hn-mwOgh6p1oTQIhDFW55AKvmk","kty":"OKP","x":"xJsn7MmQWtElKzP8B6TtBkzTPv3JRh2lwnnShpsVFTg"}
+    {"crv":"Ed25519","d":"vLtWeB7kt7fcMPlk01GhGmpWYTHYqnGRZUUN72AT1K4","kty":"OKP","x":"vUfj56-5Teu9guEKt9QQqIW1idtJE4YoVirC7IVyYSk"}
 
 The data that contributes to the compliance recipient signature.
 
-    reference_id (ascii) = "SAMPLE_REF_ID" (hex "53414d504c455f5245465f4944")
+    reference_id (ascii): "lbr1pg9q5zs2pg9q5zs2pg9q5zs2pgyqqqqqqqqqqqqqqspa3m_5b8403c986f53fe072301fe950d030cb" (in hex "6c6272 ... 306362")
+
     libra_address_bytes (hex, bytes) = "53414d504c4552454641444452455353"
-    amount (u64) = 5123456 (Hex: "802d4e0000000000")
 
-Metadata serialized using  LCS (including encoding of `reference_id`) + `address` + `amount` + `DOMAIN_SEPARATOR` (bytes, hex):
+    amount (u64) = "5123456" (Hex "802d4e0000000000")
 
-    "0200010d53414d504c455f5245465f494453414d504c4552454641444452455353802d4e0000000000404024244c494252415f41545445535424244040" (len=122)
+Metadata is serialized using  LCS (including encoding of `reference_id`) and appended to the fixed length byte sequences representing `address`, `amount`, and `DOMAIN_SEPARATOR`. For example the byte sequence that is signed for the transaction data above is (bytes, hex):
 
-The above serialized string represents:
+    "020001536c62723170673971357a733270673971357a733270673971357a73327067797171717171717171717171717171737061336d5f356238343033633938366635336665303732333031666539353064303330636253414d504c4552454641444452455353802d4e0000000000404024244c494252415f41545445535424244040" (len=262)
 
-        "0200"                                      - Metadata type and version (2, constant)
-        010d"                                       - uleb128 encoded reference_id length (variable)
-        "53414d504c455f5245465f4944"                - Bytes of reference_id (variable)
-        "53414d504c4552454641444452455353"          - Bytes of Libra address (16)
-        "802d4e0000000000"                          - Bytes of amount (8)
-        "404024244c494252415f41545445535424244040"  - DOMAIN_SEPARATOR (20)
+The above serialized byte array represents:
+
+        "0200"                                      - Metadata type and version (2 bytes, constant value)
+        "0153"                                      - uleb128 encoded reference_id length (variable)◊
+        "6c6272 ... 306362"                         - Bytes of reference_id (variable)
+        "53414d504c4552454641444452455353"          - Bytes of Libra address (16 bytes)
+        "802d4e0000000000"                          - Bytes of amount (8 bytes)
+        "404024244c494252415f41545445535424244040"  - DOMAIN_SEPARATOR (20 bytes)
 
 For information on uleb128 encoding of a u32 length integer see: https://en.wikipedia.org/wiki/LEB128
 
-Compliance Signature output (bytes, hex):
+A valid compliance Signature output is (bytes, hex):
 
-    "04d3527cc29880c93ea453d161797b87d4a1e3b7f65b48449696883aa39dc968160ae77c9abeea741384a6b1afe64d58f7e3722c212dd3d7f8ae83518812f60f" (len=128)
+    "4c988922f95f0697e83783383ce81cfc5e1ac06e6201ad7223c5abf38b839532ebb24ad46d0bde14ee30f2139580163670bfb4b06d730603bc19759d326e6602" (len=128)
