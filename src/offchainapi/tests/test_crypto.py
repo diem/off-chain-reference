@@ -95,7 +95,7 @@ async def test_sign_verif_compatibility():
 
     # LIP-1 Messages
 
-    payload = 'Hello World!'
+    payload = 'Sample signed payload.'
     verif = base64url_decode(json.loads(key.export_pub())["x"])
     verif_hex = verif.hex()
     print('Verification key (hex, bytes): "%s" (len=%s)' % (verif_hex, len(verif_hex)))
@@ -107,7 +107,7 @@ async def test_sign_verif_compatibility():
     assert raw == payload
 
     ## Dual attestation
-    reference_id = 'SAMPLE_REF_ID'
+    reference_id = 'lbr1pg9q5zs2pg9q5zs2pg9q5zs2pgyqqqqqqqqqqqqqqspa3m_5b8403c986f53fe072301fe950d030cb'
     libra_address_bytes = b'SAMPLEREFADDRESS'
     amount = 5_123_456
 
