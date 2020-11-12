@@ -126,7 +126,7 @@ class Aionet:
         else:
             server = self.vasp.get_vasp_address().as_str()
             client = other_addr_str
-        url = f'v1/{server}/{client}/command/'
+        url = f'v1/{server}/{client}/command'
         full_url = '/'.join([base_url.rstrip('/'), url])
         return full_url
 
