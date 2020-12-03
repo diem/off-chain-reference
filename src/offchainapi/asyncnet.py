@@ -15,8 +15,23 @@ import logging
 logger = logging.getLogger(name='libra_off_chain_api.asyncnet')
 
 
+X_REQUEST_ID_KEY = "X-REQUEST-ID"
+
+
 class NetworkException(Exception):
     pass
+
+
+def get_headers(request_or_response):
+    """Obtain request headers (case-insensitive)
+    Args:
+        request_or_response: HTTP request or request
+    Returns:
+        HTTP headers in dictionary form
+    """
+    # HTTP headers are CASE-INSENSITIVE (https://tools.ietf.org/html/rfc7230)
+    # Here we convert them to uppercase
+    return {k.upper(): v for k, v in request_or_response.headers.items()}
 
 
 class Aionet:
@@ -148,12 +163,15 @@ class Aionet:
 
         other_addr = LibraAddress.from_encoded_str(request.match_info['other_addr'])
         logger.debug(f'Request Received from {other_addr.as_str()}')
+        request_headers = get_headers(request)
 
-        # Check and extract '
-        if 'X-Request-ID' not in request.headers:
-            raise web.HTTPBadRequest(headers={'X-Request-ID': 'None'})
-        x_request_id = request.headers['X-Request-ID']
-        headers = {'X-Request-ID': x_request_id}
+        if X_REQUEST_ID_KEY not in request_headers:
+            raise web.HTTPBadRequest(
+                reason=f'Header needs to contain "{X_REQUEST_ID_KEY}" (case-insensitive)',
+                headers={X_REQUEST_ID_KEY: 'None'}
+            )
+        x_request_id = request_headers[X_REQUEST_ID_KEY]
+        response_headers = {X_REQUEST_ID_KEY: x_request_id}
 
         # Try to get a channel with the other VASP.
         try:
@@ -161,7 +179,7 @@ class Aionet:
         except BusinessNotAuthorized as e:
             # Raised if the other VASP is not an authorised business.
             logger.debug(f'Not Authorized', exc_info=True)
-            raise web.HTTPUnauthorized(headers=headers)
+            raise web.HTTPUnauthorized(headers=response_headers)
 
         # Perform the request, send back the reponse.
         request_text = await request.text()
@@ -174,7 +192,7 @@ class Aionet:
 
         # Send back the response.
         logger.debug(f'Sending back response to {other_addr.as_str()}.')
-        return web.Response(status=status, text=response.content, headers=headers)
+        return web.Response(status=status, text=response.content, headers=response_headers)
 
 
 
@@ -205,20 +223,20 @@ class Aionet:
         logger.debug(f'Sending post request to {url}')
 
         # Add a custom request header
-        headers = {'X-Request-ID': get_unique_string()}
+        request_headers = {X_REQUEST_ID_KEY: get_unique_string()}
 
         try:
             async with self.session.post(
                     url,
                     data=request_text,
-                    headers=headers
+                    headers=request_headers
             ) as response:
-
+                response_headers = get_headers(response)
                 # Check the header is correct
-                if 'X-Request-ID' not in response.headers or \
-                        response.headers['X-Request-ID'] != headers['X-Request-ID']:
+                if X_REQUEST_ID_KEY not in response_headers or \
+                        response_headers[X_REQUEST_ID_KEY] != request_headers[X_REQUEST_ID_KEY]:
                     raise Exception(
-                        'Incorrect X-Request-ID header:', response.headers
+                        f'Incorrect {X_REQUEST_ID_KEY} response header:', response_headers
                     )
 
                 response_text = await response.text()
