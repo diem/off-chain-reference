@@ -50,8 +50,10 @@ class Aionet:
         self.app = web.Application()
 
         # Register routes.
-        route = self.get_url('/', '{other_addr}')
-        self.app.add_routes([web.post(route, self.handle_request)])
+        route = f"/v1/{{other_addr}}/{self.vasp.get_vasp_address().as_str()}/command"
+        self.app.add_routes(
+            [web.route("*", route, self.handle_request)]
+        )
         logger.debug(f'Register route {route}')
 
         # The watchdog process variables.
@@ -135,14 +137,9 @@ class Aionet:
         Returns:
             str: The complete URL for the Off-chain API VASP end point
         """
-        if other_is_server:
-            server = other_addr_str
-            client = self.vasp.get_vasp_address().as_str()
-        else:
-            server = self.vasp.get_vasp_address().as_str()
-            client = other_addr_str
-        url = f'v1/{server}/{client}/command'
-        full_url = '/'.join([base_url.rstrip('/'), url])
+        url = f"v1/{self.vasp.get_vasp_address().as_str()}/{other_addr_str}/command"
+        full_url = "/".join([base_url.rstrip("/"), url])
+        logger.debug(f"Full URL: {full_url}")
         return full_url
 
 
