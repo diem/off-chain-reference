@@ -13,9 +13,9 @@
 from typing import Iterable, List, Optional, Tuple
 
 
-LBR = "lbr"  # lbr for mainnet
-PLB = "plb"  # plb for pre-mainnet
-TLB = "tlb"  # tlb for testnet
+DM = "dm"  # dm for mainnet
+PDM = "pdm"  # pdm for pre-mainnet
+TDM = "tdm"  # tdm for testnet
 
 # Bech32 constants
 __BECH32_CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
@@ -23,7 +23,7 @@ __BECH32_SEPARATOR = "1"
 __BECH32_CHECKSUM_CHAR_SIZE = 6
 
 # LIBRA constants
-__LIBRA_HRP = [LBR, PLB, TLB]
+__LIBRA_HRP = [DM, PDM, TDM]
 __LIBRA_ADDRESS_SIZE = 16  # in bytes
 __LIBRA_SUBADDRESS_SIZE = 8  # in bytes (for V1)
 __LIBRA_BECH32_VERSION = 1
@@ -86,7 +86,7 @@ def bech32_address_decode(
     Validate a Bech32 Libra address Bech32 string, and split between
     version, address and sub-address.
     Args:
-        expected_hrp: expected Bech32 human readable part (lbr, plb or tlb)
+        expected_hrp: expected Bech32 human readable part (dm, pdm or tdm)
         bech32: Bech32 encoded address
     Returns:
         A tuple consisiting of the Bech32 version (int), address (16 bytes), subaddress (8 bytes)
@@ -107,8 +107,8 @@ def bech32_address_decode(
     hrp = bech32[:3]
     if hrp not in __LIBRA_HRP:
         raise Bech32Error(
-            f'Wrong Libra address Bech32 human readable part (prefix): expected "{LBR}" '
-            f'for mainnet, "{PLB}" for pre-mainnet and "{TLB}" for testnet, but got "{bech32[:3]}"'
+            f'Wrong Libra address Bech32 human readable part (prefix): expected "{DM}" '
+            f'for mainnet, "{PDM}" for pre-mainnet and "{TDM}" for testnet, but got "{bech32[:3]}"'
         )
 
     if expected_hrp and expected_hrp != hrp:

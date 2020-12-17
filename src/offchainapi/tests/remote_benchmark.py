@@ -67,7 +67,7 @@ def load_configs(configs_path):
     assert 'key' in configs
 
     bytes_addr = configs['addr'].encode()
-    configs['addr'] = LibraAddress.from_bytes("lbr", bytes_addr)
+    configs['addr'] = LibraAddress.from_bytes("dm", bytes_addr)
     configs['port'] = int(configs['port'])
     configs['key'] = ComplianceKey.from_str(dumps(configs['key']))
     return configs
@@ -180,8 +180,8 @@ def run_client(my_configs_path, other_configs_path, num_of_commands=10, port=0):
     # Make a payment commands.
     commands = []
     for cid in range(num_of_commands):
-        sub_a = LibraAddress.from_bytes("lbr", b'A'*16, b'a'*8).as_str()
-        sub_b = LibraAddress.from_bytes("lbr", b'B'*16, b'b'*8).as_str()
+        sub_a = LibraAddress.from_bytes("dm", b'A'*16, b'a'*8).as_str()
+        sub_b = LibraAddress.from_bytes("dm", b'B'*16, b'b'*8).as_str()
         sender = PaymentActor(sub_b, StatusObject(Status.none), [])
         receiver = PaymentActor(sub_a, StatusObject(Status.none), [])
         action = PaymentAction(10, 'TIK', 'charge', 994773)

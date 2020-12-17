@@ -81,7 +81,7 @@ def test_empty_sender_actor_subaddress(payment, processor):
     bcm.is_recipient.side_effect = [False] * 4
 
     addr = LibraAddress.from_encoded_str(payment.sender.address)
-    addr2 = LibraAddress.from_bytes("lbr", addr.onchain_address_bytes, None)
+    addr2 = LibraAddress.from_bytes("dm", addr.onchain_address_bytes, None)
     payment.sender.address = addr2.as_str()
 
     processor.check_new_payment(payment)
@@ -103,7 +103,7 @@ def test_empty_receiver_actor_subaddress(payment, processor):
     bcm.is_recipient.side_effect = [False] * 4
 
     addr = LibraAddress.from_encoded_str(payment.sender.address)
-    addr2 = LibraAddress.from_bytes("lbr", addr.onchain_address_bytes, None)
+    addr2 = LibraAddress.from_bytes("dm", addr.onchain_address_bytes, None)
     payment.receiver.address = addr2.as_str()
 
     processor.check_new_payment(payment)
@@ -170,9 +170,9 @@ def test_check_command(three_addresses, payment, processor):
     for state in states:
         src_addr, dst_addr, origin_addr, res = state
 
-        a0 = LibraAddress.from_bytes("lbr", src_addr*4)
-        a1 = LibraAddress.from_bytes("lbr", dst_addr*4)
-        origin = LibraAddress.from_bytes("lbr", origin_addr*4)
+        a0 = LibraAddress.from_bytes("dm", src_addr*4)
+        a1 = LibraAddress.from_bytes("dm", dst_addr*4)
+        origin = LibraAddress.from_bytes("dm", origin_addr*4)
 
         channel.get_my_address.return_value = a0
         channel.get_other_address.return_value = a1
@@ -282,8 +282,8 @@ def test_payment_process_get_extended_kyc(payment, processor, kyc_data):
 def test_process_command_success_no_proc(payment, loop, db):
     store = StorableFactory(db)
 
-    my_addr = LibraAddress.from_bytes("lbr", b'B'*16)
-    other_addr = LibraAddress.from_bytes("lbr", b'A'*16)
+    my_addr = LibraAddress.from_bytes("dm", b'B'*16)
+    other_addr = LibraAddress.from_bytes("dm", b'A'*16)
     bcm = TestBusinessContext(my_addr)
     processor = PaymentProcessor(bcm, store, loop)
 
@@ -300,8 +300,8 @@ def test_process_command_success_no_proc(payment, loop, db):
 def test_process_command_success_vanilla(payment, loop, db):
     store = StorableFactory(db)
 
-    my_addr = LibraAddress.from_bytes("lbr", b'B'*16)
-    other_addr = LibraAddress.from_bytes("lbr", b'A'*16)
+    my_addr = LibraAddress.from_bytes("dm", b'B'*16)
+    other_addr = LibraAddress.from_bytes("dm", b'A'*16)
     bcm = TestBusinessContext(my_addr)
     processor = PaymentProcessor(bcm, store, loop)
 
@@ -321,8 +321,8 @@ def test_process_command_success_vanilla(payment, loop, db):
 async def test_process_command_happy_path(payment, loop, db):
     store = StorableFactory(db)
 
-    my_addr = LibraAddress.from_bytes("lbr", b'B'*16)
-    other_addr = LibraAddress.from_bytes("lbr", b'A'*16)
+    my_addr = LibraAddress.from_bytes("dm", b'B'*16)
+    other_addr = LibraAddress.from_bytes("dm", b'A'*16)
     my_bcm = TestBusinessContext(my_addr)
     other_bcm = TestBusinessContext(other_addr)
     # Use the same store/DB backend
@@ -385,8 +385,8 @@ def update_role_status(payment, role, status):
 def test_can_change_status(payment, loop, db):
     """ Test invalid status change are rejected """
     store = StorableFactory(db)
-    my_addr = LibraAddress.from_bytes("lbr", b'B'*16)
-    other_addr = LibraAddress.from_bytes("lbr", b'A'*16)
+    my_addr = LibraAddress.from_bytes("dm", b'B'*16)
+    other_addr = LibraAddress.from_bytes("dm", b'A'*16)
     bcm = TestBusinessContext(my_addr)
     processor = PaymentProcessor(bcm, store, loop)
 

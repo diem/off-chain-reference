@@ -7,8 +7,8 @@ from .bech32 import (
     bech32_address_encode,
     bech32_address_decode,
     Bech32Error,
-    LBR,
-    TLB,
+    DM,
+    TDM,
     LIBRA_ZERO_SUBADDRESS,
 )
 
@@ -24,8 +24,8 @@ class LibraAddress:
     1. onchain_address: a 16 bytes address on chain, for example a VASP address
     2. subaddress: a subaddress in bytes
     3. hrp: Human Readable Part, indicating the network version:
-        * "lbr" for Mainnet addresses
-        * "tlb" for Testnet addresses
+        * "dm" for Mainnet addresses
+        * "tdm" for Testnet addresses
     """
 
     @classmethod
