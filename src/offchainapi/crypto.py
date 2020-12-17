@@ -3,7 +3,7 @@
 
 from jwcrypto.common import base64url_encode
 from cryptography.exceptions import InvalidSignature
-from libra import txnmetadata, utils
+from diem import txnmetadata, utils
 from jwcrypto import jwk, jws
 import json
 

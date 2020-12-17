@@ -25,7 +25,7 @@ setuptools.setup(
         'aiohttp',
         'bech32',
         'jwcrypto',
-        'libra-client-sdk',
+        'diem',
     ],
     version="0.0.9.dev1",
 )
