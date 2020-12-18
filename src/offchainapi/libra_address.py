@@ -9,7 +9,7 @@ from .bech32 import (
     Bech32Error,
     DM,
     TDM,
-    LIBRA_ZERO_SUBADDRESS,
+    DIEM_ZERO_SUBADDRESS,
 )
 
 
@@ -68,7 +68,7 @@ class LibraAddress:
                 f"got Bech32Error: {e}"
             )
         # If subaddress is absent, subaddress_bytes is a list of 0
-        if subaddress_bytes != LIBRA_ZERO_SUBADDRESS:
+        if subaddress_bytes != DIEM_ZERO_SUBADDRESS:
             return cls(encoded_str, onchain_address_bytes, subaddress_bytes, hrp)
         return cls(encoded_str, onchain_address_bytes, None, hrp)
 

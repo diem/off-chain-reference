@@ -10,6 +10,7 @@ from ..bech32 import (
     DM,
     PDM,
     TDM,
+    DDM,
 )
 
 def test_bech32_valid_address() -> None:

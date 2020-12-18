@@ -85,45 +85,46 @@ def run_server(my_configs_path, other_configs_path, num_of_commands=10, loop=Non
             'port': <int>,
         }
     '''
-    my_configs = load_configs(my_configs_path)
-    other_configs = load_configs(other_configs_path)
-    my_addr = my_configs['addr']
-    other_addr = other_configs['addr']
-
-    # Create VASP.
-    vasp = Vasp(
-        my_addr,
-        host='0.0.0.0',
-        port=my_configs['port'],
-        business_context=AsyncMock(spec=BusinessContext),
-        info_context=SimpleVASPInfo(my_configs, other_configs),
-        database=SampleDB(),
-    )
-    logging.info(f'Created VASP {my_addr.as_str()}.')
-
-    # Run VASP services.
-    logging.info(f'Running VASP {my_addr.as_str()}.')
-    loop = asyncio.get_event_loop() if loop is None else loop
-
-    vasp.set_loop(loop)
-    vasp.start_services()
-    logging.info(f'VASP services are running on port {vasp.port}.')
-
-    def stop_server(vasp):
-        channel = vasp.vasp.get_channel(other_addr)
-        requests = len(list(channel.committed_commands.keys()))
-        while requests < num_of_commands:
-            requests = len(list(channel.committed_commands.keys()))
-            time.sleep(0.1)
-        vasp.close()
-    Thread(target=stop_server, args=(vasp,)).start()
-
-    try:
-        loop.run_forever()
-
-    finally:
-        loop.run_until_complete(loop.shutdown_asyncgens())
-        loop.close()
+    print("hello")
+    # my_configs = load_configs(my_configs_path)
+    # other_configs = load_configs(other_configs_path)
+    # my_addr = my_configs['addr']
+    # other_addr = other_configs['addr']
+    #
+    # # Create VASP.
+    # vasp = Vasp(
+    #     my_addr,
+    #     host='0.0.0.0',
+    #     port=my_configs['port'],
+    #     business_context=AsyncMock(spec=BusinessContext),
+    #     info_context=SimpleVASPInfo(my_configs, other_configs),
+    #     database=SampleDB(),
+    # )
+    # logging.info(f'Created VASP {my_addr.as_str()}.')
+    #
+    # # Run VASP services.
+    # logging.info(f'Running VASP {my_addr.as_str()}.')
+    # loop = asyncio.get_event_loop() if loop is None else loop
+    #
+    # vasp.set_loop(loop)
+    # vasp.start_services()
+    # logging.info(f'VASP services are running on port {vasp.port}.')
+    #
+    # def stop_server(vasp):
+    #     channel = vasp.vasp.get_channel(other_addr)
+    #     requests = len(list(channel.committed_commands.keys()))
+    #     while requests < num_of_commands:
+    #         requests = len(list(channel.committed_commands.keys()))
+    #         time.sleep(0.1)
+    #     vasp.close()
+    # Thread(target=stop_server, args=(vasp,)).start()
+    #
+    # try:
+    #     loop.run_forever()
+    #
+    # finally:
+    #     loop.run_until_complete(loop.shutdown_asyncgens())
+    #     loop.close()
 
 
 def run_client(my_configs_path, other_configs_path, num_of_commands=10, port=0):
@@ -143,78 +144,79 @@ def run_client(my_configs_path, other_configs_path, num_of_commands=10, port=0):
             'port': <int>,
         }
     '''
-    assert num_of_commands > 0
-
-    my_configs = load_configs(my_configs_path)
-    other_configs = load_configs(other_configs_path)
-    my_addr = my_configs['addr']
-    other_addr = other_configs['addr']
-
-    # Create VASP.
-    vasp = Vasp(
-        my_addr,
-        host='0.0.0.0',
-        port=my_configs['port'],
-        business_context=TestBusinessContext(my_addr),
-        info_context=SimpleVASPInfo(my_configs, other_configs, port),
-        database=SampleDB(),
-    )
-    logging.info(f'Created VASP {my_addr.as_str()}.')
-
-    # Run VASP services.
-    def start_services(vasp, loop):
-        vasp.start_services()
-        logging.debug('Start main loop.')
-        try:
-            loop.run_forever()
-        finally:
-            loop.run_until_complete(loop.shutdown_asyncgens())
-            loop.close()
-
-    loop = asyncio.new_event_loop()
-    vasp.set_loop(loop)
-    t = Thread(target=start_services, args=(vasp, loop), daemon=True)
-    t.start()
-    logging.info(f'VASP services are running on port {vasp.port}.')
-
-    # Make a payment commands.
-    commands = []
-    for cid in range(num_of_commands):
-        sub_a = LibraAddress.from_bytes("dm", b'A'*16, b'a'*8).as_str()
-        sub_b = LibraAddress.from_bytes("dm", b'B'*16, b'b'*8).as_str()
-        sender = PaymentActor(sub_b, StatusObject(Status.none), [])
-        receiver = PaymentActor(sub_a, StatusObject(Status.none), [])
-        action = PaymentAction(10, 'TIK', 'charge', 994773)
-        reference = f'{my_addr.as_str()}_{cid}'
-        payment = PaymentObject(
-            sender, receiver, reference, 'orig_ref', 'desc', action
-        )
-        cmd = PaymentCommand(payment)
-        commands += [cmd]
-
-    # Send commands.
-    logging.info(
-        'Start measurements: '
-        f'sending {num_of_commands} commands to {other_addr.as_str()}.'
-    )
-    logging.info(
-        f'The target URL is {vasp.info_context.get_peer_base_url(other_addr)}'
-    )
-    start_time = time.perf_counter()
-
-    async def send_commands(vasp, commands):
-        return await asyncio.gather(
-            *[vasp.new_command_async(other_addr, c) for c in commands],
-            return_exceptions=True
-        )
-
-    res = asyncio.run_coroutine_threadsafe(send_commands(vasp, commands), loop)
-    res = res.result()
-
-    elapsed = (time.perf_counter() - start_time)
-
-    # Display performance and success rate.
-    success_number = sum([1 for r in res if r])
-    logging.info(f'Commands executed in {elapsed:0.2f} seconds.')
-    logging.info(f'Success #: {success_number}/{len(commands)}.')
-    logging.info(f'Estimate throughput #: {len(commands)/elapsed} TPS.')
+    print("hi")
+    # assert num_of_commands > 0
+    #
+    # my_configs = load_configs(my_configs_path)
+    # other_configs = load_configs(other_configs_path)
+    # my_addr = my_configs['addr']
+    # other_addr = other_configs['addr']
+    #
+    # # Create VASP.
+    # vasp = Vasp(
+    #     my_addr,
+    #     host='0.0.0.0',
+    #     port=my_configs['port'],
+    #     business_context=TestBusinessContext(my_addr),
+    #     info_context=SimpleVASPInfo(my_configs, other_configs, port),
+    #     database=SampleDB(),
+    # )
+    # logging.info(f'Created VASP {my_addr.as_str()}.')
+    #
+    # # Run VASP services.
+    # def start_services(vasp, loop):
+    #     vasp.start_services()
+    #     logging.debug('Start main loop.')
+    #     try:
+    #         loop.run_forever()
+    #     finally:
+    #         loop.run_until_complete(loop.shutdown_asyncgens())
+    #         loop.close()
+    #
+    # loop = asyncio.new_event_loop()
+    # vasp.set_loop(loop)
+    # t = Thread(target=start_services, args=(vasp, loop), daemon=True)
+    # t.start()
+    # logging.info(f'VASP services are running on port {vasp.port}.')
+    #
+    # # Make a payment commands.
+    # commands = []
+    # for cid in range(num_of_commands):
+    #     sub_a = LibraAddress.from_bytes("dm", b'A'*16, b'a'*8).as_str()
+    #     sub_b = LibraAddress.from_bytes("dm", b'B'*16, b'b'*8).as_str()
+    #     sender = PaymentActor(sub_b, StatusObject(Status.none), [])
+    #     receiver = PaymentActor(sub_a, StatusObject(Status.none), [])
+    #     action = PaymentAction(10, 'TIK', 'charge', 994773)
+    #     reference = f'{my_addr.as_str()}_{cid}'
+    #     payment = PaymentObject(
+    #         sender, receiver, reference, 'orig_ref', 'desc', action
+    #     )
+    #     cmd = PaymentCommand(payment)
+    #     commands += [cmd]
+    #
+    # # Send commands.
+    # logging.info(
+    #     'Start measurements: '
+    #     f'sending {num_of_commands} commands to {other_addr.as_str()}.'
+    # )
+    # logging.info(
+    #     f'The target URL is {vasp.info_context.get_peer_base_url(other_addr)}'
+    # )
+    # start_time = time.perf_counter()
+    #
+    # async def send_commands(vasp, commands):
+    #     return await asyncio.gather(
+    #         *[vasp.new_command_async(other_addr, c) for c in commands],
+    #         return_exceptions=True
+    #     )
+    #
+    # res = asyncio.run_coroutine_threadsafe(send_commands(vasp, commands), loop)
+    # res = res.result()
+    #
+    # elapsed = (time.perf_counter() - start_time)
+    #
+    # # Display performance and success rate.
+    # success_number = sum([1 for r in res if r])
+    # logging.info(f'Commands executed in {elapsed:0.2f} seconds.')
+    # logging.info(f'Success #: {success_number}/{len(commands)}.')
+    # logging.info(f'Estimate throughput #: {len(commands)/elapsed} TPS.')

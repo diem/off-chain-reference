@@ -1,14 +1,14 @@
-# Copyright (c) The Libra Core Contributors
+# Copyright (c) The DIEM Core Contributors
 # SPDX-License-Identifier: Apache-2.0
 
-# Bech32 implementation for Libra human readable addresses based on
+# Bech32 implementation for DIEM human readable addresses based on
 # Bitcoin's segwit python lib https://github.com/fiatjaf/bech32 modified to support the
-# requirements of Libra (sub)address and versioning specs.
+# requirements of DIEM (sub)address and versioning specs.
 #
 # MIT Licence of the above here: https://github.com/fiatjaf/bech32/blob/master/LICENSE
 # commit: 48b6fe15ccdbf2741a9410df277bd95f9086e18a
 
-"""Reference implementation for Bech32 encoding of Libra Blockchain addresses and sub-addresses."""
+"""Reference implementation for Bech32 encoding of DIEM addresses and sub-addresses."""
 
 from typing import Iterable, List, Optional, Tuple
 
@@ -16,59 +16,65 @@ from typing import Iterable, List, Optional, Tuple
 DM = "dm"  # dm for mainnet
 PDM = "pdm"  # pdm for pre-mainnet
 TDM = "tdm"  # tdm for testnet
+DDM = "ddm"  # ddm for dry run
 
 # Bech32 constants
 __BECH32_CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
 __BECH32_SEPARATOR = "1"
 __BECH32_CHECKSUM_CHAR_SIZE = 6
 
-# LIBRA constants
-__LIBRA_HRP = [DM, PDM, TDM]
-__LIBRA_ADDRESS_SIZE = 16  # in bytes
-__LIBRA_SUBADDRESS_SIZE = 8  # in bytes (for V1)
-__LIBRA_BECH32_VERSION = 1
-__LIBRA_BECH32_SIZE = 50  # in characters
+# DIEM constants
+__DIEM_HRP = [DM, PDM, TDM, DDM]
+__DIEM_ADDRESS_SIZE = 16  # in bytes
+__DIEM_SUBADDRESS_SIZE = 8  # in bytes (for V1)
+__DIEM_BECH32_VERSION = 1
+__DIEM_MAINNET_BECH32_SIZE = 49
+__DIEM_OTHERNETS_BECH32_SIZE = 50
 
-LIBRA_ZERO_SUBADDRESS = b"\0" * __LIBRA_SUBADDRESS_SIZE
+DIEM_ZERO_SUBADDRESS = b"\0" * __DIEM_SUBADDRESS_SIZE
 
 
 class Bech32Error(Exception):
-    """ Represents an error when creating a Libra address. """
+    """ Represents an error when creating a DIEM address. """
 
     pass
 
 
 def bech32_address_encode(
-    hrp: str, address_bytes: bytes, subaddress_bytes: Optional[bytes]
+        hrp: str, address_bytes: bytes, subaddress_bytes: Optional[bytes]
 ) -> str:
-    """Encode a Libra address (and sub-address if provided)."""
+    """Encode a DIEM address (and sub-address if provided).
+    Args:
+        hrp: Bech32 human readable part
+        address_bytes: on-chain account address (16 bytes)
+        subaddress_bytes: subaddress (8 bytes). If not provided, it is set to 8 zero bytes
+    Returns:
+        Bech32 encoded address
+    """
     # check correct hrp
-    if hrp not in __LIBRA_HRP:
+    if hrp not in __DIEM_HRP:
         raise Bech32Error(
-            f"Wrong Libra address Bech32 human readable part (prefix): expected "
-            f"{__LIBRA_HRP[0]} for mainnet or {__LIBRA_HRP[1]} for testnet, but {hrp} was provided"
+            f"Wrong DIEM address Bech32 human readable part (hrp): expected "
+            f"{__DIEM_HRP[0]} for mainnet or {__DIEM_HRP[1]} for testnet, but {hrp} was provided"
         )
 
-    # only accept correct size for Libra address
-    if len(address_bytes) != __LIBRA_ADDRESS_SIZE:
+    # only accept correct size for DIEM address
+    if len(address_bytes) != __DIEM_ADDRESS_SIZE:
         raise Bech32Error(
-            f"Address size should be {__LIBRA_ADDRESS_SIZE}, but got: {len(address_bytes)}"
+            f"Address size should be {__DIEM_ADDRESS_SIZE}, but got: {len(address_bytes)}"
         )
 
-    # only accept correct size for Libra subaddress (if set)
-    if (
-        subaddress_bytes is not None
-        and len(subaddress_bytes) != __LIBRA_SUBADDRESS_SIZE
-    ):
+    # only accept correct size for DIEM subaddress (if set)
+    if subaddress_bytes is not None and len(subaddress_bytes) != __DIEM_SUBADDRESS_SIZE:
         raise Bech32Error(
-            f"Subaddress size should be {__LIBRA_SUBADDRESS_SIZE}, but got: {len(subaddress_bytes)}"
+            f"Subaddress size should be {__DIEM_SUBADDRESS_SIZE}, but got: {len(subaddress_bytes)}"
         )
 
-    encoding_version = __LIBRA_BECH32_VERSION
+    encoding_version = __DIEM_BECH32_VERSION
 
     # if subaddress has not been provided it's set to 8 zero bytes.
     subaddress_final_bytes = (
-        subaddress_bytes if subaddress_bytes is not None else LIBRA_ZERO_SUBADDRESS
+        subaddress_bytes if subaddress_bytes is not None else DIEM_ZERO_SUBADDRESS
     )
     total_bytes = address_bytes + subaddress_final_bytes
 
@@ -79,65 +85,62 @@ def bech32_address_encode(
     return __bech32_encode(hrp, [encoding_version] + five_bit_data)
 
 
-def bech32_address_decode(
-    bech32: str, expected_hrp: Optional[str] = None
-) -> Tuple[str, int, bytes, bytes]:
-    """
-    Validate a Bech32 Libra address Bech32 string, and split between
-    version, address and sub-address.
+def bech32_address_decode(bech32: str, expected_hrp: Optional[str] = None) -> Tuple[str, int, bytes, bytes]:
+    """Validate a Bech32 DIEM address Bech32 string, and split between version, address and sub-address.
     Args:
-        expected_hrp: expected Bech32 human readable part (dm, pdm or tdm)
+        expected_hrp: expected Bech32 human readable part (dm, pdm, tdm, ddm)
         bech32: Bech32 encoded address
     Returns:
         A tuple consisiting of the Bech32 version (int), address (16 bytes), subaddress (8 bytes)
     """
     len_bech32 = len(bech32)
+
     # check expected length
-    if len_bech32 != __LIBRA_BECH32_SIZE:
+    if len_bech32 != __DIEM_MAINNET_BECH32_SIZE and len_bech32 != __DIEM_OTHERNETS_BECH32_SIZE:
         raise Bech32Error(
-            f"Bech32 size should be {__LIBRA_BECH32_SIZE}, but it is: {len_bech32}"
+            f"Bech32 size should be {__DIEM_MAINNET_BECH32_SIZE} or {__DIEM_OTHERNETS_BECH32_SIZE}, but it is: {len_bech32}"
         )
 
-    # do not allow mixed case per BIP 171
+    # do not allow mixed case per BIP 173
     if bech32 != bech32.lower() and bech32 != bech32.upper():
         raise Bech32Error(f"Mixed case Bech32 addresses are not allowed, got: {bech32}")
     bech32 = bech32.lower()
 
-    # check hrp
-    hrp = bech32[:3]
-    if hrp not in __LIBRA_HRP:
-        raise Bech32Error(
-            f'Wrong Libra address Bech32 human readable part (prefix): expected "{DM}" '
-            f'for mainnet, "{PDM}" for pre-mainnet and "{TDM}" for testnet, but got "{bech32[:3]}"'
-        )
+    # get the last occurence of the separator character; the hrp is everything before that
+    try:
+        len_hrp = bech32.rindex(__BECH32_SEPARATOR)
+    except ValueError:
+        raise Bech32Error("This address does not include a Bech32 separator")
 
-    if expected_hrp and expected_hrp != hrp:
-        raise Bech32Error(
-            f'Wrong Libra address Bech32 human readable part (prefix): requested "{expected_hrp}" but '
-            f'got "{hrp}"'
-        )
+    # check for empty hrp
+    if len_hrp == 0:
+        raise Bech32Error("Empty Bech32 human readable part (hrp)")
 
-    # check separator
-    if bech32[3] != __BECH32_SEPARATOR:
-        raise Bech32Error(f"Non-expected Bech32 separator: {bech32[3]}")
+    hrp = bech32[:len_hrp]
+
+    # check expected hrp
+    if hrp not in __DIEM_HRP:
+        raise Bech32Error(
+            f'Wrong DIEM address Bech32 human readable part (hrp): it should be "{DM}" '
+            f'for mainnet, "{PDM}" for pre-mainnet, "{TDM}" for testnet and "{DDM}" for dry-run, but got "{hrp}"'
+        )
 
     # check characters after separator in Bech32 alphabet
-    if not all(x in __BECH32_CHARSET for x in bech32[4:]):
+    if not all(x in __BECH32_CHARSET for x in bech32[len_hrp + 1 :]):
         raise Bech32Error(f"Invalid Bech32 characters detected: {bech32}")
-    hrp = bech32[:3]
 
     # version is defined by the index of the Bech32 character after separator
-    address_version = __BECH32_CHARSET.find(bech32[4])
+    address_version = __BECH32_CHARSET.find(bech32[len_hrp + 1])
     # check valid version
-    if address_version != __LIBRA_BECH32_VERSION:
+    if address_version != __DIEM_BECH32_VERSION:
         raise Bech32Error(
-            f"Version mismatch. Expected {__LIBRA_BECH32_VERSION}, "
+            f"Version mismatch. Expected {__DIEM_BECH32_VERSION}, "
             f"but received {address_version}"
         )
 
     # we've already checked that all characters are in the correct alphabet,
     # thus, this will always succeed
-    data = [__BECH32_CHARSET.find(x) for x in bech32[5:]]
+    data = [__BECH32_CHARSET.find(x) for x in bech32[len_hrp + 2 :]]
 
     # check Bech32 checksum
     if not __bech32_verify_checksum(hrp, [address_version] + data):
@@ -150,16 +153,16 @@ def bech32_address_decode(
 
     length_data = len(decoded_data)
     # extra check about the expected output (sub)address size in bytes
-    if length_data != __LIBRA_ADDRESS_SIZE + __LIBRA_SUBADDRESS_SIZE:
+    if length_data != __DIEM_ADDRESS_SIZE + __DIEM_SUBADDRESS_SIZE:
         raise Bech32Error(
-            f"Expected {__LIBRA_ADDRESS_SIZE + __LIBRA_SUBADDRESS_SIZE} bytes after decoding, but got: {length_data}"
+            f"Expected {__DIEM_ADDRESS_SIZE + __DIEM_SUBADDRESS_SIZE} bytes after decoding, but got: {length_data}"
         )
 
     return (
         hrp,
         address_version,
-        bytes(decoded_data[:__LIBRA_ADDRESS_SIZE]),
-        bytes(decoded_data[-__LIBRA_SUBADDRESS_SIZE:]),
+        bytes(decoded_data[:__DIEM_ADDRESS_SIZE]),
+        bytes(decoded_data[-__DIEM_SUBADDRESS_SIZE:]),
     )
 
 
@@ -177,9 +180,7 @@ def __bech32_polymod(values: Iterable[int]) -> int:
 
 def __bech32_hrp_expand(hrp: str) -> List[int]:
     """Expand the HRP into values for checksum computation."""
-    # TODO We could pre-compute expanded Libra's HRP.
-    # __LIBRA_MAINNET_HRP_EXPANDED = [3, 3, 3, 0, 12, 2, 18]
-    # __LIBRA_TESTNET_HRP_EXPANDED = [3, 3, 3, 0, 20, 12, 2]
+    # TODO We could pre-compute expanded DIEM's HRP.
     return [ord(x) >> 5 for x in hrp] + [0] + [ord(x) & 31 for x in hrp]
 
 
@@ -202,7 +203,7 @@ def __bech32_encode(hrp: str, data: Iterable[int]) -> str:
 
 
 def __convertbits(
-    data: Iterable[int], from_bits: int, to_bits: int, pad: bool
+        data: Iterable[int], from_bits: int, to_bits: int, pad: bool
 ) -> Optional[List[int]]:
     """General power-of-2 base conversion."""
     acc = 0
