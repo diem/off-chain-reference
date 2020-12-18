@@ -142,21 +142,21 @@ async def test_watchdog_task(net_handler, tester_addr, server, command):
 
 def test_get_url(net_handler, tester_addr, testee_addr):
     base_url = "http://offchain.test.com/offchain"
-    expected = f"{base_url}/v1/{tester_addr.as_str()}/{testee_addr.as_str()}/command"
+    expected = f"{base_url}/v1/{testee_addr.as_str()}/{tester_addr.as_str()}/command"
     url = net_handler.get_url(base_url, tester_addr.as_str(), other_is_server=True)
     assert url == expected
 
     base_url = "http://offchain.test.com/offchain/"
-    expected = f"{base_url}v1/{tester_addr.as_str()}/{testee_addr.as_str()}/command"
+    expected = f"{base_url}v1/{testee_addr.as_str()}/{tester_addr.as_str()}/command"
     url = net_handler.get_url(base_url, tester_addr.as_str(), other_is_server=True)
     assert url == expected
 
     base_url = "http://offchain.test.com"
-    expected = f"{base_url}/v1/{tester_addr.as_str()}/{testee_addr.as_str()}/command"
+    expected = f"{base_url}/v1/{testee_addr.as_str()}/{tester_addr.as_str()}/command"
     url = net_handler.get_url(base_url, tester_addr.as_str(), other_is_server=True)
     assert url == expected
 
     base_url = "http://offchain.test.com/"
-    expected = f"{base_url}v1/{tester_addr.as_str()}/{testee_addr.as_str()}/command"
+    expected = f"{base_url}v1/{testee_addr.as_str()}/{tester_addr.as_str()}/command"
     url = net_handler.get_url(base_url, tester_addr.as_str(), other_is_server=True)
     assert url == expected

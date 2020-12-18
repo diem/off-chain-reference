@@ -23,7 +23,7 @@ def test_bech32_valid_address() -> None:
     bech32_libra_address = bech32_address_encode(
         DM, some_address, none_sub_address
     )
-    assert bech32_libra_address == "dm1p7ujcndcl7nudzwt8fglhx6wxnvqqqqqqqqqqqqqflf8ma"
+    assert bech32_libra_address == "dm1p7ujcndcl7nudzwt8fglhx6wxnvqqqqqqqqqqqqqd8p9cq"
 
     hrp, version, address, subaddress = bech32_address_decode(bech32_libra_address, DM)
     assert hrp == DM
@@ -35,7 +35,7 @@ def test_bech32_valid_address() -> None:
     bech32_libra_address = bech32_address_encode(
         DM, some_address, zero_sub_address
     )
-    assert bech32_libra_address == "dm1p7ujcndcl7nudzwt8fglhx6wxnvqqqqqqqqqqqqqflf8ma"
+    assert bech32_libra_address == "dm1p7ujcndcl7nudzwt8fglhx6wxnvqqqqqqqqqqqqqd8p9cq"
 
     # set some subaddress
     some_sub_address = bytes(bytearray.fromhex("cf64428bdeb62af2"))
@@ -43,7 +43,7 @@ def test_bech32_valid_address() -> None:
     bech32_libra_address = bech32_address_encode(
         DM, some_address, some_sub_address
     )
-    assert bech32_libra_address == "dm1p7ujcndcl7nudzwt8fglhx6wxn08kgs5tm6mz4usw5p72t"
+    assert bech32_libra_address == "dm1p7ujcndcl7nudzwt8fglhx6wxn08kgs5tm6mz4us2vfufk"
 
     hrp, version, address, subaddress = bech32_address_decode(bech32_libra_address, DM)
     assert hrp == DM
@@ -73,7 +73,7 @@ def test_bech32_valid_address() -> None:
     bech32_libra_address = bech32_address_encode(
         PDM, some_address, some_sub_address
     )
-    assert bech32_libra_address == "pdm1p7ujcndcl7nudzwt8fglhx6wxn08kgs5tm6mz4usw4kqpv"
+    assert bech32_libra_address == "pdm1p7ujcndcl7nudzwt8fglhx6wxn08kgs5tm6mz4use3z425"
 
     hrp, version, address, subaddress = bech32_address_decode(bech32_libra_address, PDM)
     assert hrp == PDM
@@ -87,7 +87,7 @@ def test_bech32_valid_address() -> None:
     bech32_libra_address = bech32_address_encode(
         TDM, some_address, some_sub_address
     )
-    assert bech32_libra_address == "tdm1p7ujcndcl7nudzwt8fglhx6wxn08kgs5tm6mz4usugm707"
+    assert bech32_libra_address == "tdm1p7ujcndcl7nudzwt8fglhx6wxn08kgs5tm6mz4ustv0tyx"
 
     hrp, version, address, subaddress = bech32_address_decode(bech32_libra_address, TDM)
     assert hrp == TDM
