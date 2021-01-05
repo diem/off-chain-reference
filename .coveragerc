@@ -1,7 +1,0 @@
-[run]
-omit =
-    .tox/py37/lib/python3.7/site-packages/offchainapi/tests/*
-    .tox/py37/lib/python3.7/site-packages/offchainapi/sample/*
-    src/offchainapi/tests/*
-    src/offchainapi/sample/*
-    .tox/*
