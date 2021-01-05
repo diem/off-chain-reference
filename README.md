@@ -1,40 +1,12 @@
-> **Note to readers:** On December 1, 2020, the Libra Association was renamed to Diem Association. The project repos are in the process of being migrated. All projects will remain available for use here until the migration to a new GitHub Organization is complete.
-
 # off-chain-reference
-[![License](https://img.shields.io/badge/license-Apache-green.svg)](LICENSE)
 
-Off-Chain Reference: Provide a reference implementation for defining payments, exchanging KYC data and attestation of KYC data between VASPs.
+The Diem Off-Chain API, as proposed in [DIP-1](https://dip.diem.com/dip-1), is a protocol that allows participants on the Diem Payment Network, such as designated dealers or Virtual Asset Service Providers (VASPs)) to support the following business needs when integrating with the Diem blockchain:
+* Compliance, by providing the ability to exchange Know-Your-Customer (KYC) information about payer and payee.
+* Privacy, by allowing for the private exchange of information that cannot be achieved on-chain.
+* Scalability, by facilitating the netting of payments when this is supported in the future.
 
-## Installation
+The following are reference implementations of the off-chain API protocol service built on top of the [Diem Python Client SDK](https://github.com/diem/client-sdk-python):
+* [Diem Python Client SDK Wallet Example Service](https://github.com/diem/client-sdk-python/blob/master/examples/vasp/wallet.py): this is a highly simplified example of a wallet backend server implementation (no UI, no database, no un-related APIs) for demonstrating building off-chain API services through the Python SDK off-chain module.
+* [Diem Wallet Reference Off-chain Service](https://github.com/diem/reference-wallet/blob/master/backend/wallet/services/offchain.py): this is a reference wallet implementation for the Diem blockchain. This off-chain service module demonstrates how to integrate off-chain service APIs into a wallet application API and database.
 
-To install the API, activate the Python virtual environment you use, and then execute:
-
-    git clone https://github.com/libra/off-chain-reference.git
-    cd off-chain-api
-    pip install .
-
-If you plan to do development for the Off-Chain API consider installing in _develop_ editable mode:
-
-    pip install -e .
-
-You can also use `tox` to run all the tests and build the documentation:
-
-    pip install tox
-    tox
-    tox -e docs
-
-This should create a number of resources:
-
-* It will run all `pytest` tests and the local benchmark under coverage.
-* It will create HTML *source code coverage reports* under `htmlcov/index.html`.
-* It will build the documentation under `docs/_build/html/index.html`.
-
-The index of the documentation is a very good place to start to learn more. [Overview](specs/off_chain_protocol.md)
-
-## Status
-
-The specifications and code are shared here to support discussions within the Libra Association and wider community. Neither the specifications nor the code should be considered final. Breaking API changes are likely to occur.
-
-## License
-
-Off-Chain API is licensed as [Apache 2.0](https://github.com/libra/off-chain-reference/blob/master/LICENSE).
+The above 2 example implementations demonstrate high-level business APIs and integration with a wallet application; for low level protocol details / implementations, please refer to [Diem Python SDK offchain module API document](https://diem.github.io/client-sdk-python/diem/offchain/index.html).
