@@ -5,8 +5,8 @@ The Diem Off-Chain API, as proposed in [DIP-1](https://dip.diem.com/dip-1), is a
 * Privacy, by allowing for the private exchange of information that cannot be achieved on-chain.
 * Scalability, by facilitating the netting of payments when this is supported in the future.
 
-The following are reference implementations of the off-chain API protocol service built on top of the [Diem Python Client SDK](https://github.com/diem/client-sdk-python):
-* [Diem Python Client SDK Wallet Example Service](https://github.com/diem/client-sdk-python/blob/master/examples/vasp/wallet.py): this is a highly simplified example of a wallet backend server implementation (no UI, no database, no un-related APIs) for demonstrating building off-chain API services through the Python SDK off-chain module.
-* [Diem Wallet Reference Off-chain Service](https://github.com/diem/reference-wallet/blob/master/backend/wallet/services/offchain.py): this is a reference wallet implementation for the Diem blockchain. This off-chain service module demonstrates how to integrate off-chain service APIs into a wallet application API and database.
+Please refer to [Diem Mini-Wallet application](https://diem.github.io/client-sdk-python/diem/testing/miniwallet/app/app.html#diem.testing.miniwallet.app.app.OffChainAPI) for implementation example.
 
-The above 2 example implementations demonstrate high-level business APIs and integration with a wallet application; for low level protocol details / implementations, please refer to [Diem Python SDK offchain module API document](https://diem.github.io/client-sdk-python/diem/offchain/index.html).
+For trying out Mini-wallet, please refer to [this doc](https://github.com/diem/client-sdk-python/blob/master/mini-wallet.md).
+
+For low level protocol details / implementations, please refer to [Diem Python SDK offchain module API document](https://diem.github.io/client-sdk-python/diem/offchain/index.html).
